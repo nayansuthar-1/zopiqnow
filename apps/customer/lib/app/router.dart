@@ -2,9 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:zopiqnow/features/design_showcase/presentation/design_showcase_page.dart';
+import 'package:zopiqnow/features/home/presentation/home_page.dart';
 
 /// Route name constants — referenced instead of raw path strings.
 abstract final class Routes {
+  static const String home = 'home';
   static const String showcase = 'showcase';
 }
 
@@ -16,6 +18,12 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
     routes: <RouteBase>[
       GoRoute(
         path: '/',
+        name: Routes.home,
+        builder: (_, _) => const HomePage(),
+      ),
+      // Design-system reference screen — reachable via a debug entry on Home.
+      GoRoute(
+        path: '/showcase',
         name: Routes.showcase,
         builder: (_, _) => const DesignShowcasePage(),
       ),
