@@ -1,0 +1,23 @@
+name: zopiq_ui
+description: "Zopiqnow design system — Swiggy-grade design tokens, theming, and shared UI components. Single source of truth for color, spacing, radii, typography, and elevation (Rule 2)."
+version: 0.1.0
+publish_to: "none"
+
+# Part of the workspace: shares the root lockfile.
+resolution: workspace
+
+environment:
+  sdk: ^3.12.2
+  flutter: ">=3.44.5"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: 6.0.0
+
+flutter:
+  uses-material-design: true

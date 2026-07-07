@@ -105,7 +105,7 @@
 - [ ] Android 10 (API 29) emulator + one physical device connected and detected (`adb devices`).
 - [ ] `java -version` → 17; `node -v` → 20; `docker --version` OK.
 - [ ] A throwaway `flutter create` app **builds and runs on the Android 10 emulator** (proves the toolchain + Rule 1 target).
-- [ ] Release build test: `flutter build apk --release --split-per-abi` succeeds and installs on Android 10.
+- [ ] Release build test: `flutter build appbundle --release` succeeds (R8 + resource shrink); install the extracted arm APK on an Android 10 device. **Decision (2026-07-07, approved):** AAB is the canonical Play artifact and Play performs per-ABI splitting — we keep `ndk.abiFilters` (arm64-v8a + armeabi-v7a) and do **not** use `flutter build apk --split-per-abi`, which AGP forbids alongside `abiFilters`. (Rule 1 "split ABIs" intent is satisfied by the AAB.)
 - [ ] All lockfiles present and committed (`pubspec.lock`, `package-lock.json`/`pnpm-lock.yaml`, `.nvmrc`, `.fvmrc`, Gradle wrapper).
 - [ ] Firebase/Maps/Razorpay **dev** keys obtained and stored in secret manager (not committed).
 
