@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
-/// Home header: delivery location (tappable, changes address later) + a search
-/// entry. Implemented as a [PreferredSizeWidget] so it docks as the Scaffold's
-/// app bar. Search is a stub route target for now.
-class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const HomeAppBar({
+/// Home header as a sliver: delivery location + profile, with the search entry
+/// docked beneath.
+///
+/// `floating: true, snap: true` gives Swiggy's behaviour — the header scrolls
+/// away to hand the list the full screen, and springs straight back on the first
+/// upward drag rather than making the user scroll all the way to the top.
+class HomeSliverAppBar extends StatelessWidget {
+  const HomeSliverAppBar({
     required this.address,
     this.onTapLocation,
     this.onTapSearch,
@@ -22,75 +25,90 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// Optional extra action (e.g. a debug entry point).
   final Widget? trailing;
 
-  static const double _height = 116;
+  static const double _searchHeight = 60;
 
   @override
-  Size get preferredSize => const Size.fromHeight(_height);
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+
+    return SliverAppBar(
+      floating: true,
+      snap: true,
+      toolbarHeight: 60,
+      titleSpacing: ZopiqSpacing.pageGutter,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      title: _LocationTitle(address: address, onTap: onTapLocation),
+      actions: <Widget>[
+        ?trailing,
+        _ProfileButton(onTap: onTapProfile, color: zc.primary),
+        const SizedBox(width: ZopiqSpacing.pageGutter),
+      ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(_searchHeight),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            ZopiqSpacing.pageGutter,
+            0,
+            ZopiqSpacing.pageGutter,
+            ZopiqSpacing.lg,
+          ),
+          child: _SearchField(onTap: onTapSearch),
+        ),
+      ),
+    );
+  }
+}
+
+class _LocationTitle extends StatelessWidget {
+  const _LocationTitle({required this.address, required this.onTap});
+
+  final String address;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
 
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          ZopiqSpacing.lg,
-          ZopiqSpacing.sm,
-          ZopiqSpacing.lg,
-          ZopiqSpacing.sm,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Row(
+    return InkWell(
+      onTap: onTap,
+      borderRadius: ZopiqRadii.rSm,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(Icons.location_on_rounded, color: zc.primary, size: 22),
+          const SizedBox(width: ZopiqSpacing.xs),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Icon(Icons.location_on_rounded, color: zc.primary, size: 22),
-                const SizedBox(width: ZopiqSpacing.xs),
-                Expanded(
-                  child: InkWell(
-                    onTap: onTapLocation,
-                    borderRadius: ZopiqRadii.rSm,
-                    child: Row(
-                      children: <Widget>[
-                        Flexible(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: <Widget>[
-                              Text('Delivering to', style: t.labelSmall?.copyWith(color: zc.textMuted)),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: <Widget>[
-                                  Flexible(
-                                    child: Text(
-                                      address,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: t.titleSmall,
-                                    ),
-                                  ),
-                                  Icon(Icons.keyboard_arrow_down_rounded,
-                                      size: 20, color: zc.textStrong),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                Text(
+                  'Delivering to',
+                  style: t.labelSmall?.copyWith(color: zc.textMuted),
                 ),
-                ?trailing,
-                const SizedBox(width: ZopiqSpacing.xs),
-                _ProfileButton(onTap: onTapProfile, color: zc.primary),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Flexible(
+                      child: Text(
+                        address,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.titleSmall,
+                      ),
+                    ),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 20,
+                      color: zc.textStrong,
+                    ),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(height: ZopiqSpacing.sm),
-            _SearchField(onTap: onTapSearch),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -134,18 +152,21 @@ class _SearchField extends StatelessWidget {
         height: 44,
         padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.md),
         decoration: BoxDecoration(
-          color: isDark ? ZopiqPalette.surfaceDarkElevated : const Color(0xFFF1F1F3),
+          color: isDark
+              ? ZopiqPalette.surfaceDarkElevated
+              : ZopiqPalette.surfaceLight,
           borderRadius: ZopiqRadii.rMd,
           border: Border.all(color: zc.divider),
         ),
         child: Row(
           children: <Widget>[
-            Icon(Icons.search_rounded, color: zc.textMuted, size: 20),
-            const SizedBox(width: ZopiqSpacing.sm),
-            Text(
-              'Search for restaurants or dishes',
-              style: t.bodyMedium?.copyWith(color: zc.textMuted),
+            Expanded(
+              child: Text(
+                'Search for restaurants or dishes',
+                style: t.bodyMedium?.copyWith(color: zc.textMuted),
+              ),
             ),
+            Icon(Icons.search_rounded, color: zc.primary, size: 22),
           ],
         ),
       ),

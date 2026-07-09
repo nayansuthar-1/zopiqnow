@@ -1,9 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:zopiqnow/features/home/data/datasources/home_catalog_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_mock_datasource.dart';
 import 'package:zopiqnow/features/home/data/repositories/restaurant_repository_impl.dart';
+import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
+import 'package:zopiqnow/features/home/domain/entities/offer.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/domain/repositories/restaurant_repository.dart';
+import 'package:zopiqnow/features/home/presentation/providers/home_filters.dart';
 
 /// Data source binding. Overridden in tests to inject latency/failure, and
 /// later replaced by the HTTP data source.
@@ -24,3 +28,60 @@ final FutureProvider<List<Restaurant>> nearbyRestaurantsProvider =
     FutureProvider<List<Restaurant>>(
   (Ref ref) => ref.watch(restaurantRepositoryProvider).getNearbyRestaurants(),
 );
+
+/// Merchandising content for the category rail and the offers carousel.
+final Provider<HomeCatalogDataSource> homeCatalogDataSourceProvider =
+    Provider<HomeCatalogDataSource>((Ref ref) => const HomeCatalogDataSource());
+
+final Provider<List<FoodCategory>> foodCategoriesProvider =
+    Provider<List<FoodCategory>>(
+  (Ref ref) => ref.watch(homeCatalogDataSourceProvider).fetchCategories(),
+);
+
+final Provider<List<Offer>> offersProvider = Provider<List<Offer>>(
+  (Ref ref) => ref.watch(homeCatalogDataSourceProvider).fetchOffers(),
+);
+
+/// Chip-row state (toggles + sort order).
+final NotifierProvider<HomeFiltersNotifier, HomeFilters> homeFiltersProvider =
+    NotifierProvider<HomeFiltersNotifier, HomeFilters>(HomeFiltersNotifier.new);
+
+class HomeFiltersNotifier extends Notifier<HomeFilters> {
+  @override
+  HomeFilters build() => const HomeFilters();
+
+  void toggleFastDelivery() =>
+      state = state.copyWith(fastDelivery: !state.fastDelivery);
+
+  void toggleRatingAbove4() =>
+      state = state.copyWith(ratingAbove4: !state.ratingAbove4);
+
+  void togglePureVeg() => state = state.copyWith(pureVeg: !state.pureVeg);
+
+  void toggleGreatOffers() =>
+      state = state.copyWith(greatOffers: !state.greatOffers);
+
+  void setSort(HomeSort sort) => state = state.copyWith(sort: sort);
+}
+
+/// The feed with the chip row applied. Maps only the data case, so Home keeps
+/// its shimmer and retry states untouched.
+final Provider<AsyncValue<List<Restaurant>>> filteredRestaurantsProvider =
+    Provider<AsyncValue<List<Restaurant>>>((Ref ref) {
+  final HomeFilters filters = ref.watch(homeFiltersProvider);
+  return ref
+      .watch(nearbyRestaurantsProvider)
+      .whenData((List<Restaurant> all) => filters.apply(all));
+});
+
+/// "Top restaurant chains" rail — highest-rated first, ignores the chip row.
+final Provider<AsyncValue<List<Restaurant>>> topRatedRestaurantsProvider =
+    Provider<AsyncValue<List<Restaurant>>>((Ref ref) {
+  return ref.watch(nearbyRestaurantsProvider).whenData((List<Restaurant> all) {
+    final List<Restaurant> sorted = List<Restaurant>.of(all)
+      ..sort((Restaurant a, Restaurant b) => b.rating.compareTo(a.rating));
+    return sorted.take(_topChainCount).toList();
+  });
+});
+
+const int _topChainCount = 6;

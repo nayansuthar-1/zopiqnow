@@ -2,13 +2,21 @@ import 'package:flutter/material.dart';
 
 /// Typographic scale (Rule 2 — crisp, consistent typography).
 ///
-/// [fontFamily] is intentionally a single switch: today it falls back to the
-/// platform default (Roboto on Android). To adopt the premium brand face,
-/// bundle the font under `assets/fonts/` + declare it in pubspec, then set
-/// [fontFamily] here — every text style updates in one place.
+/// The brand face is **Figtree** (SIL Open Font License, bundled under
+/// `assets/fonts/`) — a geometric-humanist sans chosen as the closest
+/// freely-licensable relative of Swiggy's Proxima Nova. Proxima Nova is a paid
+/// face; if a mobile-app license is ever purchased, drop the `.ttf` next to
+/// Figtree, update the pubspec `fonts:` entry, and change [fontFamily] here.
+/// Nothing else in the codebase references a font name.
+///
+/// Figtree ships as a single *variable* font with a `wght` axis. Real weights
+/// therefore come from [FontVariation] — [FontWeight] alone would make the text
+/// engine synthesise (fake-bold) the heavier styles, which smears the glyphs.
+/// Both are set: the variation drives rendering, the weight drives fallback.
 @immutable
 abstract final class ZopiqTypography {
-  static const String? fontFamily = null; // TODO(design): bundle brand font.
+  /// Package-qualified so it resolves from the app *and* from zopiq_ui itself.
+  static const String fontFamily = 'packages/zopiq_ui/Figtree';
 
   // Weights used across the system.
   static const FontWeight regular = FontWeight.w400;
@@ -23,6 +31,9 @@ abstract final class ZopiqTypography {
         fontFamily: fontFamily,
         fontSize: size,
         fontWeight: weight,
+        fontVariations: <FontVariation>[
+          FontVariation('wght', weight.value.toDouble()),
+        ],
         height: height,
         letterSpacing: spacing,
         color: color,

@@ -61,6 +61,36 @@ class HomeEmptyView extends StatelessWidget {
   }
 }
 
+/// The feed had restaurants, but the active filter chips excluded all of them.
+/// Distinct from [HomeEmptyView]: the fix here is the user's, not ours.
+class HomeNoMatchesView extends StatelessWidget {
+  const HomeNoMatchesView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return _CenteredState(
+      children: <Widget>[
+        Icon(Icons.filter_alt_off_rounded, size: 56, color: zc.textMuted),
+        const SizedBox(height: ZopiqSpacing.lg),
+        Text(
+          'No matching restaurants',
+          style: t.titleMedium,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: ZopiqSpacing.xs),
+        Text(
+          'Try removing a filter to see more results.',
+          style: t.bodyMedium?.copyWith(color: zc.textMuted),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
 class _CenteredState extends StatelessWidget {
   const _CenteredState({required this.children});
 

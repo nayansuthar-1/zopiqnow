@@ -21,3 +21,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Brand face. Figtree is a variable font (wght 300–900) — one file covers every
+  # weight; ZopiqTypography selects them via FontVariation.
+  # Licensed under the SIL Open Font License (see assets/fonts/OFL.txt).
+  fonts:
+    - family: Figtree
+      fonts:
+        - asset: assets/fonts/Figtree-Variable.ttf

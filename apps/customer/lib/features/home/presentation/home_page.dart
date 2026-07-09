@@ -4,17 +4,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
+import 'package:zopiqnow/features/home/domain/entities/offer.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/domain/repositories/restaurant_repository.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/food_category_rail.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_app_bar.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/home_filter_chips.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_status_views.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/offers_carousel.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_list_skeleton.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/section_header.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/top_chains_rail.dart';
 
-/// Customer Home — restaurant discovery. First real vertical slice: renders the
-/// [nearbyRestaurantsProvider] async feed with shimmer / success / empty / error
-/// states and pull-to-refresh, all on zopiq_ui.
+/// Customer Home — restaurant discovery, laid out as Swiggy's: a snapping
+/// location/search header, an offers carousel, the dish-category rail, a
+/// top-chains rail, then the filterable restaurant list.
+///
+/// Every section is its own sliver so the scroll view only builds and paints
+/// what is on screen — the rails do not cost anything once scrolled past.
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
@@ -23,66 +33,134 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<Restaurant>> feed = ref.watch(nearbyRestaurantsProvider);
+    final List<FoodCategory> categories = ref.watch(foodCategoriesProvider);
+    final List<Offer> offers = ref.watch(offersProvider);
 
     return Scaffold(
-      appBar: HomeAppBar(
-        address: _address,
-        onTapLocation: () {},
-        onTapSearch: () {},
-        onTapProfile: () {},
-        trailing: kDebugMode
-            ? IconButton(
-                tooltip: 'Design system',
-                onPressed: () => context.push('/showcase'),
-                icon: const Icon(Icons.palette_outlined),
-              )
-            : null,
-      ),
       body: RefreshIndicator(
         color: context.zc.primary,
         onRefresh: () => ref.refresh(nearbyRestaurantsProvider.future),
         child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
           slivers: <Widget>[
-            feed.when(
-              loading: () => const SliverPadding(
-                padding: EdgeInsets.all(ZopiqSpacing.lg),
-                sliver: SliverToBoxAdapter(child: RestaurantListSkeleton()),
-              ),
-              error: (Object error, _) => SliverFillRemaining(
-                hasScrollBody: false,
-                child: HomeErrorView(
-                  message: error is RestaurantLoadFailure
-                      ? error.message
-                      : 'Please check your connection and try again.',
-                  onRetry: () => ref.invalidate(nearbyRestaurantsProvider),
-                ),
-              ),
-              data: (List<Restaurant> restaurants) {
-                if (restaurants.isEmpty) {
-                  return const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: HomeEmptyView(),
-                  );
-                }
-                return SliverPadding(
-                  padding: const EdgeInsets.all(ZopiqSpacing.lg),
-                  sliver: SliverList.separated(
-                    itemCount: restaurants.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: ZopiqSpacing.lg),
-                    itemBuilder: (BuildContext context, int i) => RestaurantCard(
-                      restaurant: restaurants[i],
-                      onTap: () {},
-                    ),
-                  ),
-                );
-              },
+            HomeSliverAppBar(
+              address: _address,
+              onTapLocation: () {},
+              onTapSearch: () {},
+              onTapProfile: () {},
+              trailing: kDebugMode
+                  ? IconButton(
+                      tooltip: 'Design system',
+                      onPressed: () => context.push('/showcase'),
+                      icon: const Icon(Icons.palette_outlined),
+                    )
+                  : null,
             ),
+            SliverToBoxAdapter(
+              child: OffersCarousel(offers: offers, onTapOffer: (Offer _) {}),
+            ),
+            const SliverToBoxAdapter(
+              child: SectionHeader(title: "What's on your mind?"),
+            ),
+            SliverToBoxAdapter(
+              child: FoodCategoryRail(
+                categories: categories,
+                onTapCategory: (FoodCategory _) {},
+              ),
+            ),
+            const SliverToBoxAdapter(child: SectionDivider()),
+            const _TopChainsSection(),
+            const SliverToBoxAdapter(child: SectionDivider()),
+            const SliverToBoxAdapter(
+              child: SectionHeader(title: 'Restaurants with online food delivery'),
+            ),
+            const SliverPersistentHeader(
+              pinned: true,
+              delegate: HomeFilterChipsHeader(),
+            ),
+            const _RestaurantListSection(),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The top-chains rail. Silent while the feed loads or fails — the restaurant
+/// list below already owns the shimmer and the retry, and duplicating either
+/// here would put two spinners (or two errors) on one screen.
+class _TopChainsSection extends ConsumerWidget {
+  const _TopChainsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final List<Restaurant> top =
+        ref.watch(topRatedRestaurantsProvider).valueOrNull ?? const <Restaurant>[];
+    if (top.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+
+    return SliverMainAxisGroup(
+      slivers: <Widget>[
+        const SliverToBoxAdapter(
+          child: SectionHeader(title: 'Top restaurant chains'),
+        ),
+        SliverToBoxAdapter(
+          child: TopChainsRail(
+            restaurants: top,
+            onTapRestaurant: (Restaurant _) {},
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RestaurantListSection extends ConsumerWidget {
+  const _RestaurantListSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<List<Restaurant>> feed =
+        ref.watch(filteredRestaurantsProvider);
+
+    return feed.when(
+      loading: () => const SliverPadding(
+        padding: EdgeInsets.all(ZopiqSpacing.lg),
+        sliver: SliverToBoxAdapter(child: RestaurantListSkeleton()),
+      ),
+      error: (Object error, _) => SliverFillRemaining(
+        hasScrollBody: false,
+        child: HomeErrorView(
+          message: error is RestaurantLoadFailure
+              ? error.message
+              : 'Please check your connection and try again.',
+          onRetry: () => ref.invalidate(nearbyRestaurantsProvider),
+        ),
+      ),
+      data: (List<Restaurant> restaurants) {
+        if (restaurants.isEmpty) {
+          // An empty *filtered* feed is a different problem from an empty area.
+          final bool filtersActive =
+              ref.read(homeFiltersProvider).hasActiveToggle;
+          return SliverFillRemaining(
+            hasScrollBody: false,
+            child: filtersActive
+                ? const HomeNoMatchesView()
+                : const HomeEmptyView(),
+          );
+        }
+        return SliverPadding(
+          padding: const EdgeInsets.all(ZopiqSpacing.lg),
+          sliver: SliverList.separated(
+            itemCount: restaurants.length,
+            separatorBuilder: (_, _) => const SizedBox(height: ZopiqSpacing.lg),
+            itemBuilder: (BuildContext context, int i) => RepaintBoundary(
+              child: RestaurantCard(restaurant: restaurants[i], onTap: () {}),
+            ),
+          ),
+        );
+      },
     );
   }
 }
