@@ -34,6 +34,13 @@ void _useTallSurface(WidgetTester tester) {
   tester.view.physicalSize = const Size(1200, 2600);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
+  // Reduce motion, exactly as the OS setting would: Home's hero banner runs
+  // ambient looping animations that would otherwise keep `pumpAndSettle`
+  // from ever settling while Home is mounted (the shell's IndexedStack keeps
+  // it alive even on other tabs).
+  tester.platformDispatcher.accessibilityFeaturesTestValue =
+      const FakeAccessibilityFeatures(disableAnimations: true);
+  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 }
 
 Finder _tab(String label) => find.widgetWithText(InkResponse, label);

@@ -33,6 +33,12 @@ void _useTallSurface(WidgetTester tester) {
   tester.view.physicalSize = const Size(1200, 2600);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
+  // Reduce motion, exactly as the OS setting would: Home's hero banner runs
+  // ambient looping animations that would otherwise keep `pumpAndSettle`
+  // from ever settling while Home is mounted below this flow's routes.
+  tester.platformDispatcher.accessibilityFeaturesTestValue =
+      const FakeAccessibilityFeatures(disableAnimations: true);
+  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 }
 
 /// Settles the feed, the route transition, and the menu fetch. Avoids
