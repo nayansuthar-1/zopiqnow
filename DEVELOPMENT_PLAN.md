@@ -1,6 +1,6 @@
 # Zopiqnow — Development Plan
 
-**Status date:** 2026-07-09
+**Status date:** 2026-07-10
 **Scope of this document:** the *executable* build order for the customer app.
 
 This is not a restatement of [`ZOPIQNOW_ARCHITECTURE.md`](ZOPIQNOW_ARCHITECTURE.md) Section 25/26.
@@ -149,7 +149,21 @@ endpoint yet.
 things this step exists to establish — and says plainly that payment arrives next. It
 is the guard's destination, not Step 6's screen.
 
-### Step 6 — Checkout + payments ← **next**
+### Step 5.5 — Home first-impression revamp ← **next**
+The homepage must *stop* someone in the first second. Reference: Zomato's home for
+the attraction (clean, modern, one bold full-bleed hero) and Swiggy for the layout
+that already exists below it.
+
+- **Hero header.** Full-bleed promo hero behind the location/search header — bold
+  campaign headline, a single CTA, subtle looping motion (transform/opacity only,
+  per the performance standard). Until brand art is supplied, ship a **temporary
+  in-app composition** (gradient + typography + existing dish photos), built so the
+  final image is a one-asset swap.
+- **Keep everything below** (category rail, filters, restaurant list) — this step
+  restyles the top of the feed, it does not rebuild the feed.
+- Verify: cold-open on the Android 10 device, hero animates with no red bars.
+
+### Step 6 — Checkout + payments
 Address selection, coupon application, order placement, Razorpay (UPI/COD).
 First step that genuinely needs a backend.
 
@@ -160,6 +174,14 @@ was.
 
 ### Step 8 — Order tracking
 Live status, driver location stream, tri-tracking map.
+
+### Step 9 — Dining (table reservations) — **new scope, 2026-07-10**
+Zomato-dining / Swiggy-Dineout style: browse restaurants that take bookings, pick a
+date + time slot + party size, confirm, and see/cancel upcoming bookings. Same
+frontend-first discipline: a mock `DiningRepository` (slot inventory, booking rules)
+first, UI against it, HTTP swap later. Surfaced as its own tab or a Food/Dineout
+switcher on Home — decide when the slice starts. Open product questions for the PM
+are in the pre-kickoff checklist (deposits? cancellation window? which restaurants?).
 
 ---
 
