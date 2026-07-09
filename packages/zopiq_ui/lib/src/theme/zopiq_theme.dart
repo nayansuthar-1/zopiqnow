@@ -43,13 +43,17 @@ abstract final class ZopiqTheme {
       primaryContainer: isDark
           ? const Color(0xFF3A2410)
           : const Color(0xFFFFE9D5),
-      onPrimaryContainer: isDark ? const Color(0xFFFFD8B5) : ZopiqPalette.textDark,
+      onPrimaryContainer: isDark
+          ? const Color(0xFFFFD8B5)
+          : ZopiqPalette.textDark,
       secondary: zc.primaryDeep,
       onSecondary: ZopiqPalette.white,
       secondaryContainer: isDark
           ? const Color(0xFF3A1608)
           : const Color(0xFFFFDCCC),
-      onSecondaryContainer: isDark ? const Color(0xFFFFC7AE) : ZopiqPalette.textDark,
+      onSecondaryContainer: isDark
+          ? const Color(0xFFFFC7AE)
+          : ZopiqPalette.textDark,
       surface: surface,
       onSurface: onSurface,
       onSurfaceVariant: zc.textMuted,
@@ -59,15 +63,25 @@ abstract final class ZopiqTheme {
       outlineVariant: zc.divider,
       shadow: ZopiqPalette.black,
       scrim: zc.scrim,
-      inverseSurface: isDark ? ZopiqPalette.surfaceLight : ZopiqPalette.textDark,
+      inverseSurface: isDark
+          ? ZopiqPalette.surfaceLight
+          : ZopiqPalette.textDark,
       onInverseSurface: isDark ? ZopiqPalette.textDark : ZopiqPalette.white,
-      surfaceContainerLowest: isDark ? const Color(0xFF141519) : ZopiqPalette.white,
-      surfaceContainerLow: isDark ? ZopiqPalette.surfaceDark : const Color(0xFFFAFAFB),
-      surfaceContainer: isDark ? ZopiqPalette.surfaceDark : const Color(0xFFF4F4F5),
-      surfaceContainerHigh:
-          isDark ? ZopiqPalette.surfaceDarkElevated : const Color(0xFFEDEDEF),
-      surfaceContainerHighest:
-          isDark ? const Color(0xFF2E2F36) : const Color(0xFFE6E6E9),
+      surfaceContainerLowest: isDark
+          ? const Color(0xFF141519)
+          : ZopiqPalette.white,
+      surfaceContainerLow: isDark
+          ? ZopiqPalette.surfaceDark
+          : const Color(0xFFFAFAFB),
+      surfaceContainer: isDark
+          ? ZopiqPalette.surfaceDark
+          : const Color(0xFFF4F4F5),
+      surfaceContainerHigh: isDark
+          ? ZopiqPalette.surfaceDarkElevated
+          : const Color(0xFFEDEDEF),
+      surfaceContainerHighest: isDark
+          ? const Color(0xFF2E2F36)
+          : const Color(0xFFE6E6E9),
     );
 
     final TextTheme textTheme = ZopiqTypography.textTheme(onSurface);
@@ -90,8 +104,9 @@ abstract final class ZopiqTheme {
         scrolledUnderElevation: 0.5,
         centerTitle: false,
         titleTextStyle: textTheme.titleLarge,
-        systemOverlayStyle:
-            isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+        systemOverlayStyle: isDark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
       ),
       cardTheme: CardThemeData(
         color: surface,
@@ -100,11 +115,7 @@ abstract final class ZopiqTheme {
         margin: EdgeInsets.zero,
         shape: const RoundedRectangleBorder(borderRadius: ZopiqRadii.rLg),
       ),
-      dividerTheme: DividerThemeData(
-        color: zc.divider,
-        thickness: 1,
-        space: 1,
-      ),
+      dividerTheme: DividerThemeData(color: zc.divider, thickness: 1, space: 1),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: zc.primaryDeep,
@@ -149,12 +160,16 @@ abstract final class ZopiqTheme {
         surfaceTintColor: Colors.transparent,
         showDragHandle: true,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(ZopiqRadii.xl)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(ZopiqRadii.xl),
+          ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? ZopiqPalette.surfaceDarkElevated : const Color(0xFFF1F1F3),
+        fillColor: isDark
+            ? ZopiqPalette.surfaceDarkElevated
+            : const Color(0xFFF1F1F3),
         hintStyle: textTheme.bodyMedium?.copyWith(color: zc.textMuted),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: ZopiqSpacing.lg,
@@ -183,8 +198,12 @@ abstract final class ZopiqTheme {
         unselectedLabelStyle: textTheme.labelSmall,
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: isDark ? ZopiqPalette.surfaceDarkElevated : ZopiqPalette.textDark,
-        contentTextStyle: textTheme.bodyMedium?.copyWith(color: ZopiqPalette.white),
+        backgroundColor: isDark
+            ? ZopiqPalette.surfaceDarkElevated
+            : ZopiqPalette.textDark,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: ZopiqPalette.white,
+        ),
         behavior: SnackBarBehavior.floating,
         shape: const RoundedRectangleBorder(borderRadius: ZopiqRadii.rMd),
       ),

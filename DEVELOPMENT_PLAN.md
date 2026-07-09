@@ -81,20 +81,23 @@ a credits screen behind the profile button. Search and Account tabs arrive with 
 features — each is one more `StatefulShellBranch`. Verified: Home scroll position
 survives a tab switch.
 
-### Step 3 — Image pipeline ← **next**
-The largest *visual* jump left.
+### ~~Step 3 — Image pipeline~~ ✅ done
+`ZopiqNetworkImage` handles loading (shimmer) / loaded (fade-in) / failed (branded
+gradient) once, so no call site reinvents them. Bitmaps decode at draw size via
+`cacheWidth`. Restaurant and dish photos are live; mock URLs point at foodish-api.
+`INTERNET` added to the release manifest — Flutter only declares it for debug, so
+release builds were silently going to fail every image.
 
-- Cached network images for restaurant/dish photos, decoded at display size
-  (`cacheWidth`), with the shimmer as the placeholder. Both are gradients today.
-- Optional: replace OpenMoji with commissioned illustrations by dropping files in
-  `assets/categories/`. The rail reads `FoodCategory.imageAsset`; nothing else moves.
+**Still owed here:** caching is Flutter's in-memory `ImageCache` only. Images survive
+a scroll, not an app restart. Disk caching needs `cached_network_image`, a new
+dependency and therefore an explicit, approved decision.
 
-**Verify:** scroll Home and a long menu on an Android 10 device with the performance
-overlay on. No frame over 16ms.
-
-### Step 4 — Search
+### Step 4 — Search ← **next**
 Query the mock repository; debounced; recent searches; results reuse `RestaurantCard`.
-Makes the search bar and its tab real.
+Makes the search bar and its shell tab real.
+
+**Verify:** type a query, see results narrow; scroll Home and a long menu on an
+Android 10 device with the performance overlay on. No frame over 16ms.
 
 ### Step 5 — Auth + location
 OTP flow, token storage, `go_router` redirect guards. Device location + address

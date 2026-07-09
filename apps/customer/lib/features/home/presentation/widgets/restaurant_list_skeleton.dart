@@ -38,7 +38,9 @@ class _SkeletonCard extends StatelessWidget {
             aspectRatio: 16 / 9,
             child: ZopiqSkeletonBox(
               height: double.infinity,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(ZopiqRadii.lg)),
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(ZopiqRadii.lg),
+              ),
             ),
           ),
           Padding(

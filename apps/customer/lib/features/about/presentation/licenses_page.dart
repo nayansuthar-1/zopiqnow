@@ -27,8 +27,10 @@ class LicensesPage extends StatelessWidget {
           const _Credit(
             title: 'Dish illustrations',
             author: 'OpenMoji',
-            license: 'Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0)',
-            detail: 'The open-source emoji and icon project for designers and '
+            license:
+                'Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0)',
+            detail:
+                'The open-source emoji and icon project for designers and '
                 'educators. Artwork used unmodified.',
           ),
           const SizedBox(height: ZopiqSpacing.lg),
@@ -49,10 +51,8 @@ class LicensesPage extends StatelessWidget {
               style: t.bodySmall?.copyWith(color: zc.textMuted),
             ),
             trailing: Icon(Icons.chevron_right_rounded, color: zc.textMuted),
-            onTap: () => showLicensePage(
-              context: context,
-              applicationName: 'zopiqnow',
-            ),
+            onTap: () =>
+                showLicensePage(context: context, applicationName: 'zopiqnow'),
           ),
         ],
       ),

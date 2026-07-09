@@ -95,7 +95,11 @@ class _PaletteRow extends StatelessWidget {
                   color: color,
                   borderRadius: ZopiqRadii.rMd,
                   boxShadow: <BoxShadow>[
-                    BoxShadow(color: zc.cardShadow, blurRadius: 8, offset: const Offset(0, 3)),
+                    BoxShadow(
+                      color: zc.cardShadow,
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
                   ],
                 ),
               ),
@@ -234,10 +238,9 @@ class _RatingPill extends StatelessWidget {
           const SizedBox(width: ZopiqSpacing.xxs),
           Text(
             rating.toStringAsFixed(1),
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall
-                ?.copyWith(color: Colors.white),
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: Colors.white),
           ),
         ],
       ),

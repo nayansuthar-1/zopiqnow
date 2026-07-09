@@ -43,9 +43,8 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
               GoRoute(
                 path: '/cart',
                 name: Routes.cart,
-                builder: (BuildContext context, _) => CartPage(
-                  onBrowse: () => context.goNamed(Routes.home),
-                ),
+                builder: (BuildContext context, _) =>
+                    CartPage(onBrowse: () => context.goNamed(Routes.home)),
               ),
             ],
           ),

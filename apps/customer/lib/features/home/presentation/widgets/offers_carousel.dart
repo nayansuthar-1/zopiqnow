@@ -108,10 +108,9 @@ class _CodeChip extends StatelessWidget {
       ),
       child: Text(
         'USE $code',
-        style: Theme.of(context)
-            .textTheme
-            .labelSmall
-            ?.copyWith(color: ZopiqPalette.white),
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: ZopiqPalette.white),
       ),
     );
   }

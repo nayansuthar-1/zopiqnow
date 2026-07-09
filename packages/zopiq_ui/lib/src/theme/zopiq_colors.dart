@@ -115,7 +115,11 @@ class ZopiqColors extends ThemeExtension<ZopiqColors> {
       textMuted: Color.lerp(textMuted, other.textMuted, t)!,
       divider: Color.lerp(divider, other.divider, t)!,
       shimmerBase: Color.lerp(shimmerBase, other.shimmerBase, t)!,
-      shimmerHighlight: Color.lerp(shimmerHighlight, other.shimmerHighlight, t)!,
+      shimmerHighlight: Color.lerp(
+        shimmerHighlight,
+        other.shimmerHighlight,
+        t,
+      )!,
       cardShadow: Color.lerp(cardShadow, other.cardShadow, t)!,
       scrim: Color.lerp(scrim, other.scrim, t)!,
     );

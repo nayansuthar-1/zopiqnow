@@ -20,6 +20,7 @@ export 'src/theme/zopiq_theme.dart';
 // Components
 export 'src/components/zopiq_button.dart';
 export 'src/components/zopiq_card.dart';
+export 'src/components/zopiq_network_image.dart';
 export 'src/components/zopiq_pressable.dart';
 export 'src/components/zopiq_shimmer.dart';
 export 'src/components/zopiq_veg_indicator.dart';

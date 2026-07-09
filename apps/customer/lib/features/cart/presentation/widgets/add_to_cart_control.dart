@@ -42,7 +42,11 @@ class AddToCartControl extends StatelessWidget {
 }
 
 class _AddButton extends StatelessWidget {
-  const _AddButton({required this.zc, required this.surface, required this.onAdd});
+  const _AddButton({
+    required this.zc,
+    required this.surface,
+    required this.onAdd,
+  });
 
   final ZopiqColors zc;
   final Color surface;
@@ -64,16 +68,19 @@ class _AddButton extends StatelessWidget {
             borderRadius: ZopiqRadii.rSm,
             border: Border.all(color: zc.divider),
             boxShadow: <BoxShadow>[
-              BoxShadow(color: zc.cardShadow, blurRadius: 6, offset: const Offset(0, 2)),
+              BoxShadow(
+                color: zc.cardShadow,
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
             ],
           ),
           child: Center(
             child: Text(
               'ADD',
-              style: Theme.of(context)
-                  .textTheme
-                  .labelLarge
-                  ?.copyWith(color: zc.primary),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: zc.primary),
             ),
           ),
         ),
@@ -98,7 +105,10 @@ class _Stepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(color: zc.primary, borderRadius: ZopiqRadii.rSm),
+      decoration: BoxDecoration(
+        color: zc.primary,
+        borderRadius: ZopiqRadii.rSm,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
@@ -111,10 +121,9 @@ class _Stepper extends StatelessWidget {
           ),
           Text(
             '$quantity',
-            style: Theme.of(context)
-                .textTheme
-                .labelLarge
-                ?.copyWith(color: Colors.white),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(color: Colors.white),
           ),
           _StepButton(
             icon: Icons.add_rounded,

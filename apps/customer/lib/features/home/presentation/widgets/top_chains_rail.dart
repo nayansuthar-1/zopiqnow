@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/restaurant_image.dart';
 
 /// "Top restaurant chains" — a horizontal rail of compact restaurant cards.
 class TopChainsRail extends StatelessWidget {
-  const TopChainsRail({required this.restaurants, this.onTapRestaurant, super.key});
+  const TopChainsRail({
+    required this.restaurants,
+    this.onTapRestaurant,
+    super.key,
+  });
 
   final List<Restaurant> restaurants;
   final ValueChanged<Restaurant>? onTapRestaurant;
@@ -99,11 +104,6 @@ class _ChainImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Deterministic tint from the id, matching RestaurantCard's placeholder
-    // treatment until the CDN image pipeline lands.
-    final double hue = (restaurant.id.hashCode % 360).abs().toDouble();
-    final Color tint = HSLColor.fromAHSL(1, hue, 0.35, 0.55).toColor();
-
     return ClipRRect(
       borderRadius: ZopiqRadii.rMd,
       child: SizedBox(
@@ -112,20 +112,7 @@ class _ChainImage extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: <Color>[tint, tint.withValues(alpha: 0.75)],
-                ),
-              ),
-              child: Icon(
-                Icons.storefront_rounded,
-                color: ZopiqPalette.white.withValues(alpha: 0.85),
-                size: 36,
-              ),
-            ),
+            RestaurantImage(restaurant: restaurant, iconSize: 36),
             if (restaurant.promoText != null)
               Positioned(
                 left: 0,
@@ -166,10 +153,9 @@ class _PromoStrip extends StatelessWidget {
         text.toUpperCase(),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: Theme.of(context)
-            .textTheme
-            .labelSmall
-            ?.copyWith(color: ZopiqPalette.white),
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: ZopiqPalette.white),
       ),
     );
   }

@@ -71,18 +71,22 @@ class HomeFilters {
       case HomeSort.relevance:
         break; // Server order is the relevance order.
       case HomeSort.rating:
-        result.sort((Restaurant a, Restaurant b) => b.rating.compareTo(a.rating));
+        result.sort(
+          (Restaurant a, Restaurant b) => b.rating.compareTo(a.rating),
+        );
       case HomeSort.deliveryTime:
         result.sort(
           (Restaurant a, Restaurant b) => a.etaMinutes.compareTo(b.etaMinutes),
         );
       case HomeSort.costLowToHigh:
         result.sort(
-          (Restaurant a, Restaurant b) => a.priceForTwo.compareTo(b.priceForTwo),
+          (Restaurant a, Restaurant b) =>
+              a.priceForTwo.compareTo(b.priceForTwo),
         );
       case HomeSort.costHighToLow:
         result.sort(
-          (Restaurant a, Restaurant b) => b.priceForTwo.compareTo(a.priceForTwo),
+          (Restaurant a, Restaurant b) =>
+              b.priceForTwo.compareTo(a.priceForTwo),
         );
     }
     return result;

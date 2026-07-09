@@ -26,10 +26,7 @@ class HomeFilterChips extends ConsumerWidget {
           padding: ZopiqSpacing.pagePadding,
           physics: const BouncingScrollPhysics(),
           children: <Widget>[
-            _SortChip(
-              sort: filters.sort,
-              onSelected: notifier.setSort,
-            ),
+            _SortChip(sort: filters.sort, onSelected: notifier.setSort),
             const SizedBox(width: ZopiqSpacing.sm),
             _FilterChip(
               label: 'Fast Delivery',
@@ -99,8 +96,8 @@ class _FilterChip extends StatelessWidget {
               Text(
                 label,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: selected ? zc.primary : zc.textStrong,
-                    ),
+                  color: selected ? zc.primary : zc.textStrong,
+                ),
               ),
               if (selected) ...<Widget>[
                 const SizedBox(width: ZopiqSpacing.xs),
@@ -160,7 +157,10 @@ class _SortSheet extends StatelessWidget {
               ZopiqSpacing.lg,
               ZopiqSpacing.sm,
             ),
-            child: Text('Sort by', style: Theme.of(context).textTheme.titleLarge),
+            child: Text(
+              'Sort by',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
           RadioGroup<HomeSort>(
             groupValue: current,
@@ -198,7 +198,11 @@ class HomeFilterChipsHeader extends SliverPersistentHeaderDelegate {
   double get maxExtent => HomeFilterChips.height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return const HomeFilterChips();
   }
 

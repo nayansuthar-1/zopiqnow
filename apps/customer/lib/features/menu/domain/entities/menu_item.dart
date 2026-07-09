@@ -11,6 +11,7 @@ class MenuItem {
     required this.isVeg,
     this.isBestseller = false,
     this.rating,
+    this.imageUrl = '',
   });
 
   final String id;
@@ -24,6 +25,10 @@ class MenuItem {
 
   /// Optional dish rating (0–5), null when not enough ratings.
   final double? rating;
+
+  /// Remote dish photo. Empty when the vendor never uploaded one — a real and
+  /// common case, so the UI falls back rather than treating it as a failure.
+  final String imageUrl;
 
   @override
   bool operator ==(Object other) =>

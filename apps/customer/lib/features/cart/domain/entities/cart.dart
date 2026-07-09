@@ -35,11 +35,9 @@ class Cart {
   bool get isEmpty => lines.isEmpty;
   bool get isNotEmpty => lines.isNotEmpty;
 
-  int get itemCount =>
-      lines.fold(0, (int sum, CartLine l) => sum + l.quantity);
+  int get itemCount => lines.fold(0, (int sum, CartLine l) => sum + l.quantity);
 
-  int get subtotal =>
-      lines.fold(0, (int sum, CartLine l) => sum + l.lineTotal);
+  int get subtotal => lines.fold(0, (int sum, CartLine l) => sum + l.lineTotal);
 
   /// Current quantity of [menuItemId] in the cart (0 if absent).
   int quantityOf(String menuItemId) {

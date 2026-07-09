@@ -39,8 +39,10 @@ class CartNotifier extends Notifier<Cart> {
     required String restaurantName,
     required MenuItem item,
   }) {
-    state = Cart(restaurantId: restaurantId, restaurantName: restaurantName)
-        ._upsert(item, 1);
+    state = Cart(
+      restaurantId: restaurantId,
+      restaurantName: restaurantName,
+    )._upsert(item, 1);
   }
 
   void increment(String menuItemId) {
@@ -60,9 +62,8 @@ class CartNotifier extends Notifier<Cart> {
 
   void clear() => state = const Cart.empty();
 
-  Cart _withRestaurant(String id, String name) => state.isEmpty
-      ? Cart(restaurantId: id, restaurantName: name)
-      : state;
+  Cart _withRestaurant(String id, String name) =>
+      state.isEmpty ? Cart(restaurantId: id, restaurantName: name) : state;
 }
 
 extension _CartOps on Cart {

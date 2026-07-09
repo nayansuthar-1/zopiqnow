@@ -3,7 +3,11 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 /// Full-bleed error state with a retry action (Rule 2.5 — no blank screens).
 class HomeErrorView extends StatelessWidget {
-  const HomeErrorView({required this.message, required this.onRetry, super.key});
+  const HomeErrorView({
+    required this.message,
+    required this.onRetry,
+    super.key,
+  });
 
   final String message;
   final VoidCallback onRetry;
@@ -17,7 +21,11 @@ class HomeErrorView extends StatelessWidget {
       children: <Widget>[
         Icon(Icons.wifi_off_rounded, size: 56, color: zc.textMuted),
         const SizedBox(height: ZopiqSpacing.lg),
-        Text('Something went wrong', style: t.titleMedium, textAlign: TextAlign.center),
+        Text(
+          'Something went wrong',
+          style: t.titleMedium,
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: ZopiqSpacing.xs),
         Text(
           message,
@@ -49,7 +57,11 @@ class HomeEmptyView extends StatelessWidget {
       children: <Widget>[
         Icon(Icons.storefront_outlined, size: 56, color: zc.textMuted),
         const SizedBox(height: ZopiqSpacing.lg),
-        Text('No restaurants nearby', style: t.titleMedium, textAlign: TextAlign.center),
+        Text(
+          'No restaurants nearby',
+          style: t.titleMedium,
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: ZopiqSpacing.xs),
         Text(
           'Try a different location — we\'re expanding fast.',
@@ -101,10 +113,7 @@ class _CenteredState extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(ZopiqSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: children,
-        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: children),
       ),
     );
   }

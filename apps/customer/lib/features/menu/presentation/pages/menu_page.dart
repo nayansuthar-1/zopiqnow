@@ -16,15 +16,20 @@ import 'package:zopiqnow/features/menu/presentation/widgets/menu_item_tile.dart'
 /// Restaurant detail — vitals plus the categorised menu, with the sticky cart
 /// bar docked at the bottom.
 class MenuPage extends ConsumerWidget {
-  const MenuPage({required this.restaurantId, required this.onViewCart, super.key});
+  const MenuPage({
+    required this.restaurantId,
+    required this.onViewCart,
+    super.key,
+  });
 
   final String restaurantId;
   final VoidCallback onViewCart;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<Restaurant> restaurant =
-        ref.watch(restaurantByIdProvider(restaurantId));
+    final AsyncValue<Restaurant> restaurant = ref.watch(
+      restaurantByIdProvider(restaurantId),
+    );
 
     return Scaffold(
       body: restaurant.when(
@@ -55,8 +60,9 @@ class _MenuBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<MenuCategory>> menu =
-        ref.watch(filteredMenuProvider(restaurant.id));
+    final AsyncValue<List<MenuCategory>> menu = ref.watch(
+      filteredMenuProvider(restaurant.id),
+    );
 
     return CustomScrollView(
       slivers: <Widget>[
@@ -74,13 +80,13 @@ class _MenuBody extends ConsumerWidget {
             ),
           ),
           data: (List<MenuCategory> categories) {
-            if (categories.isEmpty) return const SliverToBoxAdapter(child: _NoVegItems());
+            if (categories.isEmpty) {
+              return const SliverToBoxAdapter(child: _NoVegItems());
+            }
             return SliverList.builder(
               itemCount: categories.length,
-              itemBuilder: (BuildContext context, int i) => _MenuSection(
-                category: categories[i],
-                restaurant: restaurant,
-              ),
+              itemBuilder: (BuildContext context, int i) =>
+                  _MenuSection(category: categories[i], restaurant: restaurant),
             );
           },
         ),
@@ -232,9 +238,9 @@ class _NoVegItems extends StatelessWidget {
           const SizedBox(height: ZopiqSpacing.lg),
           Text(
             'No vegetarian dishes on this menu.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: zc.textMuted,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: zc.textMuted),
             textAlign: TextAlign.center,
           ),
         ],

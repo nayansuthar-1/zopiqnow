@@ -61,8 +61,14 @@ class _ShellNavBar extends ConsumerWidget {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: _CartIcon(count: itemCount, icon: Icons.shopping_bag_outlined),
-            activeIcon: _CartIcon(count: itemCount, icon: Icons.shopping_bag_rounded),
+            icon: _CartIcon(
+              count: itemCount,
+              icon: Icons.shopping_bag_outlined,
+            ),
+            activeIcon: _CartIcon(
+              count: itemCount,
+              icon: Icons.shopping_bag_rounded,
+            ),
             label: 'Cart',
           ),
         ],

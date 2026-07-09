@@ -21,10 +21,8 @@ class CartBar extends ConsumerWidget {
     return AnimatedSwitcher(
       duration: ZopiqDurations.base,
       switchInCurve: ZopiqCurves.emphasized,
-      transitionBuilder: (Widget child, Animation<double> anim) => SizeTransition(
-        sizeFactor: anim,
-        child: child,
-      ),
+      transitionBuilder: (Widget child, Animation<double> anim) =>
+          SizeTransition(sizeFactor: anim, child: child),
       child: cart.isEmpty
           ? const SizedBox.shrink()
           : SafeArea(
@@ -55,7 +53,9 @@ class CartBar extends ConsumerWidget {
                             ),
                             Text(
                               '₹${cart.subtotal}',
-                              style: t.titleMedium?.copyWith(color: Colors.white),
+                              style: t.titleMedium?.copyWith(
+                                color: Colors.white,
+                              ),
                             ),
                           ],
                         ),
@@ -65,8 +65,11 @@ class CartBar extends ConsumerWidget {
                           style: t.labelLarge?.copyWith(color: Colors.white),
                         ),
                         const SizedBox(width: ZopiqSpacing.xs),
-                        const Icon(Icons.arrow_forward_rounded,
-                            color: Colors.white, size: 20),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ],
                     ),
                   ),

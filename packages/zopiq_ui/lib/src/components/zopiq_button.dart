@@ -57,7 +57,9 @@ class ZopiqButton extends StatelessWidget {
             child: CircularProgressIndicator(
               strokeWidth: 2.4,
               valueColor: AlwaysStoppedAnimation<Color>(
-                variant == ZopiqButtonVariant.outline ? zc.primary : Colors.white,
+                variant == ZopiqButtonVariant.outline
+                    ? zc.primary
+                    : Colors.white,
               ),
             ),
           )
@@ -75,17 +77,17 @@ class ZopiqButton extends StatelessWidget {
 
     final Widget button = switch (variant) {
       ZopiqButtonVariant.primary => ElevatedButton(
-          onPressed: disabled ? null : handleTap,
-          child: child,
-        ),
+        onPressed: disabled ? null : handleTap,
+        child: child,
+      ),
       ZopiqButtonVariant.cta => FilledButton(
-          onPressed: disabled ? null : handleTap,
-          child: child,
-        ),
+        onPressed: disabled ? null : handleTap,
+        child: child,
+      ),
       ZopiqButtonVariant.outline => OutlinedButton(
-          onPressed: disabled ? null : handleTap,
-          child: child,
-        ),
+        onPressed: disabled ? null : handleTap,
+        child: child,
+      ),
     };
 
     return SizedBox(
@@ -93,10 +95,7 @@ class ZopiqButton extends StatelessWidget {
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 120),
         opacity: disabled && !isLoading ? 0.5 : 1,
-        child: ClipRRect(
-          borderRadius: ZopiqRadii.rMd,
-          child: button,
-        ),
+        child: ClipRRect(borderRadius: ZopiqRadii.rMd, child: button),
       ),
     );
   }

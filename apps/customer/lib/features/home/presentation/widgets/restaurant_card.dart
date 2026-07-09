@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/restaurant_image.dart';
 
 /// Hero tag shared by a restaurant's Home list card and its menu header, so the
 /// image flies between the two screens.
@@ -66,7 +67,10 @@ class RestaurantCard extends StatelessWidget {
                     const SizedBox(width: ZopiqSpacing.xxs),
                     Text('${restaurant.etaMinutes} min', style: t.labelMedium),
                     _Dot(color: zc.textMuted),
-                    Text('₹${restaurant.priceForTwo} for two', style: t.labelMedium),
+                    Text(
+                      '₹${restaurant.priceForTwo} for two',
+                      style: t.labelMedium,
+                    ),
                     _Dot(color: zc.textMuted),
                     Text(
                       '${restaurant.distanceKm.toStringAsFixed(1)} km',
@@ -91,13 +95,11 @@ class _CardImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
-    // Deterministic tint from the id so cards feel distinct until real
-    // CDN images land (TODO: swap for a cached network image).
-    final double hue = (restaurant.id.hashCode % 360).abs().toDouble();
-    final Color tint = HSLColor.fromAHSL(1, hue, 0.35, 0.55).toColor();
 
     return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(ZopiqRadii.lg)),
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(ZopiqRadii.lg),
+      ),
       child: AspectRatio(
         aspectRatio: 16 / 9,
         child: Stack(
@@ -108,28 +110,16 @@ class _CardImage extends StatelessWidget {
             // sharing a tag on one route is a crash.
             Hero(
               tag: restaurantImageHeroTag(restaurant.id),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: <Color>[tint, tint.withValues(alpha: 0.75)],
-                  ),
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.restaurant_rounded,
-                    color: Colors.white.withValues(alpha: 0.85),
-                    size: 40,
-                  ),
-                ),
-              ),
+              child: RestaurantImage(restaurant: restaurant),
             ),
             if (restaurant.promoText != null)
               Positioned(
                 left: ZopiqSpacing.sm,
                 bottom: ZopiqSpacing.sm,
-                child: _PromoBadge(text: restaurant.promoText!, color: zc.primaryDeep),
+                child: _PromoBadge(
+                  text: restaurant.promoText!,
+                  color: zc.primaryDeep,
+                ),
               ),
             Positioned(
               top: ZopiqSpacing.sm,
@@ -140,7 +130,11 @@ class _CardImage extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.9),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.favorite_border_rounded, size: 18, color: zc.nonVeg),
+                child: Icon(
+                  Icons.favorite_border_rounded,
+                  size: 18,
+                  color: zc.nonVeg,
+                ),
               ),
             ),
           ],
@@ -166,10 +160,9 @@ class _PromoBadge extends StatelessWidget {
       decoration: BoxDecoration(color: color, borderRadius: ZopiqRadii.rXs),
       child: Text(
         text.toUpperCase(),
-        style: Theme.of(context)
-            .textTheme
-            .labelSmall
-            ?.copyWith(color: Colors.white),
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: Colors.white),
       ),
     );
   }
@@ -196,10 +189,9 @@ class _RatingPill extends StatelessWidget {
           const SizedBox(width: ZopiqSpacing.xxs),
           Text(
             rating.toStringAsFixed(1),
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall
-                ?.copyWith(color: Colors.white),
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: Colors.white),
           ),
         ],
       ),

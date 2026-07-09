@@ -4,6 +4,14 @@ import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 /// latency (so the shimmer is exercised) and can be told to fail, to drive the
 /// error state. Swap for an HTTP data source once the backend contract is
 /// frozen (SAD Rule 4.1) — nothing above this layer changes.
+///
+/// `imageUrl`s point at foodish-api, a free food-photo dataset, on fixed paths so
+/// a restaurant always gets the same picture. Its categories are coarse — Sushi
+/// Ninja gets a rice dish — so treat the pairings as indicative, not accurate.
+///
+/// This is **mock data**: it exists to exercise the image pipeline against a real
+/// network, and it disappears with this class when the CDN lands. Production must
+/// never fetch imagery from a third-party host.
 class RestaurantMockDataSource {
   const RestaurantMockDataSource({
     this.latency = const Duration(milliseconds: 900),
@@ -45,7 +53,7 @@ class RestaurantMockDataSource {
       priceForTwo: 500,
       distanceKm: 2.1,
       isVeg: false,
-      imageUrl: 'https://cdn.zopiqnow.example/r/paradise.webp',
+      imageUrl: 'https://foodish-api.com/images/biryani/biryani1.jpg',
       promoText: '50% OFF up to ₹100',
     ),
     Restaurant(
@@ -58,7 +66,7 @@ class RestaurantMockDataSource {
       priceForTwo: 450,
       distanceKm: 1.3,
       isVeg: true,
-      imageUrl: 'https://cdn.zopiqnow.example/r/green-theory.webp',
+      imageUrl: 'https://foodish-api.com/images/pasta/pasta5.jpg',
       promoText: 'Free delivery',
     ),
     Restaurant(
@@ -71,7 +79,8 @@ class RestaurantMockDataSource {
       priceForTwo: 700,
       distanceKm: 3.7,
       isVeg: false,
-      imageUrl: 'https://cdn.zopiqnow.example/r/sultans.webp',
+      imageUrl:
+          'https://foodish-api.com/images/butter-chicken/butter-chicken1.jpg',
     ),
     Restaurant(
       id: 'r4',
@@ -83,7 +92,7 @@ class RestaurantMockDataSource {
       priceForTwo: 300,
       distanceKm: 0.8,
       isVeg: true,
-      imageUrl: 'https://cdn.zopiqnow.example/r/dosa-junction.webp',
+      imageUrl: 'https://foodish-api.com/images/dosa/dosa1.jpg',
       promoText: '₹75 OFF above ₹199',
     ),
     Restaurant(
@@ -96,7 +105,7 @@ class RestaurantMockDataSource {
       priceForTwo: 850,
       distanceKm: 4.2,
       isVeg: false,
-      imageUrl: 'https://cdn.zopiqnow.example/r/napoli.webp',
+      imageUrl: 'https://foodish-api.com/images/pizza/pizza1.jpg',
     ),
     Restaurant(
       id: 'r6',
@@ -108,7 +117,7 @@ class RestaurantMockDataSource {
       priceForTwo: 200,
       distanceKm: 1.9,
       isVeg: true,
-      imageUrl: 'https://cdn.zopiqnow.example/r/chai-chaat.webp',
+      imageUrl: 'https://foodish-api.com/images/samosa/samosa1.jpg',
     ),
     Restaurant(
       id: 'r7',
@@ -120,7 +129,7 @@ class RestaurantMockDataSource {
       priceForTwo: 1200,
       distanceKm: 5.6,
       isVeg: false,
-      imageUrl: 'https://cdn.zopiqnow.example/r/sushi-ninja.webp',
+      imageUrl: 'https://foodish-api.com/images/rice/rice5.jpg',
       promoText: '20% OFF',
     ),
     Restaurant(
@@ -133,7 +142,7 @@ class RestaurantMockDataSource {
       priceForTwo: 350,
       distanceKm: 2.8,
       isVeg: true,
-      imageUrl: 'https://cdn.zopiqnow.example/r/waffle-window.webp',
+      imageUrl: 'https://foodish-api.com/images/dessert/dessert1.jpg',
     ),
   ];
 }

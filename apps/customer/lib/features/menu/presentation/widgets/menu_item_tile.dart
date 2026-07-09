@@ -4,6 +4,8 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/cart/presentation/widgets/add_to_cart_control.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/restaurant_image.dart'
+    show GradientImagePlaceholder;
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
 
 /// One dish row: details on the left, art + the ADD control on the right.
@@ -66,8 +68,9 @@ class MenuItemTile extends ConsumerWidget {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
     // Watch only this item's quantity: adding dish A must not rebuild dish B.
-    final int quantity =
-        ref.watch(cartProvider.select((c) => c.quantityOf(item.id)));
+    final int quantity = ref.watch(
+      cartProvider.select((c) => c.quantityOf(item.id)),
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.lg),
@@ -106,8 +109,10 @@ class MenuItemTile extends ConsumerWidget {
             item: item,
             quantity: quantity,
             onAdd: () => _add(context, ref),
-            onIncrement: () => ref.read(cartProvider.notifier).increment(item.id),
-            onDecrement: () => ref.read(cartProvider.notifier).decrement(item.id),
+            onIncrement: () =>
+                ref.read(cartProvider.notifier).increment(item.id),
+            onDecrement: () =>
+                ref.read(cartProvider.notifier).decrement(item.id),
           ),
         ],
       ),
@@ -136,11 +141,6 @@ class _ItemArtAndControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Deterministic tint from the id, matching the placeholder treatment used
-    // across the app until the image pipeline lands.
-    final double hue = (item.id.hashCode % 360).abs().toDouble();
-    final Color tint = HSLColor.fromAHSL(1, hue, 0.32, 0.58).toColor();
-
     return SizedBox(
       width: _width,
       height: _totalHeight,
@@ -153,18 +153,13 @@ class _ItemArtAndControl extends StatelessWidget {
             height: _imageHeight,
             child: ClipRRect(
               borderRadius: ZopiqRadii.rMd,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: <Color>[tint, tint.withValues(alpha: 0.75)],
-                  ),
-                ),
-                child: Icon(
-                  Icons.fastfood_rounded,
-                  color: ZopiqPalette.white.withValues(alpha: 0.85),
-                  size: 28,
+              child: ZopiqNetworkImage(
+                url: item.imageUrl,
+                // Plenty of dishes have no photo. That is not an error state.
+                fallback: GradientImagePlaceholder(
+                  seed: item.id,
+                  icon: Icons.fastfood_rounded,
+                  iconSize: 28,
                 ),
               ),
             ),
@@ -222,7 +217,9 @@ class _ItemRating extends StatelessWidget {
         const SizedBox(width: ZopiqSpacing.xxs),
         Text(
           rating.toStringAsFixed(1),
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
+          style: Theme.of(
+            context,
+          ).textTheme.labelMedium?.copyWith(color: color),
         ),
       ],
     );

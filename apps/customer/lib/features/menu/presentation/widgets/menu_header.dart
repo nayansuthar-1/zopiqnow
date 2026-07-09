@@ -4,6 +4,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart'
     show restaurantImageHeroTag;
+import 'package:zopiqnow/features/home/presentation/widgets/restaurant_image.dart';
 
 /// Collapsing menu header: the restaurant image, then its name and vitals.
 class MenuSliverAppBar extends StatelessWidget {
@@ -15,9 +16,6 @@ class MenuSliverAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double hue = (restaurant.id.hashCode % 360).abs().toDouble();
-    final Color tint = HSLColor.fromAHSL(1, hue, 0.35, 0.55).toColor();
-
     return SliverAppBar(
       pinned: true,
       expandedHeight: _expandedHeight,
@@ -36,20 +34,7 @@ class MenuSliverAppBar extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: <Widget>[
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: <Color>[tint, tint.withValues(alpha: 0.75)],
-                  ),
-                ),
-                child: Icon(
-                  Icons.restaurant_rounded,
-                  color: ZopiqPalette.white.withValues(alpha: 0.85),
-                  size: 48,
-                ),
-              ),
+              RestaurantImage(restaurant: restaurant, iconSize: 48),
               // Keeps the collapsed title legible over any image.
               DecoratedBox(
                 decoration: BoxDecoration(

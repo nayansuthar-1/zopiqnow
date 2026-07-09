@@ -56,10 +56,18 @@ class CategoryArt extends StatelessWidget {
 
     final bool isDark = theme.brightness == Brightness.dark;
     final double hue = (category.id.hashCode % 360).abs().toDouble();
-    final Color base =
-        HSLColor.fromAHSL(1, hue, 0.45, isDark ? 0.32 : 0.86).toColor();
-    final Color accent =
-        HSLColor.fromAHSL(1, hue, 0.55, isDark ? 0.78 : 0.34).toColor();
+    final Color base = HSLColor.fromAHSL(
+      1,
+      hue,
+      0.45,
+      isDark ? 0.32 : 0.86,
+    ).toColor();
+    final Color accent = HSLColor.fromAHSL(
+      1,
+      hue,
+      0.55,
+      isDark ? 0.78 : 0.34,
+    ).toColor();
 
     return SizedBox.square(
       dimension: size,

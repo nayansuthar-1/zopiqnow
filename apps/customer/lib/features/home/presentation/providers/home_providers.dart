@@ -13,26 +13,28 @@ import 'package:zopiqnow/features/home/presentation/providers/home_filters.dart'
 /// later replaced by the HTTP data source.
 final Provider<RestaurantMockDataSource> restaurantDataSourceProvider =
     Provider<RestaurantMockDataSource>(
-  (Ref ref) => const RestaurantMockDataSource(),
-);
+      (Ref ref) => const RestaurantMockDataSource(),
+    );
 
 /// Repository binding — the seam the UI depends on (SAD 7.4).
 final Provider<RestaurantRepository> restaurantRepositoryProvider =
     Provider<RestaurantRepository>(
-  (Ref ref) => RestaurantRepositoryImpl(ref.watch(restaurantDataSourceProvider)),
-);
+      (Ref ref) =>
+          RestaurantRepositoryImpl(ref.watch(restaurantDataSourceProvider)),
+    );
 
 /// The Home feed as an [AsyncValue]: loading → data | error, giving the UI its
 /// shimmer/success/error states for free. Retry = `ref.invalidate(...)`.
 final FutureProvider<List<Restaurant>> nearbyRestaurantsProvider =
     FutureProvider<List<Restaurant>>(
-  (Ref ref) => ref.watch(restaurantRepositoryProvider).getNearbyRestaurants(),
-);
+      (Ref ref) =>
+          ref.watch(restaurantRepositoryProvider).getNearbyRestaurants(),
+    );
 
 /// A single restaurant, for the menu screen. A family so a cold deep link to
 /// `/restaurant/:id` resolves without the Home feed ever having loaded.
-final AutoDisposeFutureProviderFamily<Restaurant, String> restaurantByIdProvider =
-    FutureProvider.autoDispose.family<Restaurant, String>(
+final AutoDisposeFutureProviderFamily<Restaurant, String>
+restaurantByIdProvider = FutureProvider.autoDispose.family<Restaurant, String>(
   (Ref ref, String id) =>
       ref.watch(restaurantRepositoryProvider).getRestaurantById(id),
 );
@@ -43,8 +45,8 @@ final Provider<HomeCatalogDataSource> homeCatalogDataSourceProvider =
 
 final Provider<List<FoodCategory>> foodCategoriesProvider =
     Provider<List<FoodCategory>>(
-  (Ref ref) => ref.watch(homeCatalogDataSourceProvider).fetchCategories(),
-);
+      (Ref ref) => ref.watch(homeCatalogDataSourceProvider).fetchCategories(),
+    );
 
 final Provider<List<Offer>> offersProvider = Provider<List<Offer>>(
   (Ref ref) => ref.watch(homeCatalogDataSourceProvider).fetchOffers(),
@@ -76,20 +78,22 @@ class HomeFiltersNotifier extends Notifier<HomeFilters> {
 /// its shimmer and retry states untouched.
 final Provider<AsyncValue<List<Restaurant>>> filteredRestaurantsProvider =
     Provider<AsyncValue<List<Restaurant>>>((Ref ref) {
-  final HomeFilters filters = ref.watch(homeFiltersProvider);
-  return ref
-      .watch(nearbyRestaurantsProvider)
-      .whenData((List<Restaurant> all) => filters.apply(all));
-});
+      final HomeFilters filters = ref.watch(homeFiltersProvider);
+      return ref
+          .watch(nearbyRestaurantsProvider)
+          .whenData((List<Restaurant> all) => filters.apply(all));
+    });
 
 /// "Top restaurant chains" rail — highest-rated first, ignores the chip row.
 final Provider<AsyncValue<List<Restaurant>>> topRatedRestaurantsProvider =
     Provider<AsyncValue<List<Restaurant>>>((Ref ref) {
-  return ref.watch(nearbyRestaurantsProvider).whenData((List<Restaurant> all) {
-    final List<Restaurant> sorted = List<Restaurant>.of(all)
-      ..sort((Restaurant a, Restaurant b) => b.rating.compareTo(a.rating));
-    return sorted.take(_topChainCount).toList();
-  });
-});
+      return ref.watch(nearbyRestaurantsProvider).whenData((
+        List<Restaurant> all,
+      ) {
+        final List<Restaurant> sorted = List<Restaurant>.of(all)
+          ..sort((Restaurant a, Restaurant b) => b.rating.compareTo(a.rating));
+        return sorted.take(_topChainCount).toList();
+      });
+    });
 
 const int _topChainCount = 6;

@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required to load restaurant and dish imagery, and to reach the API.
+         Flutter declares this for debug builds only; without it here, release
+         builds fail every network image silently. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="zopiqnow"
         android:name="${applicationName}"

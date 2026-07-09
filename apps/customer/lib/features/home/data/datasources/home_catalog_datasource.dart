@@ -72,12 +72,7 @@ class HomeCatalogDataSource {
   ];
 
   static const List<Offer> _offers = <Offer>[
-    Offer(
-      id: 'o1',
-      headline: '60% OFF',
-      detail: 'UPTO ₹120',
-      code: 'TRYNEW',
-    ),
+    Offer(id: 'o1', headline: '60% OFF', detail: 'UPTO ₹120', code: 'TRYNEW'),
     Offer(
       id: 'o2',
       headline: 'FLAT ₹150 OFF',
@@ -90,11 +85,6 @@ class HomeCatalogDataSource {
       detail: 'ON FIRST ORDER',
       code: 'WELCOME',
     ),
-    Offer(
-      id: 'o4',
-      headline: '30% OFF',
-      detail: 'UPTO ₹75',
-      code: 'SAVE30',
-    ),
+    Offer(id: 'o4', headline: '30% OFF', detail: 'UPTO ₹75', code: 'SAVE30'),
   ];
 }

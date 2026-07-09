@@ -8,11 +8,7 @@ import 'package:flutter/foundation.dart';
 /// layout change.
 @immutable
 class FoodCategory {
-  const FoodCategory({
-    required this.id,
-    required this.label,
-    this.imageAsset,
-  });
+  const FoodCategory({required this.id, required this.label, this.imageAsset});
 
   final String id;
 

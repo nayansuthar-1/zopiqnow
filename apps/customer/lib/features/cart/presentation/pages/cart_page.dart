@@ -32,8 +32,9 @@ class CartPage extends ConsumerWidget {
       body: cart.isEmpty
           ? _EmptyCart(onBrowse: onBrowse)
           : _CartBody(cart: cart),
-      bottomNavigationBar:
-          cart.isEmpty ? null : _CheckoutBar(bill: CartBill.of(cart)),
+      bottomNavigationBar: cart.isEmpty
+          ? null
+          : _CheckoutBar(bill: CartBill.of(cart)),
     );
   }
 }
@@ -220,7 +221,9 @@ class _CheckoutBar extends StatelessWidget {
               // rather than wiring a button to nothing.
               onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Checkout arrives with addresses and payments.'),
+                  content: Text(
+                    'Checkout arrives with addresses and payments.',
+                  ),
                 ),
               ),
             ),
@@ -257,7 +260,11 @@ class _EmptyCart extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: ZopiqSpacing.xl),
-            ZopiqButton(label: 'Browse restaurants', expand: false, onPressed: onBrowse),
+            ZopiqButton(
+              label: 'Browse restaurants',
+              expand: false,
+              onPressed: onBrowse,
+            ),
           ],
         ),
       ),
