@@ -1,0 +1,25 @@
+# Melos task runner for the zopiqnow monorepo.
+# Packages are discovered from the pub workspace defined in the root pubspec.yaml.
+name: zopiqnow
+
+scripts:
+  analyze:
+    description: Analyze all packages.
+    run: flutter analyze
+    exec:
+      concurrency: 1
+
+  format:
+    description: Format all Dart code (fails CI if changes are needed).
+    run: dart format --set-exit-if-changed .
+    exec:
+      concurrency: 1
+
+  test:
+    description: Run tests in every package that has them.
+    run: flutter test
+    exec:
+      concurrency: 1
+      failFast: true
+    packageFilters:
+      dirExists: test

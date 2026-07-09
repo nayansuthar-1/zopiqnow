@@ -24,14 +24,20 @@ migrate_working_dir/
 #.vscode/
 
 # Flutter/Dart/Pub related
+# NOTE: patterns are un-anchored so they match nested apps/packages in the
+# monorepo (e.g. apps/customer/build/, packages/*/.dart_tool/).
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins-dependencies
+.flutter-plugins
 .pub-cache/
 .pub/
-/build/
-/coverage/
+build/
+coverage/
+# App-level lockfiles are not used: the workspace root pubspec.lock is authoritative.
+apps/*/pubspec.lock
+packages/*/pubspec.lock
 
 # Symbolication related
 app.*.symbols
@@ -40,6 +46,6 @@ app.*.symbols
 app.*.map.json
 
 # Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+**/android/app/debug
+**/android/app/profile
+**/android/app/release
