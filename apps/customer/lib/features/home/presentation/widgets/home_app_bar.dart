@@ -7,6 +7,10 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 /// `floating: true, snap: true` gives Swiggy's behaviour — the header scrolls
 /// away to hand the list the full screen, and springs straight back on the first
 /// upward drag rather than making the user scroll all the way to the top.
+///
+/// `primary: false` because Home wraps the whole scroll view in a [SafeArea].
+/// Left primary, this bar would eat the status-bar inset itself, and the pinned
+/// filter chips would then slide *under* the status bar once it scrolled away.
 class HomeSliverAppBar extends StatelessWidget {
   const HomeSliverAppBar({
     required this.address,
@@ -34,6 +38,7 @@ class HomeSliverAppBar extends StatelessWidget {
     return SliverAppBar(
       floating: true,
       snap: true,
+      primary: false,
       toolbarHeight: 60,
       titleSpacing: ZopiqSpacing.pageGutter,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,

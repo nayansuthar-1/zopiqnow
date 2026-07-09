@@ -1,13 +1,18 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:zopiqnow/features/cart/presentation/pages/cart_page.dart';
 import 'package:zopiqnow/features/design_showcase/presentation/design_showcase_page.dart';
 import 'package:zopiqnow/features/home/presentation/home_page.dart';
+import 'package:zopiqnow/features/menu/presentation/pages/menu_page.dart';
 
 /// Route name constants — referenced instead of raw path strings.
 abstract final class Routes {
   static const String home = 'home';
   static const String showcase = 'showcase';
+  static const String menu = 'menu';
+  static const String cart = 'cart';
 }
 
 /// The app's [GoRouter], exposed through Riverpod so guards/redirects can later
@@ -20,6 +25,23 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: '/',
         name: Routes.home,
         builder: (_, _) => const HomePage(),
+      ),
+      // Path-based, not `extra`-based: a cold deep link to a restaurant must
+      // resolve from the id alone, with no Home feed in memory.
+      GoRoute(
+        path: '/restaurant/:id',
+        name: Routes.menu,
+        builder: (BuildContext context, GoRouterState state) => MenuPage(
+          restaurantId: state.pathParameters['id']!,
+          onViewCart: () => context.pushNamed(Routes.cart),
+        ),
+      ),
+      GoRoute(
+        path: '/cart',
+        name: Routes.cart,
+        builder: (BuildContext context, _) => CartPage(
+          onBrowse: () => context.goNamed(Routes.home),
+        ),
       ),
       // Design-system reference screen — reachable via a debug entry on Home.
       GoRoute(

@@ -29,6 +29,14 @@ final FutureProvider<List<Restaurant>> nearbyRestaurantsProvider =
   (Ref ref) => ref.watch(restaurantRepositoryProvider).getNearbyRestaurants(),
 );
 
+/// A single restaurant, for the menu screen. A family so a cold deep link to
+/// `/restaurant/:id` resolves without the Home feed ever having loaded.
+final AutoDisposeFutureProviderFamily<Restaurant, String> restaurantByIdProvider =
+    FutureProvider.autoDispose.family<Restaurant, String>(
+  (Ref ref, String id) =>
+      ref.watch(restaurantRepositoryProvider).getRestaurantById(id),
+);
+
 /// Merchandising content for the category rail and the offers carousel.
 final Provider<HomeCatalogDataSource> homeCatalogDataSourceProvider =
     Provider<HomeCatalogDataSource>((Ref ref) => const HomeCatalogDataSource());

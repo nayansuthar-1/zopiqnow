@@ -19,4 +19,18 @@ class RestaurantRepositoryImpl implements RestaurantRepository {
       throw const RestaurantLoadFailure();
     }
   }
+
+  @override
+  Future<Restaurant> getRestaurantById(String id) async {
+    final Restaurant? found;
+    try {
+      found = await _dataSource.fetchById(id);
+    } on Object catch (_) {
+      throw const RestaurantLoadFailure();
+    }
+    // Thrown outside the try: a missing restaurant is a domain outcome, and
+    // must not be caught and relabelled as a transport failure.
+    if (found == null) throw const RestaurantNotFound();
+    return found;
+  }
 }

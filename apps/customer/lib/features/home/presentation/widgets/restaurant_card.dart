@@ -3,6 +3,14 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 
+/// Hero tag shared by a restaurant's Home list card and its menu header, so the
+/// image flies between the two screens.
+///
+/// Lives here, next to the card that owns the source Hero, so the menu feature
+/// depends on home rather than the reverse.
+String restaurantImageHeroTag(String restaurantId) =>
+    'restaurant-image-$restaurantId';
+
 /// Discovery card for a single [Restaurant]. Pure presentation — all color,
 /// spacing, radius, and type come from zopiq_ui tokens (Rule 2).
 class RestaurantCard extends StatelessWidget {
@@ -95,19 +103,25 @@ class _CardImage extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: <Color>[tint, tint.withValues(alpha: 0.75)],
+            // Flies into the menu header. Only the list card carries this tag —
+            // the top-chains rail shows the same restaurants, and two Heroes
+            // sharing a tag on one route is a crash.
+            Hero(
+              tag: restaurantImageHeroTag(restaurant.id),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: <Color>[tint, tint.withValues(alpha: 0.75)],
+                  ),
                 ),
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.restaurant_rounded,
-                  color: Colors.white.withValues(alpha: 0.85),
-                  size: 40,
+                child: Center(
+                  child: Icon(
+                    Icons.restaurant_rounded,
+                    color: Colors.white.withValues(alpha: 0.85),
+                    size: 40,
+                  ),
                 ),
               ),
             ),

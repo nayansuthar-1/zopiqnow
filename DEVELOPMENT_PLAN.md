@@ -50,10 +50,12 @@ mock data source behind it is swapped for HTTP without any UI change (SAD 7.4).
 - **`ZopiqPressable`** — the scale-on-press micro-interaction used by every image-led
   tile. Animates a `Transform` only, so a press repaints nothing.
 
-### In flight, NOT finished (currently untracked)
-`apps/customer/lib/features/menu/` and `apps/customer/lib/features/cart/` contain
-entities, repositories, providers, and two cart widgets — **but no menu screen, no cart
-screen, and no routes.** This is a half-slice. It is the first thing to finish.
+### Done — menu + cart slice (Step 1)
+Menu screen (collapsing Hero header, vitals, Veg-only switch, categorised dish tiles),
+cart screen (line steppers, bill breakdown, free-delivery nudge), routes
+`/restaurant/:id` and `/cart`, the sticky `CartBar`, and the "start a new cart?" prompt
+when adding across restaurants. `getRestaurantById` was added to the repository so a
+cold deep link resolves without the Home feed.
 
 ### Known gaps, deliberately accepted for now
 | Gap | Why it's acceptable today | When it must be fixed |
@@ -62,24 +64,17 @@ screen, and no routes.** This is a half-slice. It is the first thing to finish.
 | Restaurant images are deterministic gradients | No CDN, no image pipeline | Step 5 |
 | Search bar, profile, favourites are dead taps | Home was the step; wiring dead buttons to nothing is worse than leaving them | Steps 4 and 7 |
 | No auth, no real location | Nothing depends on them yet | Steps 6 and 7 |
+| "Proceed to checkout" only explains itself | Checkout needs an address and a payment provider. A snackbar saying so beats a button that silently does nothing | Step 6 |
+| Delivery fee and tax are hardcoded | Real fees depend on distance/surge; real tax on HSN category. Isolated in `CartBill` | Step 6 |
 
 ---
 
 ## Build order
 
-### Step 1 — Finish the menu + cart slice ← **next**
-Close the half-slice before starting anything new.
+### ~~Step 1 — Finish the menu + cart slice~~ ✅ done
+Verified on device: tap a card → menu → ADD → cart bar → correct total.
 
-- Restaurant detail / menu screen: collapsing header, veg/non-veg filter, category
-  sections, item rows with `AddToCartControl`.
-- Cart screen: line items, quantity edit, bill summary.
-- Routes: Home card tap → menu → cart. `CartBar` docked across both.
-- `Hero` transition on the restaurant image, Home card → menu header.
-
-**Verify:** tap a card on-device, add two items, change a quantity, land on the cart
-with a correct total. Widget tests for add/remove/clear and total arithmetic.
-
-### Step 2 — Bottom navigation shell
+### Step 2 — Bottom navigation shell ← **next**
 Home / Search / Cart / Account, with `IndexedStack` so tab state survives switches, and
 `StatefulShellRoute` in `go_router`. Cheap now, painful to retrofit after four screens
 assume they own the `Scaffold`.

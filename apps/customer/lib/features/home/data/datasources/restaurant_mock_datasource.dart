@@ -21,6 +21,19 @@ class RestaurantMockDataSource {
     return _seed;
   }
 
+  /// Null when no restaurant carries [id]. The repository maps that to a
+  /// domain-level not-found, which is not the same thing as a transport error.
+  Future<Restaurant?> fetchById(String id) async {
+    await Future<void>.delayed(latency);
+    if (shouldFail) {
+      throw const _MockNetworkException();
+    }
+    for (final Restaurant r in _seed) {
+      if (r.id == id) return r;
+    }
+    return null;
+  }
+
   static const List<Restaurant> _seed = <Restaurant>[
     Restaurant(
       id: 'r1',
