@@ -12,6 +12,8 @@ import 'package:zopiqnow/features/menu/presentation/pages/menu_page.dart';
 import 'package:zopiqnow/features/menu/presentation/providers/menu_providers.dart';
 import 'package:zopiqnow/features/search/presentation/providers/search_providers.dart';
 
+import '../../support/fake_stores.dart';
+
 const Duration _latency = Duration(milliseconds: 10);
 
 /// Long enough for the debounce to elapse.
@@ -31,6 +33,7 @@ Future<void> _settleSearch(WidgetTester tester) async {
 Widget _app() {
   return ProviderScope(
     overrides: <Override>[
+      ...storageOverrides(),
       restaurantDataSourceProvider
           .overrideWithValue(const RestaurantMockDataSource(latency: _latency)),
       menuDataSourceProvider

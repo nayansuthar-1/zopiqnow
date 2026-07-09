@@ -49,8 +49,9 @@ final AutoDisposeFutureProvider<List<Restaurant>> searchResultsProvider =
 /// results provider, which would otherwise fill this list with every prefix the
 /// user paused on ("b", "bir", "biryani").
 ///
-/// In memory only: these vanish on restart. Persisting them needs a storage
-/// dependency (`shared_preferences`), an explicit decision we have not taken.
+/// In memory only: these vanish on restart. `shared_preferences` landed with the
+/// Step 5 storage layer, so persisting them is now a small wiring job through
+/// `KeyValueStore` rather than a dependency decision.
 final NotifierProvider<RecentSearchesNotifier, List<String>>
     recentSearchesProvider =
     NotifierProvider<RecentSearchesNotifier, List<String>>(

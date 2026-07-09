@@ -43,6 +43,23 @@ dependencies:
   # Declarative navigation (SAD 7.10).
   go_router: 14.8.1
 
+  # --- Storage layer (approved Step 5, Rule 3 change request) -----------------
+  # Auth tokens only. Android-side this is Keystore-backed EncryptedSharedPrefs
+  # (SAD 7.6, 9.2: "token stored in secure storage"). Declares minSdk 23 — under
+  # our floor of 24, so Rule 1 is unaffected.
+  flutter_secure_storage: 10.3.1
+
+  # Non-secret local state: selected address id, recent searches. Never tokens.
+  shared_preferences: 2.5.5
+
+  # --- Location (approved Step 5, Rule 3 change request) ----------------------
+  # Coordinates only. Inherits flutter.minSdkVersion (24).
+  geolocator: 14.0.3
+
+  # Reverse-geocode via Android's *native* Geocoder — no Maps API key, no
+  # billing. Google Places autocomplete (SAD 14) arrives with the backend.
+  geocoding: 5.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

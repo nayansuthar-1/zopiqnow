@@ -63,10 +63,14 @@ cold deep link resolves without the Home feed.
 | Category art is OpenMoji, not commissioned illustration | Free and properly licensed (CC BY-SA 4.0). Swiggy's own illustrations are copyrighted and are not an option | Whenever brand art is ready |
 | ~~No licenses/credits screen~~ | ✅ Shipped. Reachable from Home's profile button | done |
 | Restaurant images are deterministic gradients | No CDN, no image pipeline | Step 3 |
-| Location picker and favourites are dead taps | Wiring buttons to nothing is worse than leaving them inert | Step 5 |
-| Recent searches vanish on restart | Persisting them needs `shared_preferences`, a new dependency and an explicit decision | With the storage layer |
-| No auth, no real location | Nothing depends on them yet | Steps 6 and 7 |
-| "Proceed to checkout" only explains itself | Checkout needs an address and a payment provider. A snackbar saying so beats a button that silently does nothing | Step 6 |
+| ~~Location picker is a dead tap~~ | ✅ Shipped. GPS + saved addresses, persisted | done |
+| Favourites is a dead tap | Wiring buttons to nothing is worse than leaving them inert | With the profile service |
+| Recent searches vanish on restart | `shared_preferences` landed in Step 5, so this is now a wiring job through `KeyValueStore`, not a dependency decision | Next time Search is touched |
+| ~~No auth, no real location~~ | ✅ Shipped in Step 5 (this table previously said "Steps 6 and 7", contradicting the build order) | done |
+| ~~"Proceed to checkout" only explains itself~~ | ✅ Now opens the auth-guarded `/checkout` | done |
+| OTP accepts a fixed code | No backend and no SMS provider. The mock enforces the real rules (TTL, attempt cap) so the UI is built against the true contract | Step 7 |
+| Access tokens are never refreshed | Nothing calls an authenticated endpoint yet | Step 7, with the Dio interceptor |
+| `kotlin.incremental=false` | Gradle 9.1.0 + Kotlin 2.3.20 cannot release their incremental caches on Windows; the build fails outright without it. Costs full Kotlin recompiles | Next Gradle/Kotlin upgrade |
 | Delivery fee and tax are hardcoded | Real fees depend on distance/surge; real tax on HSN category. Isolated in `CartBill` | Step 6 |
 
 ---
@@ -103,12 +107,49 @@ Search matches **names and cuisines, not dish names**: every mock restaurant ret
 the same menu, so a dish index would return nonsense. The hint text says so. A real
 dish index arrives with the search service.
 
-### Step 5 — Auth + location ← **next**
-OTP flow, token storage, `go_router` redirect guards. Device location + address
-picker replacing the hardcoded `Banjara Hills, Hyderabad`.
-Do this **before** checkout — checkout without a real address is a fiction.
+### ~~Step 5 — Auth + location~~ ✅ done
+Phone-OTP flow against a mock `AuthRepository`, the session in Keystore-backed secure
+storage, `go_router` redirect guards, and a real address picker. The hardcoded
+`Banjara Hills, Hyderabad` is gone: Home reads `selectedAddressProvider` and shows
+"Set delivery location" when nothing is chosen, rather than inventing a city.
 
-### Step 6 — Checkout + payments
+**Approved dependency additions (Rule 3 change request).** The first four since
+kickoff, pinned exactly. `pubspec.lock` gained 61 packages and bumped none:
+`flutter_secure_storage 10.3.1`, `shared_preferences 2.5.5`, `geolocator 14.0.3`,
+`geocoding 5.0.0`. Verified `minSdk 24` survives the manifest merge —
+`flutter_secure_storage` declares 23, and nothing raised our floor.
+
+Decisions worth remembering:
+- **Only `/checkout` is guarded.** Browsing, searching, and building a cart need no
+  account — that is how a food app works, and demanding a phone number before the
+  user has seen a menu is how you lose them. Identity is required where money and an
+  address are. `_protectedPrefixes` in `router.dart` is the one place to extend.
+- **The redirect owns navigation after sign-in.** The OTP screen never pops itself;
+  `?from=` carries the intended route through login, so a cold deep link to a guarded
+  route survives the session restore instead of dumping the user on Home.
+- **`AuthUnknown` is a real state, not a spinner.** It is the window between launch
+  and the Keystore read returning. The splash renders it; redirecting during it would
+  bounce a signed-in user to the login screen on every cold start. A Keystore read
+  that *throws* degrades to signed-out rather than stranding them there (Rule 1.6).
+- **Reverse-geocoding uses Android's native `Geocoder`** (`geocoding`), not the Google
+  Geocoding API — no key, no billing. Guarded by `isPresent()`, because a device with
+  no Play services has no geocoder (Rule 1.1).
+- **Foreground location only.** `ACCESS_BACKGROUND_LOCATION` is deliberately not
+  declared: we resolve an address while the picker is open and never track.
+
+**Still owed here:** the OTP is verified by `AuthMockDataSource` (fixed code `123456`,
+shown on-screen in debug builds only, since there is no SMS to read). It models the
+real contract — 6 digits, 5-minute TTL, 5-attempt cap — so Step 7 swaps the transport
+without discovering new failure modes. Saved addresses are seeded rather than
+per-user; there is no add/edit-address screen and no Places autocomplete. Access-token
+refresh-on-401 arrives with the Dio interceptor, as nothing calls an authenticated
+endpoint yet.
+
+`/checkout` is a **stub**: it confirms *who* is ordering and *where* it goes — the two
+things this step exists to establish — and says plainly that payment arrives next. It
+is the guard's destination, not Step 6's screen.
+
+### Step 6 — Checkout + payments ← **next**
 Address selection, coupon application, order placement, Razorpay (UPI/COD).
 First step that genuinely needs a backend.
 

@@ -13,9 +13,12 @@ import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_list_skeleton.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/top_chains_rail.dart';
 
+import '../../support/fake_stores.dart';
+
 Widget _app(RestaurantMockDataSource dataSource) {
   return ProviderScope(
     overrides: <Override>[
+      ...storageOverrides(),
       restaurantDataSourceProvider.overrideWithValue(dataSource),
     ],
     child: const ZopiqApp(),

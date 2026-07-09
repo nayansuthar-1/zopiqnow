@@ -13,11 +13,14 @@ import 'package:zopiqnow/features/menu/presentation/pages/menu_page.dart';
 import 'package:zopiqnow/features/menu/presentation/providers/menu_providers.dart';
 import 'package:zopiqnow/features/menu/presentation/widgets/menu_item_tile.dart';
 
+import '../support/fake_stores.dart';
+
 const Duration _latency = Duration(milliseconds: 10);
 
 Widget _app() {
   return ProviderScope(
     overrides: <Override>[
+      ...storageOverrides(),
       restaurantDataSourceProvider
           .overrideWithValue(const RestaurantMockDataSource(latency: _latency)),
       menuDataSourceProvider

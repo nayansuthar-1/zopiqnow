@@ -4,6 +4,19 @@
          builds fail every network image silently. -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Delivery-address detection, foreground only. COARSE alone places the
+         user within ~1-2km, which picks the wrong neighbourhood in a city;
+         FINE is what makes "Banjara Hills" possible rather than "Hyderabad".
+         On Android 12+ the user may grant COARSE only — geolocator reports that
+         as `whileInUse` and the reverse-geocode still works, just fuzzier.
+
+         ACCESS_BACKGROUND_LOCATION is deliberately NOT declared: we resolve an
+         address while the picker is open and never track. Declaring it would
+         trigger Play's background-location review for a feature we do not have
+         (Rule 1.7). -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
     <application
         android:label="zopiqnow"
         android:name="${applicationName}"

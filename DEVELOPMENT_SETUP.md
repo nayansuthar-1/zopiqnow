@@ -38,6 +38,19 @@
 2. **JDK 17 (Temurin)** — https://adoptium.net → set `JAVA_HOME`, add to `PATH`.
 3. **Flutter SDK (stable)** — https://docs.flutter.dev/get-started/install/windows
    - Extract to e.g. `C:\src\flutter`, add `flutter\bin` to `PATH`.
+   - **The path must contain no spaces.** Native-assets build hooks — pulled in
+     transitively by `flutter_secure_storage` → `path_provider_foundation` →
+     `objective_c` — invoke `dart compile` without quoting the SDK path. An SDK at
+     `D:\Flutter SDK\flutter` therefore fails every `flutter test` and `flutter build`
+     with ``'D:\Flutter' is not recognized as an internal or external command``.
+   - Workaround for an existing install, without reinstalling: make a space-free
+     directory junction and use it.
+     ```
+     mklink /J C:\FlutterSDK "D:\Flutter SDK\flutter"
+     C:\FlutterSDK\bin\flutter test
+     ```
+     It targets the same pinned SDK, so Rule 3 is unaffected. Reinstalling to a
+     space-free path is the real fix.
 4. **FVM (Flutter Version Management)** — to pin/freeze Flutter for the whole team:
    ```
    dart pub global activate fvm

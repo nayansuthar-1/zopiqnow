@@ -18,6 +18,9 @@ import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_list_skeleton.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/section_header.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/top_chains_rail.dart';
+import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
+import 'package:zopiqnow/features/location/presentation/widgets/address_picker_sheet.dart';
 
 import 'package:zopiqnow/app/router.dart';
 
@@ -38,13 +41,11 @@ void _openMenu(BuildContext context, Restaurant restaurant) {
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
-  // TODO(location): source from the location feature once it exists.
-  static const String _address = 'Banjara Hills, Hyderabad';
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final List<FoodCategory> categories = ref.watch(foodCategoriesProvider);
     final List<Offer> offers = ref.watch(offersProvider);
+    final Address? address = ref.watch(selectedAddressProvider);
 
     return Scaffold(
       // The whole scroll view sits below the status bar. Without this, the
@@ -60,8 +61,10 @@ class HomePage extends ConsumerWidget {
             ),
             slivers: <Widget>[
               HomeSliverAppBar(
-                address: _address,
-                onTapLocation: () {},
+                // Null on a first run. Inventing a default city would be a lie
+                // about where we deliver — ask instead.
+                address: address?.shortDisplay ?? 'Set delivery location',
+                onTapLocation: () => showAddressPicker(context),
                 onTapSearch: () => context.goNamed(Routes.search),
                 // Until the Account feature lands, the profile button opens the
                 // credits screen — which the artwork licence requires us to ship

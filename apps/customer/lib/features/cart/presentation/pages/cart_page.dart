@@ -9,10 +9,14 @@ import 'package:zopiqnow/features/cart/presentation/widgets/add_to_cart_control.
 
 /// The cart: line items, the bill breakdown, and the checkout hand-off.
 class CartPage extends ConsumerWidget {
-  const CartPage({required this.onBrowse, super.key});
+  const CartPage({required this.onBrowse, required this.onCheckout, super.key});
 
   /// Sends an empty-cart customer back to discovery.
   final VoidCallback onBrowse;
+
+  /// Opens checkout. The route is auth-guarded, so a signed-out customer lands
+  /// on the login screen and is returned here-onward after verifying.
+  final VoidCallback onCheckout;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -34,7 +38,7 @@ class CartPage extends ConsumerWidget {
           : _CartBody(cart: cart),
       bottomNavigationBar: cart.isEmpty
           ? null
-          : _CheckoutBar(bill: CartBill.of(cart)),
+          : _CheckoutBar(bill: CartBill.of(cart), onCheckout: onCheckout),
     );
   }
 }
@@ -188,9 +192,10 @@ class _BillRow extends StatelessWidget {
 }
 
 class _CheckoutBar extends StatelessWidget {
-  const _CheckoutBar({required this.bill});
+  const _CheckoutBar({required this.bill, required this.onCheckout});
 
   final CartBill bill;
+  final VoidCallback onCheckout;
 
   @override
   Widget build(BuildContext context) {
@@ -216,16 +221,7 @@ class _CheckoutBar extends StatelessWidget {
             child: ZopiqButton(
               label: 'Proceed to checkout',
               variant: ZopiqButtonVariant.cta,
-              // Checkout needs an address and a payment provider, neither of
-              // which exists yet (DEVELOPMENT_PLAN steps 5 and 6). Say so
-              // rather than wiring a button to nothing.
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Checkout arrives with addresses and payments.',
-                  ),
-                ),
-              ),
+              onPressed: onCheckout,
             ),
           ),
         ],
