@@ -15,25 +15,60 @@ class HomeCatalogDataSource {
 
   List<Offer> fetchOffers() => _offers;
 
-  /// `imageAsset` is null throughout: the rail renders generated placeholder art
-  /// until licensed illustrations are supplied. See [FoodCategory.imageAsset].
+  /// Artwork is OpenMoji (CC BY-SA 4.0) — free to ship and properly licensed.
+  /// See ATTRIBUTIONS.md. These are stand-ins for commissioned illustrations,
+  /// not for Swiggy's, which are copyrighted.
+  static const String _art = 'assets/categories';
+
   static const List<FoodCategory> _categories = <FoodCategory>[
-    FoodCategory(id: 'biryani', label: 'Biryani'),
-    FoodCategory(id: 'pizza', label: 'Pizza'),
-    FoodCategory(id: 'burger', label: 'Burger'),
-    FoodCategory(id: 'rolls', label: 'Rolls'),
-    FoodCategory(id: 'north_indian', label: 'North Indian'),
-    FoodCategory(id: 'chinese', label: 'Chinese'),
-    FoodCategory(id: 'dosa', label: 'Dosa'),
-    FoodCategory(id: 'idli', label: 'Idli'),
-    FoodCategory(id: 'momos', label: 'Momos'),
-    FoodCategory(id: 'cake', label: 'Cake'),
-    FoodCategory(id: 'ice_cream', label: 'Ice Cream'),
-    FoodCategory(id: 'noodles', label: 'Noodles'),
-    FoodCategory(id: 'shawarma', label: 'Shawarma'),
-    FoodCategory(id: 'paratha', label: 'Paratha'),
-    FoodCategory(id: 'chaat', label: 'Chaat'),
-    FoodCategory(id: 'pure_veg', label: 'Pure Veg'),
+    FoodCategory(
+      id: 'biryani',
+      label: 'Biryani',
+      imageAsset: '$_art/biryani.png',
+    ),
+    FoodCategory(id: 'pizza', label: 'Pizza', imageAsset: '$_art/pizza.png'),
+    FoodCategory(id: 'burger', label: 'Burger', imageAsset: '$_art/burger.png'),
+    FoodCategory(id: 'rolls', label: 'Rolls', imageAsset: '$_art/rolls.png'),
+    FoodCategory(
+      id: 'north_indian',
+      label: 'North Indian',
+      imageAsset: '$_art/north_indian.png',
+    ),
+    FoodCategory(
+      id: 'chinese',
+      label: 'Chinese',
+      imageAsset: '$_art/chinese.png',
+    ),
+    FoodCategory(id: 'dosa', label: 'Dosa', imageAsset: '$_art/dosa.png'),
+    FoodCategory(id: 'idli', label: 'Idli', imageAsset: '$_art/idli.png'),
+    FoodCategory(id: 'momos', label: 'Momos', imageAsset: '$_art/momos.png'),
+    FoodCategory(id: 'cake', label: 'Cake', imageAsset: '$_art/cake.png'),
+    FoodCategory(
+      id: 'ice_cream',
+      label: 'Ice Cream',
+      imageAsset: '$_art/ice_cream.png',
+    ),
+    FoodCategory(
+      id: 'noodles',
+      label: 'Noodles',
+      imageAsset: '$_art/noodles.png',
+    ),
+    FoodCategory(
+      id: 'shawarma',
+      label: 'Shawarma',
+      imageAsset: '$_art/shawarma.png',
+    ),
+    FoodCategory(
+      id: 'paratha',
+      label: 'Paratha',
+      imageAsset: '$_art/paratha.png',
+    ),
+    FoodCategory(id: 'chaat', label: 'Chaat', imageAsset: '$_art/chaat.png'),
+    FoodCategory(
+      id: 'pure_veg',
+      label: 'Pure Veg',
+      imageAsset: '$_art/pure_veg.png',
+    ),
   ];
 
   static const List<Offer> _offers = <Offer>[

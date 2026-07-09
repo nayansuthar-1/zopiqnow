@@ -60,8 +60,9 @@ cold deep link resolves without the Home feed.
 ### Known gaps, deliberately accepted for now
 | Gap | Why it's acceptable today | When it must be fixed |
 |---|---|---|
-| Category icons are generated placeholder art | Swiggy's illustrations are copyrighted; layout is legally reproducible, artwork is not | Before any public build |
-| Restaurant images are deterministic gradients | No CDN, no image pipeline | Step 5 |
+| Category art is OpenMoji, not commissioned illustration | Free and properly licensed (CC BY-SA 4.0). Swiggy's own illustrations are copyrighted and are not an option | Whenever brand art is ready |
+| **No licenses/credits screen** | CC BY-SA 4.0 requires attribution *in the shipped app*. See ATTRIBUTIONS.md | **Release blocker** |
+| Restaurant images are deterministic gradients | No CDN, no image pipeline | Step 3 |
 | Search bar, profile, favourites are dead taps | Home was the step; wiring dead buttons to nothing is worse than leaving them | Steps 4 and 7 |
 | No auth, no real location | Nothing depends on them yet | Steps 6 and 7 |
 | "Proceed to checkout" only explains itself | Checkout needs an address and a payment provider. A snackbar saying so beats a button that silently does nothing | Step 6 |
@@ -81,13 +82,14 @@ assume they own the `Scaffold`.
 
 **Verify:** scroll Home, switch tabs, come back — scroll position intact.
 
-### Step 3 — Real artwork + image pipeline
-The largest *visual* jump available, and it unblocks the "looks like Swiggy" goal.
+### Step 3 — Image pipeline + credits screen
+The largest *visual* jump left, and it clears the one release blocker.
 
-- Supply licensed category illustrations → set `FoodCategory.imageAsset`. The rail
-  already reads it; nothing else changes.
 - Cached network images for restaurant/dish photos, decoded at display size
-  (`cacheWidth`), with the shimmer as the placeholder.
+  (`cacheWidth`), with the shimmer as the placeholder. Both are gradients today.
+- A licenses/credits screen naming OpenMoji + CC BY-SA 4.0. Required to ship.
+- Optional: replace OpenMoji with commissioned illustrations by dropping files in
+  `assets/categories/`. The rail reads `FoodCategory.imageAsset`; nothing else moves.
 
 **Verify:** scroll Home and a long menu on an Android 10 device with the performance
 overlay on. No frame over 16ms.
