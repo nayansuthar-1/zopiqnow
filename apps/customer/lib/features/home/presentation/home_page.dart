@@ -62,7 +62,7 @@ class HomePage extends ConsumerWidget {
               HomeSliverAppBar(
                 address: _address,
                 onTapLocation: () {},
-                onTapSearch: () {},
+                onTapSearch: () => context.goNamed(Routes.search),
                 // Until the Account feature lands, the profile button opens the
                 // credits screen — which the artwork licence requires us to ship
                 // anyway. Better a real destination than a tap that does nothing.

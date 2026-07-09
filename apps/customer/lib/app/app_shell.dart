@@ -11,9 +11,9 @@ import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dar
 /// navigation stack *and* its scroll position: leaving Home half-scrolled and
 /// coming back lands exactly where you left.
 ///
-/// Only the tabs that exist are here. Search and Account arrive with the
-/// features behind them (DEVELOPMENT_PLAN steps 4 and 5) — each is one more
-/// [StatefulShellBranch]. A tab that navigates to nothing reads as broken.
+/// Only the tabs that exist are here. Account arrives with the feature behind it
+/// (DEVELOPMENT_PLAN step 5) as one more [StatefulShellBranch]. A tab that
+/// navigates to nothing reads as broken.
 class AppShell extends StatelessWidget {
   const AppShell({required this.navigationShell, super.key});
 
@@ -59,6 +59,11 @@ class _ShellNavBar extends ConsumerWidget {
             icon: Icon(Icons.home_outlined),
             activeIcon: Icon(Icons.home_rounded),
             label: 'Home',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.search_outlined),
+            activeIcon: Icon(Icons.search_rounded),
+            label: 'Search',
           ),
           BottomNavigationBarItem(
             icon: _CartIcon(

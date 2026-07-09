@@ -63,7 +63,8 @@ cold deep link resolves without the Home feed.
 | Category art is OpenMoji, not commissioned illustration | Free and properly licensed (CC BY-SA 4.0). Swiggy's own illustrations are copyrighted and are not an option | Whenever brand art is ready |
 | ~~No licenses/credits screen~~ | ✅ Shipped. Reachable from Home's profile button | done |
 | Restaurant images are deterministic gradients | No CDN, no image pipeline | Step 3 |
-| Search bar, location, favourites are dead taps | Wiring buttons to nothing is worse than leaving them inert | Steps 4 and 5 |
+| Location picker and favourites are dead taps | Wiring buttons to nothing is worse than leaving them inert | Step 5 |
+| Recent searches vanish on restart | Persisting them needs `shared_preferences`, a new dependency and an explicit decision | With the storage layer |
 | No auth, no real location | Nothing depends on them yet | Steps 6 and 7 |
 | "Proceed to checkout" only explains itself | Checkout needs an address and a payment provider. A snackbar saying so beats a button that silently does nothing | Step 6 |
 | Delivery fee and tax are hardcoded | Real fees depend on distance/surge; real tax on HSN category. Isolated in `CartBill` | Step 6 |
@@ -92,14 +93,17 @@ release builds were silently going to fail every image.
 a scroll, not an app restart. Disk caching needs `cached_network_image`, a new
 dependency and therefore an explicit, approved decision.
 
-### Step 4 — Search ← **next**
-Query the mock repository; debounced; recent searches; results reuse `RestaurantCard`.
-Makes the search bar and its shell tab real.
+### ~~Step 4 — Search~~ ✅ done
+Debounced query (300ms) against the repository, matching restaurant names and
+cuisines. Recent searches, recorded on submit or on opening a result — never from
+the debounced provider, which would log every prefix the user paused on. Results
+reuse `RestaurantCard`. Home's search bar and the Search tab are both live.
 
-**Verify:** type a query, see results narrow; scroll Home and a long menu on an
-Android 10 device with the performance overlay on. No frame over 16ms.
+Search matches **names and cuisines, not dish names**: every mock restaurant returns
+the same menu, so a dish index would return nonsense. The hint text says so. A real
+dish index arrives with the search service.
 
-### Step 5 — Auth + location
+### Step 5 — Auth + location ← **next**
 OTP flow, token storage, `go_router` redirect guards. Device location + address
 picker replacing the hardcoded `Banjara Hills, Hyderabad`.
 Do this **before** checkout — checkout without a real address is a fiction.

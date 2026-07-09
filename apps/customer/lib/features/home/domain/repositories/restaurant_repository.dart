@@ -18,6 +18,14 @@ abstract interface class RestaurantRepository {
   /// Throws [RestaurantNotFound] when no such restaurant exists, and
   /// [RestaurantLoadFailure] on any transport/parse error.
   Future<Restaurant> getRestaurantById(String id);
+
+  /// Restaurants matching [query] by name or cuisine, case-insensitively.
+  ///
+  /// A blank query yields an empty list rather than the whole catalogue: "no
+  /// query" and "no results" are different screens, and the caller decides.
+  ///
+  /// Throws [RestaurantLoadFailure] on any transport/parse error.
+  Future<List<Restaurant>> searchRestaurants(String query);
 }
 
 /// The requested restaurant does not exist — a stale link, or a vendor that has

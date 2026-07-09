@@ -15,10 +15,24 @@ String restaurantImageHeroTag(String restaurantId) =>
 /// Discovery card for a single [Restaurant]. Pure presentation — all color,
 /// spacing, radius, and type come from zopiq_ui tokens (Rule 2).
 class RestaurantCard extends StatelessWidget {
-  const RestaurantCard({required this.restaurant, this.onTap, super.key});
+  const RestaurantCard({
+    required this.restaurant,
+    this.onTap,
+    this.heroic = true,
+    super.key,
+  });
 
   final Restaurant restaurant;
   final VoidCallback? onTap;
+
+  /// Whether this card's image is the Hero source for the menu header.
+  ///
+  /// Exactly one mounted card per restaurant may claim it. Home and Search both
+  /// live in the shell's `IndexedStack` — both mounted, one Navigator — so a
+  /// restaurant showing in both would register two Heroes under one tag and
+  /// crash the next route transition. Search therefore opts out; it loses the
+  /// image flight, not the navigation.
+  final bool heroic;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +45,7 @@ class RestaurantCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _CardImage(restaurant: restaurant),
+          _CardImage(restaurant: restaurant, heroic: heroic),
           Padding(
             padding: const EdgeInsets.all(ZopiqSpacing.md),
             child: Column(
@@ -88,13 +102,15 @@ class RestaurantCard extends StatelessWidget {
 }
 
 class _CardImage extends StatelessWidget {
-  const _CardImage({required this.restaurant});
+  const _CardImage({required this.restaurant, required this.heroic});
 
   final Restaurant restaurant;
+  final bool heroic;
 
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
+    final Widget image = RestaurantImage(restaurant: restaurant);
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(
@@ -105,13 +121,13 @@ class _CardImage extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
-            // Flies into the menu header. Only the list card carries this tag —
-            // the top-chains rail shows the same restaurants, and two Heroes
-            // sharing a tag on one route is a crash.
-            Hero(
-              tag: restaurantImageHeroTag(restaurant.id),
-              child: RestaurantImage(restaurant: restaurant),
-            ),
+            // Flies into the menu header. Guarded by [heroic]: the top-chains
+            // rail and the Search results show the same restaurants, and two
+            // Heroes sharing a tag in one Navigator is a crash.
+            if (heroic)
+              Hero(tag: restaurantImageHeroTag(restaurant.id), child: image)
+            else
+              image,
             if (restaurant.promoText != null)
               Positioned(
                 left: ZopiqSpacing.sm,

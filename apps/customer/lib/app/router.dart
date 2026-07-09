@@ -6,13 +6,16 @@ import 'package:zopiqnow/app/app_shell.dart';
 import 'package:zopiqnow/features/about/presentation/licenses_page.dart';
 import 'package:zopiqnow/features/cart/presentation/pages/cart_page.dart';
 import 'package:zopiqnow/features/design_showcase/presentation/design_showcase_page.dart';
+import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/presentation/home_page.dart';
 import 'package:zopiqnow/features/menu/presentation/pages/menu_page.dart';
+import 'package:zopiqnow/features/search/presentation/pages/search_page.dart';
 
 /// Route name constants — referenced instead of raw path strings.
 abstract final class Routes {
   static const String home = 'home';
   static const String showcase = 'showcase';
+  static const String search = 'search';
   static const String menu = 'menu';
   static const String cart = 'cart';
   static const String licenses = 'licenses';
@@ -35,6 +38,20 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                 path: '/',
                 name: Routes.home,
                 builder: (_, _) => const HomePage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/search',
+                name: Routes.search,
+                builder: (BuildContext context, _) => SearchPage(
+                  onOpenRestaurant: (Restaurant r) => context.pushNamed(
+                    Routes.menu,
+                    pathParameters: <String, String>{'id': r.id},
+                  ),
+                ),
               ),
             ],
           ),

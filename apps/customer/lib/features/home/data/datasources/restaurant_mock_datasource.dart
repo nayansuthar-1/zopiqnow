@@ -42,6 +42,23 @@ class RestaurantMockDataSource {
     return null;
   }
 
+  /// Substring match on name and cuisines. The real search service will do
+  /// tokenising, typo tolerance and ranking server-side; this only has to be
+  /// good enough to build the screen against.
+  Future<List<Restaurant>> search(String query) async {
+    await Future<void>.delayed(latency);
+    if (shouldFail) {
+      throw const _MockNetworkException();
+    }
+    final String q = query.trim().toLowerCase();
+    if (q.isEmpty) return const <Restaurant>[];
+
+    return _seed.where((Restaurant r) {
+      if (r.name.toLowerCase().contains(q)) return true;
+      return r.cuisines.any((String c) => c.toLowerCase().contains(q));
+    }).toList(growable: false);
+  }
+
   static const List<Restaurant> _seed = <Restaurant>[
     Restaurant(
       id: 'r1',

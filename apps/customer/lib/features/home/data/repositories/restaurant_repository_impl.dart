@@ -33,4 +33,13 @@ class RestaurantRepositoryImpl implements RestaurantRepository {
     if (found == null) throw const RestaurantNotFound();
     return found;
   }
+
+  @override
+  Future<List<Restaurant>> searchRestaurants(String query) async {
+    try {
+      return await _dataSource.search(query);
+    } on Object catch (_) {
+      throw const RestaurantLoadFailure('We couldn\'t run that search.');
+    }
+  }
 }

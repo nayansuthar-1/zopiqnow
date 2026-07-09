@@ -167,7 +167,9 @@ class _SearchField extends StatelessWidget {
           children: <Widget>[
             Expanded(
               child: Text(
-                'Search for restaurants or dishes',
+                // Search matches restaurant names and cuisines, not dish names —
+                // say so rather than promise what it does not do.
+                'Search for restaurants or cuisines',
                 style: t.bodyMedium?.copyWith(color: zc.textMuted),
               ),
             ),
