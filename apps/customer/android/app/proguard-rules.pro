@@ -10,3 +10,17 @@
 
 # Keep annotations & generic signatures (needed by reflection-based libs, e.g. JSON).
 -keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
+
+# Razorpay (razorpay_flutter 1.4.5) — the SDK's own documented keep rules. Its
+# checkout runs in a WebView and calls back over @JavascriptInterface, which R8
+# would otherwise strip from a minified release build.
+-keepattributes JavascriptInterface
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keep class com.razorpay.** { *; }
+-dontwarn com.razorpay.**
+-optimizations !method/inlining/*
+-keepclasseswithmembers class * {
+    public void onPayment*(...);
+}

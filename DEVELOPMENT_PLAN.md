@@ -72,7 +72,7 @@ cold deep link resolves without the Home feed.
 | Access tokens are never refreshed | Nothing calls an authenticated endpoint yet | Step 7, with the Dio interceptor |
 | `kotlin.incremental=false` | Gradle 9.1.0 + Kotlin 2.3.20 cannot release their incremental caches on Windows; the build fails outright without it. Costs full Kotlin recompiles | Next Gradle/Kotlin upgrade |
 | Delivery fee and tax are hardcoded | Real fees depend on distance/surge; real tax on HSN category. Isolated in `CartBill` | Step 7, with the pricing engine |
-| Payments are COD-only | Razorpay is a new dependency (version freeze) and needs a backend to create the payment order | Step 7 |
+| Payments are COD-only | `razorpay_flutter 1.4.5` is approved and pinned, but checkout needs a key id and a server-created payment order | Step 7 |
 | Coupon codes are advertised on the checkout screen itself | The mock coupon book has no campaign behind it; the hint is the campaign | With the promotions service |
 
 ---
@@ -177,9 +177,12 @@ Decisions worth remembering:
 - **`CartBill` gained a `discount` field but never computes one** — it subtracts
   what the (mock) service approved. Coupon rules stay server-side.
 
-**Still owed here:** Razorpay (UPI/cards) once the dependency is approved and the
-backend exists — the `PaymentMethod` seam and the disabled tile are already in
-place. Verify on the Android 10 device before calling the step done.
+**Still owed here:** the Razorpay checkout wiring. The dependency change request
+was **approved 2026-07-10** and `razorpay_flutter 1.4.5` is pinned in the app
+(minSdk 19 — under our floor), but opening the gateway needs a Razorpay key id
+and a server-created payment order, so the UPI tile stays disabled until the
+backend (Step 7). The `PaymentMethod` seam is already in place. Verify on the
+Android 10 device before calling the step done.
 
 ### Step 7 — Backend wiring
 Swap each mock data source for its HTTP implementation, one repository at a time. If

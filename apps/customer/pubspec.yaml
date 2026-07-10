@@ -60,6 +60,12 @@ dependencies:
   # billing. Google Places autocomplete (SAD 14) arrives with the backend.
   geocoding: 5.0.0
 
+  # --- Payments (approved Step 6, Rule 3 change request, 2026-07-10) ----------
+  # Razorpay checkout for UPI/cards. Declares minSdk 19 — under our floor of 24.
+  # The checkout wiring itself lands with the backend (Step 7): opening the
+  # gateway needs a key id and a server-created payment order.
+  razorpay_flutter: 1.4.5
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
