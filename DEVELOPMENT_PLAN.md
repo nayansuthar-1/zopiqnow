@@ -71,7 +71,9 @@ cold deep link resolves without the Home feed.
 | OTP accepts a fixed code | No backend and no SMS provider. The mock enforces the real rules (TTL, attempt cap) so the UI is built against the true contract | Step 7 |
 | Access tokens are never refreshed | Nothing calls an authenticated endpoint yet | Step 7, with the Dio interceptor |
 | `kotlin.incremental=false` | Gradle 9.1.0 + Kotlin 2.3.20 cannot release their incremental caches on Windows; the build fails outright without it. Costs full Kotlin recompiles | Next Gradle/Kotlin upgrade |
-| Delivery fee and tax are hardcoded | Real fees depend on distance/surge; real tax on HSN category. Isolated in `CartBill` | Step 6 |
+| Delivery fee and tax are hardcoded | Real fees depend on distance/surge; real tax on HSN category. Isolated in `CartBill` | Step 7, with the pricing engine |
+| Payments are COD-only | Razorpay is a new dependency (version freeze) and needs a backend to create the payment order | Step 7 |
+| Coupon codes are advertised on the checkout screen itself | The mock coupon book has no campaign behind it; the hint is the campaign | With the promotions service |
 
 ---
 
@@ -149,28 +151,41 @@ endpoint yet.
 things this step exists to establish — and says plainly that payment arrives next. It
 is the guard's destination, not Step 6's screen.
 
-### Step 5.5 — Home first-impression revamp ← **next**
-The homepage must *stop* someone in the first second. Reference: Zomato's home for
-the attraction (clean, modern, one bold full-bleed hero) and Swiggy for the layout
-that already exists below it.
+### ~~Step 5.5 — Home first-impression revamp~~ ✅ done
+Brand-colored app bar with a white search pill and a full-bleed animated campaign
+banner (rotating ray bursts, pulsing CTA — transforms only). The placeholder
+composition is isolated in one widget for a one-asset swap when brand art arrives.
+Ambient loops respect OS reduce-motion, which is also what keeps `pumpAndSettle`
+settling in tests.
 
-- **Hero header.** Full-bleed promo hero behind the location/search header — bold
-  campaign headline, a single CTA, subtle looping motion (transform/opacity only,
-  per the performance standard). Until brand art is supplied, ship a **temporary
-  in-app composition** (gradient + typography + existing dish photos), built so the
-  final image is a one-asset swap.
-- **Keep everything below** (category rail, filters, restaurant list) — this step
-  restyles the top of the feed, it does not rebuild the feed.
-- Verify: cold-open on the Android 10 device, hero animates with no red bars.
+### Step 6 — Checkout + payments ← **in progress; COD slice built, device check pending**
+Shipped frontend-first against a mock `OrderRepository`, same as every other slice:
+order recap, coupon apply/remove (validated service-side by the mock: minimum order
+value, capped percentages — the client never computes a discount), bill with
+discount, payment-method selection, order placement, and an order-confirmation
+screen. Placing an order clears the cart; the receipt lives in
+`lastPlacedOrderProvider`, not route `extra`.
 
-### Step 6 — Checkout + payments
-Address selection, coupon application, order placement, Razorpay (UPI/COD).
-First step that genuinely needs a backend.
+Decisions worth remembering:
+- **COD is the only live payment method.** Razorpay is a new dependency — the
+  version freeze (Rule 4) requires an explicit approved change request — and online
+  payment needs a backend to create the payment order anyway. The UPI tile is
+  honestly disabled ("arrives with online payments") rather than dead.
+- **A coupon is invalidated by any cart change.** `CheckoutController` resets when
+  the cart's subtotal changes: the validation ran against the old subtotal, and
+  honouring a discount the order service never approved is how money is lost.
+- **`CartBill` gained a `discount` field but never computes one** — it subtracts
+  what the (mock) service approved. Coupon rules stay server-side.
+
+**Still owed here:** Razorpay (UPI/cards) once the dependency is approved and the
+backend exists — the `PaymentMethod` seam and the disabled tile are already in
+place. Verify on the Android 10 device before calling the step done.
 
 ### Step 7 — Backend wiring
 Swap each mock data source for its HTTP implementation, one repository at a time. If
 the domain layer was respected, no widget changes. This step is the test of whether it
-was.
+was. Absorbs Razorpay (UPI/cards): the SDK is a dependency change request, and online
+payment needs the backend to create the payment order.
 
 ### Step 8 — Order tracking
 Live status, driver location stream, tri-tracking map.

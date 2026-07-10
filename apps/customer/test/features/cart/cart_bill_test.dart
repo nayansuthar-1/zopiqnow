@@ -60,6 +60,24 @@ void main() {
     expect(bill.total, 525); // 500 + 0 + 25
   });
 
+  test('subtracts a coupon discount from the total, not the subtotal', () {
+    final CartBill bill = CartBill.of(
+      _cartOf(<CartLine>[CartLine(item: _item('a', 400), quantity: 1)]),
+      discount: 50,
+    );
+
+    expect(bill.subtotal, 400); // discount never rewrites the item total
+    expect(bill.discount, 50);
+    expect(bill.total, 410); // 400 + 40 + 20 − 50
+  });
+
+  test('an empty cart ignores a discount', () {
+    final CartBill bill = CartBill.of(const Cart.empty(), discount: 50);
+
+    expect(bill.discount, 0);
+    expect(bill.total, 0);
+  });
+
   test('rounds fractional tax to the nearest rupee', () {
     // 5% of 199 = 9.95 → 10, not 9.
     final CartBill bill = CartBill.of(_cartOf(<CartLine>[

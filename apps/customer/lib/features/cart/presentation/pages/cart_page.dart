@@ -6,6 +6,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/cart/presentation/widgets/add_to_cart_control.dart';
+import 'package:zopiqnow/features/cart/presentation/widgets/bill_summary.dart';
 
 /// The cart: line items, the bill breakdown, and the checkout hand-off.
 class CartPage extends ConsumerWidget {
@@ -56,7 +57,7 @@ class _CartBody extends StatelessWidget {
         for (final CartLine line in cart.lines)
           _CartLineTile(key: ValueKey<String>(line.item.id), line: line),
         const SizedBox(height: ZopiqSpacing.xl),
-        _BillSummary(bill: CartBill.of(cart)),
+        BillSummary(bill: CartBill.of(cart)),
       ],
     );
   }
@@ -103,87 +104,6 @@ class _CartLineTile extends ConsumerWidget {
               textAlign: TextAlign.end,
               style: t.titleSmall,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BillSummary extends StatelessWidget {
-  const _BillSummary({required this.bill});
-
-  final CartBill bill;
-
-  @override
-  Widget build(BuildContext context) {
-    final ZopiqColors zc = context.zc;
-    final TextTheme t = Theme.of(context).textTheme;
-
-    return ZopiqCard(
-      elevated: false,
-      child: Column(
-        children: <Widget>[
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Bill details', style: t.titleMedium),
-          ),
-          const SizedBox(height: ZopiqSpacing.md),
-          _BillRow(label: 'Item total', value: '₹${bill.subtotal}'),
-          _BillRow(
-            label: 'Delivery fee',
-            value: bill.hasFreeDelivery ? 'FREE' : '₹${bill.deliveryFee}',
-            valueColor: bill.hasFreeDelivery ? zc.veg : null,
-          ),
-          _BillRow(label: 'Taxes', value: '₹${bill.taxes}'),
-          if (!bill.hasFreeDelivery) ...<Widget>[
-            const SizedBox(height: ZopiqSpacing.sm),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Add ₹${bill.amountToFreeDelivery} more for free delivery',
-                style: t.bodySmall?.copyWith(color: zc.primary),
-              ),
-            ),
-          ],
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.md),
-            child: Divider(color: zc.divider),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: <Widget>[
-              Text('To pay', style: t.titleMedium),
-              Text('₹${bill.total}', style: t.titleMedium),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BillRow extends StatelessWidget {
-  const _BillRow({required this.label, required this.value, this.valueColor});
-
-  final String label;
-  final String value;
-  final Color? valueColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final ZopiqColors zc = context.zc;
-    final TextTheme t = Theme.of(context).textTheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: ZopiqSpacing.sm),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: <Widget>[
-          Text(label, style: t.bodyMedium?.copyWith(color: zc.textMuted)),
-          Text(
-            value,
-            style: t.bodyMedium?.copyWith(color: valueColor ?? zc.textStrong),
           ),
         ],
       ),

@@ -10,6 +10,7 @@ import 'package:zopiqnow/features/auth/presentation/pages/splash_page.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiqnow/features/cart/presentation/pages/cart_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/checkout_page.dart';
+import 'package:zopiqnow/features/checkout/presentation/pages/order_success_page.dart';
 import 'package:zopiqnow/features/design_showcase/presentation/design_showcase_page.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/presentation/home_page.dart';
@@ -24,6 +25,7 @@ abstract final class Routes {
   static const String menu = 'menu';
   static const String cart = 'cart';
   static const String checkout = 'checkout';
+  static const String orderSuccess = 'orderSuccess';
   static const String licenses = 'licenses';
   static const String splash = 'splash';
   static const String login = 'login';
@@ -176,11 +178,19 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         ],
       ),
 
-      // Outside the shell: identity and address, then payment (Step 6).
+      // Outside the shell: identity, address, coupon, and payment. The success
+      // page nests under /checkout so the auth guard covers it by prefix.
       GoRoute(
         path: '/checkout',
         name: Routes.checkout,
         builder: (_, _) => const CheckoutPage(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: 'success',
+            name: Routes.orderSuccess,
+            builder: (_, _) => const OrderSuccessPage(),
+          ),
+        ],
       ),
 
       // Outside the shell, so it covers the bottom bar: the menu docks its own

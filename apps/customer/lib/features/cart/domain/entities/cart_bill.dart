@@ -19,10 +19,14 @@ class CartBill {
     required this.subtotal,
     required this.deliveryFee,
     required this.taxes,
+    this.discount = 0,
   });
 
   /// Prices a cart. An empty cart bills nothing — not even a delivery fee.
-  factory CartBill.of(Cart cart) {
+  ///
+  /// [discount] comes from a coupon the order service has already validated
+  /// (see `AppliedCoupon`) — this class subtracts it, it never computes it.
+  factory CartBill.of(Cart cart, {int discount = 0}) {
     if (cart.isEmpty) {
       return const CartBill(subtotal: 0, deliveryFee: 0, taxes: 0);
     }
@@ -31,6 +35,7 @@ class CartBill {
       subtotal: subtotal,
       deliveryFee: subtotal >= _freeDeliveryThreshold ? 0 : _flatDeliveryFee,
       taxes: (subtotal * _taxRate).round(),
+      discount: discount,
     );
   }
 
@@ -43,7 +48,10 @@ class CartBill {
   final int deliveryFee;
   final int taxes;
 
-  int get total => subtotal + deliveryFee + taxes;
+  /// Coupon discount in whole rupees; 0 when no coupon is applied.
+  final int discount;
+
+  int get total => subtotal + deliveryFee + taxes - discount;
 
   bool get hasFreeDelivery => subtotal >= _freeDeliveryThreshold;
 
