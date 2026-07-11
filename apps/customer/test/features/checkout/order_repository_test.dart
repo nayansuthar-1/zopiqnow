@@ -101,41 +101,79 @@ void main() {
   });
 
   group('placeOrder', () {
-    test('returns a receipt matching what was submitted', () async {
+    test('prices the order itself rather than trusting a submitted total', () async {
       final Cart cart = _cartOf(400);
-      final CartBill bill = CartBill.of(cart, discount: 50);
 
       final PlacedOrder order = await _repo().placeOrder(
         cart: cart,
-        bill: bill,
         deliveryAddress: _address,
         paymentMethod: PaymentMethod.cod,
+        userId: 'usr_1',
+        userPhone: '+919876543210',
       );
 
       expect(order.id, startsWith('ZPQ-'));
       expect(order.restaurantName, 'Test Kitchen');
       expect(order.deliveryTo, 'Banjara Hills, Hyderabad');
-      expect(order.total, bill.total);
+      // 400 subtotal + 40 delivery + 20 tax, computed by the order service.
+      expect(order.total, CartBill.of(cart).total);
       expect(order.paymentMethod, PaymentMethod.cod);
       expect(order.etaMinutes, inInclusiveRange(25, 35));
+    });
+
+    test('applies the coupon it validates, not one the caller asserts', () async {
+      final Cart cart = _cartOf(400);
+
+      final PlacedOrder order = await _repo().placeOrder(
+        cart: cart,
+        deliveryAddress: _address,
+        paymentMethod: PaymentMethod.cod,
+        userId: 'usr_1',
+        userPhone: '+919876543210',
+        couponCode: 'WELCOME50',
+      );
+
+      expect(order.total, CartBill.of(cart, discount: 50).total);
+    });
+
+    test('rejects a coupon the cart does not qualify for, and says why', () async {
+      // WELCOME50 needs a subtotal of 199; this cart is 100.
+      expect(
+        () => _repo().placeOrder(
+          cart: _cartOf(100),
+          deliveryAddress: _address,
+          paymentMethod: PaymentMethod.cod,
+          userId: 'usr_1',
+          userPhone: '+919876543210',
+          couponCode: 'WELCOME50',
+        ),
+        throwsA(
+          isA<OrderPlacementFailure>().having(
+            (OrderPlacementFailure f) => f.message,
+            'message',
+            contains('₹99 more'),
+          ),
+        ),
+      );
     });
 
     test('issues a fresh order id every time', () async {
       final OrderRepositoryImpl repo = _repo();
       final Cart cart = _cartOf(400);
-      final CartBill bill = CartBill.of(cart);
 
       final PlacedOrder first = await repo.placeOrder(
         cart: cart,
-        bill: bill,
         deliveryAddress: _address,
         paymentMethod: PaymentMethod.cod,
+        userId: 'usr_1',
+        userPhone: '+919876543210',
       );
       final PlacedOrder second = await repo.placeOrder(
         cart: cart,
-        bill: bill,
         deliveryAddress: _address,
         paymentMethod: PaymentMethod.cod,
+        userId: 'usr_1',
+        userPhone: '+919876543210',
       );
 
       expect(first.id, isNot(second.id));

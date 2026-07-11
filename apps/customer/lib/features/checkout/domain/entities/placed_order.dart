@@ -14,6 +14,7 @@ class PlacedOrder {
     required this.total,
     required this.paymentMethod,
     required this.etaMinutes,
+    this.paymentId,
   });
 
   /// Human-readable order reference, e.g. `ZPQ-1042`.
@@ -30,4 +31,8 @@ class PlacedOrder {
   final PaymentMethod paymentMethod;
 
   final int etaMinutes;
+
+  /// The gateway's reference for a prepaid order (Razorpay's `pay_…`); null for
+  /// cash on delivery, where nothing has been charged yet.
+  final String? paymentId;
 }

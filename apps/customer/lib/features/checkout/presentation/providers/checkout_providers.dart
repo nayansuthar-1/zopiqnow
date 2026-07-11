@@ -1,20 +1,34 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:zopiqnow/app/router.dart';
+import 'package:zopiqnow/features/auth/domain/entities/auth_session.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
-import 'package:zopiqnow/features/checkout/data/datasources/order_mock_datasource.dart';
+import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
+import 'package:zopiqnow/features/checkout/data/datasources/order_supabase_datasource.dart';
 import 'package:zopiqnow/features/checkout/data/repositories/order_repository_impl.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/payment_outcome.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
+import 'package:zopiqnow/features/checkout/domain/gateways/payment_gateway.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
+import 'package:zopiqnow/features/checkout/presentation/gateways/mock_payment_gateway.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 
-/// Data source binding. Overridden in tests to drop the fake network latency.
-final Provider<OrderMockDataSource> orderDataSourceProvider =
-    Provider<OrderMockDataSource>((Ref ref) => OrderMockDataSource());
+/// Data source binding — Postgres, as of Step 7. Tests override it with
+/// [OrderMockDataSource] to drop the network.
+final Provider<OrderDataSource> orderDataSourceProvider =
+    Provider<OrderDataSource>((Ref ref) => const OrderSupabaseDataSource());
+
+/// Payment gateway binding — the seam Razorpay slots into once the keys and the
+/// payment-order endpoint exist (Step 7). Until then, the mock settles UPI.
+final Provider<PaymentGateway> paymentGatewayProvider = Provider<PaymentGateway>(
+  (Ref ref) =>
+      MockPaymentGateway(navigatorKey: ref.watch(rootNavigatorKeyProvider)),
+);
 
 /// Repository binding — the seam the UI depends on (SAD 7.4).
 final Provider<OrderRepository> orderRepositoryProvider =
@@ -84,24 +98,71 @@ class CheckoutController extends Notifier<CheckoutState> {
       state = CheckoutState(coupon: state.coupon, paymentMethod: method);
 
   /// Places the order, records it for the confirmation screen, and clears the
-  /// cart. Throws [OrderPlacementFailure]; the caller surfaces it.
-  Future<PlacedOrder> placeOrder({required Address deliveryAddress}) async {
+  /// cart.
+  ///
+  /// Prepaid methods go through the gateway first. Returns null when the
+  /// customer dismissed the payment sheet — nothing was charged and nothing was
+  /// ordered, so there is nothing to say. Throws [PaymentFailure] on a decline
+  /// and [OrderPlacementFailure] on a transport error; the caller surfaces both.
+  ///
+  /// Pay-then-order is still the shape here. Verifying the payment with Razorpay
+  /// server-side inverts it (create payment order → settle → verify signature),
+  /// but that reshuffle lives behind this method.
+  ///
+  /// The bill computed here is what the *gateway* is asked to charge. It is not
+  /// what the order costs: `place_order` reprices the cart in Postgres, and the
+  /// receipt it returns is the number that counts.
+  Future<PlacedOrder?> placeOrder({
+    required Address deliveryAddress,
+    required AuthUser user,
+  }) async {
     final Cart cart = ref.read(cartProvider);
+    // Not read from checkoutBillProvider: that provider watches this
+    // controller, and reading it back from here is a dependency cycle.
+    final CartBill bill = CartBill.of(
+      cart,
+      discount: state.coupon?.discount ?? 0,
+    );
     state = CheckoutState(
       coupon: state.coupon,
       paymentMethod: state.paymentMethod,
       isPlacingOrder: true,
     );
     try {
+      String? paymentId;
+      if (state.paymentMethod == PaymentMethod.upi) {
+        final PaymentOutcome outcome = await ref
+            .read(paymentGatewayProvider)
+            .pay(
+              amount: bill.total,
+              description: cart.restaurantName ?? 'Zopiq order',
+            );
+        switch (outcome) {
+          case PaymentSucceeded(paymentId: final String id):
+            paymentId = id;
+          case PaymentFailed(message: final String message):
+            throw PaymentFailure(message);
+          case PaymentCancelled():
+            state = CheckoutState(
+              coupon: state.coupon,
+              paymentMethod: state.paymentMethod,
+            );
+            return null;
+        }
+      }
+
       final PlacedOrder order = await ref
           .read(orderRepositoryProvider)
           .placeOrder(
             cart: cart,
-            // Not read from checkoutBillProvider: that provider watches this
-            // controller, and reading it back from here is a dependency cycle.
-            bill: CartBill.of(cart, discount: state.coupon?.discount ?? 0),
             deliveryAddress: deliveryAddress,
             paymentMethod: state.paymentMethod,
+            userId: user.id,
+            userPhone: user.phone,
+            // The code, not the discount. What it is worth is the service's
+            // call, made again against the subtotal the service computes.
+            couponCode: state.coupon?.code,
+            paymentId: paymentId,
           );
       ref.read(lastPlacedOrderProvider.notifier).record(order);
       // Clearing the cart also resets this notifier (build watches subtotal).
@@ -122,8 +183,18 @@ checkoutControllerProvider = NotifierProvider<CheckoutController, CheckoutState>
   CheckoutController.new,
 );
 
+/// Codes the checkout screen advertises. Empty on failure — a missing hint must
+/// never take checkout down.
+final FutureProvider<List<String>> couponHintsProvider =
+    FutureProvider<List<String>>(
+      (Ref ref) => ref.watch(orderRepositoryProvider).getCouponHints(),
+    );
+
 /// The bill the checkout screen shows: the cart's bill with the applied
 /// coupon's discount folded in.
+///
+/// An estimate, and labelled as one in [CheckoutController.placeOrder]: the
+/// order service reprices everything and its receipt is what the customer pays.
 final Provider<CartBill> checkoutBillProvider = Provider<CartBill>((Ref ref) {
   final Cart cart = ref.watch(cartProvider);
   final AppliedCoupon? coupon = ref.watch(

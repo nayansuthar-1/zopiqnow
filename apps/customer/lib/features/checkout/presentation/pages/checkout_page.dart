@@ -4,14 +4,16 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/router.dart';
+import 'package:zopiqnow/features/auth/domain/entities/auth_session.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/cart/presentation/widgets/bill_summary.dart';
-import 'package:zopiqnow/features/checkout/data/datasources/order_mock_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
+import 'package:zopiqnow/features/checkout/domain/gateways/payment_gateway.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
@@ -21,9 +23,9 @@ import 'package:zopiqnow/features/location/presentation/widgets/address_picker_s
 /// Checkout: who is ordering, where it goes, what it costs after a coupon, and
 /// how it's paid. Auth-guarded — only signed-in users reach it.
 ///
-/// Cash on delivery is the only live payment method: online payment needs the
-/// Razorpay SDK (a dependency change awaiting approval) and a backend to create
-/// the payment order. The UPI tile says so instead of dangling a dead option.
+/// UPI settles through the mock gateway until the Razorpay keys and the
+/// payment-order endpoint land (Step 7). The tile says so: a test payment that
+/// looks like a real one is worse than one that admits what it is.
 class CheckoutPage extends ConsumerWidget {
   const CheckoutPage({super.key});
 
@@ -31,22 +33,27 @@ class CheckoutPage extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Address address,
+    AuthUser user,
   ) async {
     try {
-      await ref
+      final PlacedOrder? order = await ref
           .read(checkoutControllerProvider.notifier)
-          .placeOrder(deliveryAddress: address);
-      if (context.mounted) {
+          .placeOrder(deliveryAddress: address, user: user);
+      // Null: the customer closed the payment sheet. They know — no snackbar.
+      if (order != null && context.mounted) {
         context.pushReplacementNamed(Routes.orderSuccess);
       }
+    } on PaymentFailure catch (failure) {
+      if (context.mounted) _showFailure(context, failure.message);
     } on OrderPlacementFailure catch (failure) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(failure.message)));
-      }
+      if (context.mounted) _showFailure(context, failure.message);
     }
   }
+
+  void _showFailure(BuildContext context, String message) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -116,20 +123,26 @@ class CheckoutPage extends ConsumerWidget {
               // A tap with no address opens the picker — never a dead button.
               label: address == null
                   ? 'Select delivery address'
+                  : checkout.paymentMethod == PaymentMethod.upi
+                  ? 'Pay ₹${bill.total}'
                   : 'Place order · ₹${bill.total}',
               variant: ZopiqButtonVariant.cta,
               isLoading: checkout.isPlacingOrder,
-              onPressed: address == null
+              // The route is auth-guarded, so `auth` is AuthSignedIn here. The
+              // pattern match is what proves it rather than a `!`.
+              onPressed: address == null || auth is! AuthSignedIn
                   ? () => showAddressPicker(context)
-                  : () => _placeOrder(context, ref, address),
+                  : () => _placeOrder(context, ref, address, auth.user),
             ),
-            if (checkout.paymentMethod == PaymentMethod.cod) ...<Widget>[
-              const SizedBox(height: ZopiqSpacing.sm),
-              Text(
-                'Pay ₹${bill.total} in cash when your order arrives.',
-                style: t.bodySmall?.copyWith(color: zc.textMuted),
-              ),
-            ],
+            const SizedBox(height: ZopiqSpacing.sm),
+            Text(
+              checkout.paymentMethod == PaymentMethod.cod
+                  ? 'Pay ₹${bill.total} in cash when your order arrives.'
+                  : 'Test gateway — no money moves until the Razorpay keys are '
+                        'live.',
+              style: t.bodySmall?.copyWith(color: zc.textMuted),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -211,6 +224,8 @@ class _CouponCardState extends ConsumerState<_CouponCard> {
     final TextTheme t = Theme.of(context).textTheme;
     final CheckoutState checkout = ref.watch(checkoutControllerProvider);
     final AppliedCoupon? coupon = checkout.coupon;
+    final List<String> hints =
+        ref.watch(couponHintsProvider).valueOrNull ?? const <String>[];
 
     if (coupon != null) {
       return ZopiqCard(
@@ -275,12 +290,15 @@ class _CouponCardState extends ConsumerState<_CouponCard> {
             ],
           ),
           const SizedBox(height: ZopiqSpacing.xs),
-          // The mock coupon book has no marketing campaign behind it, so the
-          // screen is the campaign. Goes away with the promotions service.
-          Text(
-            'Try ${OrderMockDataSource.coupons.map((CouponRule r) => r.summary).join('  ·  ')}',
-            style: t.bodySmall?.copyWith(color: zc.textMuted),
-          ),
+          // There is no marketing campaign behind these codes yet, so the screen
+          // is the campaign. Goes away with the promotions service. Silent while
+          // loading or on failure: a missing hint is not worth a spinner, and it
+          // is certainly not worth an error.
+          if (hints.isNotEmpty)
+            Text(
+              'Try ${hints.join('  ·  ')}',
+              style: t.bodySmall?.copyWith(color: zc.textMuted),
+            ),
         ],
       ),
     );
@@ -315,10 +333,9 @@ class _PaymentMethods extends StatelessWidget {
             method: PaymentMethod.upi,
             icon: Icons.qr_code_rounded,
             title: 'UPI',
-            subtitle: 'Arrives with online payments',
+            subtitle: 'Test gateway · no real money',
             selected: selected == PaymentMethod.upi,
-            // Honestly unavailable, not silently broken: no Razorpay yet.
-            onSelect: null,
+            onSelect: onSelect,
           ),
         ],
       ),

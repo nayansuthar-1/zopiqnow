@@ -1,5 +1,4 @@
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
-import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
@@ -18,13 +17,28 @@ abstract interface class OrderRepository {
 
   /// Places the order and returns the receipt.
   ///
-  /// Throws [OrderPlacementFailure] on any transport error.
+  /// Takes no bill. The order service prices the cart from its own menu and its
+  /// own coupon rules, and the receipt it returns is the truth — what the
+  /// checkout screen showed was only ever an estimate of it.
+  ///
+  /// [paymentId] is the gateway's reference for an already-paid order, and null
+  /// for cash on delivery.
+  ///
+  /// Throws [OrderPlacementFailure] on any transport error, or with the
+  /// service's own message when it rejects the order (a dish went unavailable,
+  /// a coupon no longer applies).
   Future<PlacedOrder> placeOrder({
     required Cart cart,
-    required CartBill bill,
     required Address deliveryAddress,
     required PaymentMethod paymentMethod,
+    required String userId,
+    required String userPhone,
+    String? couponCode,
+    String? paymentId,
   });
+
+  /// Coupon codes to advertise on the checkout screen.
+  Future<List<String>> getCouponHints();
 }
 
 /// A coupon the order service rejected. [message] is written for the customer,

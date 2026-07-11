@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
+import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
@@ -15,7 +16,7 @@ import 'package:zopiqnow/features/location/domain/entities/address.dart';
 /// Modelling the rules now means the coupon field already has "unknown code"
 /// and "cart too small" states to render, and the HTTP swap (Step 7) changes
 /// the transport, not the UI's failure modes.
-class OrderMockDataSource {
+class OrderMockDataSource implements OrderDataSource {
   OrderMockDataSource({this.latency = const Duration(milliseconds: 600)});
 
   final Duration latency;
@@ -29,6 +30,11 @@ class OrderMockDataSource {
 
   int _orderSeq = 0;
 
+  @override
+  Future<List<String>> fetchCouponHints() async =>
+      coupons.map((CouponRule r) => r.summary).toList(growable: false);
+
+  @override
   Future<AppliedCoupon> applyCoupon({
     required String code,
     required int subtotal,
@@ -52,13 +58,27 @@ class OrderMockDataSource {
     return AppliedCoupon(code: rule.code, discount: rule.discountOn(subtotal));
   }
 
+  @override
   Future<PlacedOrder> placeOrder({
     required Cart cart,
-    required CartBill bill,
     required Address deliveryAddress,
     required PaymentMethod paymentMethod,
+    required String userId,
+    required String userPhone,
+    String? couponCode,
+    String? paymentId,
   }) async {
     await Future<void>.delayed(latency);
+
+    // Prices the order itself, exactly as `place_order` does in Postgres: the
+    // caller hands over a cart and a code, never a total. Re-validating the
+    // coupon here is not belt-and-braces — it is this mock refusing to be more
+    // gullible than the service it stands in for.
+    final int subtotal = cart.subtotal;
+    final int discount = couponCode == null || couponCode.trim().isEmpty
+        ? 0
+        : (await applyCoupon(code: couponCode, subtotal: subtotal)).discount;
+    final CartBill bill = CartBill.of(cart, discount: discount);
 
     _orderSeq++;
     return PlacedOrder(
@@ -67,6 +87,7 @@ class OrderMockDataSource {
       deliveryTo: deliveryAddress.shortDisplay,
       total: bill.total,
       paymentMethod: paymentMethod,
+      paymentId: paymentId,
       // Deterministic per restaurant, 25–35 min. A real ETA comes from the
       // dispatch engine with tracking (Step 8).
       etaMinutes: 25 + (cart.restaurantId ?? '').hashCode.toUnsigned(32) % 11,

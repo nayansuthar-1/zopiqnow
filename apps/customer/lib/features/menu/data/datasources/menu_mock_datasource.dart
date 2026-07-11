@@ -1,13 +1,15 @@
+import 'package:zopiqnow/features/menu/data/datasources/menu_datasource.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_category.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
 
 /// In-memory stand-in for the menu API. Returns a plausible categorized menu
-/// after a short delay so the shimmer is exercised. Swap for HTTP later.
+/// after a short delay so the shimmer is exercised.
 ///
-/// Dish photos come from foodish-api — mock data only, never production. Laccha
-/// Paratha deliberately has no `imageUrl`: vendors routinely skip photos, and the
-/// fallback path has to be exercised somewhere real.
-class MenuMockDataSource {
+/// The app now reads Postgres ([MenuSupabaseDataSource]); this stays as the
+/// tests' data source. Dish photos come from foodish-api — mock data only, never
+/// production. Laccha Paratha deliberately has no `imageUrl`: vendors routinely
+/// skip photos, and the fallback path has to be exercised somewhere real.
+class MenuMockDataSource implements MenuDataSource {
   const MenuMockDataSource({
     this.latency = const Duration(milliseconds: 700),
     this.shouldFail = false,
@@ -16,6 +18,7 @@ class MenuMockDataSource {
   final Duration latency;
   final bool shouldFail;
 
+  @override
   Future<List<MenuCategory>> fetchMenu(String restaurantId) async {
     await Future<void>.delayed(latency);
     if (shouldFail) {

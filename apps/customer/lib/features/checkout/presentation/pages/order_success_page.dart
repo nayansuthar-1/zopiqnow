@@ -95,7 +95,7 @@ class OrderSuccessPage extends ConsumerWidget {
                       icon: Icons.payments_outlined,
                       text: order.paymentMethod == PaymentMethod.cod
                           ? 'Pay ₹${order.total} in cash on delivery'
-                          : 'Paid ₹${order.total}',
+                          : 'Paid ₹${order.total} · ${order.paymentId}',
                     ),
                   ],
                 ),

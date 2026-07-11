@@ -1,7 +1,6 @@
 /// How the customer pays for an order.
 ///
-/// [cod] is the only method the mock order service can settle. Online payment
-/// ([upi]) needs the Razorpay SDK — a new dependency awaiting an approved
-/// change request — and a backend to create the payment order, so the checkout
-/// screen shows it disabled rather than pretending.
+/// [upi] currently settles through the mock gateway (no real money moves): the
+/// Razorpay keys and the backend that creates the payment order arrive in
+/// Step 7, and swapping them in replaces the gateway binding, not this enum.
 enum PaymentMethod { cod, upi }

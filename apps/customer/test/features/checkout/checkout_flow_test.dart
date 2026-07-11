@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/app/zopiq_app.dart';
 import 'package:zopiqnow/features/auth/domain/entities/auth_session.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_mock_datasource.dart';
+import 'package:zopiqnow/features/checkout/presentation/gateways/mock_payment_gateway.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/checkout_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/order_success_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
@@ -87,6 +89,12 @@ Widget _app({bool withAddress = true}) {
       orderDataSourceProvider.overrideWithValue(
         OrderMockDataSource(latency: _latency),
       ),
+      paymentGatewayProvider.overrideWith(
+        (Ref ref) => MockPaymentGateway(
+          navigatorKey: ref.watch(rootNavigatorKeyProvider),
+          latency: _latency,
+        ),
+      ),
       cartProvider.overrideWith(_SeededCartNotifier.new),
     ],
     child: const ZopiqApp(),
@@ -112,6 +120,28 @@ Future<void> _openCheckout(WidgetTester tester) async {
   await tester.tap(find.text('Proceed to checkout'));
   await tester.pumpAndSettle();
   expect(find.byType(CheckoutPage), findsOneWidget);
+}
+
+/// Selects UPI and taps the CTA, leaving the mock gateway's sheet open.
+///
+/// No `pumpAndSettle` while a payment is in flight: both CTAs spin an
+/// indeterminate progress indicator, which never settles. Pump explicitly.
+Future<void> _openPaymentSheet(WidgetTester tester) async {
+  await tester.tap(find.text('UPI'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Pay ₹460'));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400)); // Sheet slides in.
+  expect(find.text('UPI payment'), findsOneWidget);
+}
+
+/// Runs out the gateway's latency, the sheet's exit, and order placement.
+Future<void> _drainPayment(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 50)); // Gateway settles.
+  await tester.pump(const Duration(milliseconds: 400)); // Sheet slides out.
+  await tester.pump(const Duration(milliseconds: 50)); // Order is placed.
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -187,6 +217,56 @@ void main() {
 
     expect(find.text('This code isn\'t valid.'), findsOneWidget);
     expect(find.text('Place order · ₹460'), findsOneWidget);
+  });
+
+  testWidgets('paying by UPI settles on the mock gateway and the receipt shows '
+      'the payment reference', (WidgetTester tester) async {
+    _useTallSurface(tester);
+    await tester.pumpWidget(_app());
+    await _openCheckout(tester);
+    await _openPaymentSheet(tester);
+
+    // The sheet's own CTA, above the checkout screen's.
+    await tester.tap(find.text('Pay ₹460').last);
+    await _drainPayment(tester);
+
+    expect(find.byType(OrderSuccessPage), findsOneWidget);
+    expect(find.textContaining('Paid ₹460 · pay_mock_'), findsOneWidget);
+  });
+
+  testWidgets('a declined UPI payment says so and places no order', (
+    WidgetTester tester,
+  ) async {
+    _useTallSurface(tester);
+    await tester.pumpWidget(_app());
+    await _openCheckout(tester);
+    await _openPaymentSheet(tester);
+
+    await tester.tap(find.text('Simulate a failed payment'));
+    await _drainPayment(tester);
+
+    expect(find.byType(OrderSuccessPage), findsNothing);
+    expect(find.byType(CheckoutPage), findsOneWidget);
+    expect(
+      find.text('Your payment was declined. Try another method.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('dismissing the payment sheet charges nothing and places no '
+      'order', (WidgetTester tester) async {
+    _useTallSurface(tester);
+    await tester.pumpWidget(_app());
+    await _openCheckout(tester);
+    await _openPaymentSheet(tester);
+
+    await tester.tap(find.byTooltip('Cancel payment'));
+    await _drainPayment(tester);
+
+    // No error either: they closed it, they know. Just back where they were.
+    expect(find.byType(OrderSuccessPage), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.text('Pay ₹460'), findsOneWidget);
   });
 
   testWidgets('with no delivery address, the CTA opens the address picker '

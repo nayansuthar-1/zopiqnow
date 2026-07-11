@@ -1,13 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:zopiqnow/features/menu/data/datasources/menu_mock_datasource.dart';
+import 'package:zopiqnow/features/menu/data/datasources/menu_datasource.dart';
+import 'package:zopiqnow/features/menu/data/datasources/menu_supabase_datasource.dart';
 import 'package:zopiqnow/features/menu/data/repositories/menu_repository_impl.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_category.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
 import 'package:zopiqnow/features/menu/domain/repositories/menu_repository.dart';
 
-final Provider<MenuMockDataSource> menuDataSourceProvider =
-    Provider<MenuMockDataSource>((Ref ref) => const MenuMockDataSource());
+/// Data source binding — Postgres, as of Step 7. Tests override it with
+/// [MenuMockDataSource].
+final Provider<MenuDataSource> menuDataSourceProvider = Provider<MenuDataSource>(
+  (Ref ref) => const MenuSupabaseDataSource(),
+);
 
 final Provider<MenuRepository> menuRepositoryProvider =
     Provider<MenuRepository>(
