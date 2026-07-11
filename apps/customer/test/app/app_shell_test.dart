@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zopiqnow/app/zopiq_app.dart';
 import 'package:zopiqnow/features/about/presentation/licenses_page.dart';
+import 'package:zopiqnow/features/account/presentation/pages/account_page.dart';
 import 'package:zopiqnow/features/cart/presentation/pages/cart_page.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_mock_datasource.dart';
 import 'package:zopiqnow/features/home/presentation/home_page.dart';
@@ -130,8 +131,8 @@ void main() {
     expect(find.text('1'), findsWidgets);
   });
 
-  testWidgets('the profile button opens the credits screen',
-      (WidgetTester tester) async {
+  testWidgets('the profile button opens the account page, which reaches the '
+      'credits screen', (WidgetTester tester) async {
     _useTallSurface(tester);
     await tester.pumpWidget(_app());
     await tester.pump(const Duration(milliseconds: 50));
@@ -139,9 +140,15 @@ void main() {
     await tester.tap(find.byIcon(Icons.person_rounded));
     await tester.pumpAndSettle();
 
+    expect(find.byType(AccountPage), findsOneWidget);
+
+    await tester.tap(find.text('Licenses & credits'));
+    await tester.pumpAndSettle();
+
+    // The bundled licenses must be readable inside the shipped app, not just
+    // in ATTRIBUTIONS.md.
     expect(find.byType(LicensesPage), findsOneWidget);
-    // CC BY-SA 4.0 requires this attribution to be visible in the shipped app.
-    expect(find.text('OpenMoji'), findsOneWidget);
-    expect(find.textContaining('CC BY-SA 4.0'), findsOneWidget);
+    expect(find.text('Microsoft Fluent Emoji'), findsOneWidget);
+    expect(find.textContaining('MIT License'), findsOneWidget);
   });
 }

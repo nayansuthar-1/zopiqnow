@@ -31,8 +31,8 @@ void _openMenu(BuildContext context, Restaurant restaurant) {
 
 /// Customer Home — restaurant discovery. The top is Zomato's home (a
 /// full-bleed brand hero carrying the location/search header and a campaign
-/// banner); everything below is Swiggy's layout: an offers carousel, the
-/// dish-category rail, a top-chains rail, then the filterable restaurant list.
+/// banner); everything below is Swiggy's layout: the dish-category rail, a
+/// top-chains rail, then the filterable restaurant list.
 ///
 /// Every section is its own sliver so the scroll view only builds and paints
 /// what is on screen — the rails do not cost anything once scrolled past.

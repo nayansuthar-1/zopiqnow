@@ -8,7 +8,6 @@ import 'package:zopiqnow/features/home/presentation/providers/home_providers.dar
 import 'package:zopiqnow/features/home/presentation/widgets/food_category_rail.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_filter_chips.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_status_views.dart';
-import 'package:zopiqnow/features/home/presentation/widgets/offers_carousel.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_list_skeleton.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/top_chains_rail.dart';
@@ -73,9 +72,8 @@ void main() {
       _app(const RestaurantMockDataSource(latency: Duration(milliseconds: 200))),
     );
 
-    // Categories, offers and chips are static: they are on screen during the
-    // first frame, while the restaurant feed is still loading.
-    expect(find.byType(OffersCarousel), findsOneWidget);
+    // Categories and chips are static: they are on screen during the first
+    // frame, while the restaurant feed is still loading.
     expect(find.byType(FoodCategoryRail), findsOneWidget);
     expect(find.byType(HomeFilterChips), findsOneWidget);
     expect(find.text("What's on your mind?"), findsOneWidget);
