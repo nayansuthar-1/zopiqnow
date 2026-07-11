@@ -58,6 +58,14 @@ class _AuthRefreshListenable extends ChangeNotifier {
   }
 }
 
+/// The root navigator's key — how code that isn't a widget reaches a
+/// [BuildContext]. The mock payment gateway needs one to raise its sheet; the
+/// real Razorpay SDK won't, and this can go with it.
+final Provider<GlobalKey<NavigatorState>> rootNavigatorKeyProvider =
+    Provider<GlobalKey<NavigatorState>>(
+      (Ref ref) => GlobalKey<NavigatorState>(debugLabel: 'root'),
+    );
+
 /// The app's [GoRouter]. `redirect` is the single place auth affects navigation
 /// (SAD 7.10) — no screen pushes a login route imperatively.
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
@@ -66,6 +74,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
 
   return GoRouter(
     initialLocation: '/',
+    navigatorKey: ref.watch(rootNavigatorKeyProvider),
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
       final AuthState auth = ref.read(authControllerProvider);
