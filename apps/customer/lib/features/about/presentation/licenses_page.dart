@@ -3,9 +3,9 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 /// Credits for the third-party assets zopiqnow ships.
 ///
-/// Not optional decoration: the dish artwork is licensed CC BY-SA 4.0, which
-/// requires attribution **in the distributed app**. This screen is what
-/// discharges that obligation. See ATTRIBUTIONS.md.
+/// Not optional decoration: the bundled assets (Fluent Emoji under MIT, Figtree
+/// under the OFL) ship with notices that belong in the distributed app. This
+/// screen is what surfaces them. See ATTRIBUTIONS.md.
 class LicensesPage extends StatelessWidget {
   const LicensesPage({super.key});
 
@@ -25,13 +25,12 @@ class LicensesPage extends StatelessWidget {
           ),
           const SizedBox(height: ZopiqSpacing.xl),
           const _Credit(
-            title: 'Dish illustrations',
-            author: 'OpenMoji',
-            license:
-                'Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0)',
+            title: 'Dish artwork (3D)',
+            author: 'Microsoft Fluent Emoji',
+            license: 'MIT License',
             detail:
-                'The open-source emoji and icon project for designers and '
-                'educators. Artwork used unmodified.',
+                "Microsoft's open-source 3D emoji set. Used unmodified as "
+                'category artwork.',
           ),
           const SizedBox(height: ZopiqSpacing.lg),
           const _Credit(

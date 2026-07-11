@@ -22,26 +22,19 @@ only place a font name appears.
 
 ---
 
-## OpenMoji (dish-category artwork)
+## Microsoft Fluent Emoji (dish-category 3D artwork)
 
 - **Where:** `apps/customer/assets/categories/*.png`
-- **Author:** OpenMoji — the open-source emoji and icon project
-- **License:** Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0) —
-  `apps/customer/assets/OPENMOJI-LICENSE.txt`
-- **Source:** https://github.com/hfg-gmuend/openmoji
+- **Author:** Microsoft — the Fluent Emoji project (3D style)
+- **License:** MIT — `apps/customer/assets/FLUENT-EMOJI-LICENSE.txt`
+- **Source:** https://github.com/microsoft/fluentui-emoji
 
-**Two obligations this places on us:**
-
-1. **Attribution is required in the shipped app**, not just this file. A credits or
-   licenses screen must name OpenMoji and the CC BY-SA 4.0 license. That screen does
-   not exist yet — it is a release blocker, tracked in `DEVELOPMENT_PLAN.md`.
-2. **ShareAlike:** if we *modify* an OpenMoji graphic, the modified graphic must be
-   released under CC BY-SA 4.0 too. Using the files as-is, as we do, carries no such
-   obligation on our own code — the license is not viral across the application.
-
-If either obligation becomes inconvenient, the escape is to commission original
-illustrations. `FoodCategory.imageAsset` is the single swap point; no layout,
-sizing, or motion changes.
+MIT is permissive: it requires only that the copyright and permission notice ship
+with the app (the `FLUENT-EMOJI-LICENSE.txt` above, surfaced in the in-app licenses
+screen). No ShareAlike, no viral obligation on our own code, and modifying a render
+carries no extra duty. Each category maps to its nearest food emoji (e.g. Biryani →
+Curry rice, Momos → Dumpling); `FoodCategory.imageAsset` is the single swap point
+for commissioned renders — no layout, sizing, or motion changes.
 
 **These are not Swiggy's icons.** Swiggy's category illustrations are copyrighted
 artwork on their CDN, and copying them into a competing delivery app would be
