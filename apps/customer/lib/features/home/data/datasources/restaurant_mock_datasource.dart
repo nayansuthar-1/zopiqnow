@@ -1,9 +1,13 @@
+import 'package:zopiqnow/features/home/data/datasources/restaurant_datasource.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 
 /// In-memory stand-in for the restaurant discovery API. Simulates network
 /// latency (so the shimmer is exercised) and can be told to fail, to drive the
-/// error state. Swap for an HTTP data source once the backend contract is
-/// frozen (SAD Rule 4.1) — nothing above this layer changes.
+/// error state.
+///
+/// The app now reads Postgres ([RestaurantSupabaseDataSource]); this stays as
+/// the tests' data source, where a real network would be a liability, not a
+/// feature.
 ///
 /// `imageUrl`s point at foodish-api, a free food-photo dataset, on fixed paths so
 /// a restaurant always gets the same picture. Its categories are coarse — Sushi
@@ -12,7 +16,7 @@ import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 /// This is **mock data**: it exists to exercise the image pipeline against a real
 /// network, and it disappears with this class when the CDN lands. Production must
 /// never fetch imagery from a third-party host.
-class RestaurantMockDataSource {
+class RestaurantMockDataSource implements RestaurantDataSource {
   const RestaurantMockDataSource({
     this.latency = const Duration(milliseconds: 900),
     this.shouldFail = false,
@@ -21,6 +25,7 @@ class RestaurantMockDataSource {
   final Duration latency;
   final bool shouldFail;
 
+  @override
   Future<List<Restaurant>> fetchNearby() async {
     await Future<void>.delayed(latency);
     if (shouldFail) {
@@ -29,8 +34,7 @@ class RestaurantMockDataSource {
     return _seed;
   }
 
-  /// Null when no restaurant carries [id]. The repository maps that to a
-  /// domain-level not-found, which is not the same thing as a transport error.
+  @override
   Future<Restaurant?> fetchById(String id) async {
     await Future<void>.delayed(latency);
     if (shouldFail) {
@@ -45,6 +49,7 @@ class RestaurantMockDataSource {
   /// Substring match on name and cuisines. The real search service will do
   /// tokenising, typo tolerance and ranking server-side; this only has to be
   /// good enough to build the screen against.
+  @override
   Future<List<Restaurant>> search(String query) async {
     await Future<void>.delayed(latency);
     if (shouldFail) {

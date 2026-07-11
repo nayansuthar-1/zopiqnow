@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:zopiqnow/app/env.dart';
 import 'package:zopiqnow/app/zopiq_app.dart';
 import 'package:zopiqnow/core/storage/key_value_store.dart';
 import 'package:zopiqnow/core/storage/storage_providers.dart';
@@ -23,6 +25,13 @@ Future<void> main() async {
   // so Home paints its saved address on the first frame rather than flashing
   // "Set delivery location" and then correcting itself.
   final SharedPreferences prefs = await SharedPreferences.getInstance();
+
+  // Sets up the Postgres client (and, later, the realtime socket for order
+  // tracking). It does not open a connection here — the first query does.
+  await Supabase.initialize(
+    url: Env.supabaseUrl,
+    anonKey: Env.supabaseAnonKey,
+  );
 
   runApp(
     ProviderScope(

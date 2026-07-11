@@ -1,13 +1,13 @@
-import 'package:zopiqnow/features/home/data/datasources/restaurant_mock_datasource.dart';
+import 'package:zopiqnow/features/home/data/datasources/restaurant_datasource.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/domain/repositories/restaurant_repository.dart';
 
-/// Default [RestaurantRepository]. Today it reads the mock data source; the
-/// only change to go live is swapping the injected data source for an HTTP one.
+/// Default [RestaurantRepository]. It names the data source *interface*, which
+/// is why going live meant changing one provider binding and nothing else.
 class RestaurantRepositoryImpl implements RestaurantRepository {
   const RestaurantRepositoryImpl(this._dataSource);
 
-  final RestaurantMockDataSource _dataSource;
+  final RestaurantDataSource _dataSource;
 
   @override
   Future<List<Restaurant>> getNearbyRestaurants() async {

@@ -1,7 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:zopiqnow/features/home/data/datasources/home_catalog_datasource.dart';
-import 'package:zopiqnow/features/home/data/datasources/restaurant_mock_datasource.dart';
+import 'package:zopiqnow/features/home/data/datasources/restaurant_datasource.dart';
+import 'package:zopiqnow/features/home/data/datasources/restaurant_supabase_datasource.dart';
 import 'package:zopiqnow/features/home/data/repositories/restaurant_repository_impl.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/domain/entities/offer.dart';
@@ -9,11 +10,11 @@ import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/domain/repositories/restaurant_repository.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_filters.dart';
 
-/// Data source binding. Overridden in tests to inject latency/failure, and
-/// later replaced by the HTTP data source.
-final Provider<RestaurantMockDataSource> restaurantDataSourceProvider =
-    Provider<RestaurantMockDataSource>(
-      (Ref ref) => const RestaurantMockDataSource(),
+/// Data source binding — Postgres, as of Step 7. Tests override it with
+/// [RestaurantMockDataSource] to inject latency and failure without a network.
+final Provider<RestaurantDataSource> restaurantDataSourceProvider =
+    Provider<RestaurantDataSource>(
+      (Ref ref) => const RestaurantSupabaseDataSource(),
     );
 
 /// Repository binding — the seam the UI depends on (SAD 7.4).
