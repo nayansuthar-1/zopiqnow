@@ -1,29 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
-/// Home header as a sliver: delivery location + profile, with the search entry
-/// docked beneath.
+import 'package:zopiqnow/features/home/presentation/providers/home_filters.dart';
+import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/home_hero_carousel.dart';
+
+/// Home header as a Zomato-style collapsing sliver, built *around* the hero
+/// carousel.
 ///
-/// Styled to sit on the brand hero (Zomato's home): solid `primary` background
-/// that the [HomeHeroBanner] gradient below continues, white ink, and a white
-/// search pill. Because the bar itself carries the brand color, it still looks
-/// right when it floats back mid-list.
+/// **At the top** there is no chrome at all: the swipeable carousel is
+/// full-bleed from the very top of the screen (behind the status bar), and the
+/// delivery location + profile and the search pill + "Veg" toggle simply float
+/// over it. The app bar is effectively transparent.
 ///
-/// `floating: true, snap: true` gives Swiggy's behaviour — the header scrolls
-/// away to hand the list the full screen, and springs straight back on the first
-/// upward drag rather than making the user scroll all the way to the top.
+/// **On scroll** the carousel slides up and out, the location row fades away,
+/// and the search + veg row rises into a solid `primary` strip that pins under
+/// the status bar — Zomato's sticky search. The search row is one widget whose
+/// top is interpolated by the collapse fraction, so it *travels* into the bar
+/// rather than being duplicated.
 ///
-/// `primary: false` because Home wraps the whole scroll view in a [SafeArea].
-/// Left primary, this bar would eat the status-bar inset itself, and the pinned
-/// filter chips would then slide *under* the status bar once it scrolled away.
+/// `primary: false`: this bar owns the status-bar area itself (Home no longer
+/// wraps the scroll view in a SafeArea), and the header content is inset by the
+/// real `MediaQuery` top padding so the carousel can bleed behind the clock.
 class HomeSliverAppBar extends StatelessWidget {
   const HomeSliverAppBar({
     required this.address,
     this.onTapLocation,
     this.onTapSearch,
     this.onTapProfile,
-    this.trailing,
+    this.onTapCta,
     super.key,
   });
 
@@ -32,40 +39,141 @@ class HomeSliverAppBar extends StatelessWidget {
   final VoidCallback? onTapSearch;
   final VoidCallback? onTapProfile;
 
-  /// Optional extra action (e.g. a debug entry point).
-  final Widget? trailing;
+  /// Forwarded to the carousel's "Order now" CTA.
+  final VoidCallback? onTapCta;
 
-  static const double _searchHeight = 60;
+  // Header metrics (below the status-bar inset).
+  static const double _topPad = ZopiqSpacing.sm; // 8
+  static const double _rowHeight = 44; // address row & search pill
+  static const double _rowGap = ZopiqSpacing.sm + ZopiqSpacing.xxs; // 10
+  static const double _belowSearch = ZopiqSpacing.sm; // 8
+
+  /// Header content height, status-bar inset excluded.
+  static const double _headerBody =
+      _topPad + _rowHeight + _rowGap + _rowHeight; // 106
 
   @override
   Widget build(BuildContext context) {
+    final double inset = MediaQuery.paddingOf(context).top;
+    final double width = MediaQuery.sizeOf(context).width;
+
+    // The visible promo area under the header; the carousel is the sum. Sized
+    // for the tallest slide (a two-line headline + subline + CTA) so nothing
+    // clips.
+    final double promoHeight = (width * 0.58).clamp(238.0, 262.0);
+    final double headerInset = inset + _headerBody + _belowSearch;
+    final double expanded = headerInset + promoHeight;
+    // The pinned strip: status inset + a padded search pill.
+    final double collapsed = inset + _topPad + _rowHeight + _topPad;
+
+    final double searchTopExpanded = inset + _topPad + _rowHeight + _rowGap;
+    final double searchTopCollapsed = inset + _topPad;
+
     return SliverAppBar(
-      floating: true,
-      snap: true,
+      pinned: true,
       primary: false,
-      toolbarHeight: 60,
-      titleSpacing: ZopiqSpacing.pageGutter,
+      automaticallyImplyLeading: false,
+      expandedHeight: expanded,
+      collapsedHeight: collapsed,
+      toolbarHeight: collapsed,
       backgroundColor: ZopiqPalette.primary,
-      // White status-bar icons over the brand hero, in both themes.
+      elevation: 0,
       systemOverlayStyle: SystemUiOverlayStyle.light,
-      actionsIconTheme: const IconThemeData(color: ZopiqPalette.white),
-      title: _LocationTitle(address: address, onTap: onTapLocation),
-      actions: <Widget>[
-        ?trailing,
-        _ProfileButton(onTap: onTapProfile),
-        const SizedBox(width: ZopiqSpacing.pageGutter),
-      ],
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(_searchHeight),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            ZopiqSpacing.pageGutter,
-            0,
-            ZopiqSpacing.pageGutter,
-            ZopiqSpacing.lg,
-          ),
-          child: _SearchField(onTap: onTapSearch),
-        ),
+      flexibleSpace: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final double h = constraints.maxHeight;
+          final double shrink = expanded - h;
+          final double t = (shrink / (expanded - collapsed)).clamp(0.0, 1.0);
+
+          // The location row leaves quickly, well before it could touch the
+          // rising search pill.
+          final double locationOpacity = (1 - t * 2.2).clamp(0.0, 1.0);
+          // The solid strip only takes over near the end, so the carousel stays
+          // clear (not veiled) through most of the scroll.
+          final double solidAlpha = ((t - 0.55) / 0.45).clamp(0.0, 1.0);
+          // The search pill rises from just under the location row to the top.
+          final double searchTop =
+              searchTopExpanded +
+              (searchTopCollapsed - searchTopExpanded) * t;
+
+          return ClipRect(
+            child: Stack(
+              children: <Widget>[
+                // The carousel, full height, translated up as the bar collapses
+                // so it scrolls away naturally (no squish).
+                Positioned(
+                  top: -shrink,
+                  left: 0,
+                  right: 0,
+                  height: expanded,
+                  child: IgnorePointer(
+                    ignoring: t > 0.5,
+                    child: HomeHeroCarousel(
+                      headerInset: headerInset,
+                      promoHeight: promoHeight,
+                      onTapCta: onTapCta,
+                    ),
+                  ),
+                ),
+
+                // Solid brand fill that fades in to become the pinned bar.
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: ZopiqPalette.primary.withValues(alpha: solidAlpha),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Location + profile — fades and lifts away on collapse.
+                Positioned(
+                  left: ZopiqSpacing.pageGutter,
+                  right: ZopiqSpacing.pageGutter,
+                  top: inset + _topPad,
+                  height: _rowHeight,
+                  child: IgnorePointer(
+                    ignoring: locationOpacity < 0.1,
+                    child: Opacity(
+                      opacity: locationOpacity,
+                      child: Transform.translate(
+                        offset: Offset(0, -10 * t),
+                        child: Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: _LocationTitle(
+                                address: address,
+                                onTap: onTapLocation,
+                              ),
+                            ),
+                            const SizedBox(width: ZopiqSpacing.sm),
+                            _ProfileButton(onTap: onTapProfile),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Search + veg — travels up into the pinned strip.
+                Positioned(
+                  left: ZopiqSpacing.pageGutter,
+                  right: ZopiqSpacing.pageGutter,
+                  top: searchTop,
+                  height: _rowHeight,
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(child: _SearchField(onTap: onTapSearch)),
+                      const SizedBox(width: ZopiqSpacing.sm),
+                      const _VegToggle(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -112,9 +220,7 @@ class _LocationTitle extends StatelessWidget {
                         address,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: t.titleSmall?.copyWith(
-                          color: ZopiqPalette.white,
-                        ),
+                        style: t.titleSmall?.copyWith(color: ZopiqPalette.white),
                       ),
                     ),
                     const Icon(
@@ -169,7 +275,7 @@ class _SearchField extends StatelessWidget {
       onTap: onTap,
       borderRadius: ZopiqRadii.rMd,
       child: Container(
-        height: 44,
+        height: HomeSliverAppBar._rowHeight,
         padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.md),
         // Fixed light colors in both themes: this pill sits on the brand
         // hero, not on the scaffold, so it must not flip with the mode.
@@ -187,6 +293,8 @@ class _SearchField extends StatelessWidget {
                 // Search matches restaurant names and cuisines, not dish names —
                 // say so rather than promise what it does not do.
                 'Search for restaurants or cuisines',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: t.bodyMedium?.copyWith(color: ZopiqPalette.textMuted),
               ),
             ),
@@ -196,6 +304,101 @@ class _SearchField extends StatelessWidget {
               size: 22,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Zomato's "Veg Mode": a white pill with a mini switch that filters the whole
+/// feed to pure-veg restaurants. It shares the `pureVeg` filter, so flipping it
+/// also lights the "Pure Veg" chip below (and vice-versa) — one source of truth.
+class _VegToggle extends ConsumerWidget {
+  const _VegToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bool on = ref.watch(
+      homeFiltersProvider.select((HomeFilters f) => f.pureVeg),
+    );
+    final ZopiqColors zc = context.zc;
+
+    return Semantics(
+      button: true,
+      toggled: on,
+      label: 'Veg mode',
+      child: InkWell(
+        onTap: ref.read(homeFiltersProvider.notifier).togglePureVeg,
+        borderRadius: ZopiqRadii.rMd,
+        child: Container(
+          height: HomeSliverAppBar._rowHeight,
+          padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.sm),
+          decoration: BoxDecoration(
+            color: ZopiqPalette.white,
+            borderRadius: ZopiqRadii.rMd,
+            border: Border.all(
+              color: on ? zc.veg : Colors.transparent,
+              width: 1.5,
+            ),
+            boxShadow: const <BoxShadow>[
+              BoxShadow(color: Color(0x1F000000), blurRadius: 8),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _MiniToggle(on: on),
+              const SizedBox(width: ZopiqSpacing.xs),
+              Text(
+                'Veg',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: on ? zc.veg : ZopiqPalette.textMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A compact on/off track with a sliding knob — small enough to sit inside the
+/// veg pill without a Material [Switch]'s bulk.
+class _MiniToggle extends StatelessWidget {
+  const _MiniToggle({required this.on});
+
+  final bool on;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+
+    return AnimatedContainer(
+      duration: ZopiqDurations.fast,
+      curve: ZopiqCurves.standard,
+      width: 32,
+      height: 18,
+      decoration: BoxDecoration(
+        color: on ? zc.veg : ZopiqPalette.textMuted.withValues(alpha: 0.5),
+        borderRadius: ZopiqRadii.rPill,
+      ),
+      child: AnimatedAlign(
+        duration: ZopiqDurations.fast,
+        curve: ZopiqCurves.standard,
+        alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          width: 14,
+          height: 14,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          decoration: const BoxDecoration(
+            color: ZopiqPalette.white,
+            shape: BoxShape.circle,
+            boxShadow: <BoxShadow>[
+              BoxShadow(color: Color(0x33000000), blurRadius: 2),
+            ],
+          ),
         ),
       ),
     );

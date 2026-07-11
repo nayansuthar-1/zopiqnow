@@ -1,20 +1,16 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
-import 'package:zopiqnow/features/home/domain/entities/offer.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/domain/repositories/restaurant_repository.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/food_category_rail.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_app_bar.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_filter_chips.dart';
-import 'package:zopiqnow/features/home/presentation/widgets/home_hero_banner.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_status_views.dart';
-import 'package:zopiqnow/features/home/presentation/widgets/offers_carousel.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_list_skeleton.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/section_header.dart';
@@ -71,87 +67,64 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     final List<FoodCategory> categories = ref.watch(foodCategoriesProvider);
-    final List<Offer> offers = ref.watch(offersProvider);
     final Address? address = ref.watch(selectedAddressProvider);
 
+    // Full-bleed: no top SafeArea, so the hero carousel bleeds behind the
+    // status bar. The app bar insets its own content by the real top padding,
+    // and — because it owns the status-bar area — the pinned filter chips still
+    // stop below the clock rather than under it.
+    final double topInset = MediaQuery.paddingOf(context).top;
+
     return Scaffold(
-      // The strip behind the status bar carries the hero color, so the brand
-      // header reads as full-bleed (Zomato's home) instead of floating under
-      // a bare system bar.
-      body: ColoredBox(
-        color: ZopiqPalette.primary,
-        // The scroll view itself still sits below the status bar. Without
-        // this, the pinned filter chips slide under the clock once the app
-        // bar snaps away.
-        child: SafeArea(
-          bottom: false,
-          child: ColoredBox(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            child: RefreshIndicator(
-              // The spinner drops over the hero, so it must not be hero-colored.
-              color: ZopiqPalette.primaryDeep,
-              backgroundColor: ZopiqPalette.white,
-              onRefresh: () => ref.refresh(nearbyRestaurantsProvider.future),
-              child: CustomScrollView(
-                controller: _scroll,
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-                slivers: <Widget>[
-                  HomeSliverAppBar(
-                    // Null on a first run. Inventing a default city would be
-                    // a lie about where we deliver — ask instead.
-                    address: address?.shortDisplay ?? 'Set delivery location',
-                    onTapLocation: () => showAddressPicker(context),
-                    onTapSearch: () => context.goNamed(Routes.search),
-                    // Until the Account feature lands, the profile button
-                    // opens the credits screen — which the artwork licence
-                    // requires us to ship anyway. Better a real destination
-                    // than a tap that does nothing.
-                    onTapProfile: () => context.pushNamed(Routes.licenses),
-                    trailing: kDebugMode
-                        ? IconButton(
-                            tooltip: 'Design system',
-                            onPressed: () => context.push('/showcase'),
-                            icon: const Icon(Icons.palette_outlined),
-                          )
-                        : null,
-                  ),
-                  SliverToBoxAdapter(
-                    child: HomeHeroBanner(onTapCta: _scrollTowardsRestaurants),
-                  ),
-                  SliverToBoxAdapter(
-                    child: OffersCarousel(
-                      offers: offers,
-                      onTapOffer: (Offer _) {},
-                    ),
-                  ),
-                  const SliverToBoxAdapter(
-                    child: SectionHeader(title: "What's on your mind?"),
-                  ),
-                  SliverToBoxAdapter(
-                    child: FoodCategoryRail(
-                      categories: categories,
-                      onTapCategory: (FoodCategory _) {},
-                    ),
-                  ),
-                  const SliverToBoxAdapter(child: SectionDivider()),
-                  const _TopChainsSection(),
-                  const SliverToBoxAdapter(child: SectionDivider()),
-                  const SliverToBoxAdapter(
-                    child: SectionHeader(
-                      title: 'Restaurants with online food delivery',
-                    ),
-                  ),
-                  const SliverPersistentHeader(
-                    pinned: true,
-                    delegate: HomeFilterChipsHeader(),
-                  ),
-                  const _RestaurantListSection(),
-                ],
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: RefreshIndicator(
+        // The spinner drops over the hero, so it must not be hero-colored.
+        color: ZopiqPalette.primaryDeep,
+        backgroundColor: ZopiqPalette.white,
+        // Sit the spinner just below the status bar, clear of the search pill.
+        edgeOffset: topInset + ZopiqSpacing.sm,
+        displacement: 40,
+        onRefresh: () => ref.refresh(nearbyRestaurantsProvider.future),
+        child: CustomScrollView(
+          controller: _scroll,
+          // Clamping (not bouncing): a pull-to-refresh drags only the
+          // spinner, never the hero. The content stays put on overscroll.
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: ClampingScrollPhysics(),
+          ),
+          slivers: <Widget>[
+            HomeSliverAppBar(
+              // Null on a first run. Inventing a default city would be
+              // a lie about where we deliver — ask instead.
+              address: address?.shortDisplay ?? 'Set delivery location',
+              onTapLocation: () => showAddressPicker(context),
+              onTapSearch: () => context.goNamed(Routes.search),
+              onTapProfile: () => context.pushNamed(Routes.account),
+              onTapCta: _scrollTowardsRestaurants,
+            ),
+            const SliverToBoxAdapter(
+              child: SectionHeader(title: "What's on your mind?"),
+            ),
+            SliverToBoxAdapter(
+              child: FoodCategoryRail(
+                categories: categories,
+                onTapCategory: (FoodCategory _) {},
               ),
             ),
-          ),
+            const SliverToBoxAdapter(child: SectionDivider()),
+            const _TopChainsSection(),
+            const SliverToBoxAdapter(child: SectionDivider()),
+            const SliverToBoxAdapter(
+              child: SectionHeader(
+                title: 'Restaurants with online food delivery',
+              ),
+            ),
+            const SliverPersistentHeader(
+              pinned: true,
+              delegate: HomeFilterChipsHeader(),
+            ),
+            const _RestaurantListSection(),
+          ],
         ),
       ),
     );
