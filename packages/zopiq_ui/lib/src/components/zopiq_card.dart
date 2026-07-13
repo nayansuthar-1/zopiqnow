@@ -33,16 +33,6 @@ class ZopiqCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: surface,
         borderRadius: borderRadius,
-        border: elevated ? null : Border.all(color: zc.divider),
-        boxShadow: elevated
-            ? <BoxShadow>[
-                BoxShadow(
-                  color: zc.cardShadow,
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
       ),
       child: Material(
         type: MaterialType.transparency,

@@ -19,13 +19,13 @@ abstract final class ZopiqPalette {
   static const Color textDark = Color(0xFF282C3F); // headings / primary text
   static const Color textMuted = Color(0xFF7E808C); // captions / secondary
   static const Color surfaceLight = Color(0xFFFFFFFF); // cards / sheets
-  static const Color backgroundLight = Color(0xFFF4F4F5); // app background
+  static const Color backgroundLight = Color(0xFFFFFFFF);
   static const Color dividerLight = Color(0xFFE9E9EB);
 
   // --- Neutrals (dark mode) ---
-  static const Color backgroundDark = Color(0xFF0F1013);
-  static const Color surfaceDark = Color(0xFF1C1D22);
-  static const Color surfaceDarkElevated = Color(0xFF25262C);
+  static const Color backgroundDark = Color(0xFF000000);
+  static const Color surfaceDark = Color(0xFF000000);
+  static const Color surfaceDarkElevated = Color(0xFF141414);
   static const Color textLight = Color(0xFFF0F1F5);
   static const Color textMutedDark = Color(0xFF9A9CA8);
   static const Color dividerDark = Color(0xFF2A2B31);

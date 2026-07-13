@@ -238,11 +238,7 @@ class _HeroSlideViewState extends State<_HeroSlideView>
           end: Alignment.bottomRight,
           colors: s.gradient,
         ),
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(ZopiqRadii.xl),
-        ),
       ),
-      clipBehavior: Clip.antiAlias,
       child: Stack(
         fit: StackFit.expand,
         children: <Widget>[

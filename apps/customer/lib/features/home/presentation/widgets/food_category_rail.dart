@@ -16,22 +16,26 @@ class FoodCategoryRail extends StatelessWidget {
   final List<FoodCategory> categories;
   final ValueChanged<FoodCategory>? onTapCategory;
 
-  static const double _artSize = 76;
-  static const double _tileWidth = 84;
+  static const double _artSize = 40;
+  static const double _tileWidth = 48;
 
-  /// Art + gap + one line of label, so the rail never reflows on long names.
-  static const double _railHeight = _artSize + ZopiqSpacing.sm + 18;
+  /// Art + top pad + gap + one line of label, so the rail never reflows on long names.
+  static const double railHeight = _artSize + ZopiqSpacing.lg + ZopiqSpacing.sm + 18;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: _railHeight,
+      height: railHeight,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: ZopiqSpacing.pagePadding,
+        padding: const EdgeInsets.only(
+          left: ZopiqSpacing.md,
+          right: ZopiqSpacing.md,
+          top: ZopiqSpacing.lg,
+        ),
         physics: const BouncingScrollPhysics(),
         itemCount: categories.length,
-        separatorBuilder: (_, _) => const SizedBox(width: ZopiqSpacing.md),
+        separatorBuilder: (_, _) => const SizedBox(width: ZopiqSpacing.sm),
         itemBuilder: (BuildContext context, int i) {
           final FoodCategory category = categories[i];
           // Each tile paints independently: pressing one must not repaint the row.

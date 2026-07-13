@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_filters.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_hero_carousel.dart';
@@ -43,7 +44,7 @@ class HomeSliverAppBar extends StatelessWidget {
   final VoidCallback? onTapCta;
 
   // Header metrics (below the status-bar inset).
-  static const double _topPad = ZopiqSpacing.sm; // 8
+  static const double _topPad = ZopiqSpacing.pageGutter; // 16
   static const double _rowHeight = 44; // address row & search pill
   static const double _rowGap = ZopiqSpacing.sm + ZopiqSpacing.xxs; // 10
   static const double _belowSearch = ZopiqSpacing.sm; // 8
@@ -76,7 +77,7 @@ class HomeSliverAppBar extends StatelessWidget {
       expandedHeight: expanded,
       collapsedHeight: collapsed,
       toolbarHeight: collapsed,
-      backgroundColor: ZopiqPalette.primary,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       elevation: 0,
       systemOverlayStyle: SystemUiOverlayStyle.light,
       flexibleSpace: LayoutBuilder(
@@ -96,8 +97,16 @@ class HomeSliverAppBar extends StatelessWidget {
               searchTopExpanded +
               (searchTopCollapsed - searchTopExpanded) * t;
 
-          return ClipRect(
-            child: Stack(
+          final SystemUiOverlayStyle overlayStyle = t > 0.5 
+              ? (Theme.of(context).brightness == Brightness.dark 
+                  ? SystemUiOverlayStyle.light 
+                  : SystemUiOverlayStyle.dark)
+              : SystemUiOverlayStyle.light;
+
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: overlayStyle,
+            child: ClipRect(
+              child: Stack(
               children: <Widget>[
                 // The carousel, full height, translated up as the bar collapses
                 // so it scrolls away naturally (no squish).
@@ -121,7 +130,7 @@ class HomeSliverAppBar extends StatelessWidget {
                   child: IgnorePointer(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: ZopiqPalette.primary.withValues(alpha: solidAlpha),
+                        color: Theme.of(context).colorScheme.surface.withValues(alpha: solidAlpha),
                       ),
                     ),
                   ),
@@ -170,8 +179,10 @@ class HomeSliverAppBar extends StatelessWidget {
                     ],
                   ),
                 ),
+
               ],
             ),
+          ),
           );
         },
       ),
@@ -288,20 +299,19 @@ class _SearchField extends StatelessWidget {
         ),
         child: Row(
           children: <Widget>[
-            Expanded(
-              child: Text(
-                // Search matches restaurant names and cuisines, not dish names —
-                // say so rather than promise what it does not do.
-                'Search for restaurants or cuisines',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: t.bodyMedium?.copyWith(color: ZopiqPalette.textMuted),
-              ),
-            ),
             const Icon(
               Icons.search_rounded,
               color: ZopiqPalette.primaryDeep,
               size: 22,
+            ),
+            const SizedBox(width: ZopiqSpacing.sm),
+            Expanded(
+              child: Text(
+                'Search "Biryani"',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: t.bodyMedium?.copyWith(color: ZopiqPalette.textMuted),
+              ),
             ),
           ],
         ),
@@ -329,33 +339,23 @@ class _VegToggle extends ConsumerWidget {
       label: 'Veg mode',
       child: InkWell(
         onTap: ref.read(homeFiltersProvider.notifier).togglePureVeg,
-        borderRadius: ZopiqRadii.rMd,
+        borderRadius: ZopiqRadii.rPill,
         child: Container(
           height: HomeSliverAppBar._rowHeight,
+          alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.sm),
-          decoration: BoxDecoration(
-            color: ZopiqPalette.white,
-            borderRadius: ZopiqRadii.rMd,
-            border: Border.all(
-              color: on ? zc.veg : Colors.transparent,
-              width: 1.5,
-            ),
-            boxShadow: const <BoxShadow>[
-              BoxShadow(color: Color(0x1F000000), blurRadius: 8),
-            ],
-          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              _MiniToggle(on: on),
-              const SizedBox(width: ZopiqSpacing.xs),
               Text(
                 'Veg',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: on ? zc.veg : ZopiqPalette.textMuted,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
+                  color: ZopiqPalette.white,
                 ),
               ),
+              const SizedBox(width: ZopiqSpacing.xs),
+              _MiniToggle(on: on),
             ],
           ),
         ),

@@ -15,26 +15,33 @@ class TopChainsRail extends StatelessWidget {
   final List<Restaurant> restaurants;
   final ValueChanged<Restaurant>? onTapRestaurant;
 
-  static const double _cardWidth = 156;
-  static const double _imageHeight = 156;
-  static const double _railHeight = 244;
+  static const double _cardWidth = 112;
+  static const double _imageHeight = 112;
+  static const double _cardHeight = 180;
+  static const double _railHeight = (_cardHeight * 2) + ZopiqSpacing.md;
 
   @override
   Widget build(BuildContext context) {
+    final List<Restaurant> items = restaurants.take(8).toList();
     return SizedBox(
       height: _railHeight,
-      child: ListView.separated(
+      child: GridView.builder(
         scrollDirection: Axis.horizontal,
         padding: ZopiqSpacing.pagePadding,
         physics: const BouncingScrollPhysics(),
-        itemCount: restaurants.length,
-        separatorBuilder: (_, _) => const SizedBox(width: ZopiqSpacing.md),
+        itemCount: items.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: ZopiqSpacing.md,
+          crossAxisSpacing: ZopiqSpacing.md,
+          mainAxisExtent: _cardWidth,
+        ),
         itemBuilder: (BuildContext context, int i) => RepaintBoundary(
           child: _ChainCard(
-            restaurant: restaurants[i],
+            restaurant: items[i],
             onTap: onTapRestaurant == null
                 ? null
-                : () => onTapRestaurant!(restaurants[i]),
+                : () => onTapRestaurant!(items[i]),
           ),
         ),
       ),

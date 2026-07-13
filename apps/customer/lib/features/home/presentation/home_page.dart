@@ -20,6 +20,7 @@ import 'package:zopiqnow/features/location/presentation/providers/location_provi
 import 'package:zopiqnow/features/location/presentation/widgets/address_picker_sheet.dart';
 
 import 'package:zopiqnow/app/router.dart';
+import 'package:zopiqnow/app/providers/bottom_nav_provider.dart';
 
 /// Opens a restaurant's menu. Shared by the list cards and the top-chains rail.
 void _openMenu(BuildContext context, Restaurant restaurant) {
@@ -43,11 +44,57 @@ class HomePage extends ConsumerStatefulWidget {
   ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends ConsumerState<HomePage> {
+class _HomePageState extends ConsumerState<HomePage>
+    with SingleTickerProviderStateMixin {
   final ScrollController _scroll = ScrollController();
+  AnimationController? _filterAnimCtrl;
+  Animation<double>? _filterAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _initAnim();
+    _scroll.addListener(_onScroll);
+  }
+
+  void _initAnim() {
+    _filterAnimCtrl ??= AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+      value: 1.0,
+    );
+    _filterAnim ??= CurvedAnimation(
+      parent: _filterAnimCtrl!,
+      curve: Curves.easeInOutCubic,
+    );
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final bool atTop = _scroll.offset <= 10;
+    final bool isVisible = ref.read(bottomNavVisibilityProvider);
+    if (atTop != isVisible) {
+      ref.read(bottomNavVisibilityProvider.notifier).state = atTop;
+    }
+
+    final bool shouldHideFilters = _scroll.offset > 400; // Half of Top Chains
+    if (_filterAnimCtrl != null) {
+      if (shouldHideFilters &&
+          _filterAnimCtrl!.status != AnimationStatus.dismissed &&
+          _filterAnimCtrl!.status != AnimationStatus.reverse) {
+        _filterAnimCtrl!.reverse();
+      } else if (!shouldHideFilters &&
+          _filterAnimCtrl!.status != AnimationStatus.completed &&
+          _filterAnimCtrl!.status != AnimationStatus.forward) {
+        _filterAnimCtrl!.forward();
+      }
+    }
+  }
 
   @override
   void dispose() {
+    _filterAnimCtrl?.dispose();
+    _scroll.removeListener(_onScroll);
     _scroll.dispose();
     super.dispose();
   }
@@ -76,7 +123,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final double topInset = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: RefreshIndicator(
         // The spinner drops over the hero, so it must not be hero-colored.
         color: ZopiqPalette.primaryDeep,
@@ -102,26 +149,29 @@ class _HomePageState extends ConsumerState<HomePage> {
               onTapProfile: () => context.pushNamed(Routes.account),
               onTapCta: _scrollTowardsRestaurants,
             ),
-            const SliverToBoxAdapter(
-              child: SectionHeader(title: "What's on your mind?"),
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _FoodCategoryRailDelegate(categories),
             ),
-            SliverToBoxAdapter(
-              child: FoodCategoryRail(
-                categories: categories,
-                onTapCategory: (FoodCategory _) {},
-              ),
+            const SliverToBoxAdapter(child: SizedBox(height: ZopiqSpacing.lg)),
+            AnimatedBuilder(
+              animation: _filterAnim ?? const AlwaysStoppedAnimation(1.0),
+              builder: (BuildContext context, Widget? child) {
+                _initAnim(); // Ensure init on hot reload
+                return SliverPersistentHeader(
+                  pinned: true,
+                  delegate: HomeFilterChipsHeader(
+                    heightFactor: _filterAnim!.value,
+                  ),
+                );
+              },
             ),
-            const SliverToBoxAdapter(child: SectionDivider()),
             const _TopChainsSection(),
-            const SliverToBoxAdapter(child: SectionDivider()),
+            const SliverToBoxAdapter(child: SizedBox(height: ZopiqSpacing.lg)),
             const SliverToBoxAdapter(
               child: SectionHeader(
                 title: 'Restaurants with online food delivery',
               ),
-            ),
-            const SliverPersistentHeader(
-              pinned: true,
-              delegate: HomeFilterChipsHeader(),
             ),
             const _RestaurantListSection(),
           ],
@@ -147,7 +197,7 @@ class _TopChainsSection extends ConsumerWidget {
     return SliverMainAxisGroup(
       slivers: <Widget>[
         const SliverToBoxAdapter(
-          child: SectionHeader(title: 'Top restaurant chains'),
+          child: SectionHeader(title: 'Recommended for you'),
         ),
         SliverToBoxAdapter(
           child: TopChainsRail(
@@ -211,5 +261,32 @@ class _RestaurantListSection extends ConsumerWidget {
         );
       },
     );
+  }
+}
+
+class _FoodCategoryRailDelegate extends SliverPersistentHeaderDelegate {
+  _FoodCategoryRailDelegate(this.categories);
+  final List<FoodCategory> categories;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surface,
+      child: FoodCategoryRail(
+        categories: categories,
+        onTapCategory: (FoodCategory _) {},
+      ),
+    );
+  }
+
+  @override
+  double get maxExtent => FoodCategoryRail.railHeight;
+
+  @override
+  double get minExtent => FoodCategoryRail.railHeight;
+
+  @override
+  bool shouldRebuild(covariant _FoodCategoryRailDelegate oldDelegate) {
+    return categories != oldDelegate.categories;
   }
 }

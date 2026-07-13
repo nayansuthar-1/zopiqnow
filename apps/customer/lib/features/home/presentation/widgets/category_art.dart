@@ -27,42 +27,22 @@ class CategoryArt extends StatelessWidget {
 
     return SizedBox.square(
       dimension: size,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: theme.colorScheme.surfaceContainerHigh,
-          // A soft lift so each 3D render sits on a tactile chip, not flat on
-          // the background.
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.10),
-              blurRadius: size * 0.12,
-              offset: Offset(0, size * 0.05),
-            ),
-          ],
-        ),
-        child: asset == null
-            ? Center(
-                child: Icon(
-                  Icons.restaurant_rounded,
-                  size: size * 0.4,
-                  color: theme.colorScheme.primary,
-                ),
-              )
-            : Padding(
-                padding: EdgeInsets.all(inset),
-                child: Image.asset(
-                  asset,
-                  fit: BoxFit.contain,
-                  // Decode at display resolution, not the 256px source: a rail
-                  // of 16 full-size bitmaps is the classic scroll-jank source.
-                  cacheWidth:
-                      ((size - inset * 2) *
-                              MediaQuery.devicePixelRatioOf(context))
-                          .round(),
-                ),
+      child: asset == null
+          ? Center(
+              child: Icon(
+                Icons.restaurant_rounded,
+                size: size * 0.4,
+                color: theme.colorScheme.primary,
               ),
-      ),
+            )
+          : Image.asset(
+              asset,
+              fit: BoxFit.contain,
+              // Decode at display resolution, not the 256px source: a rail
+              // of 16 full-size bitmaps is the classic scroll-jank source.
+              cacheWidth:
+                  (size * MediaQuery.devicePixelRatioOf(context)).round(),
+            ),
     );
   }
 }

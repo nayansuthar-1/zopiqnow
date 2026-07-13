@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.siteonlab.zopiqnow"
     // compileSdk tracks the pinned Flutter SDK (3.44.5 -> API 36). See ENGINEERING_RULES.md Rule 3.
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     // NDK pinned explicitly (frozen per Rule 3), independent of Flutter SDK swaps.
     ndkVersion = "28.2.13676358"
 

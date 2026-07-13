@@ -187,9 +187,11 @@ class _SortSheet extends StatelessWidget {
   }
 }
 
-/// Makes [HomeFilterChips] usable as a pinned sliver.
+/// Makes [HomeFilterChips] usable as a pinned sliver, with dynamic height.
 class HomeFilterChipsHeader extends SliverPersistentHeaderDelegate {
-  const HomeFilterChipsHeader();
+  const HomeFilterChipsHeader({this.heightFactor = 1.0});
+
+  final double heightFactor;
 
   @override
   double get minExtent => HomeFilterChips.height;
@@ -203,9 +205,19 @@ class HomeFilterChipsHeader extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return const HomeFilterChips();
+    // heightFactor animates from 1.0 (visible) to 0.0 (hidden).
+    // By keeping the layout extent fixed, we prevent any scroll jumps or dead zones.
+    // The Transform visually slides the bar up, revealing the content scrolling underneath it.
+    final double dy = -HomeFilterChips.height * (1.0 - heightFactor);
+    return ClipRect(
+      child: Transform.translate(
+        offset: Offset(0, dy),
+        child: const HomeFilterChips(),
+      ),
+    );
   }
 
   @override
-  bool shouldRebuild(HomeFilterChipsHeader oldDelegate) => false;
+  bool shouldRebuild(HomeFilterChipsHeader oldDelegate) =>
+      heightFactor != oldDelegate.heightFactor;
 }
