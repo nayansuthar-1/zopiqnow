@@ -27,11 +27,13 @@ abstract interface class OrderRepository {
   /// Throws [OrderPlacementFailure] on any transport error, or with the
   /// service's own message when it rejects the order (a dish went unavailable,
   /// a coupon no longer applies).
+  /// The buyer is whoever the session says they are — the order service reads it
+  /// from the JWT, so there is no user id to pass. [userPhone] is the number the
+  /// rider calls.
   Future<PlacedOrder> placeOrder({
     required Cart cart,
     required Address deliveryAddress,
     required PaymentMethod paymentMethod,
-    required String userId,
     required String userPhone,
     String? couponCode,
     String? paymentId,

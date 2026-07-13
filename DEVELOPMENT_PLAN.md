@@ -184,11 +184,32 @@ and a server-created payment order, so the UPI tile stays disabled until the
 backend (Step 7). The `PaymentMethod` seam is already in place. Verify on the
 Android 10 device before calling the step done.
 
-### Step 7 — Backend wiring
+### Step 7 — Backend wiring ← **in progress**
 Swap each mock data source for its HTTP implementation, one repository at a time. If
 the domain layer was respected, no widget changes. This step is the test of whether it
 was. Absorbs Razorpay (UPI/cards): the SDK is a dependency change request, and online
 payment needs the backend to create the payment order.
+
+Catalog, menus, pricing and coupons, and order placement are on Postgres. Auth is the
+last mock, and it moved to **email OTP, not SMS** — there is no SMS provider yet
+(2026-07-13). Decisions worth remembering:
+- **Email is the identity; the phone number is a delivery detail.** An account can
+  exist without a number, so checkout asks for one before it will place an order and
+  stores it in the user's metadata. Supabase's `phone` column is deliberately not used:
+  writing it starts an SMS verification we cannot complete.
+- **The session lives in the Keystore, not SharedPreferences.** `supabase_flutter`
+  defaults to prefs — a plaintext file holding a long-lived refresh token — so
+  `SupabaseSecureLocalStorage` points it at the same secure store we always used.
+- **`place_order` no longer takes a user id** (migration 0004). It reads `auth.uid()`
+  from the caller's JWT. A client that can name the buyer can buy in someone else's name.
+- The phone-OTP mock is gone rather than parked: it was typed against a domain that no
+  longer exists, and the rules it modelled (6 digits, TTL, attempt cap) are now enforced
+  by Supabase. Git history has it; `FakeAuthDataSource` carries the same rules in tests.
+
+**Still owed here:** Google sign-in (the button ships disabled and says so — the OAuth
+clients do not exist yet, and `google_sign_in` is an unapproved dependency change
+request), a working SMTP sender (Gmail app password currently rejected, so no code can
+actually be delivered), and the Razorpay wiring inherited from Step 6.
 
 ### Step 8 — Order tracking
 Live status, driver location stream, tri-tracking map.

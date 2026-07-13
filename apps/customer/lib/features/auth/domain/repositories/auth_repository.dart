@@ -1,29 +1,41 @@
-import 'package:zopiqnow/features/auth/domain/entities/auth_session.dart';
+import 'package:zopiqnow/features/auth/domain/entities/auth_user.dart';
 
-/// Contract for phone-OTP authentication (SAD 9.1 / 9.3).
+/// Contract for email-OTP authentication (SAD 9.1 / 9.3).
 ///
-/// Mock today, HTTP at Step 7. The presentation layer depends only on this, so
-/// swapping the data source must not touch a widget.
+/// Email, not SMS: there is no SMS provider yet. The phone-OTP contract is
+/// preserved in `AuthMockDataSource` — when an SMS provider lands, the transport
+/// swaps and these screens barely move.
 abstract interface class AuthRepository {
   /// Restores a persisted session, or null when signed out.
   ///
   /// Never throws: a corrupt or unreadable session is treated as signed out,
   /// because a user who cannot read their token must still reach the login
   /// screen rather than a crash on launch.
-  Future<AuthSession?> restoreSession();
+  Future<AuthUser?> restoreSession();
 
-  /// Sends a 6-digit OTP to [phone] (E.164).
+  /// Emails a 6-digit code to [email], creating the account if it is new.
   ///
-  /// Throws [AuthFailure] when the number is rejected or delivery fails.
-  Future<void> requestOtp(String phone);
+  /// Throws [OtpDeliveryFailure] when the address is rejected or the mail cannot
+  /// be sent, and [TooManyOtpAttempts] once the send rate limit is hit.
+  Future<void> sendEmailOtp(String email);
 
-  /// Exchanges [code] for a session and persists it.
+  /// Exchanges [code] for a session.
   ///
-  /// Throws [InvalidOtp] on a wrong code, [OtpExpired] once the 5-minute TTL
-  /// has passed, and [TooManyOtpAttempts] after the attempt cap.
-  Future<AuthSession> verifyOtp({required String phone, required String code});
+  /// Throws [InvalidOtp] on a wrong code, [OtpExpired] once the code's TTL has
+  /// passed, and [TooManyOtpAttempts] after the attempt cap.
+  Future<AuthUser> verifyEmailOtp({
+    required String email,
+    required String code,
+  });
 
-  /// Clears the persisted session. Server-side revocation lands with the API.
+  /// Stores [phone] (E.164) against the signed-in user.
+  ///
+  /// It goes in the user's metadata, not Supabase's `phone` column: that column
+  /// is for phone *sign-in*, and writing it starts an SMS verification we have no
+  /// provider for. This is a delivery contact, not a credential.
+  Future<AuthUser> setPhone(String phone);
+
+  /// Ends the session — locally, and server-side where the transport allows.
   Future<void> signOut();
 }
 

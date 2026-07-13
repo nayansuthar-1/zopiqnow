@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:zopiqnow/app/router.dart';
-import 'package:zopiqnow/features/auth/domain/entities/auth_session.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
@@ -112,9 +111,13 @@ class CheckoutController extends Notifier<CheckoutState> {
   /// The bill computed here is what the *gateway* is asked to charge. It is not
   /// what the order costs: `place_order` reprices the cart in Postgres, and the
   /// receipt it returns is the number that counts.
+  /// [userPhone] is E.164 and non-null: an account can exist without a number
+  /// (sign-in is by email), but an order cannot. Checkout collects it before it
+  /// gets here — see `showDeliveryPhoneSheet`. Who is buying is not passed at
+  /// all: `place_order` reads that from the session's JWT.
   Future<PlacedOrder?> placeOrder({
     required Address deliveryAddress,
-    required AuthUser user,
+    required String userPhone,
   }) async {
     final Cart cart = ref.read(cartProvider);
     // Not read from checkoutBillProvider: that provider watches this
@@ -157,8 +160,7 @@ class CheckoutController extends Notifier<CheckoutState> {
             cart: cart,
             deliveryAddress: deliveryAddress,
             paymentMethod: state.paymentMethod,
-            userId: user.id,
-            userPhone: user.phone,
+            userPhone: userPhone,
             // The code, not the discount. What it is worth is the service's
             // call, made again against the subtotal the service computes.
             couponCode: state.coupon?.code,

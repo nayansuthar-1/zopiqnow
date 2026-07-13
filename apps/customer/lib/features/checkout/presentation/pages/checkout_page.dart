@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/router.dart';
-import 'package:zopiqnow/features/auth/domain/entities/auth_session.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
+import 'package:zopiqnow/features/auth/presentation/widgets/delivery_phone_sheet.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
@@ -33,12 +33,12 @@ class CheckoutPage extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Address address,
-    AuthUser user,
+    String userPhone,
   ) async {
     try {
       final PlacedOrder? order = await ref
           .read(checkoutControllerProvider.notifier)
-          .placeOrder(deliveryAddress: address, user: user);
+          .placeOrder(deliveryAddress: address, userPhone: userPhone);
       // Null: the customer closed the payment sheet. They know — no snackbar.
       if (order != null && context.mounted) {
         context.pushReplacementNamed(Routes.orderSuccess);
@@ -75,6 +75,10 @@ class CheckoutPage extends ConsumerWidget {
     final AuthState auth = ref.watch(authControllerProvider);
     final CheckoutState checkout = ref.watch(checkoutControllerProvider);
 
+    // Null until the user gives one. `place_order` will not take an order
+    // without a number to call, so neither will the button below.
+    final String? phone = auth is AuthSignedIn ? auth.user.phone : null;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
       body: SafeArea(
@@ -93,10 +97,19 @@ class CheckoutPage extends ConsumerWidget {
               _SectionCard(
                 icon: Icons.person_rounded,
                 title: 'Ordering as',
-                body: '+91 ${auth.user.displayPhone}',
+                body: auth.user.email,
                 actionLabel: 'Sign out',
                 onAction: () =>
                     ref.read(authControllerProvider.notifier).signOut(),
+              ),
+            const SizedBox(height: ZopiqSpacing.md),
+            if (auth is AuthSignedIn)
+              _SectionCard(
+                icon: Icons.call_rounded,
+                title: 'Rider calls',
+                body: auth.user.phone ?? 'No number yet',
+                actionLabel: auth.user.phone == null ? 'Add' : 'Change',
+                onAction: () => showDeliveryPhoneSheet(context),
               ),
             const SizedBox(height: ZopiqSpacing.md),
             _OrderSummaryCard(cart: cart),
@@ -120,9 +133,12 @@ class CheckoutPage extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             ZopiqButton(
-              // A tap with no address opens the picker — never a dead button.
+              // A tap with something missing opens the thing that fills it in —
+              // never a dead button.
               label: address == null
                   ? 'Select delivery address'
+                  : phone == null
+                  ? 'Add a delivery number'
                   : checkout.paymentMethod == PaymentMethod.upi
                   ? 'Pay ₹${bill.total}'
                   : 'Place order · ₹${bill.total}',
@@ -132,7 +148,9 @@ class CheckoutPage extends ConsumerWidget {
               // pattern match is what proves it rather than a `!`.
               onPressed: address == null || auth is! AuthSignedIn
                   ? () => showAddressPicker(context)
-                  : () => _placeOrder(context, ref, address, auth.user),
+                  : phone == null
+                  ? () => showDeliveryPhoneSheet(context)
+                  : () => _placeOrder(context, ref, address, phone),
             ),
             const SizedBox(height: ZopiqSpacing.sm),
             Text(

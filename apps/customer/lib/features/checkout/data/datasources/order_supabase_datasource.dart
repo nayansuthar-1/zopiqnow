@@ -48,17 +48,18 @@ class OrderSupabaseDataSource implements OrderDataSource {
     required Cart cart,
     required Address deliveryAddress,
     required PaymentMethod paymentMethod,
-    required String userId,
     required String userPhone,
     String? couponCode,
     String? paymentId,
   }) async {
     try {
+      // The session's JWT rides along on the RPC, and `place_order` takes the
+      // buyer from `auth.uid()`. That is why no user id is sent: the one value
+      // the client must not be trusted with is who it is.
       final Map<String, dynamic> receipt = await _db
           .rpc<Map<String, dynamic>>(
             'place_order',
             params: <String, dynamic>{
-              'p_user_id': userId,
               'p_user_phone': userPhone,
               'p_restaurant_id': cart.restaurantId,
               // Ids and quantities only. No prices leave this device.

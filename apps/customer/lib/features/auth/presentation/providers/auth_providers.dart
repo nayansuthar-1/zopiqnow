@@ -2,29 +2,27 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:zopiqnow/core/storage/storage_providers.dart';
-import 'package:zopiqnow/features/auth/data/datasources/auth_mock_datasource.dart';
+import 'package:zopiqnow/features/auth/data/datasources/auth_datasource.dart';
+import 'package:zopiqnow/features/auth/data/datasources/auth_supabase_datasource.dart';
 import 'package:zopiqnow/features/auth/data/repositories/auth_repository_impl.dart';
-import 'package:zopiqnow/features/auth/domain/entities/auth_session.dart';
+import 'package:zopiqnow/features/auth/domain/entities/auth_user.dart';
 import 'package:zopiqnow/features/auth/domain/repositories/auth_repository.dart';
 
-/// Data source binding. Overridden in tests to drop the fake network latency.
-final Provider<AuthMockDataSource> authDataSourceProvider =
-    Provider<AuthMockDataSource>((Ref ref) => AuthMockDataSource());
+/// Data source binding. Overridden in tests, which have no Supabase instance.
+final Provider<AuthDataSource> authDataSourceProvider = Provider<AuthDataSource>(
+  (Ref ref) => const AuthSupabaseDataSource(),
+);
 
 /// Repository binding — the seam the UI depends on (SAD 7.4).
 final Provider<AuthRepository> authRepositoryProvider =
     Provider<AuthRepository>(
-      (Ref ref) => AuthRepositoryImpl(
-        ref.watch(authDataSourceProvider),
-        ref.watch(secureStoreProvider),
-      ),
+      (Ref ref) => AuthRepositoryImpl(ref.watch(authDataSourceProvider)),
     );
 
 /// Where the user stands with respect to authentication.
 ///
 /// [AuthUnknown] is not a loading spinner — it is the window between launch and
-/// the Keystore read completing, during which the router must not redirect. Send
+/// the session read completing, during which the router must not redirect. Send
 /// a signed-in user to `/login` for even one frame and their deep link is gone.
 sealed class AuthState {
   const AuthState();
@@ -57,12 +55,10 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> _restore() async {
     try {
-      final AuthSession? session = await ref
+      final AuthUser? user = await ref
           .read(authRepositoryProvider)
           .restoreSession();
-      state = session == null
-          ? const AuthSignedOut()
-          : AuthSignedIn(session.user);
+      state = user == null ? const AuthSignedOut() : AuthSignedIn(user);
     } on Object {
       // A Keystore read can fail outright — a corrupted keyset, or an OEM with a
       // broken provider. Signed-out is recoverable (the user logs in again);
@@ -71,15 +67,25 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  Future<void> requestOtp(String phone) =>
-      ref.read(authRepositoryProvider).requestOtp(phone);
+  Future<void> sendEmailOtp(String email) =>
+      ref.read(authRepositoryProvider).sendEmailOtp(email);
 
   /// Throws [AuthFailure] on a bad/expired code — the OTP screen renders it.
-  Future<void> verifyOtp({required String phone, required String code}) async {
-    final AuthSession session = await ref
+  Future<void> verifyEmailOtp({
+    required String email,
+    required String code,
+  }) async {
+    final AuthUser user = await ref
         .read(authRepositoryProvider)
-        .verifyOtp(phone: phone, code: code);
-    state = AuthSignedIn(session.user);
+        .verifyEmailOtp(email: email, code: code);
+    state = AuthSignedIn(user);
+  }
+
+  /// The delivery number. Asked for at checkout, where it is first needed, not
+  /// as a fourth screen between the user and their food.
+  Future<void> setPhone(String phone) async {
+    final AuthUser user = await ref.read(authRepositoryProvider).setPhone(phone);
+    state = AuthSignedIn(user);
   }
 
   Future<void> signOut() async {

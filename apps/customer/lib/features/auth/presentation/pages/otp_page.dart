@@ -1,27 +1,24 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
-import 'package:zopiqnow/features/auth/data/datasources/auth_mock_datasource.dart';
 import 'package:zopiqnow/features/auth/domain/repositories/auth_repository.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
 
-/// Resend cooldown (SAD 9.3). Also what the real endpoint rate-limits on, so the
-/// UI should never let the user hit it.
+/// Resend cooldown (SAD 9.3). Supabase rate-limits sends server-side, so the UI
+/// should never let the user hit it.
 const Duration otpResendCooldown = Duration(seconds: 30);
 
 /// Verifies the code. Navigation on success is *not* this screen's job: the
 /// router's redirect watches auth state and sends the user to wherever they were
 /// originally headed. Popping from here as well would race that redirect.
 class OtpPage extends ConsumerStatefulWidget {
-  const OtpPage({required this.phone, super.key});
+  const OtpPage({required this.email, super.key});
 
-  /// E.164.
-  final String phone;
+  final String email;
 
   @override
   ConsumerState<OtpPage> createState() => _OtpPageState();
@@ -66,7 +63,7 @@ class _OtpPageState extends ConsumerState<OtpPage> {
     try {
       await ref
           .read(authControllerProvider.notifier)
-          .verifyOtp(phone: widget.phone, code: _controller.text);
+          .verifyEmailOtp(email: widget.email, code: _controller.text);
       // No navigation here — see the class doc.
     } on AuthFailure catch (failure) {
       if (!mounted) return;
@@ -81,7 +78,7 @@ class _OtpPageState extends ConsumerState<OtpPage> {
   Future<void> _resend() async {
     setState(() => _error = null);
     try {
-      await ref.read(authControllerProvider.notifier).requestOtp(widget.phone);
+      await ref.read(authControllerProvider.notifier).sendEmailOtp(widget.email);
       _startCooldown();
     } on AuthFailure catch (failure) {
       if (mounted) setState(() => _error = failure.message);
@@ -101,10 +98,10 @@ class _OtpPageState extends ConsumerState<OtpPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text('Verify your number', style: t.headlineSmall),
+              Text('Check your inbox', style: t.headlineSmall),
               const SizedBox(height: ZopiqSpacing.xs),
               Text(
-                'Enter the 6-digit code sent to ${widget.phone}',
+                'Enter the 6-digit code sent to ${widget.email}',
                 style: t.bodyMedium?.copyWith(color: zc.textMuted),
               ),
               const SizedBox(height: ZopiqSpacing.xl),
@@ -115,6 +112,7 @@ class _OtpPageState extends ConsumerState<OtpPage> {
                 maxLength: 6,
                 textAlign: TextAlign.center,
                 style: t.headlineSmall?.copyWith(letterSpacing: 12),
+                autofillHints: const <String>[AutofillHints.oneTimeCode],
                 inputFormatters: <TextInputFormatter>[
                   FilteringTextInputFormatter.digitsOnly,
                 ],
@@ -150,17 +148,6 @@ class _OtpPageState extends ConsumerState<OtpPage> {
                         child: const Text('Resend code'),
                       ),
               ),
-              // There is no SMS to read from a mock data source. Rather than
-              // leave the screen unusable, say the code out loud — in debug only.
-              if (kDebugMode) ...<Widget>[
-                const Spacer(),
-                Center(
-                  child: Text(
-                    'Debug: the code is ${AuthMockDataSource.devCode}',
-                    style: t.labelSmall?.copyWith(color: zc.textMuted),
-                  ),
-                ),
-              ],
             ],
           ),
         ),

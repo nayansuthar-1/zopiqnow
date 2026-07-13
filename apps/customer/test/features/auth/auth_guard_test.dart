@@ -4,41 +4,42 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/app/zopiq_app.dart';
-import 'package:zopiqnow/features/auth/data/datasources/auth_mock_datasource.dart';
+import 'package:zopiqnow/features/auth/domain/entities/auth_user.dart';
+import 'package:zopiqnow/features/auth/presentation/pages/email_page.dart';
 import 'package:zopiqnow/features/auth/presentation/pages/otp_page.dart';
-import 'package:zopiqnow/features/auth/presentation/pages/phone_page.dart';
 import 'package:zopiqnow/features/auth/presentation/pages/splash_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/checkout_page.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_mock_datasource.dart';
 import 'package:zopiqnow/features/home/presentation/home_page.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 
+import '../../support/fake_auth_datasource.dart';
 import '../../support/fake_stores.dart';
 
 const Duration _latency = Duration(milliseconds: 10);
 
-/// A signed-in session, exactly as [AuthRepositoryImpl] writes it.
-const Map<String, String> _storedSession = <String, String>{
-  'zopiq.auth.session':
-      '{"userId":"usr_1","phone":"+919876543210",'
-      '"accessToken":"a","refreshToken":"r"}',
-};
+const String _email = 'diner@example.com';
+
+/// A session Supabase has already restored — what a returning user has.
+const AuthUser _restoredUser = AuthUser(
+  id: 'usr_1',
+  email: _email,
+  phone: '+919876543210',
+);
 
 /// Uses the *real* [AuthController] (`authState: null`) so the async session
-/// restore, the splash, and the redirect all actually run. The secure store is
-/// given a real delay so the restore cannot complete before the first frame.
-ProviderContainer _container({Map<String, String>? session}) =>
-    ProviderContainer(
-      overrides: <Override>[
-        ...storageOverrides(
-          authState: null,
-          secureStore: FakeSecureStore(session, _latency),
-        ),
-        restaurantDataSourceProvider.overrideWithValue(
-          const RestaurantMockDataSource(latency: _latency),
-        ),
-      ],
-    );
+/// restore, the splash, and the redirect all actually run.
+ProviderContainer _container({AuthUser? signedInAs}) => ProviderContainer(
+  overrides: <Override>[
+    ...storageOverrides(
+      authState: null,
+      authDataSource: FakeAuthDataSource(signedInAs: signedInAs),
+    ),
+    restaurantDataSourceProvider.overrideWithValue(
+      const RestaurantMockDataSource(latency: _latency),
+    ),
+  ],
+);
 
 Widget _app(ProviderContainer container) =>
     UncontrolledProviderScope(container: container, child: const ZopiqApp());
@@ -58,6 +59,24 @@ Future<void> _settle(WidgetTester tester) async {
 String _location(ProviderContainer c) =>
     c.read(routerProvider).routerDelegate.currentConfiguration.uri.toString();
 
+/// Signs in from the login screen: address, then code.
+Future<void> _signIn(WidgetTester tester, {required String code}) async {
+  await tester.enterText(
+    find.descendant(of: find.byType(EmailPage), matching: find.byType(TextField)),
+    _email,
+  );
+  await tester.pump();
+  await tester.tap(find.text('Continue'));
+  await _settle(tester);
+
+  // Six digits auto-submits.
+  await tester.enterText(
+    find.descendant(of: find.byType(OtpPage), matching: find.byType(TextField)),
+    code,
+  );
+  await _settle(tester);
+}
+
 void main() {
   testWidgets('a cold start shows the splash until the session resolves', (
     WidgetTester tester,
@@ -67,7 +86,7 @@ void main() {
 
     await tester.pumpWidget(_app(container));
 
-    // First frame: the Keystore read has not returned, so we must not have
+    // First frame: the session read has not returned, so we must not have
     // guessed. Redirecting to Home or Login here would be the bug.
     expect(find.byType(SplashPage), findsOneWidget);
 
@@ -85,7 +104,7 @@ void main() {
 
     // Signed out, yet Home renders. Search and cart are open too.
     expect(find.byType(HomePage), findsOneWidget);
-    expect(find.byType(PhonePage), findsNothing);
+    expect(find.byType(EmailPage), findsNothing);
   });
 
   testWidgets('a signed-out user hitting /checkout is sent to login', (
@@ -100,13 +119,13 @@ void main() {
     container.read(routerProvider).go('/checkout');
     await _settle(tester);
 
-    expect(find.byType(PhonePage), findsOneWidget);
+    expect(find.byType(EmailPage), findsOneWidget);
     expect(find.byType(CheckoutPage), findsNothing);
     // The intended destination is carried, not discarded.
     expect(_location(container), contains('from=%2Fcheckout'));
   });
 
-  testWidgets('verifying the OTP returns the user to the intended route', (
+  testWidgets('verifying the code returns the user to the intended route', (
     WidgetTester tester,
   ) async {
     final ProviderContainer container = _container();
@@ -118,22 +137,7 @@ void main() {
     container.read(routerProvider).go('/checkout');
     await _settle(tester);
 
-    await tester.enterText(find.byType(TextField), '9876543210');
-    await tester.pump();
-    await tester.tap(find.text('Continue'));
-    await _settle(tester);
-
-    expect(find.byType(OtpPage), findsOneWidget);
-
-    // Six digits auto-submits.
-    await tester.enterText(
-      find.descendant(
-        of: find.byType(OtpPage),
-        matching: find.byType(TextField),
-      ),
-      AuthMockDataSource.devCode,
-    );
-    await _settle(tester);
+    await _signIn(tester, code: FakeAuthDataSource.devCode);
 
     // Not Home — /checkout, which is where they were going.
     expect(find.byType(CheckoutPage), findsOneWidget);
@@ -151,19 +155,7 @@ void main() {
     container.read(routerProvider).go('/checkout');
     await _settle(tester);
 
-    await tester.enterText(find.byType(TextField), '9876543210');
-    await tester.pump();
-    await tester.tap(find.text('Continue'));
-    await _settle(tester);
-
-    await tester.enterText(
-      find.descendant(
-        of: find.byType(OtpPage),
-        matching: find.byType(TextField),
-      ),
-      '000000',
-    );
-    await _settle(tester);
+    await _signIn(tester, code: '000000');
 
     expect(find.byType(OtpPage), findsOneWidget);
     expect(find.text('That code is not right. Try again.'), findsOneWidget);
@@ -173,7 +165,7 @@ void main() {
   testWidgets('a restored session opens /checkout without a login', (
     WidgetTester tester,
   ) async {
-    final ProviderContainer container = _container(session: _storedSession);
+    final ProviderContainer container = _container(signedInAs: _restoredUser);
     addTearDown(container.dispose);
 
     await tester.pumpWidget(_app(container));
@@ -183,13 +175,13 @@ void main() {
     await _settle(tester);
 
     expect(find.byType(CheckoutPage), findsOneWidget);
-    expect(find.byType(PhonePage), findsNothing);
+    expect(find.byType(EmailPage), findsNothing);
   });
 
   testWidgets('a cold deep link to /checkout survives the session restore', (
     WidgetTester tester,
   ) async {
-    final ProviderContainer container = _container(session: _storedSession);
+    final ProviderContainer container = _container(signedInAs: _restoredUser);
     addTearDown(container.dispose);
 
     // Navigate before the restore has resolved — the splash must remember it.

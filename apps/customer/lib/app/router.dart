@@ -5,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiqnow/app/app_shell.dart';
 import 'package:zopiqnow/features/about/presentation/licenses_page.dart';
 import 'package:zopiqnow/features/account/presentation/pages/account_page.dart';
+import 'package:zopiqnow/features/auth/presentation/pages/email_page.dart';
 import 'package:zopiqnow/features/auth/presentation/pages/otp_page.dart';
-import 'package:zopiqnow/features/auth/presentation/pages/phone_page.dart';
 import 'package:zopiqnow/features/auth/presentation/pages/splash_page.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiqnow/features/cart/presentation/pages/cart_page.dart';
@@ -129,10 +129,10 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           // `from` rides along to the OTP screen: the redirect reads it there,
           // after sign-in, to resume the originally requested route.
           final String? from = state.uri.queryParameters['from'];
-          return PhonePage(
-            onOtpSent: (String phone) => context.pushNamed(
+          return EmailPage(
+            onOtpSent: (String email) => context.pushNamed(
               Routes.otp,
-              queryParameters: <String, String>{'phone': phone, 'from': ?from},
+              queryParameters: <String, String>{'email': email, 'from': ?from},
             ),
           );
         },
@@ -141,7 +141,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             path: 'otp',
             name: Routes.otp,
             builder: (BuildContext context, GoRouterState state) =>
-                OtpPage(phone: state.uri.queryParameters['phone']!),
+                OtpPage(email: state.uri.queryParameters['email']!),
           ),
         ],
       ),

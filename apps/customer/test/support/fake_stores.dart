@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiqnow/core/storage/key_value_store.dart';
 import 'package:zopiqnow/core/storage/secure_store.dart';
 import 'package:zopiqnow/core/storage/storage_providers.dart';
-import 'package:zopiqnow/features/auth/data/datasources/auth_mock_datasource.dart';
+import 'package:zopiqnow/features/auth/data/datasources/auth_datasource.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
+
+import 'fake_auth_datasource.dart';
 
 /// In-memory stand-ins for the two stores. Every widget test needs them: the
 /// real ones are plugins, and a plugin in a widget test throws
@@ -50,9 +52,9 @@ class FakeSecureStore implements SecureStore {
   Future<void> delete(String key) async => _values.remove(key);
 }
 
-/// An [AuthController] that starts from a known state instead of reading the
-/// secure store. Every other method — `verifyOtp`, `signOut` — still runs for
-/// real against the overridden repository.
+/// An [AuthController] that starts from a known state instead of restoring a
+/// session. Every other method — `verifyEmailOtp`, `setPhone`, `signOut` — still
+/// runs for real against the overridden repository.
 class ResolvedAuthController extends AuthController {
   ResolvedAuthController(this._initial);
 
@@ -63,7 +65,7 @@ class ResolvedAuthController extends AuthController {
 }
 
 /// Overrides every test that builds `ZopiqApp` needs: both stores in memory, an
-/// OTP data source with no artificial latency, and auth already resolved.
+/// in-memory auth transport, and auth already resolved.
 ///
 /// Resolving auth up front matters: the real controller restores the session
 /// asynchronously, so the first frame is the splash. Tests that assert on Home
@@ -73,12 +75,13 @@ class ResolvedAuthController extends AuthController {
 List<Override> storageOverrides({
   KeyValueStore? keyValueStore,
   SecureStore? secureStore,
+  AuthDataSource? authDataSource,
   AuthState? authState = const AuthSignedOut(),
 }) => <Override>[
   keyValueStoreProvider.overrideWithValue(keyValueStore ?? FakeKeyValueStore()),
   secureStoreProvider.overrideWithValue(secureStore ?? FakeSecureStore()),
   authDataSourceProvider.overrideWithValue(
-    AuthMockDataSource(latency: Duration.zero),
+    authDataSource ?? FakeAuthDataSource(),
   ),
   if (authState != null)
     authControllerProvider.overrideWith(

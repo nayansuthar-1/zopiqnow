@@ -1,128 +1,130 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:zopiqnow/features/auth/data/datasources/auth_mock_datasource.dart';
 import 'package:zopiqnow/features/auth/data/repositories/auth_repository_impl.dart';
-import 'package:zopiqnow/features/auth/domain/entities/auth_session.dart';
+import 'package:zopiqnow/features/auth/domain/entities/auth_user.dart';
 import 'package:zopiqnow/features/auth/domain/repositories/auth_repository.dart';
 
-import '../../support/fake_stores.dart';
+import '../../support/fake_auth_datasource.dart';
 
-const String _phone = '+919876543210';
-
-AuthRepositoryImpl _repo(FakeSecureStore store) =>
-    AuthRepositoryImpl(AuthMockDataSource(latency: Duration.zero), store);
+const String _email = 'diner@example.com';
 
 void main() {
-  group('OTP verification', () {
-    test('a correct code returns a session and persists it', () async {
-      final FakeSecureStore store = FakeSecureStore();
-      final AuthRepositoryImpl repo = _repo(store);
+  group('email OTP', () {
+    test('a correct code signs the user in', () async {
+      final FakeAuthDataSource source = FakeAuthDataSource();
+      final AuthRepositoryImpl repo = AuthRepositoryImpl(source);
 
-      await repo.requestOtp(_phone);
-      final AuthSession session = await repo.verifyOtp(
-        phone: _phone,
-        code: AuthMockDataSource.devCode,
+      await repo.sendEmailOtp(_email);
+      final AuthUser user = await repo.verifyEmailOtp(
+        email: _email,
+        code: FakeAuthDataSource.devCode,
       );
 
-      expect(session.user.phone, _phone);
-      expect(session.tokens.accessToken, isNotEmpty);
-      // Survives a restart: the next launch restores from the secure store.
-      expect(await store.read('zopiq.auth.session'), isNotNull);
+      expect(source.sentTo, <String>[_email]);
+      expect(user.email, _email);
+      // Sign-in is by email, so there is no number yet. Checkout asks for it.
+      expect(user.phone, isNull);
     });
 
-    test('a wrong code throws InvalidOtp and persists nothing', () async {
-      final FakeSecureStore store = FakeSecureStore();
-      final AuthRepositoryImpl repo = _repo(store);
+    test('a wrong code throws InvalidOtp and signs nobody in', () async {
+      final FakeAuthDataSource source = FakeAuthDataSource();
+      final AuthRepositoryImpl repo = AuthRepositoryImpl(source);
 
-      await repo.requestOtp(_phone);
+      await repo.sendEmailOtp(_email);
 
-      expect(
-        () => repo.verifyOtp(phone: _phone, code: '000000'),
+      await expectLater(
+        repo.verifyEmailOtp(email: _email, code: '000000'),
         throwsA(isA<InvalidOtp>()),
       );
-      expect(await store.read('zopiq.auth.session'), isNull);
+      expect(await repo.restoreSession(), isNull);
     });
 
     test('the attempt cap trips TooManyOtpAttempts', () async {
-      final AuthRepositoryImpl repo = _repo(FakeSecureStore());
-      await repo.requestOtp(_phone);
+      final AuthRepositoryImpl repo = AuthRepositoryImpl(FakeAuthDataSource());
+      await repo.sendEmailOtp(_email);
 
       // The 5th wrong attempt is the one that trips the cap.
-      for (int i = 0; i < AuthMockDataSource.maxAttempts - 1; i++) {
+      for (int i = 0; i < FakeAuthDataSource.maxAttempts - 1; i++) {
         await expectLater(
-          repo.verifyOtp(phone: _phone, code: '000000'),
+          repo.verifyEmailOtp(email: _email, code: '000000'),
           throwsA(isA<InvalidOtp>()),
         );
       }
       await expectLater(
-        repo.verifyOtp(phone: _phone, code: '000000'),
+        repo.verifyEmailOtp(email: _email, code: '000000'),
         throwsA(isA<TooManyOtpAttempts>()),
       );
       // Even the right code is refused once the challenge is locked out.
       await expectLater(
-        repo.verifyOtp(phone: _phone, code: AuthMockDataSource.devCode),
+        repo.verifyEmailOtp(email: _email, code: FakeAuthDataSource.devCode),
         throwsA(isA<TooManyOtpAttempts>()),
       );
     });
 
-    test('verifying without requesting a code throws OtpExpired', () async {
-      final AuthRepositoryImpl repo = _repo(FakeSecureStore());
-      await expectLater(
-        repo.verifyOtp(phone: _phone, code: AuthMockDataSource.devCode),
-        throwsA(isA<OtpExpired>()),
-      );
-    });
+    test('a code issued for another address is refused', () async {
+      final AuthRepositoryImpl repo = AuthRepositoryImpl(FakeAuthDataSource());
+      await repo.sendEmailOtp('someone@example.com');
 
-    test('a code issued for another number is refused', () async {
-      final AuthRepositoryImpl repo = _repo(FakeSecureStore());
-      await repo.requestOtp('+919000000000');
       await expectLater(
-        repo.verifyOtp(phone: _phone, code: AuthMockDataSource.devCode),
+        repo.verifyEmailOtp(email: _email, code: FakeAuthDataSource.devCode),
         throwsA(isA<OtpExpired>()),
       );
     });
   });
 
-  group('session persistence', () {
-    test('restoreSession returns null when nothing is stored', () async {
-      expect(await _repo(FakeSecureStore()).restoreSession(), isNull);
+  group('session', () {
+    test('restoreSession returns null when signed out', () async {
+      expect(
+        await AuthRepositoryImpl(FakeAuthDataSource()).restoreSession(),
+        isNull,
+      );
     });
 
-    test('restoreSession round-trips the stored session', () async {
-      final FakeSecureStore store = FakeSecureStore();
-      final AuthRepositoryImpl repo = _repo(store);
-      await repo.requestOtp(_phone);
-      await repo.verifyOtp(phone: _phone, code: AuthMockDataSource.devCode);
+    test('restoreSession returns the user Supabase restored', () async {
+      const AuthUser user = AuthUser(id: 'usr_1', email: _email);
+      final AuthRepositoryImpl repo = AuthRepositoryImpl(
+        FakeAuthDataSource(signedInAs: user),
+      );
 
-      final AuthSession? restored = await _repo(store).restoreSession();
-      expect(restored?.user.phone, _phone);
+      expect((await repo.restoreSession())?.email, _email);
     });
 
-    test('a corrupt session is discarded, not thrown', () async {
-      final FakeSecureStore store = FakeSecureStore(<String, String>{
-        'zopiq.auth.session': 'not json',
-      });
+    test('a session that cannot be read is signed out, not thrown', () async {
+      final AuthRepositoryImpl repo = AuthRepositoryImpl(_BrokenAuthDataSource());
 
-      expect(await _repo(store).restoreSession(), isNull);
-      // And it is cleared, so the next launch does not retry the same garbage.
-      expect(await store.read('zopiq.auth.session'), isNull);
+      // Never throws: a user who cannot read their token must still reach the
+      // login screen rather than a crash on launch.
+      expect(await repo.restoreSession(), isNull);
     });
 
-    test('signOut clears the stored session', () async {
-      final FakeSecureStore store = FakeSecureStore();
-      final AuthRepositoryImpl repo = _repo(store);
-      await repo.requestOtp(_phone);
-      await repo.verifyOtp(phone: _phone, code: AuthMockDataSource.devCode);
+    test('signOut ends the session', () async {
+      final AuthRepositoryImpl repo = AuthRepositoryImpl(
+        FakeAuthDataSource(
+          signedInAs: const AuthUser(id: 'usr_1', email: _email),
+        ),
+      );
 
       await repo.signOut();
 
-      expect(await store.read('zopiq.auth.session'), isNull);
       expect(await repo.restoreSession(), isNull);
     });
   });
 
-  test('displayPhone formats an Indian number for humans', () {
-    const AuthUser user = AuthUser(id: 'u1', phone: _phone);
-    expect(user.displayPhone, '98765 43210');
+  test('setPhone attaches the delivery number to the signed-in user', () async {
+    final AuthRepositoryImpl repo = AuthRepositoryImpl(
+      FakeAuthDataSource(signedInAs: const AuthUser(id: 'usr_1', email: _email)),
+    );
+
+    final AuthUser user = await repo.setPhone('+919876543210');
+
+    expect(user.phone, '+919876543210');
+    expect((await repo.restoreSession())?.phone, '+919876543210');
   });
+}
+
+/// A Keystore that fails outright — a corrupted keyset, or an OEM with a broken
+/// provider.
+class _BrokenAuthDataSource extends FakeAuthDataSource {
+  @override
+  AuthUser? currentUser() => throw Exception('keystore unavailable');
 }

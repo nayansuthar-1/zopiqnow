@@ -15,11 +15,13 @@ abstract interface class OrderDataSource {
     required int subtotal,
   });
 
+  /// No user id: `place_order` reads it from the caller's JWT (`auth.uid()`).
+  /// A client that could name the buyer could buy in someone else's name.
+  /// [userPhone] is a delivery contact, not an identity.
   Future<PlacedOrder> placeOrder({
     required Cart cart,
     required Address deliveryAddress,
     required PaymentMethod paymentMethod,
-    required String userId,
     required String userPhone,
     String? couponCode,
     String? paymentId,

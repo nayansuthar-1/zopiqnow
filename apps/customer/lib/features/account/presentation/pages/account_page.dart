@@ -141,7 +141,7 @@ class _ProfileHeader extends StatelessWidget {
                       Text('Zopiq user', style: t.titleMedium),
                       const SizedBox(height: ZopiqSpacing.xxs),
                       Text(
-                        '+91 ${(auth as AuthSignedIn).user.displayPhone}',
+                        (auth as AuthSignedIn).user.email,
                         style: t.bodyMedium?.copyWith(color: zc.textMuted),
                       ),
                     ],

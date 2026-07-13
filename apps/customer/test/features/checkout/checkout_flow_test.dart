@@ -6,7 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/app/zopiq_app.dart';
-import 'package:zopiqnow/features/auth/domain/entities/auth_session.dart';
+import 'package:zopiqnow/features/auth/domain/entities/auth_user.dart';
+import 'package:zopiqnow/features/auth/presentation/widgets/delivery_phone_sheet.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
@@ -22,11 +23,16 @@ import 'package:zopiqnow/features/menu/data/datasources/menu_mock_datasource.dar
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
 import 'package:zopiqnow/features/menu/presentation/providers/menu_providers.dart';
 
+import '../../support/fake_auth_datasource.dart';
 import '../../support/fake_stores.dart';
 
 const Duration _latency = Duration(milliseconds: 10);
 
-const AuthUser _user = AuthUser(id: 'usr_1', phone: '+919876543210');
+const AuthUser _user = AuthUser(
+  id: 'usr_1',
+  email: 'diner@example.com',
+  phone: '+919876543210',
+);
 
 const Address _address = Address(
   id: 'home',
@@ -70,11 +76,12 @@ class _SeededCartNotifier extends CartNotifier {
   Cart build() => _seededCart;
 }
 
-Widget _app({bool withAddress = true}) {
+Widget _app({bool withAddress = true, AuthUser user = _user}) {
   return ProviderScope(
     overrides: <Override>[
       ...storageOverrides(
-        authState: const AuthSignedIn(_user),
+        authState: AuthSignedIn(user),
+        authDataSource: FakeAuthDataSource(signedInAs: user),
         keyValueStore: FakeKeyValueStore(<String, String>{
           if (withAddress)
             'zopiq.location.selected_address': jsonEncode(_address.toJson()),
@@ -153,7 +160,9 @@ void main() {
     await _openCheckout(tester);
 
     expect(find.text('Banjara Hills, Hyderabad'), findsOneWidget);
-    expect(find.text('+91 98765 43210'), findsOneWidget);
+    // Identity is the email now; the number is the one the rider calls.
+    expect(find.text('diner@example.com'), findsOneWidget);
+    expect(find.text('+919876543210'), findsOneWidget);
     expect(find.text('1 × Paneer Butter Masala'), findsOneWidget);
     expect(find.text('Cash on delivery'), findsOneWidget);
     expect(find.text('Place order · ₹460'), findsOneWidget);
@@ -283,5 +292,36 @@ void main() {
     // The saved-address sheet, not an order.
     expect(find.text('Home'), findsWidgets);
     expect(find.text('Work'), findsOneWidget);
+  });
+
+  testWidgets('an account with no phone number asks for one before it can '
+      'order', (WidgetTester tester) async {
+    _useTallSurface(tester);
+    // Signed in with an email and nothing else — what every new account looks
+    // like now that sign-in no longer goes through a phone number.
+    await tester.pumpWidget(
+      _app(user: const AuthUser(id: 'usr_1', email: 'diner@example.com')),
+    );
+    await _openCheckout(tester);
+
+    expect(find.text('No number yet'), findsOneWidget);
+
+    await tester.tap(find.text('Add a delivery number'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(DeliveryPhoneSheet),
+        matching: find.byType(TextField),
+      ),
+      '9876543210',
+    );
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    // The number is on the account, and the CTA will now place an order.
+    expect(find.text('+919876543210'), findsOneWidget);
+    expect(find.text('Place order · ₹460'), findsOneWidget);
   });
 }

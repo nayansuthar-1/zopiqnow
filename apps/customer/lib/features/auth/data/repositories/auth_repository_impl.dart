@@ -1,71 +1,39 @@
-import 'dart:convert';
-
-import 'package:zopiqnow/core/storage/secure_store.dart';
-import 'package:zopiqnow/features/auth/data/datasources/auth_mock_datasource.dart';
-import 'package:zopiqnow/features/auth/domain/entities/auth_session.dart';
+import 'package:zopiqnow/features/auth/data/datasources/auth_datasource.dart';
+import 'package:zopiqnow/features/auth/domain/entities/auth_user.dart';
 import 'package:zopiqnow/features/auth/domain/repositories/auth_repository.dart';
 
+/// There is no persistence code here any more: Supabase's client restores and
+/// refreshes the session itself, out of the Keystore (see
+/// `SupabaseSecureLocalStorage`). Keeping a second copy of the tokens is how you
+/// end up serving a stale one after a refresh.
 class AuthRepositoryImpl implements AuthRepository {
-  const AuthRepositoryImpl(this._dataSource, this._secureStore);
+  const AuthRepositoryImpl(this._dataSource);
 
-  final AuthMockDataSource _dataSource;
-  final SecureStore _secureStore;
-
-  /// One blob, one Keystore round-trip. Splitting the session across four keys
-  /// would let a partial write leave a user half-signed-in.
-  static const String _sessionKey = 'zopiq.auth.session';
+  final AuthDataSource _dataSource;
 
   @override
-  Future<AuthSession?> restoreSession() async {
-    final String? raw = await _secureStore.read(_sessionKey);
-    if (raw == null) return null;
+  Future<AuthUser?> restoreSession() async {
     try {
-      return _decode(raw);
+      return _dataSource.currentUser();
     } on Object {
-      // A session we cannot parse is a session we cannot use. Drop it and let
-      // the user sign in again — never boot into a crash.
-      await _secureStore.delete(_sessionKey);
+      // A session Supabase cannot read is a session we cannot use. Signed out is
+      // recoverable; a crash on launch is not.
       return null;
     }
   }
 
   @override
-  Future<void> requestOtp(String phone) => _dataSource.requestOtp(phone);
+  Future<void> sendEmailOtp(String email) => _dataSource.sendEmailOtp(email);
 
   @override
-  Future<AuthSession> verifyOtp({
-    required String phone,
+  Future<AuthUser> verifyEmailOtp({
+    required String email,
     required String code,
-  }) async {
-    final AuthSession session = await _dataSource.verifyOtp(
-      phone: phone,
-      code: code,
-    );
-    await _secureStore.write(_sessionKey, _encode(session));
-    return session;
-  }
+  }) => _dataSource.verifyEmailOtp(email: email, code: code);
 
   @override
-  Future<void> signOut() => _secureStore.delete(_sessionKey);
+  Future<AuthUser> setPhone(String phone) => _dataSource.setPhone(phone);
 
-  static String _encode(AuthSession s) => jsonEncode(<String, String>{
-    'userId': s.user.id,
-    'phone': s.user.phone,
-    'accessToken': s.tokens.accessToken,
-    'refreshToken': s.tokens.refreshToken,
-  });
-
-  static AuthSession _decode(String raw) {
-    final Map<String, dynamic> json = jsonDecode(raw) as Map<String, dynamic>;
-    return AuthSession(
-      user: AuthUser(
-        id: json['userId']! as String,
-        phone: json['phone']! as String,
-      ),
-      tokens: AuthTokens(
-        accessToken: json['accessToken']! as String,
-        refreshToken: json['refreshToken']! as String,
-      ),
-    );
-  }
+  @override
+  Future<void> signOut() => _dataSource.signOut();
 }

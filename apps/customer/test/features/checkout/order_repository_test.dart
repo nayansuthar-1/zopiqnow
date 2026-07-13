@@ -108,7 +108,6 @@ void main() {
         cart: cart,
         deliveryAddress: _address,
         paymentMethod: PaymentMethod.cod,
-        userId: 'usr_1',
         userPhone: '+919876543210',
       );
 
@@ -128,7 +127,6 @@ void main() {
         cart: cart,
         deliveryAddress: _address,
         paymentMethod: PaymentMethod.cod,
-        userId: 'usr_1',
         userPhone: '+919876543210',
         couponCode: 'WELCOME50',
       );
@@ -143,7 +141,6 @@ void main() {
           cart: _cartOf(100),
           deliveryAddress: _address,
           paymentMethod: PaymentMethod.cod,
-          userId: 'usr_1',
           userPhone: '+919876543210',
           couponCode: 'WELCOME50',
         ),
@@ -165,14 +162,12 @@ void main() {
         cart: cart,
         deliveryAddress: _address,
         paymentMethod: PaymentMethod.cod,
-        userId: 'usr_1',
         userPhone: '+919876543210',
       );
       final PlacedOrder second = await repo.placeOrder(
         cart: cart,
         deliveryAddress: _address,
         paymentMethod: PaymentMethod.cod,
-        userId: 'usr_1',
         userPhone: '+919876543210',
       );
 
