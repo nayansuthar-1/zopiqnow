@@ -71,6 +71,25 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
+  Future<CustomerOrder?> getOrder(String orderId) async {
+    try {
+      return await _dataSource.fetchOrder(orderId);
+    } on Object catch (_) {
+      // Null already means "you have no such order", which the screen renders
+      // as a dead end with a way back to the list. A failed fetch must not be
+      // able to say that — it is a retry, not a verdict.
+      throw const OrdersLoadFailure();
+    }
+  }
+
+  @override
+  Stream<OrderStatus> watchOrderStatus(String orderId) =>
+      // Passed through untouched. A dropped subscription is not a failure the
+      // customer needs a sentence about: the order still renders from what was
+      // fetched, and the only thing lost is the live-ness.
+      _dataSource.watchOrderStatus(orderId);
+
+  @override
   Future<List<String>> getCouponHints() async {
     try {
       return await _dataSource.fetchCouponHints();

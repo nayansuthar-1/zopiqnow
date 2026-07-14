@@ -8,9 +8,10 @@ import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_card.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/order_tracking_card.dart';
 
-/// One past order in full: the lines as they were charged, the bill that was
-/// actually billed, and where it went.
+/// One order in full: where it is right now if it is still coming, and the lines
+/// as they were charged, the bill that was actually billed, and where it went.
 ///
 /// Every number here is read from the order, never recomputed. `CartBill` prices
 /// a *cart* — a live thing, at today's prices — and running it over a receipt
@@ -23,34 +24,50 @@ class OrderDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<CustomerOrder?> order = ref.watch(
+      orderByIdProvider(orderId),
+    );
+
+    return order.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      // The fetch failed — which is not the same as "no such order", and must
+      // not be told to the customer as though it were.
+      error: (Object _, StackTrace _) => _OrderMessage(
+        title: 'We couldn\'t load this order',
+        body: 'Check your connection and try again.',
+        actionLabel: 'Retry',
+        onAction: () => ref.invalidate(orderByIdProvider(orderId)),
+      ),
+      data: (CustomerOrder? data) => data == null
+          // No such order, or not this customer's — the policy makes those the
+          // same answer, deliberately.
+          ? _OrderMessage(
+              title: 'Order not found',
+              body: 'It may belong to another account.',
+              actionLabel: 'Your orders',
+              onAction: () => context.goNamed(Routes.orders),
+            )
+          : _OrderBody(order: data),
+    );
+  }
+}
+
+class _OrderBody extends StatelessWidget {
+  const _OrderBody({required this.order});
+
+  final CustomerOrder order;
+
+  @override
+  Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
-    final CustomerOrder? order = ref.watch(orderByIdProvider(orderId));
 
-    // A cold deep link to /orders/ZPQ-1042: the history is not loaded, so there
-    // is nothing to render. Send them to the list, which loads it.
-    if (order == null) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(ZopiqSpacing.xl),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text('Order not found', style: t.titleMedium),
-                const SizedBox(height: ZopiqSpacing.xl),
-                ZopiqButton(
-                  label: 'Your orders',
-                  expand: false,
-                  onPressed: () => context.goNamed(Routes.orders),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+    // An order still on its way gets the live timeline; a finished one gets the
+    // chip. Only one of them says what the status is, so the two never contradict
+    // each other — a static chip beside a live card is a chip that goes stale.
+    final bool isOpen = order.status.isOpen;
 
     return Scaffold(
       appBar: AppBar(title: Text(order.id)),
@@ -75,11 +92,18 @@ class OrderDetailPage extends ConsumerWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: ZopiqSpacing.sm),
-              OrderStatusChip(status: order.status),
+              if (!isOpen) ...<Widget>[
+                const SizedBox(width: ZopiqSpacing.sm),
+                OrderStatusChip(status: order.status),
+              ],
             ],
           ),
           const SizedBox(height: ZopiqSpacing.lg),
+
+          if (isOpen) ...<Widget>[
+            OrderTrackingCard(order: order),
+            const SizedBox(height: ZopiqSpacing.md),
+          ],
 
           ZopiqCard(
             elevated: false,
@@ -142,7 +166,15 @@ class OrderDetailPage extends ConsumerWidget {
                 const SizedBox(height: ZopiqSpacing.md),
                 Row(
                   children: <Widget>[
-                    Expanded(child: Text('Total paid', style: t.titleSmall)),
+                    Expanded(
+                      // The screen is now shown *before* the food arrives, and
+                      // a cash order that has not been handed over has not been
+                      // paid. The word has to earn itself.
+                      child: Text(
+                        isOpen ? 'Total' : 'Total paid',
+                        style: t.titleSmall,
+                      ),
+                    ),
                     Text('₹${order.total}', style: t.titleSmall),
                   ],
                 ),
@@ -157,7 +189,9 @@ class OrderDetailPage extends ConsumerWidget {
               children: <Widget>[
                 _DetailRow(
                   icon: Icons.location_on_rounded,
-                  text: 'Delivered to ${order.deliveryTo}',
+                  text: isOpen
+                      ? 'Delivering to ${order.deliveryTo}'
+                      : 'Delivered to ${order.deliveryTo}',
                 ),
                 const SizedBox(height: ZopiqSpacing.md),
                 _DetailRow(
@@ -170,6 +204,55 @@ class OrderDetailPage extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The two dead ends — "no such order" and "we couldn't ask" — which differ only
+/// in their words and in whether the button retries or leaves.
+class _OrderMessage extends StatelessWidget {
+  const _OrderMessage({
+    required this.title,
+    required this.body,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  final String title;
+  final String body;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Scaffold(
+      appBar: AppBar(),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(ZopiqSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(title, style: t.titleMedium),
+              const SizedBox(height: ZopiqSpacing.xs),
+              Text(
+                body,
+                style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: ZopiqSpacing.xl),
+              ZopiqButton(
+                label: actionLabel,
+                expand: false,
+                onPressed: onAction,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

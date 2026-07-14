@@ -48,6 +48,31 @@ class OrderMockDataSource implements OrderDataSource {
   }
 
   @override
+  Future<CustomerOrder?> fetchOrder(String orderId) async {
+    await Future<void>.delayed(latency);
+    for (final CustomerOrder o in _history) {
+      if (o.id == orderId) return o;
+    }
+    return null;
+  }
+
+  /// The order's status, once.
+  ///
+  /// It does not advance, and that is the honest shape: what moves an order
+  /// through the kitchen is the kitchen, and in its absence a cron job in
+  /// Postgres (migration 0008). Neither is something an in-memory fake can
+  /// stand in for — a fake that marched an order to 'delivered' on a timer
+  /// would be testing its own timer. What this *does* model is the contract the
+  /// screen is built against: a stream that opens with the current status.
+  @override
+  Stream<OrderStatus> watchOrderStatus(String orderId) {
+    for (final CustomerOrder o in _history) {
+      if (o.id == orderId) return Stream<OrderStatus>.value(o.status);
+    }
+    return const Stream<OrderStatus>.empty();
+  }
+
+  @override
   Future<AppliedCoupon> applyCoupon({
     required String code,
     required int subtotal,

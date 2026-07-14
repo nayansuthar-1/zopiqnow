@@ -10,19 +10,22 @@ const List<String> _months = <String>[
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
+/// `7:42 pm`.
+String formatClockTime(DateTime dt) {
+  final int hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+  final String minute = dt.minute.toString().padLeft(2, '0');
+  final String meridiem = dt.hour < 12 ? 'am' : 'pm';
+  return '$hour12:$minute $meridiem';
+}
+
 /// `14 Jul 2026, 7:42 pm`.
 ///
 /// Hand-rolled rather than `intl`: the package is a dependency we have not taken
 /// (version freeze — DEVELOPMENT_PLAN Rule 4), and one date format is not a
 /// reason to take one. It becomes a reason the day the app is localized, and
 /// then this function is the single place that changes.
-String formatOrderTimestamp(DateTime dt) {
-  final int hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-  final String minute = dt.minute.toString().padLeft(2, '0');
-  final String meridiem = dt.hour < 12 ? 'am' : 'pm';
-  return '${dt.day} ${_months[dt.month - 1]} ${dt.year}, '
-      '$hour12:$minute $meridiem';
-}
+String formatOrderTimestamp(DateTime dt) =>
+    '${dt.day} ${_months[dt.month - 1]} ${dt.year}, ${formatClockTime(dt)}';
 
 /// Where the order is, as a chip. Open orders wear the brand colour; a delivered
 /// order is green and a cancelled one is not shouted about.

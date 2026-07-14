@@ -105,6 +105,18 @@ class OrderSupabaseDataSource implements OrderDataSource {
   /// fast in testing gets slow in production. Paging arrives if anyone asks.
   static const int _historyLimit = 25;
 
+  /// Everything an order renders from. One constant, because the list and the
+  /// detail screen show the same order and a column the detail screen forgot to
+  /// ask for is a field that is null on exactly one of them.
+  static const String _orderColumns =
+      'id, restaurant_id, restaurant_name, status, created_at, delivery_to, '
+      'eta_minutes, payment_method, payment_id, subtotal, delivery_fee, '
+      'taxes, discount, total, coupon_code, '
+      // The catalog join is for the photo alone — the name is on the order,
+      // so a delisted restaurant costs us an image and not an identity.
+      'restaurants(image_url), '
+      'order_items(menu_item_id, name, unit_price, quantity, line_total)';
+
   @override
   Future<List<CustomerOrder>> fetchOrders() async {
     // No `.eq('user_id', …)`. The row-level policy on `orders` already answers
@@ -113,19 +125,46 @@ class OrderSupabaseDataSource implements OrderDataSource {
     // could simply omit.
     final List<Map<String, dynamic>> rows = await _db
         .from('orders')
-        .select(
-          'id, restaurant_id, restaurant_name, status, created_at, delivery_to, '
-          'eta_minutes, payment_method, payment_id, subtotal, delivery_fee, '
-          'taxes, discount, total, coupon_code, '
-          // The catalog join is for the photo alone — the name is on the order,
-          // so a delisted restaurant costs us an image and not an identity.
-          'restaurants(image_url), '
-          'order_items(menu_item_id, name, unit_price, quantity, line_total)',
-        )
+        .select(_orderColumns)
         .order('created_at', ascending: false)
         .limit(_historyLimit);
 
     return rows.map(_orderFrom).toList(growable: false);
+  }
+
+  @override
+  Future<CustomerOrder?> fetchOrder(String orderId) async {
+    // `maybeSingle`, not `single`: an order that isn't there is an answer, not
+    // an exception. The policy makes "someone else's order" indistinguishable
+    // from "no such order", which is the behaviour we want anyway.
+    final Map<String, dynamic>? row = await _db
+        .from('orders')
+        .select(_orderColumns)
+        .eq('id', orderId)
+        .maybeSingle();
+
+    return row == null ? null : _orderFrom(row);
+  }
+
+  @override
+  Stream<OrderStatus> watchOrderStatus(String orderId) {
+    // `.stream()` selects the row and then holds a Realtime subscription open,
+    // so the first event is the status as it stands and every later one is a
+    // write to the row. Only the status is read off it — the rest of the order
+    // is immutable once `place_order` has written it, and re-parsing a whole
+    // receipt on every kitchen update would be work for a field that cannot
+    // have changed.
+    return _db
+        .from('orders')
+        .stream(primaryKey: const <String>['id'])
+        .eq('id', orderId)
+        // An empty list means the row is gone or was never ours. There is no
+        // status to report, so report none rather than inventing one.
+        .where((List<Map<String, dynamic>> rows) => rows.isNotEmpty)
+        .map(
+          (List<Map<String, dynamic>> rows) =>
+              OrderStatus.fromWire(rows.first['status'] as String),
+        );
   }
 
   CustomerOrder _orderFrom(Map<String, dynamic> row) {

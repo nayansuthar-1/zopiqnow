@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/zopiq_app.dart';
 import 'package:zopiqnow/features/auth/domain/entities/auth_user.dart';
@@ -16,6 +17,8 @@ import 'package:zopiqnow/features/checkout/presentation/pages/order_detail_page.
 import 'package:zopiqnow/features/checkout/presentation/pages/orders_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/order_card.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/order_tracking_card.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_mock_datasource.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
@@ -211,8 +214,65 @@ void main() {
       // ₹0 delivery is something the customer was *given*, not something that
       // failed to happen.
       expect(find.text('FREE'), findsOneWidget);
-      expect(find.text('Total paid'), findsOneWidget);
+      // Not "Total paid": the order was placed a moment ago, it is cash on
+      // delivery, and nobody has paid anybody yet.
+      expect(find.text('Total'), findsOneWidget);
       expect(find.text('Cash on delivery'), findsOneWidget);
+    });
+
+    testWidgets('an order still on its way is tracked, not receipted', (
+      WidgetTester tester,
+    ) async {
+      _useTallSurface(tester);
+      await tester.pumpWidget(_app());
+
+      await _placeCodOrder(tester);
+      await _openOrders(tester);
+      await tester.tap(find.text('Test Kitchen'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OrderTrackingCard), findsOneWidget);
+      expect(
+        find.text('Waiting for the restaurant to accept'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Arriving by'), findsOneWidget);
+      // The whole journey is drawn, not just the step it is on — the customer
+      // wants to know what is left, not only where it is.
+      expect(find.text('Out for delivery'), findsOneWidget);
+      // The address is a promise, not a fact, until the food is there.
+      expect(find.textContaining('Delivering to'), findsOneWidget);
+      // The live card owns the status. A chip beside it would be a second,
+      // staler copy of the same fact.
+      expect(find.byType(OrderStatusChip), findsNothing);
+    });
+
+    testWidgets('a delivered order shows the receipt, not a timeline', (
+      WidgetTester tester,
+    ) async {
+      _useTallSurface(tester);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: <Override>[
+            ..._overrides(seedCart: false),
+            // A delivered order — the state the mock's own history can never
+            // reach, because nothing in it plays the kitchen.
+            orderByIdProvider(
+              'ZPQ-1042',
+            ).overrideWith((Ref ref) async => _pastOrder()),
+          ],
+          child: MaterialApp(
+            theme: ZopiqTheme.light,
+            home: const OrderDetailPage(orderId: 'ZPQ-1042'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OrderTrackingCard), findsNothing);
+      expect(find.byType(OrderStatusChip), findsOneWidget);
+      expect(find.text('Total paid'), findsOneWidget);
+      expect(find.textContaining('Delivered to'), findsOneWidget);
     });
   });
 

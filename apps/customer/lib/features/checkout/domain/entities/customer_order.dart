@@ -31,9 +31,27 @@ enum OrderStatus {
     _ => throw ArgumentError.value(value, 'status', 'Unknown order status'),
   };
 
-  /// Still on its way — the order is neither delivered nor cancelled. Live
-  /// status arrives with tracking (Step 8); today this only decides styling.
+  /// Still on its way — the order is neither delivered nor cancelled. An open
+  /// order is one worth watching: it is what decides whether the detail screen
+  /// subscribes to live status or renders a receipt.
   bool get isOpen => this != delivered && this != cancelled;
+
+  /// The five stages an order that goes well passes through, in order.
+  ///
+  /// [cancelled] is not among them, and that is not an omission: it is not a
+  /// step on the way to anywhere. A cancelled order has left the journey, and
+  /// the tracking screen says so instead of drawing a timeline it will never
+  /// finish.
+  static const List<OrderStatus> journey = <OrderStatus>[
+    placed,
+    accepted,
+    preparing,
+    outForDelivery,
+    delivered,
+  ];
+
+  /// How far along [journey] this status is; `-1` for [cancelled].
+  int get step => journey.indexOf(this);
 }
 
 /// One line of a past order, priced **as it was charged**.

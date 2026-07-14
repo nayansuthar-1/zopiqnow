@@ -74,6 +74,8 @@ cold deep link resolves without the Home feed.
 | Delivery fee and tax are hardcoded | Real fees depend on distance/surge; real tax on HSN category. Isolated in `CartBill` | Step 7, with the pricing engine |
 | Payments are COD-only | `razorpay_flutter 1.4.5` is approved and pinned, but checkout needs a key id and a server-created payment order | Step 7 |
 | Coupon codes are advertised on the checkout screen itself | The mock coupon book has no campaign behind it; the hint is the campaign | With the promotions service |
+| A cron job advances order status, not a kitchen | There is no vendor app. It writes only `status`, on the ETA the customer was quoted, and is invisible to the client | With the vendor app — unschedule and drop |
+| No driver location, no tracking map | Needs a Maps billing account + key (PM §5) *and* a rider app emitting a location. Neither exists | Step 8's remainder |
 
 ---
 
@@ -295,8 +297,47 @@ plugin that talks to Play services is only really tested on hardware. Order hist
 been verified against Postgres (the policy isolates by uid) and in widget tests, but it has
 only been installed on the Android 13 device, not the Android 10 floor.
 
-### Step 8 — Order tracking
-Live status, driver location stream, tri-tracking map.
+### Step 8 — Order tracking ← **in progress; live status shipped, map blocked**
+`/orders/:id` is now the tracking screen: while an order is open it carries a live
+timeline (Placed → Accepted → Preparing → Out for delivery → Delivered) and the arrival
+time it was promised, instead of a static status chip. "Track this order" on the
+confirmation screen finally does what it says — it opens the order, not the list.
+Realtime over `supabase_flutter`'s `.stream()`, so **no new dependency**.
+
+Decisions worth remembering:
+- **The subscription is the select policy, staying open.** 0005 already said a customer
+  may read their own order; 0008 adds `orders` to the `supabase_realtime` publication,
+  and Realtime applies that same RLS per subscriber. Publishing the table decides what
+  is *available* to be filtered — not who sees it. `order_items` is deliberately not
+  published: lines never change after `place_order` writes them, and a subscription to a
+  table that cannot change is a socket that will never speak.
+- **A cron job plays the kitchen, and is written to be deleted** (0008). Nothing moved an
+  order past `placed` — in production the vendor app does, and we don't have one. So
+  `advance_open_orders()` walks open orders through the same six statuses on a schedule
+  derived from the ETA *the customer was actually quoted*: deliver in four minutes flat
+  and the screen contradicts the "arriving in about 30 min" the confirmation promised.
+  It touches only `status`, has no grant and no API surface, and the app cannot tell a
+  status it wrote from one a kitchen wrote. When the vendor app lands:
+  `select cron.unschedule('advance-open-orders')`, drop the function, change zero Flutter.
+- **The mock does not simulate the kitchen.** `OrderMockDataSource.watchOrderStatus`
+  emits the current status once and stops. A fake that marched an order to `delivered` on
+  a timer would be testing its own timer; the timeline is tested by pushing statuses at
+  the widget instead.
+- **`orderByIdProvider` fetches now, rather than reading the loaded history.** It was a
+  lookup into the list, on the reasoning that the detail screen is only opened *from* the
+  list. "Track this order" ended that: checkout loads nobody's history, so the lookup
+  would have missed and told the customer their brand-new order does not exist. A cold
+  deep link to `/orders/ZPQ-1042` works now for the same reason.
+- **Words that asserted a delivery that hasn't happened are gone.** The screen renders
+  before the food arrives now, so "Delivered to" is "Delivering to" while the order is
+  open, and a cash order nobody has paid for says "Total", not "Total paid".
+
+**Still owed here:** the driver location stream and the tri-tracking map — blocked, and
+not on us: they need the Google Maps (or Ola/Mappls) billing account and key from
+PM_CHECKLIST §5, and a rider app that emits a location. Nothing to build until both
+exist. The Postgres half is verified against the live database (cron fires, status
+advances); the **Realtime → Flutter leg has not been exercised on a device**, and a
+socket is only really tested on hardware.
 
 ### Step 9 — Dining (table reservations) — **new scope, 2026-07-10**
 Zomato-dining / Swiggy-Dineout style: browse restaurants that take bookings, pick a

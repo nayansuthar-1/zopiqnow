@@ -22,20 +22,40 @@ final AutoDisposeFutureProvider<List<CustomerOrder>> ordersProvider =
       return ref.watch(orderRepositoryProvider).getOrders();
     });
 
-/// A single order out of the already-loaded history.
+/// A single order, fetched by id.
 ///
-/// The detail screen is opened *from* the list, so the order is in memory and
-/// re-fetching it by id would be a second round trip for bytes we hold. Null
-/// when the history has not loaded — a cold deep link to `/orders/ZPQ-1042` —
-/// and the screen sends the user to the list rather than inventing a receipt.
-final AutoDisposeProviderFamily<CustomerOrder?, String> orderByIdProvider =
-    Provider.autoDispose.family<CustomerOrder?, String>((Ref ref, String id) {
-      final List<CustomerOrder>? orders = ref.watch(ordersProvider).valueOrNull;
-      if (orders == null) return null;
-      for (final CustomerOrder o in orders) {
-        if (o.id == id) return o;
-      }
-      return null;
+/// It used to be a lookup into the already-loaded history, on the reasoning that
+/// the detail screen is only ever opened *from* the list. That stopped being
+/// true the moment the confirmation screen grew a "Track this order" button:
+/// checkout does not load anyone's history, so the lookup would miss and the
+/// customer would be told their brand-new order does not exist. So it fetches —
+/// one row, by primary key, behind the same policy — and a cold deep link to
+/// `/orders/ZPQ-1042` now works for the same reason.
+///
+/// Null is a real answer: no such order, or not this customer's. The screen says
+/// so. A *failure* to ask throws [OrdersLoadFailure], and the screen offers a
+/// retry — telling someone their order is gone because a socket hiccuped is the
+/// one thing this must never do.
+final AutoDisposeFutureProviderFamily<CustomerOrder?, String> orderByIdProvider =
+    FutureProvider.autoDispose.family<CustomerOrder?, String>((
+      Ref ref,
+      String id,
+    ) {
+      ref.watch(authControllerProvider);
+      return ref.watch(orderRepositoryProvider).getOrder(id);
+    });
+
+/// The order's status, live.
+///
+/// Only ever watched for an order that is still open — a delivered receipt has
+/// nothing left to report, and a subscription to it is a socket held open for an
+/// event that will never come.
+final AutoDisposeStreamProviderFamily<OrderStatus, String> orderStatusProvider =
+    StreamProvider.autoDispose.family<OrderStatus, String>((
+      Ref ref,
+      String id,
+    ) {
+      return ref.watch(orderRepositoryProvider).watchOrderStatus(id);
     });
 
 /// What a reorder actually managed to put in the cart.

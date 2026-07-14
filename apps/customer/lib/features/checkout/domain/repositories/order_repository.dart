@@ -50,6 +50,20 @@ abstract interface class OrderRepository {
   /// account look the same from here, and the screen behind an auth guard will
   /// never ask.
   Future<List<CustomerOrder>> getOrders();
+
+  /// One order, by id, or null when the customer has no such order.
+  ///
+  /// Throws [OrdersLoadFailure] on a transport error — which is a different
+  /// thing from "no such order", and the detail screen says something different
+  /// about each.
+  Future<CustomerOrder?> getOrder(String orderId);
+
+  /// The order's status, now and as the kitchen changes it.
+  ///
+  /// Errors are left on the stream rather than translated: the screen already
+  /// holds the order, so a broken subscription costs it live updates, not the
+  /// receipt. It falls back to the status it fetched.
+  Stream<OrderStatus> watchOrderStatus(String orderId);
 }
 
 /// Domain-level failure for reading order history.

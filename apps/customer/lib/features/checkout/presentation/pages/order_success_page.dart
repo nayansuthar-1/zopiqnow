@@ -10,8 +10,9 @@ import 'package:zopiqnow/features/checkout/presentation/providers/checkout_provi
 
 /// Order confirmation — the one screen in the app that exists purely to make
 /// someone feel good. It reads the receipt from [lastPlacedOrderProvider] rather
-/// than route `extra`, so it survives router rebuilds; live tracking replaces the
-/// static ETA in Step 8.
+/// than route `extra`, so it survives router rebuilds. The ETA here is a promise,
+/// not a status: "Track this order" opens the order itself, where the timeline is
+/// live.
 class OrderSuccessPage extends ConsumerWidget {
   const OrderSuccessPage({super.key});
 
@@ -102,11 +103,16 @@ class OrderSuccessPage extends ConsumerWidget {
                     ZopiqButton(
                       label: 'Track this order',
                       variant: ZopiqButtonVariant.cta,
-                      // The order history, which is where the receipt now lives.
-                      // `go`, not `push`: nothing above the shell should survive
-                      // a completed checkout — the cart is empty and there is
-                      // nothing to go back *to*.
-                      onPressed: () => context.goNamed(Routes.orders),
+                      // Straight to the order, which is where tracking lives —
+                      // the button finally does what it says. `go`, not `push`:
+                      // nothing above the shell should survive a completed
+                      // checkout — the cart is empty and there is nothing to go
+                      // back *to*. `go` rebuilds the stack from the route tree,
+                      // so `/orders` sits underneath and Back lands on the list.
+                      onPressed: () => context.goNamed(
+                        Routes.orderDetail,
+                        pathParameters: <String, String>{'id': order.id},
+                      ),
                     ),
                     const SizedBox(height: ZopiqSpacing.sm),
                     TextButton(
