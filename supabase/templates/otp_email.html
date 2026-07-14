@@ -1,0 +1,72 @@
+<!--
+  Sign-in OTP email. Applied to BOTH the "confirmation" (first sign-in, the user row
+  does not exist yet) and "magic_link" (every sign-in after) templates — Supabase picks
+  between them depending on whether the account is already confirmed, and a user must not
+  be able to tell which one they got.
+
+  Email HTML, not app HTML. The rules here are 2003's, not Flutter's:
+    - Tables for layout. Gmail, Outlook and every Android client still drop flex/grid.
+    - Every style inlined. Gmail strips <style> blocks on the mobile clients, so anything
+      that must render lives on the element. The one <style> block is progressive
+      enhancement (dark mode) and the mail is legible without it.
+    - No webfont. Figtree cannot be loaded here, so the stack falls back to the platform
+      UI face; the brand carries on colour and layout instead.
+    - Colours are copied from ZopiqPalette by hand because email cannot import Dart.
+      primary #FC8019 / primaryDeep #FF5200 / textDark #282C3F / textMuted #7E808C.
+      If the palette moves, move these.
+-->
+<!--[if mso]><style>* { font-family: Arial, sans-serif !important; }</style><![endif]-->
+<style>
+  @media (prefers-color-scheme: dark) {
+    .zq-body { background: #000000 !important; }
+    .zq-card { background: #141414 !important; border-color: #2A2B31 !important; }
+    .zq-heading { color: #F0F1F5 !important; }
+    .zq-text { color: #9A9CA8 !important; }
+    .zq-code-box { background: #000000 !important; border-color: #2A2B31 !important; }
+    .zq-code { color: #F0F1F5 !important; }
+  }
+</style>
+
+<table class="zq-body" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;background:#F4F4F6;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+
+      <table class="zq-card" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:440px;background:#FFFFFF;border:1px solid #E9E9EB;border-radius:16px;overflow:hidden;">
+
+        <!-- Brand bar -->
+        <tr>
+          <td align="center" style="background:#FC8019;background-image:linear-gradient(135deg,#FC8019 0%,#FF5200 100%);padding:28px 24px;">
+            <span style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:24px;font-weight:700;letter-spacing:-0.5px;color:#FFFFFF;">zopiqnow</span>
+          </td>
+        </tr>
+
+        <!-- Code -->
+        <tr>
+          <td style="padding:36px 32px 8px 32px;">
+            <h1 class="zq-heading" style="margin:0 0 8px 0;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:20px;line-height:28px;font-weight:700;color:#282C3F;">Your sign-in code</h1>
+            <p class="zq-text" style="margin:0 0 24px 0;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:22px;color:#7E808C;">Enter this code in the app to continue. It expires in 5 minutes.</p>
+
+            <table class="zq-code-box" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FFF7F0;border:1px solid #FFE0C7;border-radius:12px;">
+              <tr>
+                <td align="center" style="padding:22px 12px;">
+                  <span class="zq-code" style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:34px;line-height:40px;font-weight:700;letter-spacing:10px;text-indent:10px;color:#282C3F;">{{ .Token }}</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:24px 32px 32px 32px;">
+            <p class="zq-text" style="margin:0 0 20px 0;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;color:#7E808C;">Didn't try to sign in? You can ignore this email &mdash; nobody can get in with your address alone.</p>
+            <hr style="border:none;border-top:1px solid #E9E9EB;margin:0 0 16px 0;">
+            <p class="zq-text" style="margin:0;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:18px;color:#7E808C;">Sent by zopiqnow. Never share this code with anyone, including someone claiming to be from zopiqnow.</p>
+          </td>
+        </tr>
+
+      </table>
+
+    </td>
+  </tr>
+</table>
