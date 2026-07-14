@@ -17,6 +17,7 @@ import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/presentation/home_page.dart';
 import 'package:zopiqnow/features/menu/presentation/pages/menu_page.dart';
 import 'package:zopiqnow/features/search/presentation/pages/search_page.dart';
+import 'package:zopiqnow/app/coming_soon_page.dart';
 
 /// Route name constants — referenced instead of raw path strings.
 abstract final class Routes {
@@ -151,6 +152,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         builder: (_, _, StatefulNavigationShell navigationShell) =>
             AppShell(navigationShell: navigationShell),
         branches: <StatefulShellBranch>[
+          // Branch 0: Delivery (Home)
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
@@ -160,20 +162,25 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
               ),
             ],
           ),
+          // Branch 1: Dining
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: '/search',
-                name: Routes.search,
-                builder: (BuildContext context, _) => SearchPage(
-                  onOpenRestaurant: (Restaurant r) => context.pushNamed(
-                    Routes.menu,
-                    pathParameters: <String, String>{'id': r.id},
-                  ),
-                ),
+                path: '/dining',
+                builder: (_, _) => const ComingSoonPage(title: 'Dining'),
               ),
             ],
           ),
+          // Branch 2: Grocery
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/grocery',
+                builder: (_, _) => const ComingSoonPage(title: 'Grocery'),
+              ),
+            ],
+          ),
+          // Branch 3: Cart
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
@@ -232,6 +239,17 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: '/showcase',
         name: Routes.showcase,
         builder: (_, _) => const DesignShowcasePage(),
+      ),
+      // Search is now outside the shell so it covers the bottom bar
+      GoRoute(
+        path: '/search',
+        name: Routes.search,
+        builder: (BuildContext context, _) => SearchPage(
+          onOpenRestaurant: (Restaurant r) => context.pushNamed(
+            Routes.menu,
+            pathParameters: <String, String>{'id': r.id},
+          ),
+        ),
       ),
     ],
   );

@@ -36,8 +36,15 @@ class _ShellNavBar extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
 
   void _onTap(int index) {
-    // `initialLocation: true` when re-tapping the active tab pops it back to
-    // its root — the standard "tap Home again to go home" affordance.
+    if (index == 3) {
+      // Cart is index 3
+      navigationShell.goBranch(
+        3,
+        initialLocation: 3 == navigationShell.currentIndex,
+      );
+      return;
+    }
+
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
@@ -50,81 +57,222 @@ class _ShellNavBar extends ConsumerWidget {
     final bool isVisible = ref.watch(bottomNavVisibilityProvider);
     final ZopiqColors zc = context.zc;
 
-    return AnimatedSlide(
-      duration: ZopiqDurations.slow,
+    final int currentIndex = navigationShell.currentIndex;
+    final int leftIndex = currentIndex < 3 ? currentIndex : 0; // fallback if cart selected
+
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color glowColor = isDark ? Colors.black : Colors.white;
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 800),
       curve: ZopiqCurves.emphasized,
-      offset: isVisible ? Offset.zero : const Offset(0, 1),
-      child: AnimatedOpacity(
-        duration: ZopiqDurations.slow,
-        curve: ZopiqCurves.emphasized,
-        opacity: isVisible ? 1.0 : 0.0,
+      opacity: isVisible ? 1.0 : 0.0,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [
+              glowColor,
+              glowColor.withOpacity(0.8),
+              glowColor.withOpacity(0.0),
+            ],
+            stops: const [0.0, 0.3, 1.0], // Reduced stops for lower glow height
+          ),
+        ),
         child: SafeArea(
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
               ZopiqSpacing.md,
-              0,
+              16.0, // Reduced top padding for lower glow height
               ZopiqSpacing.md,
               ZopiqSpacing.md,
             ),
-            decoration: BoxDecoration(
-              borderRadius: ZopiqRadii.rXl,
-              boxShadow: const <BoxShadow>[
-                BoxShadow(color: Color(0x1A000000), blurRadius: 12, offset: Offset(0, 4)),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: ZopiqRadii.rXl,
-              child: BottomNavigationBar(
-                elevation: 0,
-            currentIndex: navigationShell.currentIndex,
-            onTap: _onTap,
-            items: <BottomNavigationBarItem>[
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.home_outlined),
-                activeIcon: Icon(Icons.home_rounded),
-                label: 'Home',
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.search_outlined),
-                activeIcon: Icon(Icons.search_rounded),
-                label: 'Search',
-              ),
-              BottomNavigationBarItem(
-                icon: _CartIcon(
-                  count: itemCount,
-                  icon: Icons.shopping_bag_outlined,
+            child: Row(
+            children: [
+              Expanded(
+                child: AnimatedSlide(
+                  duration: const Duration(milliseconds: 600),
+                  curve: ZopiqCurves.emphasized,
+                  offset: isVisible ? Offset.zero : const Offset(0, 1.5), // Slide down
+                  child: Container(
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark 
+                          ? Colors.black 
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(32),
+                      boxShadow: const <BoxShadow>[
+                        BoxShadow(
+                          color: Color(0x1A000000),
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final double tabWidth = constraints.maxWidth / 3;
+                        return Stack(
+                          children: [
+                            // Sliding indicator
+                            AnimatedPositioned(
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeInOutCubic,
+                              left: leftIndex * tabWidth,
+                              top: 4,
+                              bottom: 4,
+                              width: tabWidth,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: zc.primaryDeep.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                _buildNavItem(
+                                  context: context,
+                                  index: 0,
+                                  title: 'Delivery',
+                                  icon: Icons.delivery_dining_outlined,
+                                  activeIcon: Icons.delivery_dining,
+                                  width: tabWidth,
+                                  isSelected: currentIndex == 0,
+                                  zc: zc,
+                                ),
+                                _buildNavItem(
+                                  context: context,
+                                  index: 1,
+                                  title: 'Dining',
+                                  icon: Icons.restaurant_outlined,
+                                  activeIcon: Icons.restaurant,
+                                  width: tabWidth,
+                                  isSelected: currentIndex == 1,
+                                  zc: zc,
+                                ),
+                                _buildNavItem(
+                                  context: context,
+                                  index: 2,
+                                  title: 'Grocery',
+                                  icon: Icons.local_grocery_store_outlined,
+                                  activeIcon: Icons.local_grocery_store,
+                                  width: tabWidth,
+                                  isSelected: currentIndex == 2,
+                                  zc: zc,
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
                 ),
-                activeIcon: _CartIcon(
-                  count: itemCount,
-                  icon: Icons.shopping_bag_rounded,
+              ),
+              const SizedBox(width: ZopiqSpacing.sm),
+              // Cart Pill
+              AnimatedSlide(
+                duration: const Duration(milliseconds: 600),
+                curve: ZopiqCurves.emphasized,
+                offset: isVisible ? Offset.zero : const Offset(1.5, 0), // Slide right
+                child: GestureDetector(
+                  onTap: () => _onTap(3),
+                  child: Container(
+                    height: 64,
+                    padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.lg),
+                    decoration: BoxDecoration(
+                      color: zc.primaryDeep,
+                      borderRadius: BorderRadius.circular(32),
+                      boxShadow: const <BoxShadow>[
+                        BoxShadow(
+                          color: Color(0x1A000000),
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (itemCount > 0) ...[
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '$itemCount',
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: zc.primaryDeep,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: ZopiqSpacing.sm),
+                        ],
+                        Text(
+                          'Cart',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: ZopiqSpacing.xs),
+                        const Icon(
+                          Icons.shopping_cart_outlined,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                label: 'Cart',
               ),
             ],
-            ),
           ),
         ),
       ),
       ),
     );
   }
-}
 
-/// Cart glyph with a live item-count badge.
-class _CartIcon extends StatelessWidget {
-  const _CartIcon({required this.count, required this.icon});
-
-  final int count;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    if (count == 0) return Icon(icon);
-
-    return Badge.count(
-      count: count,
-      backgroundColor: context.zc.primaryDeep,
-      child: Icon(icon),
+  Widget _buildNavItem({
+    required BuildContext context,
+    required int index,
+    required String title,
+    required IconData icon,
+    required IconData activeIcon,
+    required double width,
+    required bool isSelected,
+    required ZopiqColors zc,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _onTap(index),
+      child: SizedBox(
+        width: width,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isSelected ? activeIcon : icon,
+              color: isSelected ? zc.primaryDeep : zc.textMuted,
+              size: 24,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: isSelected ? zc.primaryDeep : zc.textMuted,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

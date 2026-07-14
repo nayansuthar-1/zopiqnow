@@ -71,7 +71,8 @@ class _HomePageState extends ConsumerState<HomePage>
 
   void _onScroll() {
     if (!_scroll.hasClients) return;
-    final bool atTop = _scroll.offset <= 10;
+    // Change threshold from 10 to 400 to hide when Top Chains is in the middle
+    final bool atTop = _scroll.offset <= 400;
     final bool isVisible = ref.read(bottomNavVisibilityProvider);
     if (atTop != isVisible) {
       ref.read(bottomNavVisibilityProvider.notifier).state = atTop;
@@ -286,7 +287,5 @@ class _FoodCategoryRailDelegate extends SliverPersistentHeaderDelegate {
   double get minExtent => FoodCategoryRail.railHeight;
 
   @override
-  bool shouldRebuild(covariant _FoodCategoryRailDelegate oldDelegate) {
-    return categories != oldDelegate.categories;
-  }
+  bool shouldRebuild(covariant _FoodCategoryRailDelegate oldDelegate) => true;
 }
