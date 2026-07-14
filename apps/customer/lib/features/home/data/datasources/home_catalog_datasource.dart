@@ -18,25 +18,23 @@ class HomeCatalogDataSource {
   /// Artwork is Microsoft Fluent Emoji (3D) — MIT licensed, free to ship. See
   /// ATTRIBUTIONS.md. Each category maps to its closest food emoji; these are
   /// stand-ins for commissioned renders, and swapping one is a single edit here.
-  static const String _art = 'assets/categories';
+  static const String _art = 'assets/icons_zopiq';
 
   static const List<FoodCategory> _categories = <FoodCategory>[
-    FoodCategory(id: 'biryani', label: 'Biryani', imageAsset: '$_art/biryani.png'),
-    FoodCategory(id: 'pizza', label: 'Pizza', imageAsset: '$_art/pizza.png'),
-    FoodCategory(id: 'burger', label: 'Burger', imageAsset: '$_art/burger.png'),
-    FoodCategory(id: 'rolls', label: 'Rolls', imageAsset: '$_art/rolls.png'),
-    FoodCategory(id: 'north_indian', label: 'North Indian', imageAsset: '$_art/north_indian.png'),
-    FoodCategory(id: 'chinese', label: 'Chinese', imageAsset: '$_art/chinese.png'),
-    FoodCategory(id: 'dosa', label: 'Dosa', imageAsset: '$_art/dosa.png'),
-    FoodCategory(id: 'idli', label: 'Idli', imageAsset: '$_art/idli.png'),
-    FoodCategory(id: 'momos', label: 'Momos', imageAsset: '$_art/momos.png'),
-    FoodCategory(id: 'cake', label: 'Cake', imageAsset: '$_art/cake.png'),
-    FoodCategory(id: 'ice_cream', label: 'Ice Cream', imageAsset: '$_art/ice_cream.png'),
-    FoodCategory(id: 'noodles', label: 'Noodles', imageAsset: '$_art/noodles.png'),
-    FoodCategory(id: 'shawarma', label: 'Shawarma', imageAsset: '$_art/shawarma.png'),
-    FoodCategory(id: 'paratha', label: 'Paratha', imageAsset: '$_art/paratha.png'),
-    FoodCategory(id: 'chaat', label: 'Chaat', imageAsset: '$_art/chaat.png'),
-    FoodCategory(id: 'pure_veg', label: 'Pure Veg', imageAsset: '$_art/pure_veg.png'),
+    FoodCategory(id: 'sandwich', label: 'Sandwich', imageAsset: '$_art/realistic_sandwich.svg'),
+    FoodCategory(id: 'pizza', label: 'Pizza', imageAsset: '$_art/realistic_pizza.svg'),
+    FoodCategory(id: 'burger', label: 'Burger', imageAsset: '$_art/realistic_burger.svg'),
+    FoodCategory(id: 'momos', label: 'Momos', imageAsset: '$_art/momos_hd.svg'),
+    FoodCategory(id: 'pav_bhaji', label: 'Pav Bhaji', imageAsset: '$_art/pav_bhaji_plate.svg'),
+    FoodCategory(id: 'dosa', label: 'Dosa', imageAsset: '$_art/dosa_hd.svg'),
+    FoodCategory(id: 'aloo_paratha', label: 'Aloo Paratha', imageAsset: '$_art/realistic_aloo_paratha.svg'),
+    FoodCategory(id: 'paneer_tikka', label: 'Paneer Tikka', imageAsset: '$_art/paneer_tikka_hd.svg'),
+    FoodCategory(id: 'paneer_sabji', label: 'Paneer Sabji', imageAsset: '$_art/paneer_sabji_1.svg'),
+    FoodCategory(id: 'icecream', label: 'Ice Cream', imageAsset: '$_art/ice_cream_sundae_2.svg'),
+    FoodCategory(id: 'sweet_box', label: 'Sweet Box', imageAsset: '$_art/mix_sweet_box.svg'),
+    FoodCategory(id: 'chocolate_cake', label: 'Cake', imageAsset: '$_art/chocolate_cake_2.svg'),
+    FoodCategory(id: 'cold_coffee', label: 'Cold Coffee', imageAsset: '$_art/cold_coffee_hd.svg'),
+    FoodCategory(id: 'view_more', label: 'View More', imageAsset: null),
   ];
 
   static const List<Offer> _offers = <Offer>[

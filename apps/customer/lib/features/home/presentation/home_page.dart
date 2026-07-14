@@ -169,11 +169,7 @@ class _HomePageState extends ConsumerState<HomePage>
             ),
             const _TopChainsSection(),
             const SliverToBoxAdapter(child: SizedBox(height: ZopiqSpacing.lg)),
-            const SliverToBoxAdapter(
-              child: SectionHeader(
-                title: 'Restaurants with online food delivery',
-              ),
-            ),
+            const _RestaurantCountHeader(),
             const _RestaurantListSection(),
           ],
         ),
@@ -288,4 +284,41 @@ class _FoodCategoryRailDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _FoodCategoryRailDelegate oldDelegate) => true;
+}
+
+class _RestaurantCountHeader extends ConsumerWidget {
+  const _RestaurantCountHeader();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<List<Restaurant>> feed = ref.watch(filteredRestaurantsProvider);
+
+    return SliverToBoxAdapter(
+      child: feed.when(
+        data: (List<Restaurant> restaurants) {
+          if (restaurants.isEmpty) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(
+              ZopiqSpacing.pageGutter,
+              ZopiqSpacing.lg,
+              ZopiqSpacing.pageGutter,
+              ZopiqSpacing.md,
+            ),
+            child: Text(
+              '${restaurants.length} RESTAURANTS DELIVERING TO YOU',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                  ),
+            ),
+          );
+        },
+        loading: () => const SizedBox.shrink(),
+        error: (_, __) => const SizedBox.shrink(),
+      ),
+    );
+  }
 }

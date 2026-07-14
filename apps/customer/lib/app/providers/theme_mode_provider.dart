@@ -1,24 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// App-wide light/dark/system theme mode.
-///
-/// Defaults to [ThemeMode.system] (Rule 2.3 — dark is a first-class variant).
-/// TODO(persistence): hydrate from local storage once the settings feature and
-/// the storage layer (SAD 7.6) land.
 class ThemeModeNotifier extends Notifier<ThemeMode> {
+  static const String _key = 'theme_mode';
+
   @override
-  ThemeMode build() => ThemeMode.system;
+  ThemeMode build() {
+    _loadTheme();
+    return ThemeMode.system;
+  }
 
-  void set(ThemeMode mode) => state = mode;
+  Future<void> _loadTheme() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? savedTheme = prefs.getString(_key);
+    if (savedTheme != null) {
+      if (savedTheme == 'light') state = ThemeMode.light;
+      if (savedTheme == 'dark') state = ThemeMode.dark;
+      if (savedTheme == 'system') state = ThemeMode.system;
+    }
+  }
 
-  /// Cycles system → light → dark → system, for the showcase toggle.
+  Future<void> set(ThemeMode mode) async {
+    state = mode;
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, mode.name);
+  }
+
   void cycle() {
-    state = switch (state) {
+    final newMode = switch (state) {
       ThemeMode.system => ThemeMode.light,
       ThemeMode.light => ThemeMode.dark,
       ThemeMode.dark => ThemeMode.system,
     };
+    set(newMode);
   }
 }
 

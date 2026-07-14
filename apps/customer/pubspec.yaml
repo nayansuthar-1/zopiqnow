@@ -43,6 +43,8 @@ dependencies:
   # Declarative navigation (SAD 7.10).
   go_router: 14.8.1
 
+  flutter_svg: ^2.0.10
+
   # --- Storage layer (approved Step 5, Rule 3 change request) -----------------
   # Auth tokens only. Android-side this is Keystore-backed EncryptedSharedPrefs
   # (SAD 7.6, 9.2: "token stored in secure storage"). Declares minSdk 23 — under
@@ -94,6 +96,7 @@ flutter:
   # ATTRIBUTIONS.md. Stand-ins until commissioned illustrations are ready.
   assets:
     - assets/categories/
+    - assets/icons_zopiq/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -16,8 +16,8 @@ class FoodCategoryRail extends StatelessWidget {
   final List<FoodCategory> categories;
   final ValueChanged<FoodCategory>? onTapCategory;
 
-  static const double _artSize = 40;
-  static const double _tileWidth = 48;
+  static const double _artSize = 58;
+  static const double _tileWidth = 66;
 
   /// Art + top pad + gap + one line of label, so the rail never reflows on long names.
   static const double railHeight = _artSize + ZopiqSpacing.lg + ZopiqSpacing.sm + 18;

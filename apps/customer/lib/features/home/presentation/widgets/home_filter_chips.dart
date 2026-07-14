@@ -120,7 +120,12 @@ class _SortChip extends StatelessWidget {
   Future<void> _openSheet(BuildContext context) async {
     final HomeSort? picked = await showModalBottomSheet<HomeSort>(
       context: context,
-      builder: (BuildContext sheetContext) => _SortSheet(current: sort),
+      isScrollControlled: true,
+      useRootNavigator: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      builder: (BuildContext sheetContext) {
+        return _SortSheet(current: sort);
+      },
     );
     if (picked != null) onSelected(picked);
   }
@@ -153,7 +158,7 @@ class _SortSheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(
               ZopiqSpacing.lg,
-              0,
+              ZopiqSpacing.lg,
               ZopiqSpacing.lg,
               ZopiqSpacing.sm,
             ),
@@ -162,22 +167,26 @@ class _SortSheet extends StatelessWidget {
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ),
-          RadioGroup<HomeSort>(
-            groupValue: current,
-            onChanged: (HomeSort? value) => Navigator.pop(context, value),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                for (final HomeSort option in HomeSort.values)
-                  RadioListTile<HomeSort>(
-                    value: option,
-                    activeColor: zc.primary,
-                    title: Text(
-                      option.label,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                  ),
-              ],
+          Flexible(
+            child: SingleChildScrollView(
+              child: RadioGroup<HomeSort>(
+                groupValue: current,
+                onChanged: (HomeSort? value) => Navigator.pop(context, value),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    for (final HomeSort option in HomeSort.values)
+                      RadioListTile<HomeSort>(
+                        value: option,
+                        activeColor: zc.primary,
+                        title: Text(
+                          option.label,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
           const SizedBox(height: ZopiqSpacing.sm),

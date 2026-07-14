@@ -17,7 +17,16 @@ class SectionHeader extends StatelessWidget {
         ZopiqSpacing.pageGutter,
         ZopiqSpacing.md,
       ),
-      child: Text(title, style: Theme.of(context).textTheme.headlineMedium),
+      child: Text(
+        title.toUpperCase(),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.1,
+            ),
+      ),
     );
   }
 }

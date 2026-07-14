@@ -331,30 +331,36 @@ class _VegToggle extends ConsumerWidget {
     final bool on = ref.watch(
       homeFiltersProvider.select((HomeFilters f) => f.pureVeg),
     );
-    final ZopiqColors zc = context.zc;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color textColor = isDark ? Colors.white : Colors.black87;
 
     return Semantics(
       button: true,
       toggled: on,
       label: 'Veg mode',
-      child: InkWell(
+      child: GestureDetector(
         onTap: ref.read(homeFiltersProvider.notifier).togglePureVeg,
-        borderRadius: ZopiqRadii.rPill,
+        behavior: HitTestBehavior.opaque,
         child: Container(
           height: HomeSliverAppBar._rowHeight,
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.sm),
-          child: Row(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
               Text(
-                'Veg',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: ZopiqPalette.white,
+                'VEG\nMODE',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  height: 1.1,
+                  letterSpacing: 0.5,
+                  color: textColor,
                 ),
               ),
-              const SizedBox(width: ZopiqSpacing.xs),
+              const SizedBox(height: 2),
               _MiniToggle(on: on),
             ],
           ),
