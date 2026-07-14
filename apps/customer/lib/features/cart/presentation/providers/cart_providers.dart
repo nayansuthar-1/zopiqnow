@@ -73,6 +73,26 @@ class CartNotifier extends Notifier<Cart> {
     state = state._delta(menuItemId, -1);
   }
 
+  /// Puts a removed line back, at the quantity it had — what "Undo" means after
+  /// a swipe.
+  ///
+  /// Appends rather than restoring the original position: a cart is a set of
+  /// lines, not an ordering the customer chose, and remembering the index to put
+  /// it back at would be state kept solely to be pedantic about it.
+  ///
+  /// If the cart was emptied by the removal, the restored line brings its
+  /// restaurant back with it — the alternative is a cart holding food from
+  /// nowhere.
+  void restoreLine(CartLine line, {String? restaurantId, String? restaurantName}) {
+    final Cart base = state.isEmpty
+        ? Cart(
+            restaurantId: restaurantId ?? state.restaurantId,
+            restaurantName: restaurantName ?? state.restaurantName,
+          )
+        : state;
+    state = base.copyWith(lines: <CartLine>[...base.lines, line]);
+  }
+
   void removeLine(String menuItemId) {
     final List<CartLine> lines = state.lines
         .where((CartLine l) => l.item.id != menuItemId)

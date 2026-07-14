@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
@@ -79,85 +80,149 @@ class CheckoutPage extends ConsumerWidget {
     // without a number to call, so neither will the button below.
     final String? phone = auth is AuthSignedIn ? auth.user.phone : null;
 
+    // Everything the order still needs, in the order the screen asks for it. The
+    // CTA below is driven by the *first* gap, so the button always offers the
+    // next thing to do rather than refusing to do anything.
+    final bool needsAddress = address == null;
+    final bool needsPhone = phone == null;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),
           children: <Widget>[
-            _SectionCard(
-              icon: Icons.location_on_rounded,
-              title: 'Deliver to',
-              body: address?.shortDisplay ?? 'No address selected',
-              actionLabel: address == null ? 'Select' : 'Change',
-              onAction: () => showAddressPicker(context),
+            ZopiqReveal(
+              child: _SectionCard(
+                icon: Icons.location_on_rounded,
+                title: 'Deliver to',
+                body: address?.shortDisplay ?? 'No address selected',
+                actionLabel: needsAddress ? 'Select' : 'Change',
+                // An unfilled requirement is not a neutral row. It is the reason
+                // the order cannot be placed, and it should look like it.
+                isMissing: needsAddress,
+                onAction: () => showAddressPicker(context),
+              ),
             ),
             const SizedBox(height: ZopiqSpacing.md),
             if (auth is AuthSignedIn)
-              _SectionCard(
-                icon: Icons.person_rounded,
-                title: 'Ordering as',
-                body: auth.user.email,
-                actionLabel: 'Sign out',
-                onAction: () =>
-                    ref.read(authControllerProvider.notifier).signOut(),
+              ZopiqReveal(
+                index: 1,
+                child: _SectionCard(
+                  icon: Icons.person_rounded,
+                  title: 'Ordering as',
+                  body: auth.user.email,
+                  actionLabel: 'Sign out',
+                  onAction: () =>
+                      ref.read(authControllerProvider.notifier).signOut(),
+                ),
               ),
             const SizedBox(height: ZopiqSpacing.md),
             if (auth is AuthSignedIn)
-              _SectionCard(
-                icon: Icons.call_rounded,
-                title: 'Rider calls',
-                body: auth.user.phone ?? 'No number yet',
-                actionLabel: auth.user.phone == null ? 'Add' : 'Change',
-                onAction: () => showDeliveryPhoneSheet(context),
+              ZopiqReveal(
+                index: 2,
+                child: _SectionCard(
+                  icon: Icons.call_rounded,
+                  title: 'Rider calls',
+                  body: auth.user.phone ?? 'No number yet',
+                  actionLabel: needsPhone ? 'Add' : 'Change',
+                  isMissing: needsPhone,
+                  onAction: () => showDeliveryPhoneSheet(context),
+                ),
               ),
             const SizedBox(height: ZopiqSpacing.md),
-            _OrderSummaryCard(cart: cart),
+            ZopiqReveal(index: 3, child: _OrderSummaryCard(cart: cart)),
             const SizedBox(height: ZopiqSpacing.md),
-            const _CouponCard(),
+            const ZopiqReveal(index: 4, child: _CouponCard()),
             const SizedBox(height: ZopiqSpacing.md),
-            BillSummary(bill: bill),
+            ZopiqReveal(index: 5, child: BillSummary(bill: bill)),
             const SizedBox(height: ZopiqSpacing.md),
-            _PaymentMethods(
-              selected: checkout.paymentMethod,
-              onSelect: (PaymentMethod m) => ref
-                  .read(checkoutControllerProvider.notifier)
-                  .selectPaymentMethod(m),
+            ZopiqReveal(
+              index: 6,
+              child: _PaymentMethods(
+                selected: checkout.paymentMethod,
+                onSelect: (PaymentMethod m) => ref
+                    .read(checkoutControllerProvider.notifier)
+                    .selectPaymentMethod(m),
+              ),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
+      bottomNavigationBar: _PlaceOrderBar(
+        bill: bill,
+        // A tap with something missing opens the thing that fills it in — never
+        // a dead button.
+        label: needsAddress
+            ? 'Select delivery address'
+            : needsPhone
+            ? 'Add a delivery number'
+            : checkout.paymentMethod == PaymentMethod.upi
+            ? 'Pay ₹${bill.total}'
+            : 'Place order · ₹${bill.total}',
+        caption: checkout.paymentMethod == PaymentMethod.cod
+            ? 'Pay ₹${bill.total} in cash when your order arrives.'
+            : 'Test gateway — no money moves until the Razorpay keys are live.',
+        isLoading: checkout.isPlacingOrder,
+        // The route is auth-guarded, so `auth` is AuthSignedIn here. The pattern
+        // match is what proves it rather than a `!`.
+        onPressed: needsAddress || auth is! AuthSignedIn
+            ? () => showAddressPicker(context)
+            : needsPhone
+            ? () => showDeliveryPhoneSheet(context)
+            : () => _placeOrder(context, ref, address, phone),
+      ),
+    );
+  }
+}
+
+/// The sticky foot of checkout: what it costs, the one button, and the sentence
+/// that says what the button will actually do.
+class _PlaceOrderBar extends StatelessWidget {
+  const _PlaceOrderBar({
+    required this.bill,
+    required this.label,
+    required this.caption,
+    required this.isLoading,
+    required this.onPressed,
+  });
+
+  final CartBill bill;
+  final String label;
+  final String caption;
+  final bool isLoading;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: zc.cardShadow,
+            blurRadius: 24,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
         minimum: const EdgeInsets.all(ZopiqSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             ZopiqButton(
-              // A tap with something missing opens the thing that fills it in —
-              // never a dead button.
-              label: address == null
-                  ? 'Select delivery address'
-                  : phone == null
-                  ? 'Add a delivery number'
-                  : checkout.paymentMethod == PaymentMethod.upi
-                  ? 'Pay ₹${bill.total}'
-                  : 'Place order · ₹${bill.total}',
+              label: label,
               variant: ZopiqButtonVariant.cta,
-              isLoading: checkout.isPlacingOrder,
-              // The route is auth-guarded, so `auth` is AuthSignedIn here. The
-              // pattern match is what proves it rather than a `!`.
-              onPressed: address == null || auth is! AuthSignedIn
-                  ? () => showAddressPicker(context)
-                  : phone == null
-                  ? () => showDeliveryPhoneSheet(context)
-                  : () => _placeOrder(context, ref, address, phone),
+              isLoading: isLoading,
+              onPressed: onPressed,
             ),
             const SizedBox(height: ZopiqSpacing.sm),
             Text(
-              checkout.paymentMethod == PaymentMethod.cod
-                  ? 'Pay ₹${bill.total} in cash when your order arrives.'
-                  : 'Test gateway — no money moves until the Razorpay keys are '
-                        'live.',
+              caption,
               style: t.bodySmall?.copyWith(color: zc.textMuted),
               textAlign: TextAlign.center,
             ),
@@ -246,30 +311,59 @@ class _CouponCardState extends ConsumerState<_CouponCard> {
         ref.watch(couponHintsProvider).valueOrNull ?? const <String>[];
 
     if (coupon != null) {
-      return ZopiqCard(
-        child: Row(
-          children: <Widget>[
-            Icon(Icons.local_offer_rounded, color: zc.veg, size: 22),
-            const SizedBox(width: ZopiqSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text('${coupon.code} applied', style: t.titleSmall),
-                  Text(
-                    'You save ₹${coupon.discount} on this order',
-                    style: t.bodySmall?.copyWith(color: zc.veg),
-                  ),
-                ],
+      // An applied coupon is a small win, and it should feel like one: green,
+      // bordered, and visibly a *ticket* rather than one more grey row on a
+      // screen the customer is trying to get off.
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: zc.veg.withValues(alpha: 0.08),
+          borderRadius: ZopiqRadii.rLg,
+          border: Border.all(color: zc.veg.withValues(alpha: 0.35)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(ZopiqSpacing.lg),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: zc.veg.withValues(alpha: 0.14),
+                  borderRadius: ZopiqRadii.rMd,
+                ),
+                child: Icon(
+                  Icons.confirmation_num_rounded,
+                  color: zc.veg,
+                  size: 20,
+                ),
               ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close_rounded),
-              tooltip: 'Remove coupon',
-              onPressed: () =>
-                  ref.read(checkoutControllerProvider.notifier).removeCoupon(),
-            ),
-          ],
+              const SizedBox(width: ZopiqSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      '${coupon.code} applied',
+                      style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      'You save ₹${coupon.discount} on this order',
+                      style: t.bodySmall?.copyWith(
+                        color: zc.veg,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded),
+                tooltip: 'Remove coupon',
+                onPressed: () =>
+                    ref.read(checkoutControllerProvider.notifier).removeCoupon(),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -387,35 +481,67 @@ class _PaymentTile extends StatelessWidget {
     final bool enabled = onSelect != null;
     final Color textColor = enabled ? zc.textStrong : zc.textMuted;
 
-    return InkWell(
-      onTap: enabled ? () => onSelect!(method) : null,
-      borderRadius: ZopiqRadii.rMd,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.sm),
-        child: Row(
-          children: <Widget>[
-            Icon(icon, size: 22, color: enabled ? zc.primary : zc.textMuted),
-            const SizedBox(width: ZopiqSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(title, style: t.titleSmall?.copyWith(color: textColor)),
-                  Text(
-                    subtitle,
-                    style: t.bodySmall?.copyWith(color: zc.textMuted),
-                  ),
-                ],
+    return Padding(
+      padding: const EdgeInsets.only(top: ZopiqSpacing.sm),
+      child: InkWell(
+        onTap: enabled
+            ? () {
+                HapticFeedback.selectionClick();
+                onSelect!(method);
+              }
+            : null,
+        borderRadius: ZopiqRadii.rMd,
+        // The selected method is the one the customer's money goes through, so
+        // it gets a filled, bordered state rather than a radio dot they have to
+        // squint at. Colors only — no size or padding changes — so switching
+        // methods cannot reflow the card underneath the finger that tapped it.
+        child: AnimatedContainer(
+          duration: ZopiqDurations.fast,
+          curve: ZopiqCurves.standard,
+          padding: const EdgeInsets.all(ZopiqSpacing.md),
+          decoration: BoxDecoration(
+            color: selected
+                ? zc.primary.withValues(alpha: 0.06)
+                : Colors.transparent,
+            borderRadius: ZopiqRadii.rMd,
+            border: Border.all(
+              color: selected ? zc.primary : zc.divider,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(icon, size: 22, color: enabled ? zc.primary : zc.textMuted),
+              const SizedBox(width: ZopiqSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: t.titleSmall?.copyWith(
+                        color: textColor,
+                        fontWeight: selected
+                            ? FontWeight.w700
+                            : FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: t.bodySmall?.copyWith(color: zc.textMuted),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Icon(
-              selected
-                  ? Icons.radio_button_checked_rounded
-                  : Icons.radio_button_off_rounded,
-              size: 22,
-              color: selected ? zc.primary : zc.textMuted,
-            ),
-          ],
+              Icon(
+                selected
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_off_rounded,
+                size: 22,
+                color: selected ? zc.primary : zc.textMuted,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -429,6 +555,7 @@ class _SectionCard extends StatelessWidget {
     required this.body,
     required this.actionLabel,
     required this.onAction,
+    this.isMissing = false,
   });
 
   final IconData icon;
@@ -437,15 +564,30 @@ class _SectionCard extends StatelessWidget {
   final String actionLabel;
   final VoidCallback onAction;
 
+  /// This row is *why* the order cannot be placed — no address, no phone. It
+  /// gets a warm border and a filled action, so the customer's eye lands on the
+  /// thing standing in their way instead of hunting for it after the button
+  /// refuses to do what they expected.
+  final bool isMissing;
+
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
 
-    return ZopiqCard(
+    final Widget card = ZopiqCard(
+      onTap: onAction,
       child: Row(
         children: <Widget>[
-          Icon(icon, color: zc.primary, size: 22),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: zc.primary.withValues(alpha: 0.10),
+              borderRadius: ZopiqRadii.rMd,
+            ),
+            child: Icon(icon, color: zc.primary, size: 20),
+          ),
           const SizedBox(width: ZopiqSpacing.md),
           Expanded(
             child: Column(
@@ -457,7 +599,9 @@ class _SectionCard extends StatelessWidget {
                   body,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: t.titleSmall,
+                  style: t.titleSmall?.copyWith(
+                    color: isMissing ? zc.textMuted : zc.textStrong,
+                  ),
                 ),
               ],
             ),
@@ -465,6 +609,16 @@ class _SectionCard extends StatelessWidget {
           TextButton(onPressed: onAction, child: Text(actionLabel)),
         ],
       ),
+    );
+
+    if (!isMissing) return card;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: ZopiqRadii.rLg,
+        border: Border.all(color: zc.primary.withValues(alpha: 0.45), width: 1.5),
+      ),
+      child: card,
     );
   }
 }

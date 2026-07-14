@@ -33,14 +33,19 @@ class CartBill {
     final int subtotal = cart.subtotal;
     return CartBill(
       subtotal: subtotal,
-      deliveryFee: subtotal >= _freeDeliveryThreshold ? 0 : _flatDeliveryFee,
+      deliveryFee: subtotal >= freeDeliveryThreshold ? 0 : flatDeliveryFee,
       taxes: (subtotal * _taxRate).round(),
       discount: discount,
     );
   }
 
-  static const int _flatDeliveryFee = 40;
-  static const int _freeDeliveryThreshold = 500;
+  /// Public because the bill *card* needs them: it strikes through the fee the
+  /// customer is not paying, and draws how far they are from not paying it. The
+  /// alternative is the UI restating 40 and 500 as its own magic numbers, and
+  /// then quietly disagreeing with the bill the day the rule changes.
+  static const int flatDeliveryFee = 40;
+  static const int freeDeliveryThreshold = 500;
+
   static const double _taxRate = 0.05;
 
   /// Sum of the line totals, in whole rupees.
@@ -53,9 +58,9 @@ class CartBill {
 
   int get total => subtotal + deliveryFee + taxes - discount;
 
-  bool get hasFreeDelivery => subtotal >= _freeDeliveryThreshold;
+  bool get hasFreeDelivery => subtotal >= freeDeliveryThreshold;
 
   /// Rupees still needed to unlock free delivery; 0 once unlocked.
   int get amountToFreeDelivery =>
-      hasFreeDelivery ? 0 : _freeDeliveryThreshold - subtotal;
+      hasFreeDelivery ? 0 : freeDeliveryThreshold - subtotal;
 }
