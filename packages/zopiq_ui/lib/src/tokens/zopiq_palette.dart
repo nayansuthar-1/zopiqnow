@@ -31,10 +31,10 @@ abstract final class ZopiqPalette {
   static const Color dividerDark = Color(0xFF2A2B31);
 
   // --- Semantic (shared, tuned per mode where needed) ---
-  static const Color veg = Color(0xFF3D9B6D); // veg indicator / success
+  static const Color veg = Color(0xFF267335); // veg indicator — dark green
   static const Color vegBright = Color(0xFF60B246);
   static const Color nonVeg = Color(0xFFE43B4F); // non-veg / error
-  static const Color rating = Color(0xFF48C479); // rating pill green
+  static const Color rating = Color(0xFF267335); // rating pill — dark green
   static const Color ratingBar = Color(0xFFDB7C38); // low-rating amber
 
   // --- Utility ---
