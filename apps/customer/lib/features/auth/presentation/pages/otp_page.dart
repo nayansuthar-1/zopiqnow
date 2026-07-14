@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,13 +67,24 @@ class _OtpPageState extends ConsumerState<OtpPage> {
           .verifyEmailOtp(email: widget.email, code: _controller.text);
       // No navigation here — see the class doc.
     } on AuthFailure catch (failure) {
-      if (!mounted) return;
-      setState(() {
-        _error = failure.message;
-        _verifying = false;
-      });
-      _controller.clear();
+      _fail(failure.message);
+    } on Object catch (error) {
+      // Anything that is not an [AuthFailure] is a bug, not a wrong code — a
+      // Keystore that will not write, a plugin that is not there. It still has
+      // to release the button: a spinner that never stops is the one outcome
+      // the user cannot recover from (Rule 1.6). Debug builds name it, because
+      // the alternative is guessing from a screenshot.
+      _fail(kDebugMode ? '$error' : 'Something went wrong. Try again.');
     }
+  }
+
+  void _fail(String message) {
+    if (!mounted) return;
+    setState(() {
+      _error = message;
+      _verifying = false;
+    });
+    _controller.clear();
   }
 
   Future<void> _resend() async {

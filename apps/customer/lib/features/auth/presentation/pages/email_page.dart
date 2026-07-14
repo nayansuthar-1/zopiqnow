@@ -15,10 +15,15 @@ bool isPlausibleEmail(String value) => _emailPattern.hasMatch(value.trim());
 /// Sign in / sign up — one screen, because an email OTP makes no distinction:
 /// an unknown address is created, a known one is signed in.
 class EmailPage extends ConsumerStatefulWidget {
-  const EmailPage({required this.onOtpSent, super.key});
+  const EmailPage({required this.onOtpSent, required this.onCancel, super.key});
 
   /// Called with the address once the code is on its way.
   final void Function(String email) onOtpSent;
+
+  /// Backs out of the sign-in. This screen is reached by `go`, not `push`, so
+  /// there is nothing on the stack to pop and Flutter draws no back arrow —
+  /// without this, a user who tapped "Sign in" by accident would be trapped.
+  final VoidCallback onCancel;
 
   @override
   ConsumerState<EmailPage> createState() => _EmailPageState();
@@ -83,7 +88,12 @@ class _EmailPageState extends ConsumerState<EmailPage> {
     final TextTheme t = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: widget.onCancel,
+        ),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),

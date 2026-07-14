@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -142,6 +144,35 @@ void main() {
     // Not Home — /checkout, which is where they were going.
     expect(find.byType(CheckoutPage), findsOneWidget);
     expect(_location(container), '/checkout');
+    // And the OTP screen is *gone*, not merely covered by the destination.
+    // Reaching the right location is not enough: an imperatively pushed route
+    // outlives the redirect that replaced its location, so the user would still
+    // be looking at a Verify button that spins forever. Only this assertion
+    // catches that — the one above passes either way.
+    expect(find.byType(OtpPage), findsNothing);
+  });
+
+  testWidgets('signing in from Account leaves the login flow behind', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = _container();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_app(container));
+    await _settle(tester);
+
+    // Account opens login *imperatively* — the guard is not involved, because
+    // /account is not protected. This is the path a user actually takes, and it
+    // is the one that broke: a pushed route outlives the redirect that replaces
+    // its location, so the OTP screen stayed on top of Home, spinning forever.
+    unawaited(container.read(routerProvider).push('/login'));
+    await _settle(tester);
+
+    await _signIn(tester, code: FakeAuthDataSource.devCode);
+
+    expect(find.byType(OtpPage), findsNothing);
+    expect(find.byType(EmailPage), findsNothing);
+    expect(find.byType(HomePage), findsOneWidget);
   });
 
   testWidgets('a wrong code keeps the user on the OTP screen', (

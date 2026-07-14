@@ -130,8 +130,23 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           // `from` rides along to the OTP screen: the redirect reads it there,
           // after sign-in, to resume the originally requested route.
           final String? from = state.uri.queryParameters['from'];
+
+          // Backing out of a sign-in must not land on the route that demanded
+          // one — that would bounce straight back to this screen, forever. Home
+          // is the only destination that is always safe.
+          final String cancelTo = from != null && !_isProtected(from)
+              ? from
+              : '/';
+
           return EmailPage(
-            onOtpSent: (String email) => context.pushNamed(
+            onCancel: () => context.go(cancelTo),
+            // `go`, never `push`. A pushed route is imperative: it sits on the
+            // navigator's stack *above* whatever location the router holds, and
+            // no redirect can take it back down. Signing in would move the
+            // router onward while the OTP screen stayed on top — spinning
+            // forever, because it only ever stops spinning by being navigated
+            // away from.
+            onOtpSent: (String email) => context.goNamed(
               Routes.otp,
               queryParameters: <String, String>{'email': email, 'from': ?from},
             ),

@@ -160,7 +160,15 @@ class _ProfileHeader extends StatelessWidget {
           ),
           if (!signedIn)
             TextButton(
-              onPressed: () => context.push('/login'),
+              // `go`, not `push` (SAD 7.10: no screen pushes a login route
+              // imperatively). A pushed login flow sits above the router's
+              // location, so the post-sign-in redirect moves the location out
+              // from under it and leaves the OTP screen on screen, spinning.
+              // `from` is what brings the user back here afterwards.
+              onPressed: () => context.goNamed(
+                Routes.login,
+                queryParameters: const <String, String>{'from': '/account'},
+              ),
               child: const Text('Log in'),
             ),
         ],
