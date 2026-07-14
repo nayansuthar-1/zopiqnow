@@ -5,6 +5,9 @@ import 'package:zopiqnow/core/storage/secure_store.dart';
 import 'package:zopiqnow/core/storage/storage_providers.dart';
 import 'package:zopiqnow/features/auth/data/datasources/auth_datasource.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
+import 'package:zopiqnow/features/favourites/data/datasources/favourites_datasource.dart';
+import 'package:zopiqnow/features/favourites/data/datasources/favourites_mock_datasource.dart';
+import 'package:zopiqnow/features/favourites/presentation/providers/favourites_providers.dart';
 import 'package:zopiqnow/features/location/data/datasources/address_datasource.dart';
 import 'package:zopiqnow/features/location/data/datasources/address_mock_datasource.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
@@ -80,6 +83,7 @@ List<Override> storageOverrides({
   SecureStore? secureStore,
   AuthDataSource? authDataSource,
   AddressDataSource? addressDataSource,
+  FavouritesDataSource? favouritesDataSource,
   AuthState? authState = const AuthSignedOut(),
 }) => <Override>[
   keyValueStoreProvider.overrideWithValue(keyValueStore ?? FakeKeyValueStore()),
@@ -93,6 +97,12 @@ List<Override> storageOverrides({
   // used to hand out to everybody.
   addressDataSourceProvider.overrideWithValue(
     addressDataSource ?? AddressMockDataSource(),
+  ),
+  // Every restaurant card carries a heart, so *every* widget test that renders
+  // the feed reads favourites — and a widget test that reaches Supabase throws
+  // before it reaches an assertion.
+  favouritesDataSourceProvider.overrideWithValue(
+    favouritesDataSource ?? FavouritesMockDataSource(),
   ),
   if (authState != null)
     authControllerProvider.overrideWith(

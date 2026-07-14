@@ -48,8 +48,8 @@ class AccountPage extends ConsumerWidget {
           _AccountTile(
             icon: Icons.favorite_rounded,
             title: 'Favourites',
-            comingSoon: true,
-            onTap: () => _comingSoon(context, 'Favourites'),
+            subtitle: 'Restaurants you saved',
+            onTap: () => context.pushNamed(Routes.favourites),
           ),
           _AccountTile(
             icon: Icons.location_on_rounded,

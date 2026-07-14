@@ -25,9 +25,17 @@ class RestaurantMockDataSource implements RestaurantDataSource {
   final Duration latency;
   final bool shouldFail;
 
+  /// `Future.delayed(Duration.zero)` still *arms a Timer*, and a widget test
+  /// that finishes before it fires fails on "a Timer is still pending" — for a
+  /// delay of nothing. A zero latency therefore schedules nothing at all, which
+  /// is what a caller asking for no latency meant.
+  Future<void> _wait() async {
+    if (latency > Duration.zero) await Future<void>.delayed(latency);
+  }
+
   @override
   Future<List<Restaurant>> fetchNearby() async {
-    await Future<void>.delayed(latency);
+    await _wait();
     if (shouldFail) {
       throw const _MockNetworkException();
     }
@@ -36,7 +44,7 @@ class RestaurantMockDataSource implements RestaurantDataSource {
 
   @override
   Future<Restaurant?> fetchById(String id) async {
-    await Future<void>.delayed(latency);
+    await _wait();
     if (shouldFail) {
       throw const _MockNetworkException();
     }
@@ -51,7 +59,7 @@ class RestaurantMockDataSource implements RestaurantDataSource {
   /// good enough to build the screen against.
   @override
   Future<List<Restaurant>> search(String query) async {
-    await Future<void>.delayed(latency);
+    await _wait();
     if (shouldFail) {
       throw const _MockNetworkException();
     }

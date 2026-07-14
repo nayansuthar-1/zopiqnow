@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/features/favourites/presentation/widgets/favourite_button.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_image.dart';
 
@@ -22,7 +23,9 @@ const Color _darkGreen = Color(0xFF267335);
 /// Redesigned to match the Swiggy-style reference:
 /// - Thin border with low opacity
 /// - Cuisine · price overlay badge (top-left of image)
-/// - Bookmark icon (top-right of image)
+/// - Favourite heart (top-right of image) — a live control now. It was a
+///   decorative bookmark glyph: an icon that looked tappable, was not, and did
+///   nothing, which is the worst thing a control can be.
 /// - "FREE delivery" badge (bottom-left of image)
 /// - Dot indicator (bottom-right of image)
 /// - Name + dark-green rating pill
@@ -239,6 +242,16 @@ class _CardImage extends StatelessWidget {
             else
               image,
 
+            // ─── Favourite heart (top-right) ───
+            // Outside the card's InkWell hit area in intent, though not in the
+            // tree: it takes its own tap, so hearting a restaurant does not also
+            // open its menu.
+            Positioned(
+              right: ZopiqSpacing.md,
+              top: ZopiqSpacing.md,
+              child: FavouriteButton(restaurant: restaurant),
+            ),
+
             // ─── Cuisine · Price overlay (top-left) ───
             Positioned(
               left: ZopiqSpacing.md,
@@ -259,23 +272,6 @@ class _CardImage extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-            ),
-
-            // ─── Bookmark icon (top-right) ───
-            Positioned(
-              top: ZopiqSpacing.md,
-              right: ZopiqSpacing.md,
-              child: Icon(
-                Icons.bookmark_border_rounded,
-                size: 28,
-                color: Colors.white.withValues(alpha: 0.95),
-                shadows: const <Shadow>[
-                  Shadow(
-                    blurRadius: 8,
-                    color: Color(0x66000000),
-                  ),
-                ],
               ),
             ),
 

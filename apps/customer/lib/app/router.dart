@@ -15,6 +15,7 @@ import 'package:zopiqnow/features/checkout/presentation/pages/order_detail_page.
 import 'package:zopiqnow/features/checkout/presentation/pages/order_success_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/orders_page.dart';
 import 'package:zopiqnow/features/design_showcase/presentation/design_showcase_page.dart';
+import 'package:zopiqnow/features/favourites/presentation/pages/favourites_page.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/presentation/home_page.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
@@ -35,6 +36,7 @@ abstract final class Routes {
   static const String orderSuccess = 'orderSuccess';
   static const String orders = 'orders';
   static const String orderDetail = 'orderDetail';
+  static const String favourites = 'favourites';
   static const String addresses = 'addresses';
   static const String addressNew = 'addressNew';
   static const String addressEdit = 'addressEdit';
@@ -53,12 +55,14 @@ abstract final class Routes {
 ///
 /// `/orders` is here because an order history *is* identity: every receipt on it
 /// carries the phone number the rider called and the address the food went to.
-/// `/addresses` is here because an address book belongs to an account — there is
-/// no such thing as a signed-out user's saved addresses.
+/// `/addresses` and `/favourites` are here because both belong to an account —
+/// there is no such thing as a signed-out user's saved addresses, or their saved
+/// restaurants.
 const List<String> _protectedPrefixes = <String>[
   '/checkout',
   '/orders',
   '/addresses',
+  '/favourites',
 ];
 
 const String _splashPath = '/splash';
@@ -252,6 +256,12 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             builder: (_, _) => const OrderSuccessPage(),
           ),
         ],
+      ),
+
+      GoRoute(
+        path: '/favourites',
+        name: Routes.favourites,
+        builder: (_, _) => const FavouritesPage(),
       ),
 
       // The address book. Guarded by prefix; the form nests under it so one

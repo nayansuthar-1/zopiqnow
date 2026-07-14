@@ -64,7 +64,7 @@ cold deep link resolves without the Home feed.
 | ~~No licenses/credits screen~~ | ✅ Shipped. Reachable from Home's profile button | done |
 | Restaurant images are deterministic gradients | No CDN, no image pipeline | Step 3 |
 | ~~Location picker is a dead tap~~ | ✅ Shipped. GPS + saved addresses, persisted | done |
-| Favourites is a dead tap | Wiring buttons to nothing is worse than leaving them inert | With the profile service |
+| ~~Favourites is a dead tap~~ | ✅ Shipped (migration 0007). The heart on the restaurant card replaced a *decorative bookmark glyph* — an icon that looked tappable, was not, and did nothing | done |
 | ~~Recent searches vanish on restart~~ | ✅ Shipped. Persisted through `KeyValueStore` — local, not account state, for the same reason the selected address is | done |
 | ~~No auth, no real location~~ | ✅ Shipped in Step 5 (this table previously said "Steps 6 and 7", contradicting the build order) | done |
 | ~~"Proceed to checkout" only explains itself~~ | ✅ Now opens the auth-guarded `/checkout` | done |
