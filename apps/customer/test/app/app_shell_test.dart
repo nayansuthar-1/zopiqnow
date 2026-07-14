@@ -44,16 +44,27 @@ void _useTallSurface(WidgetTester tester) {
   addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 }
 
-Finder _tab(String label) => find.widgetWithText(InkResponse, label);
+/// The nav bar builds its tabs — and the cart pill — from [GestureDetector]s,
+/// not the `InkResponse` of a stock `NavigationBar`.
+Finder _tab(String label) => find.widgetWithText(GestureDetector, label);
+
+/// The cart's item count, which the pill renders as a circled number beside the
+/// word "Cart". Scoped to the pill: a "1" elsewhere on Home is not the badge.
+Finder _cartCount(String count) => find.descendant(
+  of: _tab('Cart'),
+  matching: find.text(count),
+);
 
 void main() {
-  testWidgets('starts on the Home tab', (WidgetTester tester) async {
+  testWidgets('starts on the Delivery tab', (WidgetTester tester) async {
     _useTallSurface(tester);
     await tester.pumpWidget(_app());
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.byType(HomePage), findsOneWidget);
-    expect(find.text('Home'), findsOneWidget);
+    // The first tab is "Delivery" — Home is what it shows, not what it is
+    // called. Dining and Grocery sit beside it; Cart is the pill on the right.
+    expect(find.text('Delivery'), findsOneWidget);
     expect(find.text('Cart'), findsOneWidget);
   });
 
@@ -81,21 +92,21 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text("What's on your mind?"), findsOneWidget);
+    expect(find.text('RECOMMENDED FOR YOU'), findsOneWidget);
 
-    // Scroll the category rail off the top of the viewport.
+    // Scroll that section off the top of the viewport.
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -1500));
     await tester.pumpAndSettle();
-    expect(find.text("What's on your mind?"), findsNothing);
+    expect(find.text('RECOMMENDED FOR YOU'), findsNothing);
 
     await tester.tap(_tab('Cart'));
     await tester.pumpAndSettle();
-    await tester.tap(_tab('Home'));
+    await tester.tap(_tab('Delivery'));
     await tester.pumpAndSettle();
 
     // Still scrolled: an IndexedStack shell keeps the branch alive.
     expect(find.byType(HomePage), findsOneWidget);
-    expect(find.text("What's on your mind?"), findsNothing);
+    expect(find.text('RECOMMENDED FOR YOU'), findsNothing);
   });
 
   testWidgets('the cart badge tracks the item count',
@@ -104,7 +115,9 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.byType(Badge), findsNothing);
+    // An empty cart shows no count at all — not a "0".
+    expect(_cartCount('0'), findsNothing);
+    expect(_cartCount('1'), findsNothing);
 
     await tester.tap(find.text('Paradise Biryani').first);
     await tester.pump(const Duration(milliseconds: 50));
@@ -127,8 +140,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    expect(find.byType(Badge), findsOneWidget);
-    expect(find.text('1'), findsWidgets);
+    expect(_cartCount('1'), findsOneWidget);
   });
 
   testWidgets('the profile button opens the account page, which reaches the '

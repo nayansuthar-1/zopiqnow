@@ -47,14 +47,20 @@ void _useTallSurface(WidgetTester tester) {
   tester.view.physicalSize = const Size(1200, 2600);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
+  // Reduce motion, as the OS setting would. Search is pushed *over* Home, which
+  // stays mounted and keeps looping its hero banner — so without this,
+  // `pumpAndSettle` never settles once Search is open.
+  tester.platformDispatcher.accessibilityFeaturesTestValue =
+      const FakeAccessibilityFeatures(disableAnimations: true);
+  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 }
 
-Finder _tab(String label) => find.widgetWithText(InkResponse, label);
-
+/// Search has no tab any more: it opens from the pill in Home's header, which is
+/// the only way into it that a user actually has.
 Future<void> _openSearch(WidgetTester tester) async {
   await tester.pumpWidget(_app());
   await tester.pump(const Duration(milliseconds: 50));
-  await tester.tap(_tab('Search'));
+  await tester.tap(find.text('Search "Biryani"'));
   await tester.pumpAndSettle();
 }
 
@@ -85,9 +91,23 @@ void main() {
   });
 
   group('recent searches', () {
+    late FakeKeyValueStore store;
     late ProviderContainer container;
-    setUp(() => container = ProviderContainer());
-    tearDown(() => container.dispose());
+
+    /// A container over [store] — a second one is the next app launch, reading
+    /// the same prefs the first one wrote.
+    ProviderContainer launch() {
+      final ProviderContainer c = ProviderContainer(
+        overrides: storageOverrides(keyValueStore: store),
+      );
+      addTearDown(c.dispose);
+      return c;
+    }
+
+    setUp(() {
+      store = FakeKeyValueStore();
+      container = launch();
+    });
 
     RecentSearchesNotifier notifier() =>
         container.read(recentSearchesProvider.notifier);
@@ -111,6 +131,33 @@ void main() {
         notifier().record(q);
       }
       expect(recents(), <String>['f', 'e', 'd', 'c', 'b']);
+    });
+
+    test('survives a restart', () {
+      notifier().record('biryani');
+      notifier().record('pizza');
+
+      // The next app launch, over the same prefs. A "recent" search that forgets
+      // itself on close is a list of what you did five minutes ago — which you
+      // already remember.
+      expect(
+        launch().read(recentSearchesProvider),
+        <String>['pizza', 'biryani'],
+      );
+    });
+
+    test('clearing them clears the stored copy too', () {
+      notifier().record('biryani');
+      notifier().clear();
+
+      expect(launch().read(recentSearchesProvider), isEmpty);
+    });
+
+    test('a corrupt stored history is ignored, not thrown', () {
+      store = FakeKeyValueStore(<String, String>{
+        'zopiq.search.recent': '{"not":"a list"}',
+      });
+      expect(launch().read(recentSearchesProvider), isEmpty);
     });
   });
 

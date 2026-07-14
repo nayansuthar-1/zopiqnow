@@ -65,7 +65,7 @@ cold deep link resolves without the Home feed.
 | Restaurant images are deterministic gradients | No CDN, no image pipeline | Step 3 |
 | ~~Location picker is a dead tap~~ | ✅ Shipped. GPS + saved addresses, persisted | done |
 | Favourites is a dead tap | Wiring buttons to nothing is worse than leaving them inert | With the profile service |
-| Recent searches vanish on restart | `shared_preferences` landed in Step 5, so this is now a wiring job through `KeyValueStore`, not a dependency decision | Next time Search is touched |
+| ~~Recent searches vanish on restart~~ | ✅ Shipped. Persisted through `KeyValueStore` — local, not account state, for the same reason the selected address is | done |
 | ~~No auth, no real location~~ | ✅ Shipped in Step 5 (this table previously said "Steps 6 and 7", contradicting the build order) | done |
 | ~~"Proceed to checkout" only explains itself~~ | ✅ Now opens the auth-guarded `/checkout` | done |
 | OTP accepts a fixed code | No backend and no SMS provider. The mock enforces the real rules (TTL, attempt cap) so the UI is built against the true contract | Step 7 |

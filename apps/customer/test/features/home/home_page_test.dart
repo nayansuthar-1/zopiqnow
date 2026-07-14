@@ -73,10 +73,12 @@ void main() {
     );
 
     // Categories and chips are static: they are on screen during the first
-    // frame, while the restaurant feed is still loading.
+    // frame, while the restaurant feed is still loading. (The rail's old
+    // "What's on your mind?" heading went with the Home revamp — the categories
+    // themselves are the point, and they are still here.)
     expect(find.byType(FoodCategoryRail), findsOneWidget);
     expect(find.byType(HomeFilterChips), findsOneWidget);
-    expect(find.text("What's on your mind?"), findsOneWidget);
+    expect(find.text('Pizza'), findsOneWidget);
 
     // The top-chains rail derives from the feed, so it only appears after load.
     expect(find.byType(TopChainsRail), findsNothing);
