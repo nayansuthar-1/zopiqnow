@@ -5,6 +5,9 @@ import 'package:zopiqnow/core/storage/secure_store.dart';
 import 'package:zopiqnow/core/storage/storage_providers.dart';
 import 'package:zopiqnow/features/auth/data/datasources/auth_datasource.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
+import 'package:zopiqnow/features/location/data/datasources/address_datasource.dart';
+import 'package:zopiqnow/features/location/data/datasources/address_mock_datasource.dart';
+import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 
 import 'fake_auth_datasource.dart';
 
@@ -76,12 +79,20 @@ List<Override> storageOverrides({
   KeyValueStore? keyValueStore,
   SecureStore? secureStore,
   AuthDataSource? authDataSource,
+  AddressDataSource? addressDataSource,
   AuthState? authState = const AuthSignedOut(),
 }) => <Override>[
   keyValueStoreProvider.overrideWithValue(keyValueStore ?? FakeKeyValueStore()),
   secureStoreProvider.overrideWithValue(secureStore ?? FakeSecureStore()),
   authDataSourceProvider.overrideWithValue(
     authDataSource ?? FakeAuthDataSource(),
+  ),
+  // The address book is per-user and server-side now, so it is a network seam
+  // like any other — and a widget test that reaches Supabase throws before it
+  // reaches an assertion. The mock carries the Home/Work fixtures the repository
+  // used to hand out to everybody.
+  addressDataSourceProvider.overrideWithValue(
+    addressDataSource ?? AddressMockDataSource(),
   ),
   if (authState != null)
     authControllerProvider.overrideWith(

@@ -6,7 +6,6 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
-import 'package:zopiqnow/features/location/presentation/widgets/address_picker_sheet.dart';
 
 /// The customer Account screen, opened from the Home profile button.
 ///
@@ -56,7 +55,10 @@ class AccountPage extends ConsumerWidget {
             icon: Icons.location_on_rounded,
             title: 'Address book',
             subtitle: 'Manage your delivery addresses',
-            onTap: () => showAddressPicker(context),
+            // The book, not the picker sheet. The sheet answers "where am I
+            // ordering to right now"; this answers "what addresses do I have",
+            // and until now the second question had no screen and no answer.
+            onTap: () => context.pushNamed(Routes.addresses),
           ),
           _AccountTile(
             icon: Icons.account_balance_wallet_rounded,

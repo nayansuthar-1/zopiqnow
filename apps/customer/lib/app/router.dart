@@ -17,6 +17,9 @@ import 'package:zopiqnow/features/checkout/presentation/pages/orders_page.dart';
 import 'package:zopiqnow/features/design_showcase/presentation/design_showcase_page.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/presentation/home_page.dart';
+import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/location/presentation/pages/address_book_page.dart';
+import 'package:zopiqnow/features/location/presentation/pages/address_form_page.dart';
 import 'package:zopiqnow/features/menu/presentation/pages/menu_page.dart';
 import 'package:zopiqnow/features/search/presentation/pages/search_page.dart';
 import 'package:zopiqnow/app/coming_soon_page.dart';
@@ -32,6 +35,9 @@ abstract final class Routes {
   static const String orderSuccess = 'orderSuccess';
   static const String orders = 'orders';
   static const String orderDetail = 'orderDetail';
+  static const String addresses = 'addresses';
+  static const String addressNew = 'addressNew';
+  static const String addressEdit = 'addressEdit';
   static const String licenses = 'licenses';
   static const String account = 'account';
   static const String splash = 'splash';
@@ -47,7 +53,13 @@ abstract final class Routes {
 ///
 /// `/orders` is here because an order history *is* identity: every receipt on it
 /// carries the phone number the rider called and the address the food went to.
-const List<String> _protectedPrefixes = <String>['/checkout', '/orders'];
+/// `/addresses` is here because an address book belongs to an account — there is
+/// no such thing as a signed-out user's saved addresses.
+const List<String> _protectedPrefixes = <String>[
+  '/checkout',
+  '/orders',
+  '/addresses',
+];
 
 const String _splashPath = '/splash';
 const String _loginPath = '/login';
@@ -229,6 +241,36 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             path: 'success',
             name: Routes.orderSuccess,
             builder: (_, _) => const OrderSuccessPage(),
+          ),
+        ],
+      ),
+
+      // The address book. Guarded by prefix; the form nests under it so one
+      // entry in _protectedPrefixes covers adding and editing too.
+      GoRoute(
+        path: '/addresses',
+        name: Routes.addresses,
+        builder: (_, _) => const AddressBookPage(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: 'new',
+            name: Routes.addressNew,
+            builder: (_, _) => const AddressFormPage(),
+          ),
+          GoRoute(
+            path: ':id/edit',
+            name: Routes.addressEdit,
+            builder: (BuildContext context, GoRouterState state) {
+              // The address rides along in `extra` — the list already holds it,
+              // and re-fetching one row we have in hand would be a round trip
+              // for nothing. A cold deep link has no `extra`, and rather than
+              // silently turn an edit into an *add* (which would duplicate the
+              // address), it lands on the book, where the row can be tapped.
+              final Object? extra = state.extra;
+              return extra is Address
+                  ? AddressFormPage(existing: extra)
+                  : const AddressBookPage();
+            },
           ),
         ],
       ),

@@ -142,8 +142,10 @@ Decisions worth remembering:
 **Still owed here:** the OTP is verified by `AuthMockDataSource` (fixed code `123456`,
 shown on-screen in debug builds only, since there is no SMS to read). It models the
 real contract — 6 digits, 5-minute TTL, 5-attempt cap — so Step 7 swaps the transport
-without discovering new failure modes. Saved addresses are seeded rather than
-per-user; there is no add/edit-address screen and no Places autocomplete. Access-token
+without discovering new failure modes. ~~Saved addresses are seeded rather than
+per-user; there is no add/edit-address screen~~ — both fixed in Step 7 (migration 0006).
+There is still no Places autocomplete: the form forward-geocodes typed text through
+Android's native `Geocoder`, which needs no key and no billing. Access-token
 refresh-on-401 arrives with the Dio interceptor, as nothing calls an authenticated
 endpoint yet.
 
@@ -255,6 +257,37 @@ Decisions worth remembering:
   `place_order` would reprice it at checkout anyway. Items that are gone are skipped and
   counted, and an order where *nothing* survives leaves the existing cart untouched rather
   than emptying it for nothing.
+
+**The address book is live (2026-07-14).** `/addresses`, reached from the Account tab:
+the account's saved addresses in Postgres (migration 0006), an add/edit form, and delete.
+Guarded, like `/orders` — there is no such thing as a signed-out user's saved addresses.
+The seeded `Home — Banjara Hills` / `Work — HITEC City` constants are gone from the app;
+they were shared by *every account* and now live in `AddressMockDataSource`, where fixtures
+belong.
+
+Decisions worth remembering:
+- **The list is the account's; the selection is the device's.** Which address this phone is
+  ordering to is not a fact about the account — the same customer can be at home on one
+  phone and at the office on another — so it stays in local storage, and the Home header
+  still renders on the first frame with no network call. `AddressRepositoryImpl` holds both
+  seams because they must be kept in step: editing the selected address rewrites the local
+  snapshot, and deleting it clears it, or the header goes on showing an address the next
+  order would ship to.
+- **The client may write this table**, unlike `orders`. That is the distinction worth being
+  precise about: `place_order` owns writes because *the client must not decide what anything
+  costs*. An address costs nothing — it is the customer's own text about where they live —
+  so the only rule is "it is yours", and RLS enforces exactly that (insert carries a
+  `with check`, update carries both clauses, so no row can be filed under another user).
+- **Coordinates come from GPS, then from a forward geocode, then not at all.** The table
+  requires a lat/lng — an address the dispatcher cannot put on a map is not a delivery
+  address — but customers type words, not points. A point already attached to unchanged text
+  is reused (re-geocoding "Flat 402, Banjara Hills" would throw away a real GPS fix for a
+  neighbourhood centroid); changed text is forward-geocoded through the native `Geocoder`,
+  which is what lets someone save their *office* address from their sofa; and if neither
+  yields a point, the form refuses to save and says why. `geocoding` already ships — no new
+  dependency.
+- Deleting an address cannot damage history: an order stores `delivery_to`/`lat`/`lng` on
+  itself (0003), so a receipt still says where the food went.
 
 **Still owed here:** the Razorpay wiring inherited from Step 6, and Google sign-in has not
 yet been exercised on the Android 10 device — it builds and the unit tests pass, but a

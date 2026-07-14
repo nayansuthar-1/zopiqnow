@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/domain/services/device_location_service.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
@@ -61,7 +63,7 @@ class _AddressPickerSheetState extends ConsumerState<AddressPickerSheet> {
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
-    final List<Address> saved = ref.watch(savedAddressesProvider);
+    final AsyncValue<List<Address>> saved = ref.watch(savedAddressesProvider);
     final Address? selected = ref.watch(selectedAddressProvider);
 
     return SafeArea(
@@ -95,11 +97,60 @@ class _AddressPickerSheetState extends ConsumerState<AddressPickerSheet> {
               style: t.labelSmall?.copyWith(color: zc.textMuted),
             ),
             const SizedBox(height: ZopiqSpacing.sm),
-            ...saved.map(
-              (Address address) => _AddressTile(
-                address: address,
-                isSelected: selected?.id == address.id,
-                onTap: () => _select(address),
+            // The list is the account's now, so it arrives over the network. A
+            // failure here is not fatal to the sheet: GPS above still works, and
+            // that is the path a signed-out user takes anyway.
+            saved.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.symmetric(vertical: ZopiqSpacing.md),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (Object _, StackTrace _) => Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: ZopiqSpacing.md,
+                ),
+                child: Text(
+                  'We couldn\'t load your saved addresses.',
+                  style: t.bodySmall?.copyWith(color: zc.textMuted),
+                ),
+              ),
+              data: (List<Address> addresses) => Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  if (addresses.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: ZopiqSpacing.sm,
+                      ),
+                      child: Text(
+                        'Nothing saved yet.',
+                        style: t.bodySmall?.copyWith(color: zc.textMuted),
+                      ),
+                    ),
+                  ...addresses.map(
+                    (Address address) => _AddressTile(
+                      address: address,
+                      isSelected: selected?.id == address.id,
+                      onTap: () => _select(address),
+                    ),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.add_rounded, color: zc.primary),
+                    title: Text(
+                      'Add a new address',
+                      style: t.titleSmall?.copyWith(color: zc.primary),
+                    ),
+                    // The route is auth-guarded: a signed-out tap lands on login
+                    // and comes back. The sheet closes first — leaving a modal
+                    // over the login screen is how you get a dead-looking app.
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.pushNamed(Routes.addressNew);
+                    },
+                  ),
+                ],
               ),
             ),
           ],

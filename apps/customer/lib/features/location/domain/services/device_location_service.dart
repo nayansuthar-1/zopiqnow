@@ -10,6 +10,26 @@ abstract interface class DeviceLocationService {
   /// differently: service off, permission denied, permanently denied, or no
   /// address for the coordinates.
   Future<Address> currentAddress();
+
+  /// Forward-geocodes typed text ("Banjara Hills, Hyderabad") to a point.
+  ///
+  /// This is what lets a customer save their office address from their sofa. GPS
+  /// only ever answers "where am I", which is the wrong question for an address
+  /// book — the one address you cannot add that way is the one you are not
+  /// standing in.
+  ///
+  /// Throws [AddressNotFound] when the geocoder is missing (a device with no
+  /// Play services) or the text matches nothing.
+  Future<GeoPoint> coordinatesOf(String query);
+}
+
+/// A latitude/longitude pair. Not an [Address]: this is the answer to "where is
+/// that text", and the text is already in hand.
+class GeoPoint {
+  const GeoPoint(this.latitude, this.longitude);
+
+  final double latitude;
+  final double longitude;
 }
 
 sealed class LocationFailure implements Exception {

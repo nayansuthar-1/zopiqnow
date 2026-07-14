@@ -62,6 +62,24 @@ class GeolocatorLocationService implements DeviceLocationService {
     return _toAddress(places.first, position);
   }
 
+  @override
+  Future<GeoPoint> coordinatesOf(String query) async {
+    // Same capability check as the reverse path, and the same reason: a device
+    // with no Play services has no Geocoder at all, and calling it there throws
+    // rather than returning empty (Rule 1.1).
+    if (!await _geocoding.isPresent()) throw const AddressNotFound();
+
+    final List<Location> matches = await _geocoding.locationFromAddress(query);
+    if (matches.isEmpty) throw const AddressNotFound();
+
+    // The first match. The geocoder ranks by relevance and we have no map for
+    // the customer to disambiguate on — offering them a list of five points they
+    // cannot see would be a worse lie than taking the best guess and letting
+    // them correct the text.
+    final Location best = matches.first;
+    return GeoPoint(best.latitude, best.longitude);
+  }
+
   static Address _toAddress(Placemark p, Position position) {
     // Indian addresses put the neighbourhood in `subLocality` ("Banjara Hills")
     // and the city in `locality` ("Hyderabad"). Fall back down the hierarchy
