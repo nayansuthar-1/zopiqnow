@@ -159,6 +159,15 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
 
           return EmailPage(
             onCancel: () => context.go(cancelTo),
+            // Google signs in without a second screen, so nothing else rewrites
+            // the stack. `go`, not `pop`: the login may have been *pushed* here
+            // by the guard (Cart → "Proceed to checkout" pushes), and go_router
+            // does not re-apply `redirect` to a pushed route — the sign-in would
+            // move the location underneath a login screen that stays on top.
+            // A `go` replaces the stack outright, which is the one thing that
+            // reliably leaves this screen. `from` is the destination the guard
+            // recorded; without it there is nowhere to be but Home.
+            onSignedIn: () => context.go(from ?? '/'),
             // `go`, never `push`. A pushed route is imperative: it sits on the
             // navigator's stack *above* whatever location the router holds, and
             // no redirect can take it back down. Signing in would move the

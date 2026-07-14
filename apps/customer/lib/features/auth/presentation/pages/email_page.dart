@@ -15,10 +15,25 @@ bool isPlausibleEmail(String value) => _emailPattern.hasMatch(value.trim());
 /// Sign in / sign up — one screen, because an email OTP makes no distinction:
 /// an unknown address is created, a known one is signed in.
 class EmailPage extends ConsumerStatefulWidget {
-  const EmailPage({required this.onOtpSent, required this.onCancel, super.key});
+  const EmailPage({
+    required this.onOtpSent,
+    required this.onSignedIn,
+    required this.onCancel,
+    super.key,
+  });
 
   /// Called with the address once the code is on its way.
   final void Function(String email) onOtpSent;
+
+  /// Called when Google has signed the user in and this screen is done.
+  ///
+  /// The email path never needs this: sending a code navigates to the OTP screen,
+  /// and *that* `go` is what turns an imperatively pushed login back into a
+  /// declarative one the redirect can move. Google has no second step, so
+  /// nothing rewrites the stack — and go_router does not re-run `redirect` on a
+  /// pushed route. Without this callback the user picks an account, watches
+  /// nothing happen, and discovers they are signed in only after pressing back.
+  final VoidCallback onSignedIn;
 
   /// Backs out of the sign-in. This screen is reached by `go`, not `push`, so
   /// there is nothing on the stack to pop and Flutter draws no back arrow —
@@ -61,9 +76,6 @@ class _EmailPageState extends ConsumerState<EmailPage> {
     }
   }
 
-  /// No navigation on success: signing in flips [AuthState], and the router's
-  /// redirect is the only thing that moves the user (SAD 7.10). It already knows
-  /// where they were headed, via `?from=`.
   Future<void> _signInWithGoogle() async {
     if (_googleBusy || _sending) return;
     setState(() {
@@ -73,6 +85,11 @@ class _EmailPageState extends ConsumerState<EmailPage> {
 
     try {
       await ref.read(authControllerProvider.notifier).signInWithGoogle();
+      // [onSignedIn] `go`es, which is a declarative navigation — so it leaves
+      // this screen behind even when the guard *pushed* it here, which the
+      // redirect on its own cannot do. Where to go is still the router's call,
+      // not this screen's: it holds `?from=`.
+      if (mounted) widget.onSignedIn();
     } on GoogleSignInCancelled {
       // They closed the sheet. They know they closed the sheet.
     } on AuthFailure catch (failure) {
