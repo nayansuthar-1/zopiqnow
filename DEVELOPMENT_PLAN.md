@@ -206,10 +206,33 @@ last mock, and it moved to **email OTP, not SMS** — there is no SMS provider y
   longer exists, and the rules it modelled (6 digits, TTL, attempt cap) are now enforced
   by Supabase. Git history has it; `FakeAuthDataSource` carries the same rules in tests.
 
-**Still owed here:** Google sign-in (the button ships disabled and says so — the OAuth
-clients do not exist yet, and `google_sign_in` is an unapproved dependency change
-request), a working SMTP sender (Gmail app password currently rejected, so no code can
-actually be delivered), and the Razorpay wiring inherited from Step 6.
+**Email OTP is live (2026-07-14).** The sender is Brevo (`smtp-relay.brevo.com`), not
+Gmail: Google answers `534 5.7.9 WebLoginRequired` to a login from Supabase's datacenter
+IPs even with a valid App Password, and the `DisplayUnlockCaptcha` page that used to
+whitelist such logins no longer exists. Gmail is a mailbox, not a relay — do not retry it.
+Brevo's free tier sends 300/day to any recipient with no domain to verify, which is what
+buys us time; move to Resend on a real domain before launch. The mail template lives in
+`supabase/templates/otp_email.html` and is applied to *both* the confirmation and
+magic-link templates, because Supabase picks between them on whether the account already
+exists and the user must not be able to tell which one they got.
+
+**Google sign-in is live (2026-07-14).** Native, not the browser OAuth flow: the account
+sheet returns an id token that goes straight to `signInWithIdToken`, so the user never
+leaves the app and there is no redirect scheme to register. `google_sign_in 7.2.0` was an
+approved Rule 3 change request; `pubspec.lock` gained 6 packages and bumped none, and the
+merged manifest still reads `minSdk 24`.
+
+Decisions worth remembering:
+- **The app is configured with the *Web* client id, not the Android one.** Native sign-in
+  asks for a token addressed to a backend, and the backend is Supabase, which holds that
+  same web client. The Android client must exist — it is what ties the signing certificate
+  to the app — but it is never named in code. The release SHA-1 is still owed for Play.
+- **A dismissed account sheet is not an error.** `GoogleSignInCancelled` is swallowed by
+  the email screen; only real failures get a message.
+
+**Still owed here:** the Razorpay wiring inherited from Step 6, and Google sign-in has not
+yet been exercised on the Android 10 device — it builds and the unit tests pass, but a
+plugin that talks to Play services is only really tested on hardware.
 
 ### Step 8 — Order tracking
 Live status, driver location stream, tri-tracking map.

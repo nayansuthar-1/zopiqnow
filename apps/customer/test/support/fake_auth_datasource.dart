@@ -59,6 +59,21 @@ class FakeAuthDataSource implements AuthDataSource {
     );
   }
 
+  /// Signs in as [googleUser] unless [googleCancels] is set, in which case it
+  /// throws exactly what a dismissed account sheet throws.
+  bool googleCancels = false;
+
+  static const AuthUser googleUser = AuthUser(
+    id: 'usr_google',
+    email: 'google@example.com',
+  );
+
+  @override
+  Future<AuthUser> signInWithGoogle() async {
+    if (googleCancels) throw const GoogleSignInCancelled();
+    return _user = googleUser;
+  }
+
   @override
   Future<AuthUser> setPhone(String phone) async =>
       _user = _user!.copyWith(phone: phone);

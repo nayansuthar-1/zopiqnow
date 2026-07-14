@@ -14,6 +14,10 @@ abstract interface class AuthDataSource {
     required String code,
   });
 
+  /// Signs in with a Google account, or throws [GoogleSignInCancelled] if the
+  /// user backs out of the sheet.
+  Future<AuthUser> signInWithGoogle();
+
   Future<AuthUser> setPhone(String phone);
 
   Future<void> signOut();

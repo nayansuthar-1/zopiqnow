@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/auth/domain/repositories/auth_repository.dart';
@@ -26,6 +27,7 @@ class EmailPage extends ConsumerStatefulWidget {
 class _EmailPageState extends ConsumerState<EmailPage> {
   final TextEditingController _controller = TextEditingController();
   bool _sending = false;
+  bool _googleBusy = false;
   String? _error;
 
   @override
@@ -51,6 +53,27 @@ class _EmailPageState extends ConsumerState<EmailPage> {
       if (mounted) setState(() => _error = failure.message);
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  /// No navigation on success: signing in flips [AuthState], and the router's
+  /// redirect is the only thing that moves the user (SAD 7.10). It already knows
+  /// where they were headed, via `?from=`.
+  Future<void> _signInWithGoogle() async {
+    if (_googleBusy || _sending) return;
+    setState(() {
+      _googleBusy = true;
+      _error = null;
+    });
+
+    try {
+      await ref.read(authControllerProvider.notifier).signInWithGoogle();
+    } on GoogleSignInCancelled {
+      // They closed the sheet. They know they closed the sheet.
+    } on AuthFailure catch (failure) {
+      if (mounted) setState(() => _error = failure.message);
+    } finally {
+      if (mounted) setState(() => _googleBusy = false);
     }
   }
 
@@ -115,25 +138,27 @@ class _EmailPageState extends ConsumerState<EmailPage> {
                 ],
               ),
               const SizedBox(height: ZopiqSpacing.lg),
-              // Disabled rather than absent, and it says why: the Google Cloud
-              // OAuth clients do not exist yet, so a tap could only fail. Same
-              // honesty as the UPI tile at checkout.
               OutlinedButton.icon(
-                onPressed: null,
-                icon: const Icon(Icons.account_circle_outlined),
+                onPressed: _sending ? null : _signInWithGoogle,
+                icon: _googleBusy
+                    // Sized to the icon it replaces, so the label does not
+                    // shift sideways when the spinner appears.
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : SvgPicture.asset(
+                        'assets/icons_zopiq/google_g.svg',
+                        width: 20,
+                        height: 20,
+                      ),
                 label: const Text('Continue with Google'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(52),
+                  side: BorderSide(color: zc.divider),
                   shape: const RoundedRectangleBorder(
                     borderRadius: ZopiqRadii.rMd,
                   ),
-                ),
-              ),
-              const SizedBox(height: ZopiqSpacing.xs),
-              Center(
-                child: Text(
-                  'Google sign-in arrives with the OAuth setup.',
-                  style: t.labelSmall?.copyWith(color: zc.textMuted),
                 ),
               ),
             ],

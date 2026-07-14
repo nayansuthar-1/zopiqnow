@@ -28,6 +28,13 @@ abstract interface class AuthRepository {
     required String code,
   });
 
+  /// Signs in with a Google account, creating it if it is new.
+  ///
+  /// Throws [GoogleSignInCancelled] when the user dismisses the account sheet —
+  /// which is not an error and must not be shown as one — and
+  /// [GoogleSignInFailure] when the sign-in itself fails.
+  Future<AuthUser> signInWithGoogle();
+
   /// Stores [phone] (E.164) against the signed-in user.
   ///
   /// It goes in the user's metadata, not Supabase's `phone` column: that column
@@ -69,5 +76,17 @@ class TooManyOtpAttempts extends AuthFailure {
 class OtpDeliveryFailure extends AuthFailure {
   const OtpDeliveryFailure([
     super.message = 'We couldn\'t send your code. Check your connection.',
+  ]);
+}
+
+/// The user closed the Google account sheet. A deliberate choice, not a fault:
+/// the UI swallows this one rather than accusing them of an error.
+class GoogleSignInCancelled extends AuthFailure {
+  const GoogleSignInCancelled([super.message = 'Sign-in cancelled.']);
+}
+
+class GoogleSignInFailure extends AuthFailure {
+  const GoogleSignInFailure([
+    super.message = 'Google sign-in failed. Try again, or use your email.',
   ]);
 }

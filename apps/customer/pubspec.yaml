@@ -75,6 +75,13 @@ dependencies:
   # under our floor of 24, so Rule 1 is unaffected.
   supabase_flutter: 2.8.0
 
+  # --- Google Sign-In (approved Rule 3 change request, 2026-07-14) ------------
+  # Native sign-in, not the browser OAuth flow: it returns an id token we hand
+  # straight to `signInWithIdToken`, so the user never leaves the app and no
+  # redirect/deep-link scheme is needed. Declares minSdk 21 — under our floor of
+  # 24, so Rule 1 is unaffected.
+  google_sign_in: 7.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

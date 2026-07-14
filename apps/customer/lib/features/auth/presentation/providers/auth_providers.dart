@@ -81,6 +81,15 @@ class AuthController extends Notifier<AuthState> {
     state = AuthSignedIn(user);
   }
 
+  /// Throws [GoogleSignInCancelled] when the user dismisses the sheet — the
+  /// email screen swallows that one; everything else it renders.
+  Future<void> signInWithGoogle() async {
+    final AuthUser user = await ref
+        .read(authRepositoryProvider)
+        .signInWithGoogle();
+    state = AuthSignedIn(user);
+  }
+
   /// The delivery number. Asked for at checkout, where it is first needed, not
   /// as a fourth screen between the user and their food.
   Future<void> setPhone(String phone) async {

@@ -72,6 +72,31 @@ void main() {
     });
   });
 
+  group('Google', () {
+    test('a Google sign-in establishes a session', () async {
+      final AuthRepositoryImpl repo = AuthRepositoryImpl(FakeAuthDataSource());
+
+      final AuthUser user = await repo.signInWithGoogle();
+
+      expect(user.email, FakeAuthDataSource.googleUser.email);
+      expect((await repo.restoreSession())?.id, user.id);
+      // Google hands over an email, never a phone. Checkout still has to ask.
+      expect(user.phone, isNull);
+    });
+
+    test('a dismissed account sheet signs nobody in', () async {
+      final FakeAuthDataSource source = FakeAuthDataSource()
+        ..googleCancels = true;
+      final AuthRepositoryImpl repo = AuthRepositoryImpl(source);
+
+      await expectLater(
+        repo.signInWithGoogle(),
+        throwsA(isA<GoogleSignInCancelled>()),
+      );
+      expect(await repo.restoreSession(), isNull);
+    });
+  });
+
   group('session', () {
     test('restoreSession returns null when signed out', () async {
       expect(
