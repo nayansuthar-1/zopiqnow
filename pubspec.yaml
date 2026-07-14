@@ -11,6 +11,7 @@ environment:
 # Members of the workspace. Each member sets `resolution: workspace`.
 workspace:
   - apps/customer
+  - apps/vendor
   - packages/zopiq_ui
 
 # Tooling only — Melos runs scripts (analyze/test/format) across all members.

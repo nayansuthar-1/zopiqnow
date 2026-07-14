@@ -1,0 +1,43 @@
+name: zopiq_vendor
+description: "Zopiqnow for restaurants — the kitchen's side of an order."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+# Part of the zopiqnow pub workspace: shares the single root lockfile (Rule 3).
+resolution: workspace
+
+environment:
+  sdk: ^3.12.2
+
+# Every dependency here is one the customer app already pins, at the version the
+# root lockfile already froze. A second app is not an excuse to take a new
+# dependency (Rule 4) — and it does not need one: this app reads orders, writes a
+# status, and edits a menu, which is Supabase and nothing else.
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: 1.0.9
+
+  # The same design system, so the two apps cannot drift into two brands.
+  zopiq_ui:
+    path: ../../packages/zopiq_ui
+
+  flutter_riverpod: 2.6.1
+  go_router: 14.8.1
+
+  # The vendor's session, in the Keystore. Same reasoning as the customer app: a
+  # refresh token in SharedPreferences is a refresh token in a plaintext file.
+  flutter_secure_storage: 10.3.1
+
+  supabase_flutter: 2.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: 6.0.0
+
+flutter:
+  uses-material-design: true

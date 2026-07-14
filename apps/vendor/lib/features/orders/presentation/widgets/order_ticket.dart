@@ -1,0 +1,299 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:zopiq_ui/zopiq_ui.dart';
+
+import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
+import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
+
+/// One order, as a ticket.
+///
+/// Everything a cook has to act on and nothing else. There is no bill breakdown
+/// on here — no subtotal, no taxes, no coupon — because the kitchen does not
+/// reconcile the customer's bill, and a number that nobody acts on is a number
+/// somebody eventually misreads. The one figure that survives is the total, and
+/// only on a cash order, where it is the amount the rider collects.
+class OrderTicket extends ConsumerStatefulWidget {
+  const OrderTicket({required this.order, super.key});
+
+  final VendorOrder order;
+
+  @override
+  ConsumerState<OrderTicket> createState() => _OrderTicketState();
+}
+
+class _OrderTicketState extends ConsumerState<OrderTicket> {
+  /// The database's own words, when it refuses a move. Cleared on the next
+  /// attempt — an error from a button press two minutes ago is noise.
+  String? _refusal;
+
+  Future<void> _move(OrderStatus to) async {
+    setState(() => _refusal = null);
+    final String? refusal = await ref
+        .read(orderActionControllerProvider.notifier)
+        .move(widget.order, to);
+    if (mounted && refusal != null) setState(() => _refusal = refusal);
+  }
+
+  Future<void> _cancel() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Cancel this order?'),
+        // A cancellation is the customer's evening, not a checkbox. It is the
+        // one irreversible thing on this screen, so it is the one thing that
+        // asks twice.
+        content: Text(
+          'Order ${widget.order.id} will be cancelled and the customer will be '
+          'told. This cannot be undone.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep it'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancel order'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed ?? false) await _move(OrderStatus.cancelled);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+    final VendorOrder order = widget.order;
+
+    // Rebuilds this ticket's age every 30s without anyone touching the screen.
+    ref.watch(clockProvider);
+
+    final bool isBusy = ref.watch(
+      orderActionControllerProvider.select(
+        (Set<String> busy) => busy.contains(order.id),
+      ),
+    );
+    final bool isNew = order.status == OrderStatus.placed;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: ZopiqSpacing.pageGutter,
+        vertical: ZopiqSpacing.xs,
+      ),
+      child: ZopiqCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    order.id,
+                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                // The age, not the clock time. Nobody in a kitchen converts
+                // "7:42 pm" into "that one has been sitting for twenty minutes".
+                Text(
+                  formatAge(order.age),
+                  style: t.bodySmall?.copyWith(
+                    color: isNew ? zc.primary : zc.textMuted,
+                    fontWeight: isNew ? FontWeight.w700 : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: ZopiqSpacing.md),
+
+            _Lines(orderId: order.id),
+
+            const SizedBox(height: ZopiqSpacing.md),
+            Divider(height: 1, color: zc.divider),
+            const SizedBox(height: ZopiqSpacing.md),
+
+            // Cash is the only thing about payment a kitchen acts on: somebody
+            // has to collect it. A prepaid order needs no sentence at all.
+            if (order.paymentMethod.isCash)
+              _Detail(
+                icon: Icons.payments_outlined,
+                text: 'Collect ₹${order.total} in cash',
+                emphasis: true,
+              )
+            else
+              _Detail(
+                icon: Icons.check_circle_outline_rounded,
+                text: 'Paid online · ₹${order.total}',
+              ),
+            const SizedBox(height: ZopiqSpacing.sm),
+            _Detail(icon: Icons.phone_rounded, text: order.customerPhone),
+            const SizedBox(height: ZopiqSpacing.sm),
+            _Detail(icon: Icons.location_on_rounded, text: order.deliveryTo),
+
+            if (_refusal != null) ...<Widget>[
+              const SizedBox(height: ZopiqSpacing.md),
+              Text(_refusal!, style: t.bodySmall?.copyWith(color: zc.nonVeg)),
+            ],
+
+            const SizedBox(height: ZopiqSpacing.md),
+            Row(
+              children: <Widget>[
+                if (order.status.canCancel) ...<Widget>[
+                  Expanded(
+                    child: ZopiqButton(
+                      label: 'Cancel',
+                      variant: ZopiqButtonVariant.outline,
+                      onPressed: isBusy ? null : _cancel,
+                    ),
+                  ),
+                  const SizedBox(width: ZopiqSpacing.sm),
+                ],
+                if (order.status.next case final OrderStatus next)
+                  Expanded(
+                    // The new ticket's button is the loud one. Every other step
+                    // is a kitchen keeping itself honest; this one is a customer
+                    // sitting in front of a screen that says "waiting for the
+                    // restaurant to accept".
+                    flex: 2,
+                    child: ZopiqButton(
+                      label: order.status.nextAction!,
+                      variant: isNew
+                          ? ZopiqButtonVariant.cta
+                          : ZopiqButtonVariant.primary,
+                      isLoading: isBusy,
+                      onPressed: () => _move(next),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// What to cook. The only part of the ticket a cook actually reads.
+class _Lines extends ConsumerWidget {
+  const _Lines({required this.orderId});
+
+  final String orderId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+    final AsyncValue<List<OrderLine>> lines = ref.watch(
+      orderLinesProvider(orderId),
+    );
+
+    return lines.when(
+      loading: () => ZopiqShimmer(
+        child: SizedBox(
+          height: 48,
+          width: double.infinity,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: zc.shimmerBase,
+              borderRadius: ZopiqRadii.rMd,
+            ),
+          ),
+        ),
+      ),
+      error: (Object _, StackTrace _) => Row(
+        children: <Widget>[
+          Icon(Icons.error_outline_rounded, size: 18, color: zc.nonVeg),
+          const SizedBox(width: ZopiqSpacing.sm),
+          Expanded(
+            child: Text(
+              'Couldn\'t load the items',
+              style: t.bodyMedium?.copyWith(color: zc.nonVeg),
+            ),
+          ),
+          TextButton(
+            onPressed: () => ref.invalidate(orderLinesProvider(orderId)),
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+      data: (List<OrderLine> data) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          for (final OrderLine line in data)
+            Padding(
+              padding: const EdgeInsets.only(bottom: ZopiqSpacing.xs),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  // The quantity is the thing that gets misread across a hot
+                  // kitchen, so it is the thing that is big and boxed.
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: ZopiqSpacing.sm,
+                      vertical: ZopiqSpacing.xxs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: zc.primary.withValues(alpha: 0.10),
+                      borderRadius: ZopiqRadii.rSm,
+                    ),
+                    child: Text(
+                      '${line.quantity}×',
+                      style: t.titleSmall?.copyWith(
+                        color: zc.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: ZopiqSpacing.md),
+                  Expanded(
+                    child: Text(
+                      line.name,
+                      style: t.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Detail extends StatelessWidget {
+  const _Detail({
+    required this.icon,
+    required this.text,
+    this.emphasis = false,
+  });
+
+  final IconData icon;
+  final String text;
+  final bool emphasis;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+    final Color color = emphasis ? zc.primary : zc.textMuted;
+
+    return Row(
+      children: <Widget>[
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: ZopiqSpacing.sm),
+        Expanded(
+          child: Text(
+            text,
+            style: t.bodyMedium?.copyWith(
+              color: emphasis ? zc.textStrong : zc.textMuted,
+              fontWeight: emphasis ? FontWeight.w700 : null,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}

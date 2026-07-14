@@ -74,7 +74,8 @@ cold deep link resolves without the Home feed.
 | Delivery fee and tax are hardcoded | Real fees depend on distance/surge; real tax on HSN category. Isolated in `CartBill` | Step 7, with the pricing engine |
 | Payments are COD-only | `razorpay_flutter 1.4.5` is approved and pinned, but checkout needs a key id and a server-created payment order | Step 7 |
 | Coupon codes are advertised on the checkout screen itself | The mock coupon book has no campaign behind it; the hint is the campaign | With the promotions service |
-| A cron job advances order status, not a kitchen | There is no vendor app. It writes only `status`, on the ETA the customer was quoted, and is invisible to the client | With the vendor app — unschedule and drop |
+| ~~A cron job advances order status, not a kitchen~~ | ✅ Gone (migration 0009). A real vendor moves the order now; the simulator lasted one day, exactly as intended | done |
+| Restaurant accounts are seeded by SQL | There is no admin dashboard, so "ops" is a seed file. Self-service signup would let anyone claim a kitchen | With the admin dashboard (PM §8) |
 | No driver location, no tracking map | Needs a Maps billing account + key (PM §5) *and* a rider app emitting a location. Neither exists | Step 8's remainder |
 
 ---
@@ -338,6 +339,60 @@ PM_CHECKLIST §5, and a rider app that emits a location. Nothing to build until 
 exist. The Postgres half is verified against the live database (cron fires, status
 advances); the **Realtime → Flutter leg has not been exercised on a device**, and a
 socket is only really tested on hardware.
+
+### Step 10 — The restaurant app — **new scope, 2026-07-15; order queue shipped**
+`apps/vendor` — a second Flutter app in the same workspace, on the same design
+system, against the same Postgres. **No new dependency:** every package it uses is
+one the customer app already pins, and `pubspec.lock` did not move.
+
+Shipped: sign-in, the live order queue, and the four moves that carry an order —
+Accept → Start preparing → Hand to rider → Mark delivered, plus Cancel while the
+food is still in the building. One screen, oldest ticket first, each ticket carrying
+what to cook, who to call, and what to collect.
+
+Decisions worth remembering:
+- **The cron simulator is gone** (migration 0009 unschedules it and drops the
+  function). It existed for one day, because nothing else moved an order past
+  `placed`. Something does now. Leaving it running would have meant a vendor and a
+  cron job both writing `status` — a kitchen pressing "Accept" on an order the
+  simulator had already sent out for delivery.
+- **Staff are keyed by *email*, not by `auth.uid()`.** Ops onboards a restaurant days
+  before anyone at that kitchen has ever opened the app and been issued a uid. A table
+  keyed by uid could only be filled in *after* first sign-in — which is backwards: it
+  would mean the first person to sign in with any address is the one who gets the
+  restaurant. So the grant is made to an address, and the OTP is how someone proves
+  they control it.
+- **There is no vendor signup, deliberately.** A `restaurant_staff` row is created by
+  ops, and until the admin dashboard exists (PM §8) that means SQL. A signed-in user
+  with no row lands on "Not a partner account" — a screen, not an error: a customer who
+  installed the wrong app has done nothing wrong, and "sign-in failed" would send them
+  round the login loop forever.
+- **The OTP is mailed to any address that asks, without checking staff first.** The
+  check has to come *after* sign-in. A "not a partner" answer before the code is sent
+  would be an oracle — anyone could type addresses until one worked, and the ones that
+  work belong to people who can accept orders.
+- **A vendor cannot `update` an order. At all.** There is no update grant on `orders`;
+  `set_order_status` is the only way in, and the only column it can reach is `status`.
+  RLS can say *which rows* a caller may write but not *which columns*, and an update
+  policy that lets a restaurant set `status` is one typo away from letting it set
+  `total`. The party being paid must not be able to change what it is paid. Verified:
+  `update orders set total = 1` as the vendor returns **UPDATE 0**.
+- **The status machine lives in the database, and the button mirrors it.** No skipping
+  (nothing that was never cooked is out for delivery), no going backwards (a customer
+  told their food is coming must not watch it return to the kitchen), and no cancelling
+  once it is with the rider — that is a refund conversation. The Dart `next`/`canCancel`
+  getters mirror the transition table so the button offers what the database will
+  accept; when they disagree, the database wins and the ticket shows its sentence.
+- **`OrderStatus` is duplicated, not shared.** The contract both apps answer to is the
+  `orders.status` check constraint — the schema, not a Dart file. A third package to
+  hold six strings would mean refactoring every import in the customer app for a new
+  place to disagree with Postgres.
+
+**Still owed here** (the rest of the restaurant app): menu management (availability
+toggle, prices, add/remove a dish), an open/closed switch, order history, and the
+restaurant's own profile. **Blocked, not deferred:** payouts, commission and settlement
+— PM_CHECKLIST §4 has no answer for the commission model, the settlement cadence, or the
+bank account, and those are not numbers to invent.
 
 ### Step 9 — Dining (table reservations) — **new scope, 2026-07-10**
 Zomato-dining / Swiggy-Dineout style: browse restaurants that take bookings, pick a
