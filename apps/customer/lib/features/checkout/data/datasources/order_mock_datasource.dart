@@ -4,6 +4,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
@@ -30,9 +31,21 @@ class OrderMockDataSource implements OrderDataSource {
 
   int _orderSeq = 0;
 
+  /// Orders this instance has placed, newest last. The real history lives in
+  /// Postgres and outlives the process; this one exists so the flow after
+  /// checkout — place an order, open "Your orders", see it — can be exercised
+  /// without a network.
+  final List<CustomerOrder> _history = <CustomerOrder>[];
+
   @override
   Future<List<String>> fetchCouponHints() async =>
       coupons.map((CouponRule r) => r.summary).toList(growable: false);
+
+  @override
+  Future<List<CustomerOrder>> fetchOrders() async {
+    await Future<void>.delayed(latency);
+    return _history.reversed.toList(growable: false);
+  }
 
   @override
   Future<AppliedCoupon> applyCoupon({
@@ -80,16 +93,51 @@ class OrderMockDataSource implements OrderDataSource {
     final CartBill bill = CartBill.of(cart, discount: discount);
 
     _orderSeq++;
+    final String id = 'ZPQ-${1000 + _orderSeq}';
+    // Deterministic per restaurant, 25–35 min. A real ETA comes from the
+    // dispatch engine with tracking (Step 8).
+    final int etaMinutes =
+        25 + (cart.restaurantId ?? '').hashCode.toUnsigned(32) % 11;
+
+    _history.add(
+      CustomerOrder(
+        id: id,
+        restaurantId: cart.restaurantId ?? '',
+        restaurantName: cart.restaurantName ?? '',
+        status: OrderStatus.placed,
+        placedAt: DateTime.now(),
+        deliveryTo: deliveryAddress.shortDisplay,
+        etaMinutes: etaMinutes,
+        paymentMethod: paymentMethod,
+        paymentId: paymentId,
+        subtotal: bill.subtotal,
+        deliveryFee: bill.deliveryFee,
+        taxes: bill.taxes,
+        discount: bill.discount,
+        total: bill.total,
+        couponCode: couponCode,
+        lines: cart.lines
+            .map(
+              (CartLine l) => OrderLine(
+                menuItemId: l.item.id,
+                name: l.item.name,
+                unitPrice: l.item.price,
+                quantity: l.quantity,
+                lineTotal: l.lineTotal,
+              ),
+            )
+            .toList(growable: false),
+      ),
+    );
+
     return PlacedOrder(
-      id: 'ZPQ-${1000 + _orderSeq}',
+      id: id,
       restaurantName: cart.restaurantName ?? '',
       deliveryTo: deliveryAddress.shortDisplay,
       total: bill.total,
       paymentMethod: paymentMethod,
       paymentId: paymentId,
-      // Deterministic per restaurant, 25–35 min. A real ETA comes from the
-      // dispatch engine with tracking (Step 8).
-      etaMinutes: 25 + (cart.restaurantId ?? '').hashCode.toUnsigned(32) % 11,
+      etaMinutes: etaMinutes,
     );
   }
 }

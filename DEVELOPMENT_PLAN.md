@@ -230,9 +230,37 @@ Decisions worth remembering:
 - **A dismissed account sheet is not an error.** `GoogleSignInCancelled` is swallowed by
   the email screen; only real failures get a message.
 
+**Order history is live (2026-07-14).** `/orders` and `/orders/:id`, reached from the
+Account tab: past orders newest-first, the bill as it was actually charged, and reorder.
+Both routes sit behind the auth guard — a receipt carries the phone number the rider
+called and the address the food went to, so an order history *is* identity.
+
+Decisions worth remembering:
+- **The read is an RLS policy, not another `security definer` function** (migration 0005).
+  0003 left the order tables invisible to the client and said the functions were "the only
+  way in" — but the reason money moves through `place_order` is that *the client must not
+  decide what anything costs*, an argument about pricing, not about visibility. It says
+  nothing about a customer reading a receipt they already paid for. So `select` is scoped
+  to `auth.uid()`, and PostgREST returns the order, its items, and the restaurant's photo
+  in one round trip. Nothing grants insert/update/delete: an order is immutable to the
+  customer once placed.
+- **The restaurant's name is now stored on the order** (also 0005, with `place_order`
+  updated to write it). It was only ever a `restaurant_id`, and the catalog policy is
+  `using (is_active)` — so the day a vendor is delisted, every past order of theirs would
+  have rendered with a blank name. `order_items` already denormalizes dish names for this
+  exact reason. The photo is *not* copied: it is decoration, and the UI falls back.
+- **Reorder re-prices against today's menu.** The order's lines are resolved by id and the
+  cart is rebuilt from the current `MenuItem`s, never from the receipt's prices — a cart
+  restored from a three-month-old order would otherwise promise last quarter's prices, and
+  `place_order` would reprice it at checkout anyway. Items that are gone are skipped and
+  counted, and an order where *nothing* survives leaves the existing cart untouched rather
+  than emptying it for nothing.
+
 **Still owed here:** the Razorpay wiring inherited from Step 6, and Google sign-in has not
 yet been exercised on the Android 10 device — it builds and the unit tests pass, but a
-plugin that talks to Play services is only really tested on hardware.
+plugin that talks to Play services is only really tested on hardware. Order history has
+been verified against Postgres (the policy isolates by uid) and in widget tests, but it has
+only been installed on the Android 13 device, not the Android 10 floor.
 
 ### Step 8 — Order tracking
 Live status, driver location stream, tri-tracking map.

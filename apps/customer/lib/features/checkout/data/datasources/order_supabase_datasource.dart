@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
@@ -97,6 +98,77 @@ class OrderSupabaseDataSource implements OrderDataSource {
       }
       throw const OrderPlacementFailure();
     }
+  }
+
+  /// How far back "your orders" goes. A customer with a thousand orders does not
+  /// want a thousand cards, and an unbounded select is how a screen that was
+  /// fast in testing gets slow in production. Paging arrives if anyone asks.
+  static const int _historyLimit = 25;
+
+  @override
+  Future<List<CustomerOrder>> fetchOrders() async {
+    // No `.eq('user_id', …)`. The row-level policy on `orders` already answers
+    // "whose?" from the JWT, and a filter here would only be a second, weaker
+    // copy of that rule — one that a bug could get wrong and that an attacker
+    // could simply omit.
+    final List<Map<String, dynamic>> rows = await _db
+        .from('orders')
+        .select(
+          'id, restaurant_id, restaurant_name, status, created_at, delivery_to, '
+          'eta_minutes, payment_method, payment_id, subtotal, delivery_fee, '
+          'taxes, discount, total, coupon_code, '
+          // The catalog join is for the photo alone — the name is on the order,
+          // so a delisted restaurant costs us an image and not an identity.
+          'restaurants(image_url), '
+          'order_items(menu_item_id, name, unit_price, quantity, line_total)',
+        )
+        .order('created_at', ascending: false)
+        .limit(_historyLimit);
+
+    return rows.map(_orderFrom).toList(growable: false);
+  }
+
+  CustomerOrder _orderFrom(Map<String, dynamic> row) {
+    final Map<String, dynamic>? restaurant =
+        row['restaurants'] as Map<String, dynamic>?;
+
+    final List<OrderLine> lines =
+        (row['order_items'] as List<dynamic>)
+            .cast<Map<String, dynamic>>()
+            .map(
+              (Map<String, dynamic> i) => OrderLine(
+                menuItemId: i['menu_item_id'] as String,
+                name: i['name'] as String,
+                unitPrice: (i['unit_price'] as num).toInt(),
+                quantity: (i['quantity'] as num).toInt(),
+                lineTotal: (i['line_total'] as num).toInt(),
+              ),
+            )
+            .toList()
+          // PostgREST does not promise an order within an embedded list, and a
+          // receipt whose lines shuffle between two reads of the same order
+          // looks broken. Sorting by name is arbitrary but stable.
+          ..sort((OrderLine a, OrderLine b) => a.name.compareTo(b.name));
+
+    return CustomerOrder(
+      id: row['id'] as String,
+      restaurantId: row['restaurant_id'] as String,
+      restaurantName: row['restaurant_name'] as String,
+      restaurantImageUrl: restaurant?['image_url'] as String? ?? '',
+      status: OrderStatus.fromWire(row['status'] as String),
+      placedAt: DateTime.parse(row['created_at'] as String).toLocal(),
+      deliveryTo: row['delivery_to'] as String,
+      etaMinutes: (row['eta_minutes'] as num).toInt(),
+      paymentMethod: PaymentMethod.values.byName(row['payment_method'] as String),
+      paymentId: row['payment_id'] as String?,
+      subtotal: (row['subtotal'] as num).toInt(),
+      deliveryFee: (row['delivery_fee'] as num).toInt(),
+      taxes: (row['taxes'] as num).toInt(),
+      discount: (row['discount'] as num).toInt(),
+      total: (row['total'] as num).toInt(),
+      couponCode: row['coupon_code'] as String?,
+      lines: lines,
+    );
   }
 
   @override

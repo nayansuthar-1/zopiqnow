@@ -1,6 +1,7 @@
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
@@ -53,6 +54,19 @@ class OrderRepositoryImpl implements OrderRepository {
       throw OrderPlacementFailure(failure.message);
     } on Object catch (_) {
       throw const OrderPlacementFailure();
+    }
+  }
+
+  @override
+  Future<List<CustomerOrder>> getOrders() async {
+    try {
+      return await _dataSource.fetchOrders();
+    } on Object catch (_) {
+      // Unlike a missing coupon hint, an empty list here is a *statement* —
+      // "you have never ordered" — and the screen renders it as one. A failed
+      // fetch must not be able to say that, so it surfaces as an error the user
+      // can retry.
+      throw const OrdersLoadFailure();
     }
   }
 

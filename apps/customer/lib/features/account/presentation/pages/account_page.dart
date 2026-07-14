@@ -41,8 +41,10 @@ class AccountPage extends ConsumerWidget {
           _AccountTile(
             icon: Icons.receipt_long_rounded,
             title: 'Your orders',
-            comingSoon: true,
-            onTap: () => _comingSoon(context, 'Your orders'),
+            subtitle: 'Track and reorder past orders',
+            // Guarded by the router: a signed-out tap lands on login and comes
+            // back here afterwards, which is why this tile needs no auth check.
+            onTap: () => context.pushNamed(Routes.orders),
           ),
           _AccountTile(
             icon: Icons.favorite_rounded,

@@ -1,5 +1,6 @@
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
@@ -41,6 +42,26 @@ abstract interface class OrderRepository {
 
   /// Coupon codes to advertise on the checkout screen.
   Future<List<String>> getCouponHints();
+
+  /// The signed-in customer's order history, newest first.
+  ///
+  /// Throws [OrdersLoadFailure] on any transport or contract error. A signed-out
+  /// caller gets an empty list, not a failure: having no orders and having no
+  /// account look the same from here, and the screen behind an auth guard will
+  /// never ask.
+  Future<List<CustomerOrder>> getOrders();
+}
+
+/// Domain-level failure for reading order history.
+class OrdersLoadFailure implements Exception {
+  const OrdersLoadFailure([
+    this.message = 'We couldn\'t load your orders. Please try again.',
+  ]);
+
+  final String message;
+
+  @override
+  String toString() => 'OrdersLoadFailure: $message';
 }
 
 /// A coupon the order service rejected. [message] is written for the customer,

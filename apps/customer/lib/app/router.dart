@@ -11,7 +11,9 @@ import 'package:zopiqnow/features/auth/presentation/pages/splash_page.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiqnow/features/cart/presentation/pages/cart_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/checkout_page.dart';
+import 'package:zopiqnow/features/checkout/presentation/pages/order_detail_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/order_success_page.dart';
+import 'package:zopiqnow/features/checkout/presentation/pages/orders_page.dart';
 import 'package:zopiqnow/features/design_showcase/presentation/design_showcase_page.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/presentation/home_page.dart';
@@ -28,6 +30,8 @@ abstract final class Routes {
   static const String cart = 'cart';
   static const String checkout = 'checkout';
   static const String orderSuccess = 'orderSuccess';
+  static const String orders = 'orders';
+  static const String orderDetail = 'orderDetail';
   static const String licenses = 'licenses';
   static const String account = 'account';
   static const String splash = 'splash';
@@ -40,7 +44,10 @@ abstract final class Routes {
 /// Browsing, searching, and *building a cart* stay open — that is how a food app
 /// works, and demanding a phone number before a user has seen a menu is how you
 /// lose them. Identity is required only where money and an address are.
-const List<String> _protectedPrefixes = <String>['/checkout'];
+///
+/// `/orders` is here because an order history *is* identity: every receipt on it
+/// carries the phone number the rider called and the address the food went to.
+const List<String> _protectedPrefixes = <String>['/checkout', '/orders'];
 
 const String _splashPath = '/splash';
 const String _loginPath = '/login';
@@ -222,6 +229,23 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             path: 'success',
             name: Routes.orderSuccess,
             builder: (_, _) => const OrderSuccessPage(),
+          ),
+        ],
+      ),
+
+      // Order history. Guarded by prefix, like /checkout — and the detail route
+      // nests under it for the same reason, so one entry in _protectedPrefixes
+      // covers both.
+      GoRoute(
+        path: '/orders',
+        name: Routes.orders,
+        builder: (_, _) => const OrdersPage(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: ':id',
+            name: Routes.orderDetail,
+            builder: (BuildContext context, GoRouterState state) =>
+                OrderDetailPage(orderId: state.pathParameters['id']!),
           ),
         ],
       ),

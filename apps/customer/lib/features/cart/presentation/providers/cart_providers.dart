@@ -45,6 +45,26 @@ class CartNotifier extends Notifier<Cart> {
     )._upsert(item, 1);
   }
 
+  /// Replaces the cart wholesale — the reorder path.
+  ///
+  /// Whatever was in the cart is dropped, because a cart belongs to one
+  /// restaurant and reorder is not an "add". The caller is responsible for
+  /// having asked first when the cart held someone else's food; [add] returns
+  /// [AddToCartResult.differentRestaurant] for the same reason.
+  void replaceWith({
+    required String restaurantId,
+    required String restaurantName,
+    required List<CartLine> lines,
+  }) {
+    state = lines.isEmpty
+        ? const Cart.empty()
+        : Cart(
+            restaurantId: restaurantId,
+            restaurantName: restaurantName,
+            lines: lines,
+          );
+  }
+
   void increment(String menuItemId) {
     state = state._delta(menuItemId, 1);
   }
