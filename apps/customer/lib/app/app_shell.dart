@@ -63,179 +63,190 @@ class _ShellNavBar extends ConsumerWidget {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final Color glowColor = isDark ? Colors.black : Colors.white;
 
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 800),
-      curve: ZopiqCurves.emphasized,
-      opacity: isVisible ? 1.0 : 0.0,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.bottomCenter,
-            end: Alignment.topCenter,
-            colors: [
-              glowColor,
-              glowColor.withOpacity(0.8),
-              glowColor.withOpacity(0.0),
-            ],
-            stops: const [0.0, 0.3, 1.0], // Reduced stops for lower glow height
+    return Stack(
+      children: [
+        // Glow Background sliding down
+        Positioned(
+          bottom: 0, left: 0, right: 0,
+          height: 32.0, // Reduced glow height to match new bottom gap
+          child: AnimatedSlide(
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeInOutCubic,
+            offset: isVisible ? Offset.zero : const Offset(0, 1.5),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    glowColor,
+                    glowColor.withOpacity(0.0),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
-        child: SafeArea(
+        // Foreground Pills
+        SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
               ZopiqSpacing.md,
-              16.0, // Reduced top padding for lower glow height
-              ZopiqSpacing.md,
-              ZopiqSpacing.md,
+              16.0,
+              0, // No right padding, stick to edge
+              23.0, // Pushed down by 8px (from 31 to 23)
             ),
             child: Row(
-            children: [
-              Expanded(
-                child: AnimatedSlide(
-                  duration: const Duration(milliseconds: 600),
-                  curve: ZopiqCurves.emphasized,
-                  offset: isVisible ? Offset.zero : const Offset(0, 1.5), // Slide down
-                  child: Container(
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark 
-                          ? Colors.black 
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(32),
-                      boxShadow: const <BoxShadow>[
-                        BoxShadow(
-                          color: Color(0x1A000000),
-                          blurRadius: 12,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final double tabWidth = constraints.maxWidth / 3;
-                        return Stack(
-                          children: [
-                            // Sliding indicator
-                            AnimatedPositioned(
-                              duration: const Duration(milliseconds: 250),
-                              curve: Curves.easeInOutCubic,
-                              left: leftIndex * tabWidth,
-                              top: 4,
-                              bottom: 4,
-                              width: tabWidth,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: zc.primaryDeep.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(28),
-                                ),
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                _buildNavItem(
-                                  context: context,
-                                  index: 0,
-                                  title: 'Delivery',
-                                  icon: Icons.delivery_dining_outlined,
-                                  activeIcon: Icons.delivery_dining,
-                                  width: tabWidth,
-                                  isSelected: currentIndex == 0,
-                                  zc: zc,
-                                ),
-                                _buildNavItem(
-                                  context: context,
-                                  index: 1,
-                                  title: 'Dining',
-                                  icon: Icons.restaurant_outlined,
-                                  activeIcon: Icons.restaurant,
-                                  width: tabWidth,
-                                  isSelected: currentIndex == 1,
-                                  zc: zc,
-                                ),
-                                _buildNavItem(
-                                  context: context,
-                                  index: 2,
-                                  title: 'Grocery',
-                                  icon: Icons.local_grocery_store_outlined,
-                                  activeIcon: Icons.local_grocery_store,
-                                  width: tabWidth,
-                                  isSelected: currentIndex == 2,
-                                  zc: zc,
-                                ),
-                              ],
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: ZopiqSpacing.sm),
-              // Cart Pill
-              AnimatedSlide(
-                duration: const Duration(milliseconds: 600),
-                curve: ZopiqCurves.emphasized,
-                offset: isVisible ? Offset.zero : const Offset(1.5, 0), // Slide right
-                child: GestureDetector(
-                  onTap: () => _onTap(3),
-                  child: Container(
-                    height: 64,
-                    padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.lg),
-                    decoration: BoxDecoration(
-                      color: zc.primaryDeep,
-                      borderRadius: BorderRadius.circular(32),
-                      boxShadow: const <BoxShadow>[
-                        BoxShadow(
-                          color: Color(0x1A000000),
-                          blurRadius: 12,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (itemCount > 0) ...[
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              '$itemCount',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: zc.primaryDeep,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+              children: [
+                Expanded(
+                  child: AnimatedSlide(
+                    duration: const Duration(milliseconds: 800),
+                    curve: Curves.easeInOutCubic,
+                    offset: isVisible ? Offset.zero : const Offset(0, 1.5), // Slide down
+                    child: Container(
+                      height: 57,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark 
+                            ? Colors.black 
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(32),
+                        boxShadow: const <BoxShadow>[
+                          BoxShadow(
+                            color: Color(0x1A000000),
+                            blurRadius: 12,
+                            offset: Offset(0, 4),
                           ),
-                          const SizedBox(width: ZopiqSpacing.sm),
                         ],
-                        Text(
-                          'Cart',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: ZopiqSpacing.xs),
-                        const Icon(
-                          Icons.shopping_cart_outlined,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ],
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final double tabWidth = constraints.maxWidth / 3;
+                          return Stack(
+                            children: [
+                              // Sliding indicator
+                              AnimatedPositioned(
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeInOutCubic,
+                                left: leftIndex * tabWidth,
+                                top: 4,
+                                bottom: 4,
+                                width: tabWidth,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: zc.primaryDeep.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(28),
+                                  ),
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  _buildNavItem(
+                                    context: context,
+                                    index: 0,
+                                    title: 'Delivery',
+                                    icon: Icons.delivery_dining_outlined,
+                                    activeIcon: Icons.delivery_dining,
+                                    width: tabWidth,
+                                    isSelected: currentIndex == 0,
+                                    zc: zc,
+                                  ),
+                                  _buildNavItem(
+                                    context: context,
+                                    index: 1,
+                                    title: 'Dining',
+                                    icon: Icons.restaurant_outlined,
+                                    activeIcon: Icons.restaurant,
+                                    width: tabWidth,
+                                    isSelected: currentIndex == 1,
+                                    zc: zc,
+                                  ),
+                                  _buildNavItem(
+                                    context: context,
+                                    index: 2,
+                                    title: 'Grocery',
+                                    icon: Icons.local_grocery_store_outlined,
+                                    activeIcon: Icons.local_grocery_store,
+                                    width: tabWidth,
+                                    isSelected: currentIndex == 2,
+                                    zc: zc,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: ZopiqSpacing.sm),
+                // Cart Pill
+                AnimatedSlide(
+                  duration: const Duration(milliseconds: 800),
+                  curve: Curves.easeInOutCubic,
+                  offset: isVisible ? Offset.zero : const Offset(1.5, 0), // Slide right
+                  child: GestureDetector(
+                    onTap: () => _onTap(3),
+                    child: Container(
+                      height: 57,
+                      padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.lg),
+                      decoration: BoxDecoration(
+                        color: zc.primaryDeep,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(32),
+                          bottomLeft: Radius.circular(32),
+                        ),
+                        boxShadow: const <BoxShadow>[
+                          BoxShadow(
+                            color: Color(0x1A000000),
+                            blurRadius: 12,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (itemCount > 0) ...[
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '$itemCount',
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: zc.primaryDeep,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: ZopiqSpacing.sm),
+                          ],
+                          Text(
+                            'Cart',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: ZopiqSpacing.xs),
+                          const Icon(
+                            Icons.shopping_cart_outlined,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-      ),
+      ],
     );
   }
 
