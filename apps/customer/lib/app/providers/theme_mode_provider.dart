@@ -9,7 +9,7 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
   @override
   ThemeMode build() {
     _loadTheme();
-    return ThemeMode.system;
+    return ThemeMode.light;
   }
 
   Future<void> _loadTheme() async {

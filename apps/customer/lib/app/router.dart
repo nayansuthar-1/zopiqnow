@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiqnow/app/app_shell.dart';
 import 'package:zopiqnow/features/about/presentation/licenses_page.dart';
 import 'package:zopiqnow/features/account/presentation/pages/account_page.dart';
+import 'package:zopiqnow/features/account/presentation/pages/profile_details_page.dart';
 import 'package:zopiqnow/features/auth/presentation/pages/email_page.dart';
 import 'package:zopiqnow/features/auth/presentation/pages/otp_page.dart';
 import 'package:zopiqnow/features/auth/presentation/pages/splash_page.dart';
@@ -42,6 +43,7 @@ abstract final class Routes {
   static const String addressEdit = 'addressEdit';
   static const String licenses = 'licenses';
   static const String account = 'account';
+  static const String profile = 'profile';
   static const String splash = 'splash';
   static const String login = 'login';
   static const String otp = 'otp';
@@ -333,6 +335,13 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: '/account',
         name: Routes.account,
         builder: (_, _) => const AccountPage(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: 'profile',
+            name: Routes.profile,
+            builder: (_, _) => const ProfileDetailsPage(),
+          ),
+        ],
       ),
       // Design-system reference screen — reachable via a debug entry on Home.
       GoRoute(

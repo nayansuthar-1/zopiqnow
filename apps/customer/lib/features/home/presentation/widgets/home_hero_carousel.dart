@@ -44,9 +44,8 @@ class HomeHeroCarousel extends StatefulWidget {
 }
 
 class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
-  final PageController _page = PageController();
+  final PageController _page = PageController(initialPage: 12000);
   Timer? _auto;
-  int _index = 0;
   DateTime _lastInteract = DateTime.fromMillisecondsSinceEpoch(0);
   bool _reduceMotion = false;
 
@@ -72,7 +71,7 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
         return;
       }
       _page.animateToPage(
-        (_index + 1) % _slides.length,
+        (_page.page ?? 12000.0).round() + 1,
         duration: ZopiqDurations.slow,
         curve: ZopiqCurves.emphasized,
       );
@@ -105,10 +104,8 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
               children: <Widget>[
                 PageView.builder(
                   controller: _page,
-                  itemCount: _slides.length,
-                  onPageChanged: (int i) => setState(() => _index = i),
                   itemBuilder: (BuildContext context, int i) => _HeroSlideView(
-                    slide: _slides[i],
+                    slide: _slides[i % _slides.length],
                     index: i,
                     page: _page,
                     headlineSize: headlineSize,
@@ -121,7 +118,7 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
                   left: 0,
                   right: 0,
                   bottom: ZopiqSpacing.md,
-                  child: _Dots(count: _slides.length, active: _index),
+                  child: _Dots(count: _slides.length, pageController: _page),
                 ),
               ],
             ),
@@ -132,31 +129,66 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
   }
 }
 
-/// The page-position indicator. The active dot stretches into a pill.
+/// The page-position indicator. Only 5 dots visible at a time.
+/// As the user swipes, the dots infinitely slide left/right.
 class _Dots extends StatelessWidget {
-  const _Dots({required this.count, required this.active});
+  const _Dots({required this.count, required this.pageController});
 
   final int count;
-  final int active;
+  final PageController pageController;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List<Widget>.generate(count, (int i) {
-        final bool on = i == active;
-        return AnimatedContainer(
-          duration: ZopiqDurations.base,
-          curve: ZopiqCurves.standard,
-          width: on ? 22 : 7,
-          height: 7,
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          decoration: BoxDecoration(
-            color: ZopiqPalette.white.withValues(alpha: on ? 1 : 0.5),
-            borderRadius: ZopiqRadii.rPill,
-          ),
+    return AnimatedBuilder(
+      animation: pageController,
+      builder: (BuildContext context, Widget? child) {
+        final double page = pageController.hasClients && pageController.position.haveDimensions
+            ? (pageController.page ?? 12000.0)
+            : 12000.0;
+        
+        final int basePage = page.floor();
+        final double f = page - basePage;
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            SizedBox(
+              width: 65, // 5 dots * 13 width
+              height: 7,
+              child: ClipRect(
+                child: Stack(
+                  children: List<Widget>.generate(6, (int index) {
+                    final int i = index - 2; // Renders relative positions -2 to 3
+                    final double d = (basePage + i - page).abs();
+                    final double opacity = 0.5 + 0.5 * (1 - d.clamp(0.0, 1.0));
+                    
+                    double scale = 1.0;
+                    if (i == -2) scale = 1.0 - f;
+                    if (i == 3) scale = f;
+
+                    return Positioned(
+                      left: (i + 2) * 13.0 - f * 13.0,
+                      top: 0,
+                      child: Transform.scale(
+                        scale: scale,
+                        child: Container(
+                          width: 7,
+                          height: 7,
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          decoration: BoxDecoration(
+                            color: ZopiqPalette.white.withValues(alpha: opacity),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ),
+          ],
         );
-      }),
+      },
     );
   }
 }
@@ -230,6 +262,7 @@ class _HeroSlideViewState extends State<_HeroSlideView>
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
     final _HeroSlide s = widget.slide;
+    final bool hasDealCards = s.dealCards != null && s.dealCards!.isNotEmpty;
 
     return Container(
       decoration: BoxDecoration(
@@ -297,52 +330,60 @@ class _HeroSlideViewState extends State<_HeroSlideView>
                     child: child,
                   );
                 },
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    ZopiqSpacing.pageGutter,
-                    widget.topInset,
-                    ZopiqSpacing.pageGutter,
-                    ZopiqSpacing.lg,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      _EyebrowPill(icon: s.eyebrowIcon, label: s.eyebrow),
-                      const SizedBox(height: ZopiqSpacing.sm),
-                      Text(
-                        s.headline,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: t.displayLarge?.copyWith(
-                          color: ZopiqPalette.white,
-                          fontSize: widget.headlineSize,
-                          height: 1.05,
-                          fontWeight: FontWeight.w800,
-                          fontVariations: const <FontVariation>[
-                            FontVariation('wght', 800),
-                          ],
-                          shadows: const <Shadow>[
-                            Shadow(
-                              color: Color(0x33000000),
-                              offset: Offset(0, 2),
+                child: hasDealCards
+                    ? _DealCardsSlideContent(
+                        slide: s,
+                        topInset: widget.topInset,
+                        headlineSize: widget.headlineSize,
+                        pulse: _pulse,
+                        onTapCta: widget.onTapCta,
+                      )
+                    : Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          ZopiqSpacing.pageGutter,
+                          widget.topInset,
+                          ZopiqSpacing.pageGutter,
+                          ZopiqSpacing.lg,
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            _EyebrowPill(icon: s.eyebrowIcon, label: s.eyebrow),
+                            const SizedBox(height: ZopiqSpacing.sm),
+                            Text(
+                              s.headline,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: t.displayLarge?.copyWith(
+                                color: ZopiqPalette.white,
+                                fontSize: widget.headlineSize,
+                                height: 1.05,
+                                fontWeight: FontWeight.w800,
+                                fontVariations: const <FontVariation>[
+                                  FontVariation('wght', 800),
+                                ],
+                                shadows: const <Shadow>[
+                                  Shadow(
+                                    color: Color(0x33000000),
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
                             ),
+                            const SizedBox(height: ZopiqSpacing.xs),
+                            Text(
+                              s.subline,
+                              textAlign: TextAlign.center,
+                              style: t.bodyMedium?.copyWith(
+                                color: ZopiqPalette.white.withValues(alpha: 0.9),
+                              ),
+                            ),
+                            const SizedBox(height: ZopiqSpacing.md),
+                            _PulsingCta(pulse: _pulse, onTap: widget.onTapCta),
                           ],
                         ),
                       ),
-                      const SizedBox(height: ZopiqSpacing.xs),
-                      Text(
-                        s.subline,
-                        textAlign: TextAlign.center,
-                        style: t.bodyMedium?.copyWith(
-                          color: ZopiqPalette.white.withValues(alpha: 0.9),
-                        ),
-                      ),
-                      const SizedBox(height: ZopiqSpacing.md),
-                      _PulsingCta(pulse: _pulse, onTap: widget.onTapCta),
-                    ],
-                  ),
-                ),
               ),
             ),
           ),
@@ -513,7 +554,398 @@ class _PulsingCta extends StatelessWidget {
   }
 }
 
+// ─── Deal-cards slide layout ─────────────────────────────────────────────────
+
+/// Special content layout for a hero slide that contains deal cards.
+///
+/// Compact headline + "ORDER NOW" at the top, "BIG BRANDS, BIGGEST LOOT!"
+/// tagline in the middle, then a horizontally scrollable row of green cards.
+class _DealCardsSlideContent extends StatelessWidget {
+  const _DealCardsSlideContent({
+    required this.slide,
+    required this.topInset,
+    required this.headlineSize,
+    required this.pulse,
+    this.onTapCta,
+  });
+
+  final _HeroSlide slide;
+  final double topInset;
+  final double headlineSize;
+  final Animation<double> pulse;
+  final VoidCallback? onTapCta;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: EdgeInsets.only(top: topInset, bottom: ZopiqSpacing.xl),
+      child: Column(
+        children: <Widget>[
+          // ── Headline area ──
+          Text(
+            slide.headline,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: t.displayLarge?.copyWith(
+              color: ZopiqPalette.white,
+              fontSize: headlineSize * 0.72,
+              height: 1.05,
+              fontWeight: FontWeight.w900,
+              fontVariations: const <FontVariation>[
+                FontVariation('wght', 900),
+              ],
+              shadows: const <Shadow>[
+                Shadow(color: Color(0x44000000), offset: Offset(0, 2)),
+              ],
+            ),
+          ),
+          const SizedBox(height: ZopiqSpacing.md),
+
+          // ── Tagline ──
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: ZopiqSpacing.md,
+              vertical: ZopiqSpacing.xxs,
+            ),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: ZopiqPalette.white.withValues(alpha: 0.2),
+                ),
+                bottom: BorderSide(
+                  color: ZopiqPalette.white.withValues(alpha: 0.2),
+                ),
+              ),
+            ),
+            child: Text(
+              'BIG BRANDS, BIGGEST LOOT!',
+              style: t.labelSmall?.copyWith(
+                color: ZopiqPalette.white.withValues(alpha: 0.85),
+                letterSpacing: 2.0,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: ZopiqSpacing.md),
+
+          // ── Three deal cards filling the width ──
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: ZopiqSpacing.pageGutter,
+              ),
+              child: Row(
+                children: <Widget>[
+                  for (int i = 0; i < slide.dealCards!.length; i++) ...[
+                    if (i > 0) const SizedBox(width: ZopiqSpacing.sm),
+                    Expanded(
+                      child: RepaintBoundary(
+                        child: _MiniDealCard(deal: slide.dealCards![i]),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact deal card rendered inside the hero carousel slide.
+class _MiniDealCard extends StatelessWidget {
+  const _MiniDealCard({required this.deal});
+
+  final _DealCardData deal;
+
+  @override
+  Widget build(BuildContext context) {
+    return ZopiqPressable(
+      onTap: () {},
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: ZopiqRadii.rLg,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: deal.gradient,
+          ),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0x44000000),
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: ZopiqRadii.rLg,
+          child: Stack(
+            children: <Widget>[
+              // Title at the top
+              Positioned(
+                left: ZopiqSpacing.sm,
+                top: ZopiqSpacing.sm,
+                right: ZopiqSpacing.sm,
+                child: Text(
+                  deal.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              // Bold headline at the bottom-left
+              Positioned(
+                left: ZopiqSpacing.sm,
+                bottom: ZopiqSpacing.sm,
+                child: Text(
+                  deal.headline,
+                  style: const TextStyle(
+                    color: Color(0xFFFFEB3B),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    height: 1.05,
+                    letterSpacing: -0.3,
+                    shadows: <Shadow>[
+                      Shadow(
+                        color: Color(0x66000000),
+                        offset: Offset(0, 1),
+                        blurRadius: 3,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Art illustration at bottom-right
+              Positioned(
+                right: 0,
+                bottom: 0,
+                width: 56,
+                height: 56,
+                child: _DealArtWidget(artType: deal.artType),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Routes to the correct custom-painted illustration.
+class _DealArtWidget extends StatelessWidget {
+  const _DealArtWidget({required this.artType});
+
+  final _DealArt artType;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: switch (artType) {
+        _DealArt.priceDrop => _PriceDropPainter(),
+        _DealArt.dealFeast => _DealFeastPainter(),
+        _DealArt.topBrands => _TopBrandsPainter(),
+        _DealArt.freeDelivery => _FreeDeliveryPainter(),
+      },
+    );
+  }
+}
+
+// ─── Custom-painted deal card art ────────────────────────────────────────────
+
+/// Price tag with a downward arrow.
+class _PriceDropPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double cx = size.width / 2;
+    final double cy = size.height / 2;
+
+    final Path tag = Path()
+      ..moveTo(cx - 8, cy - 18)
+      ..lineTo(cx + 14, cy - 18)
+      ..lineTo(cx + 14, cy + 8)
+      ..lineTo(cx + 3, cy + 20)
+      ..lineTo(cx - 8, cy + 8)
+      ..close();
+    canvas.drawPath(tag, Paint()..color = const Color(0xFFFDD835));
+
+    final Paint arrow = Paint()
+      ..color = const Color(0xFF1B5E20)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(cx + 3, cy - 10), Offset(cx + 3, cy + 6), arrow);
+    canvas.drawLine(Offset(cx - 3, cy - 1), Offset(cx + 3, cy + 6), arrow);
+    canvas.drawLine(Offset(cx + 9, cy - 1), Offset(cx + 3, cy + 6), arrow);
+
+    canvas.drawCircle(
+      Offset(cx - 2, cy - 11),
+      2.5,
+      Paint()..color = const Color(0xFF2E8B57),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Starburst badge with "%".
+class _DealFeastPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double cx = size.width / 2;
+    final double cy = size.height / 2;
+
+    final Path burst = Path();
+    const int points = 12;
+    const double outerR = 22;
+    const double innerR = 16;
+    for (int i = 0; i < points * 2; i++) {
+      final double angle = (i * math.pi) / points - math.pi / 2;
+      final double r = i.isEven ? outerR : innerR;
+      final double x = cx + r * math.cos(angle);
+      final double y = cy + r * math.sin(angle);
+      if (i == 0) {
+        burst.moveTo(x, y);
+      } else {
+        burst.lineTo(x, y);
+      }
+    }
+    burst.close();
+    canvas.drawPath(
+      burst,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: <Color>[Color(0xFFFF6D00), Color(0xFFE53935)],
+        ).createShader(
+          Rect.fromCenter(center: Offset(cx, cy), width: 44, height: 44),
+        ),
+    );
+
+    final TextPainter tp = TextPainter(
+      text: const TextSpan(
+        text: '%',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 17,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset(cx - tp.width / 2, cy - tp.height / 2));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Food bowls with ₹ symbol.
+class _TopBrandsPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double cx = size.width / 2;
+    final double cy = size.height / 2;
+
+    _drawBowl(canvas, Offset(cx - 5, cy - 1), 14, const Color(0xFFFFB74D));
+    _drawBowl(canvas, Offset(cx + 6, cy + 5), 12, const Color(0xFFFF8A65));
+
+    final TextPainter tp = TextPainter(
+      text: const TextSpan(
+        text: '₹',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset(cx - tp.width / 2 + 1, cy - tp.height / 2 - 8));
+  }
+
+  void _drawBowl(Canvas canvas, Offset c, double r, Color color) {
+    final Path bowl = Path()
+      ..addArc(Rect.fromCircle(center: c, radius: r), 0, math.pi)
+      ..close();
+    canvas.drawPath(bowl, Paint()..color = color);
+    canvas.drawLine(
+      Offset(c.dx - r, c.dy),
+      Offset(c.dx + r, c.dy),
+      Paint()
+        ..color = color.withValues(alpha: 0.8)
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawCircle(
+      Offset(c.dx - 4, c.dy - 3),
+      3.5,
+      Paint()..color = const Color(0xFFEF5350),
+    );
+    canvas.drawCircle(
+      Offset(c.dx + 3, c.dy - 2),
+      3,
+      Paint()..color = const Color(0xFF66BB6A),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Delivery bag with wheels.
+class _FreeDeliveryPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double cx = size.width / 2;
+    final double cy = size.height / 2;
+
+    final RRect bag = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(cx, cy - 5), width: 22, height: 18),
+      const Radius.circular(3),
+    );
+    canvas.drawRRect(bag, Paint()..color = const Color(0xFFFFB300));
+    canvas.drawLine(
+      Offset(cx - 11, cy - 10),
+      Offset(cx + 11, cy - 10),
+      Paint()
+        ..color = const Color(0xFFFF8F00)
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round,
+    );
+
+    final Paint wheel = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawCircle(Offset(cx - 8, cy + 11), 5.5, wheel);
+    canvas.drawCircle(Offset(cx + 9, cy + 11), 5.5, wheel);
+    canvas.drawCircle(Offset(cx - 8, cy + 11), 1.5, Paint()..color = Colors.white);
+    canvas.drawCircle(Offset(cx + 9, cy + 11), 1.5, Paint()..color = Colors.white);
+
+    final Paint line = Paint()
+      ..color = Colors.white.withValues(alpha: 0.6)
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(cx - 20, cy - 1), Offset(cx - 14, cy - 1), line);
+    canvas.drawLine(Offset(cx - 22, cy + 4), Offset(cx - 14, cy + 4), line);
+    canvas.drawLine(Offset(cx - 18, cy + 9), Offset(cx - 14, cy + 9), line);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 /// A starburst of triangular rays.
+
 class _RayBurst extends StatelessWidget {
   const _RayBurst({required this.radius, required this.alpha});
 
@@ -576,6 +1008,7 @@ class _HeroSlide {
     required this.headline,
     required this.subline,
     required this.gradient,
+    this.dealCards,
   });
 
   final String eyebrow;
@@ -583,13 +1016,63 @@ class _HeroSlide {
   final String headline;
   final String subline;
   final List<Color> gradient;
+
+  /// When non-null, this slide renders as a "deals" slide: compact headline
+  /// at the top with a horizontally scrolling row of deal cards below it.
+  final List<_DealCardData>? dealCards;
 }
+
+/// Data for one deal card inside a hero slide.
+@immutable
+class _DealCardData {
+  const _DealCardData({
+    required this.title,
+    required this.headline,
+    required this.gradient,
+    required this.artType,
+  });
+
+  final String title;
+  final String headline;
+  final List<Color> gradient;
+  final _DealArt artType;
+}
+
+/// Which illustration art to paint on a deal card.
+enum _DealArt { priceDrop, dealFeast, topBrands, freeDelivery }
 
 /// Placeholder campaign slides. The first stays on the brand orange; the rest
 /// use temporary promo gradients (swap for real banner art later, per the
 /// class doc). These carry the offers that used to live in the removed cards,
 /// plus a teaser for the upcoming Dining feature.
 const List<_HeroSlide> _slides = <_HeroSlide>[
+  _HeroSlide(
+    eyebrow: 'BIG BRANDS · BIGGEST LOOT',
+    eyebrowIcon: Icons.local_fire_department_rounded,
+    headline: 'BIG BRAND\nHEIST',
+    subline: 'Mega deals from your favourite brands!',
+    gradient: <Color>[Color(0xFF4A148C), Color(0xFF1A0033)],
+    dealCards: <_DealCardData>[
+      _DealCardData(
+        title: 'Dishes Starting\nAt ₹29',
+        headline: 'PRICE\nDROP',
+        gradient: <Color>[Color(0xFF9CCC65), Color(0xFF558B2F)], // Lime
+        artType: _DealArt.priceDrop,
+      ),
+      _DealCardData(
+        title: 'Deal\nFeast',
+        headline: 'GET 70%\nOFF',
+        gradient: <Color>[Color(0xFFFF9800), Color(0xFFBF360C)], // Orange
+        artType: _DealArt.dealFeast,
+      ),
+      _DealCardData(
+        title: 'Top Brands,\nTop Deals',
+        headline: 'FLAT\n₹100 OFF',
+        gradient: <Color>[Color(0xFF2E7D32), Color(0xFF1B5E20)], // Dark Green
+        artType: _DealArt.topBrands,
+      ),
+    ],
+  ),
   _HeroSlide(
     eyebrow: 'LAUNCH WEEK',
     eyebrowIcon: Icons.bolt_rounded,
