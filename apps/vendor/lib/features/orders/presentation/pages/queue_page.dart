@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_vendor/app/router.dart';
 import 'package:zopiq_vendor/features/auth/domain/entities/vendor.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
@@ -41,6 +43,11 @@ class QueuePage extends ConsumerWidget {
           ],
         ),
         actions: <Widget>[
+          IconButton(
+            tooltip: 'Menu',
+            icon: const Icon(Icons.restaurant_menu_rounded),
+            onPressed: () => context.goNamed(Routes.menu),
+          ),
           IconButton(
             tooltip: 'Sign out',
             icon: const Icon(Icons.logout_rounded),

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:zopiq_vendor/features/auth/data/vendor_auth_datasource.dart';
 import 'package:zopiq_vendor/features/auth/domain/entities/vendor.dart';
+import 'package:zopiq_vendor/features/menu/data/vendor_menu_datasource.dart';
+import 'package:zopiq_vendor/features/menu/domain/entities/vendor_dish.dart';
 import 'package:zopiq_vendor/features/orders/data/vendor_order_datasource.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 
@@ -115,3 +117,104 @@ VendorOrder order({
   total: total,
   paymentMethod: paymentMethod,
 );
+
+VendorDish dish({
+  String id = 'd1',
+  String name = 'Chicken Biryani',
+  String description = '',
+  int price = 320,
+  bool isVeg = false,
+  String category = 'Biryanis',
+  bool isAvailable = true,
+}) => VendorDish(
+  id: id,
+  name: name,
+  description: description,
+  price: price,
+  isVeg: isVeg,
+  category: category,
+  isAvailable: isAvailable,
+);
+
+/// The menu, in memory. Grouping mirrors the real datasource — by category, in
+/// the order each first appears — and the failure hooks let a test rehearse the
+/// two refusals that matter: a write the database rejects, and a delete the
+/// foreign key forbids.
+class FakeVendorMenuDataSource implements VendorMenuDataSource {
+  FakeVendorMenuDataSource({List<VendorDish> dishes = const <VendorDish>[]})
+    : _dishes = List<VendorDish>.of(dishes);
+
+  List<VendorDish> _dishes;
+
+  /// Set to make the next add/edit/toggle fail with this sentence.
+  String? writeFailure;
+
+  /// Set to make delete fail the way a dish on a past order does.
+  bool deleteInUse = false;
+
+  int _nextId = 1;
+
+  List<VendorDish> get dishes => List<VendorDish>.unmodifiable(_dishes);
+
+  @override
+  Future<List<VendorMenuSection>> fetchMenu(String restaurantId) async {
+    final Map<String, List<VendorDish>> sections =
+        <String, List<VendorDish>>{};
+    for (final VendorDish d in _dishes) {
+      sections.putIfAbsent(d.category, () => <VendorDish>[]).add(d);
+    }
+    return sections.entries
+        .map(
+          (MapEntry<String, List<VendorDish>> e) =>
+              VendorMenuSection(title: e.key, dishes: e.value),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> setAvailability({
+    required String dishId,
+    required bool isAvailable,
+  }) async {
+    if (writeFailure != null) throw MenuWriteFailure(writeFailure!);
+    _dishes = _dishes
+        .map(
+          (VendorDish d) =>
+              d.id == dishId ? d.copyWith(isAvailable: isAvailable) : d,
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<VendorDish> saveDish(
+    VendorDish dish, {
+    required String restaurantId,
+  }) async {
+    if (writeFailure != null) throw MenuWriteFailure(writeFailure!);
+    if (dish.isNew) {
+      final VendorDish created = VendorDish(
+        id: 'new-${_nextId++}',
+        name: dish.name,
+        description: dish.description,
+        price: dish.price,
+        isVeg: dish.isVeg,
+        category: dish.category,
+        isAvailable: true,
+      );
+      _dishes = <VendorDish>[..._dishes, created];
+      return created;
+    }
+    _dishes = _dishes
+        .map((VendorDish d) => d.id == dish.id ? dish : d)
+        .toList(growable: false);
+    return dish;
+  }
+
+  @override
+  Future<void> deleteDish(String dishId) async {
+    if (deleteInUse) throw const MenuItemInUseFailure();
+    _dishes = _dishes
+        .where((VendorDish d) => d.id != dishId)
+        .toList(growable: false);
+  }
+}

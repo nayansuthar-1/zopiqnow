@@ -388,11 +388,44 @@ Decisions worth remembering:
   hold six strings would mean refactoring every import in the customer app for a new
   place to disagree with Postgres.
 
-**Still owed here** (the rest of the restaurant app): menu management (availability
-toggle, prices, add/remove a dish), an open/closed switch, order history, and the
-restaurant's own profile. **Blocked, not deferred:** payouts, commission and settlement
-— PM_CHECKLIST §4 has no answer for the commission model, the settlement cadence, or the
-bank account, and those are not numbers to invent.
+**Menu management is live (2026-07-15).** `/menu`, one tap from the queue: the
+restaurant's own menu grouped into its sections (including the sold-out dishes a
+customer cannot see), a per-dish availability switch, an add/edit sheet, and remove.
+Migration 0010 grants the vendor the three write verbs 0009 withheld — insert, update,
+delete — each scoped to their own restaurant by `staff_restaurant_id()`. Verified live
+against Postgres: a vendor's own-menu insert succeeds; the same insert aimed at another
+restaurant, and a customer's insert (no staff row → null restaurant), are both refused
+by the row-level policy.
+
+Decisions worth remembering:
+- **A menu write is safe where an order write was not.** 0009 kept a vendor off `orders`
+  because *the party being paid must not change what it is paid*. A menu price is the
+  opposite: it is the vendor's own number, and `place_order` freezes it onto the order at
+  checkout — editing a dish changes the *next* order, never a past one, because
+  `order_items` denormalizes name and price (0003). So insert/update/delete are granted
+  directly, gated by a `with check` that pins `restaurant_id` to the caller's kitchen (the
+  same shape as the addresses policy) so no dish can be filed under someone else's menu.
+- **The database picks a new dish's id.** `menu_items.id` gained a `gen_random_uuid()`
+  default: a vendor adding a dish has no id to offer, and a client that names a primary
+  key is one that can collide with or guess at another row's.
+- **Remove is a hard delete that degrades to "mark unavailable".** The FK from
+  `order_items.menu_item_id` (no cascade) lets a never-ordered dish be deleted cleanly and
+  refuses to erase one that sits on a past order — a receipt must survive its dish. The app
+  turns that refusal (`23503`) into a sentence pointing the vendor at the availability
+  switch, which is how a dish with a history leaves the menu (0002). `order_items` and the
+  customer app are untouched.
+- **The availability switch is optimistic.** A kitchen marking a dish sold out mid-rush
+  cannot wait on a round trip, so the switch flips first and the write confirms it; a
+  refusal puts it back and says why, because a screen reading "Sold out" over a dish that
+  is still selling is the one lie this screen must not tell.
+
+**Still owed here** (the rest of the restaurant app): an open/closed switch, order
+history, and the restaurant's own profile. Menu management has no photo upload — that
+needs a CDN this project does not have (PM §6) — and has been verified in widget tests
+and against the live database, but not yet on the Android 10 device. **Blocked, not
+deferred:** payouts, commission and settlement — PM_CHECKLIST §4 has no answer for the
+commission model, the settlement cadence, or the bank account, and those are not numbers
+to invent.
 
 ### Step 9 — Dining (table reservations) — **new scope, 2026-07-10**
 Zomato-dining / Swiggy-Dineout style: browse restaurants that take bookings, pick a

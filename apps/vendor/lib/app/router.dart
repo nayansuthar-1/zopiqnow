@@ -7,10 +7,12 @@ import 'package:zopiq_vendor/features/auth/presentation/pages/otp_page.dart';
 import 'package:zopiq_vendor/features/auth/presentation/pages/sign_in_page.dart';
 import 'package:zopiq_vendor/features/auth/presentation/pages/splash_page.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
+import 'package:zopiq_vendor/features/menu/presentation/pages/menu_page.dart';
 import 'package:zopiq_vendor/features/orders/presentation/pages/queue_page.dart';
 
 abstract final class Routes {
   static const String queue = 'queue';
+  static const String menu = 'menu';
   static const String splash = 'splash';
   static const String login = 'login';
   static const String otp = 'otp';
@@ -75,6 +77,16 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: '/',
         name: Routes.queue,
         builder: (_, _) => const QueuePage(),
+        routes: <RouteBase>[
+          // A child of the queue, so it pushes over it with a back button and
+          // stays behind the same auth guard — there is no signed-out route to
+          // a restaurant's menu.
+          GoRoute(
+            path: 'menu',
+            name: Routes.menu,
+            builder: (_, _) => const MenuPage(),
+          ),
+        ],
       ),
       GoRoute(
         path: _splashPath,
