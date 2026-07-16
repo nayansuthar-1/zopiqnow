@@ -433,10 +433,38 @@ disabled ADD buttons on its menu — honesty, not enforcement. Verified live aga
 Postgres (column defaults open for all 8 seeded rows; the guard is in the deployed
 function) and in widget tests, but not yet on the Android 10 device.
 
-**Still owed here** (the rest of the restaurant app): order history and the
-restaurant's own profile. Menu management has no photo upload — that
-needs a CDN this project does not have (PM §6) — and has been verified in widget tests
-and against the live database, but not yet on the Android 10 device. **Blocked, not
+**The app grew a spine (2026-07-16).** Four tabs in a `StatefulShellRoute.indexedStack`
+bottom-nav shell — Orders, History, Menu, Profile — replacing the single queue screen
+with a pushed menu. The queue is still the home a cook lives on; the slower rooms are a
+tab away rather than an app-bar button. Sign-out moved to Profile.
+
+**Order history is live (2026-07-16).** The History tab: delivered and cancelled orders,
+newest first, each a read-only record of how the order ended. **No new query** — it
+derives from the same `.stream()` the queue reads (0009's policy already returns every
+status), so an order lands in history the instant it leaves the queue, and the shared
+`OrderLines` widget renders both. The queue is oldest-first (a queue starves its oldest
+ticket); history is newest-first (you look up the thing you just did).
+
+**The restaurant edits its own profile is live (2026-07-16).** The Profile tab shows what
+customers see — name, cuisines, cost for two, pure-veg, offer, prep time, plus the earned
+rating — and edits all but the rating through `update_restaurant_profile` (migration 0012),
+the same one-column-at-a-time shape as `set_order_status`: no `update` grant on
+`restaurants`, so RLS can never be widened to reach `rating` (earned) or `is_active` (ops
+delisting, not the kitchen's). **This is the profile's edit propagating to the customer
+app** — both apps read the one `restaurants` row, so a renamed kitchen, a new cuisine, a
+changed price shows on the customer feed and menu; the `restaurants_set_search_text`
+trigger keeps search in step. A saved name also updates the session in place, so the queue
+header follows without a re-login — which surfaced a real bug: the router's
+`refreshListenable` was firing on *every* auth emission, and now fires only when the auth
+*class* changes, since the redirect branches on nothing finer. Verified live (the RPC
+refuses a non-staff caller and writes only its six columns) and in widget tests, but not
+yet on the Android 10 device.
+
+**Still owed here:** dish and restaurant *photo upload* — blocked on a CDN this project does
+not have (PM §6). **Blocked, not deferred:** payouts, commission and settlement (PM §4 has
+no commission model, cadence, or bank account). Everything shipped in this app has been
+verified in widget tests and against the live database, but **not yet on the Android 10
+device** — the standing floor-verification debt. **Blocked, not
 deferred:** payouts, commission and settlement — PM_CHECKLIST §4 has no answer for the
 commission model, the settlement cadence, or the bank account, and those are not numbers
 to invent.

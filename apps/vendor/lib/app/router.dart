@@ -2,35 +2,52 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:zopiq_vendor/app/vendor_shell.dart';
 import 'package:zopiq_vendor/features/auth/presentation/pages/not_staff_page.dart';
 import 'package:zopiq_vendor/features/auth/presentation/pages/otp_page.dart';
 import 'package:zopiq_vendor/features/auth/presentation/pages/sign_in_page.dart';
 import 'package:zopiq_vendor/features/auth/presentation/pages/splash_page.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_vendor/features/menu/presentation/pages/menu_page.dart';
+import 'package:zopiq_vendor/features/orders/presentation/pages/history_page.dart';
 import 'package:zopiq_vendor/features/orders/presentation/pages/queue_page.dart';
+import 'package:zopiq_vendor/features/profile/presentation/pages/profile_edit_page.dart';
+import 'package:zopiq_vendor/features/profile/presentation/pages/profile_page.dart';
 
 abstract final class Routes {
   static const String queue = 'queue';
+  static const String history = 'history';
   static const String menu = 'menu';
+  static const String profile = 'profile';
+  static const String profileEdit = 'profileEdit';
   static const String splash = 'splash';
   static const String login = 'login';
   static const String otp = 'otp';
   static const String notStaff = 'notStaff';
 }
 
+const String _ordersPath = '/orders';
 const String _splashPath = '/splash';
 const String _loginPath = '/login';
 const String _notStaffPath = '/not-a-partner';
 
 /// Bridges Riverpod's auth state to the [Listenable] GoRouter wants. Without it,
 /// signing in changes state but never re-runs `redirect`.
+///
+/// Fires only when the auth *class* changes, not on every emission. The redirect
+/// below branches on which of the four states applies and nothing inside them,
+/// so a change within a state — a restaurant renamed, `AuthSignedIn` to
+/// `AuthSignedIn` — cannot change where anyone is sent. Refreshing on it anyway
+/// rebuilds the route stack under the user's feet, which pops an imperatively
+/// pushed page (the profile editor) out from under a `Navigator.pop` mid-save.
 class _AuthRefreshListenable extends ChangeNotifier {
   _AuthRefreshListenable(Ref ref) {
-    ref.listen<VendorAuthState>(
-      vendorAuthControllerProvider,
-      (VendorAuthState? _, VendorAuthState _) => notifyListeners(),
-    );
+    ref.listen<VendorAuthState>(vendorAuthControllerProvider, (
+      VendorAuthState? previous,
+      VendorAuthState next,
+    ) {
+      if (previous.runtimeType != next.runtimeType) notifyListeners();
+    });
   }
 }
 
@@ -46,7 +63,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: _ordersPath,
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
       final VendorAuthState auth = ref.read(vendorAuthControllerProvider);
@@ -68,23 +85,65 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         // itself — see its class doc.
         AuthSignedIn() =>
           onAuthRoute || location == _splashPath || location == _notStaffPath
-              ? '/'
+              ? _ordersPath
               : null,
       };
     },
     routes: <RouteBase>[
-      GoRoute(
-        path: '/',
-        name: Routes.queue,
-        builder: (_, _) => const QueuePage(),
-        routes: <RouteBase>[
-          // A child of the queue, so it pushes over it with a back button and
-          // stays behind the same auth guard — there is no signed-out route to
-          // a restaurant's menu.
-          GoRoute(
-            path: 'menu',
-            name: Routes.menu,
-            builder: (_, _) => const MenuPage(),
+      // The four rooms of the app, held in a bottom-nav shell. Each keeps its own
+      // navigation stack and scroll position (indexedStack).
+      StatefulShellRoute.indexedStack(
+        builder:
+            (
+              BuildContext context,
+              GoRouterState state,
+              StatefulNavigationShell navigationShell,
+            ) => VendorShell(navigationShell: navigationShell),
+        branches: <StatefulShellBranch>[
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: _ordersPath,
+                name: Routes.queue,
+                builder: (_, _) => const QueuePage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/history',
+                name: Routes.history,
+                builder: (_, _) => const HistoryPage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/menu',
+                name: Routes.menu,
+                builder: (_, _) => const MenuPage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/profile',
+                name: Routes.profile,
+                builder: (_, _) => const ProfilePage(),
+                routes: <RouteBase>[
+                  // Pushed over the profile tab, inside its branch — the form has
+                  // a back button and the bottom nav stays put.
+                  GoRoute(
+                    path: 'edit',
+                    name: Routes.profileEdit,
+                    builder: (_, _) => const ProfileEditPage(),
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),

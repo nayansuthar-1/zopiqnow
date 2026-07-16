@@ -110,6 +110,16 @@ class VendorAuthController extends Notifier<VendorAuthState> {
     }
   }
 
+  /// Reflect a renamed restaurant in the session, so the queue header stops
+  /// showing the old name the moment the profile is saved — without a re-login
+  /// or a refetch. A no-op when not signed in.
+  void applyRestaurantName(String name) {
+    final VendorAuthState current = state;
+    if (current is AuthSignedIn) {
+      state = AuthSignedIn(current.vendor.copyWith(restaurantName: name));
+    }
+  }
+
   Future<void> signOut() async {
     await ref.read(vendorAuthDataSourceProvider).signOut();
     state = const AuthSignedOut();

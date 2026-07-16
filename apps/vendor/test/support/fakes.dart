@@ -6,6 +6,8 @@ import 'package:zopiq_vendor/features/menu/data/vendor_menu_datasource.dart';
 import 'package:zopiq_vendor/features/menu/domain/entities/vendor_dish.dart';
 import 'package:zopiq_vendor/features/orders/data/vendor_order_datasource.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
+import 'package:zopiq_vendor/features/profile/data/vendor_restaurant_datasource.dart';
+import 'package:zopiq_vendor/features/profile/domain/entities/restaurant_profile.dart';
 
 const Vendor testVendor = Vendor(
   email: 'kitchen@paradise.in',
@@ -229,5 +231,59 @@ class FakeVendorMenuDataSource implements VendorMenuDataSource {
     _dishes = _dishes
         .where((VendorDish d) => d.id != dishId)
         .toList(growable: false);
+  }
+}
+
+const RestaurantProfile testProfile = RestaurantProfile(
+  name: 'Paradise Biryani',
+  cuisines: <String>['Biryani', 'Hyderabadi', 'Kebabs'],
+  priceForTwo: 500,
+  isVeg: false,
+  promoText: '50% OFF up to ₹100',
+  etaMinutes: 32,
+  rating: 4.4,
+  ratingCount: 12800,
+);
+
+/// The restaurant row, in memory. `fetch` returns whatever was last saved (so a
+/// test can save then read back), and the failure hook rehearses the database
+/// refusing a bad value with its own sentence.
+class FakeVendorRestaurantDataSource implements VendorRestaurantDataSource {
+  FakeVendorRestaurantDataSource({RestaurantProfile initial = testProfile})
+    : _profile = initial;
+
+  RestaurantProfile _profile;
+
+  /// Set to make the next save fail with this sentence.
+  String? saveFailure;
+
+  /// What the last successful save wrote — the customer app would read exactly
+  /// this from the shared row.
+  RestaurantProfile? lastSaved;
+
+  @override
+  Future<RestaurantProfile> fetch(String restaurantId) async => _profile;
+
+  @override
+  Future<void> save({
+    required String name,
+    required List<String> cuisines,
+    required int priceForTwo,
+    required bool isVeg,
+    required String? promoText,
+    required int etaMinutes,
+  }) async {
+    if (saveFailure != null) throw ProfileWriteFailure(saveFailure!);
+    _profile = RestaurantProfile(
+      name: name,
+      cuisines: cuisines,
+      priceForTwo: priceForTwo,
+      isVeg: isVeg,
+      promoText: promoText,
+      etaMinutes: etaMinutes,
+      rating: _profile.rating,
+      ratingCount: _profile.ratingCount,
+    );
+    lastSaved = _profile;
   }
 }

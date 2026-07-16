@@ -26,10 +26,10 @@ class Vendor {
   /// kitchen's orders.
   final bool acceptingOrders;
 
-  Vendor copyWith({bool? acceptingOrders}) => Vendor(
+  Vendor copyWith({String? restaurantName, bool? acceptingOrders}) => Vendor(
     email: email,
     restaurantId: restaurantId,
-    restaurantName: restaurantName,
+    restaurantName: restaurantName ?? this.restaurantName,
     acceptingOrders: acceptingOrders ?? this.acceptingOrders,
   );
 }

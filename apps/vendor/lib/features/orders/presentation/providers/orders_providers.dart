@@ -44,6 +44,22 @@ final Provider<List<VendorOrder>> queueProvider = Provider<List<VendorOrder>>((
       .toList(growable: false);
 });
 
+/// The book: orders that are finished — delivered or cancelled — newest first.
+///
+/// The other reading of the same stream `queueProvider` filters. The queue is
+/// oldest-first because a queue starves its oldest ticket; history is
+/// newest-first because the thing you just did is the thing you look up.
+final Provider<List<VendorOrder>> orderHistoryProvider =
+    Provider<List<VendorOrder>>((Ref ref) {
+      final List<VendorOrder> orders =
+          ref.watch(ordersProvider).valueOrNull ?? <VendorOrder>[];
+      final List<VendorOrder> past = orders
+          .where((VendorOrder o) => !o.status.isOpen)
+          .toList();
+      past.sort((VendorOrder a, VendorOrder b) => b.placedAt.compareTo(a.placedAt));
+      return past;
+    });
+
 /// Orders that need someone to look up *right now* — the new ones. What the
 /// count badge counts.
 final Provider<int> newOrderCountProvider = Provider<int>((Ref ref) {
@@ -134,4 +150,19 @@ String formatAge(Duration age) {
   final int hours = age.inHours;
   final int rest = minutes - hours * 60;
   return rest == 0 ? '$hours hr' : '$hours hr $rest min';
+}
+
+/// `12 Jul · 7:42 PM`. A finished order is looked up by *when* it happened, not
+/// how long ago — the queue's relative age stops being the useful reading once
+/// an order is off the queue. Formatted by hand rather than reaching for `intl`,
+/// which is not a dependency this app has (Rule 4).
+String formatOrderDate(DateTime when) {
+  const List<String> months = <String>[
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  final int hour12 = when.hour % 12 == 0 ? 12 : when.hour % 12;
+  final String minute = when.minute.toString().padLeft(2, '0');
+  final String meridiem = when.hour < 12 ? 'AM' : 'PM';
+  return '${when.day} ${months[when.month - 1]} · $hour12:$minute $meridiem';
 }

@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
-import 'package:zopiq_vendor/app/router.dart';
 import 'package:zopiq_vendor/features/auth/domain/entities/vendor.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 import 'package:zopiq_vendor/features/orders/presentation/widgets/order_ticket.dart';
 
-/// The kitchen's screen. There is only one, and that is the design.
+/// The kitchen's screen — the app's home, and the tab a cook lives on.
 ///
-/// A restaurant tablet is not browsed — it is glanced at, across a room, by
-/// someone holding a pan. So there are no tabs, no navigation, and nothing to
-/// find: every order that still needs a human is on this list, oldest first,
-/// with its next action on it. The moment an order is delivered it leaves.
+/// A restaurant tablet is glanced at, across a room, by someone holding a pan.
+/// So the queue is nothing but the list: every order that still needs a human,
+/// oldest first, with its next action on it, and the open/closed switch above.
+/// The slower rooms — history, the menu, the profile — are a tab away, not on
+/// this screen, because a cook mid-rush should not have to scroll past them.
 class QueuePage extends ConsumerWidget {
   const QueuePage({super.key});
 
@@ -42,19 +41,6 @@ class QueuePage extends ConsumerWidget {
             ),
           ],
         ),
-        actions: <Widget>[
-          IconButton(
-            tooltip: 'Menu',
-            icon: const Icon(Icons.restaurant_menu_rounded),
-            onPressed: () => context.goNamed(Routes.menu),
-          ),
-          IconButton(
-            tooltip: 'Sign out',
-            icon: const Icon(Icons.logout_rounded),
-            onPressed: () =>
-                ref.read(vendorAuthControllerProvider.notifier).signOut(),
-          ),
-        ],
       ),
       body: Column(
         children: <Widget>[
