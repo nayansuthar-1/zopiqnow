@@ -18,6 +18,7 @@ class RestaurantProfile {
     required this.isVeg,
     required this.promoText,
     required this.etaMinutes,
+    required this.imageUrl,
     required this.rating,
     required this.ratingCount,
   });
@@ -28,6 +29,9 @@ class RestaurantProfile {
   final bool isVeg;
   final String? promoText;
   final int etaMinutes;
+
+  /// The cover photo's Cloudinary URL, or '' when there is none.
+  final String imageUrl;
 
   /// Read-only. Earned, not typed.
   final double rating;

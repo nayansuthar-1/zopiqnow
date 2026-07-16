@@ -6,8 +6,8 @@ import 'package:flutter/foundation.dart';
 /// photo, a rating it earned. The vendor sees a dish to *manage*: the same name
 /// and price, plus the one thing the customer never sees, which is whether it is
 /// available at all. `rating` is not here because a kitchen does not set its own
-/// rating, and `imageUrl` is not here because there is no way to change one yet —
-/// photo upload needs a CDN this project does not have (PM_CHECKLIST §6).
+/// rating. `imageUrl` *is* here now — photo upload landed with Cloudinary
+/// (PM §6's CDN) — and it holds the delivery URL, never the image itself.
 @immutable
 class VendorDish {
   const VendorDish({
@@ -18,6 +18,7 @@ class VendorDish {
     required this.isVeg,
     required this.category,
     required this.isAvailable,
+    this.imageUrl = '',
   });
 
   /// A dish being created, before the database has given it an id. `saveDish`
@@ -28,12 +29,17 @@ class VendorDish {
     this.price = 0,
     this.isVeg = true,
     this.category = '',
+    this.imageUrl = '',
   }) : id = '',
        isAvailable = true;
 
   final String id;
   final String name;
   final String description;
+
+  /// The dish photo's Cloudinary URL, or '' when there is none — the same empty
+  /// string the customer menu reads as "no photo, draw the fallback".
+  final String imageUrl;
 
   /// Price in whole rupees. The check constraint refuses anything <= 0.
   final int price;
@@ -58,6 +64,7 @@ class VendorDish {
     bool? isVeg,
     String? category,
     bool? isAvailable,
+    String? imageUrl,
   }) => VendorDish(
     id: id,
     name: name ?? this.name,
@@ -66,6 +73,7 @@ class VendorDish {
     isVeg: isVeg ?? this.isVeg,
     category: category ?? this.category,
     isAvailable: isAvailable ?? this.isAvailable,
+    imageUrl: imageUrl ?? this.imageUrl,
   );
 
   @override

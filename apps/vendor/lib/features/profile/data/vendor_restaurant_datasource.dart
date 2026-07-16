@@ -18,6 +18,7 @@ abstract interface class VendorRestaurantDataSource {
     required bool isVeg,
     required String? promoText,
     required int etaMinutes,
+    required String imageUrl,
   });
 }
 
@@ -40,7 +41,7 @@ class VendorRestaurantSupabaseDataSource implements VendorRestaurantDataSource {
 
   static const String _columns =
       'name, cuisines, price_for_two, is_veg, promo_text, eta_minutes, '
-      'rating, rating_count';
+      'image_url, rating, rating_count';
 
   @override
   Future<RestaurantProfile> fetch(String restaurantId) async {
@@ -57,6 +58,7 @@ class VendorRestaurantSupabaseDataSource implements VendorRestaurantDataSource {
       isVeg: row['is_veg'] as bool,
       promoText: row['promo_text'] as String?,
       etaMinutes: (row['eta_minutes'] as num).toInt(),
+      imageUrl: row['image_url'] as String? ?? '',
       rating: (row['rating'] as num).toDouble(),
       ratingCount: (row['rating_count'] as num).toInt(),
     );
@@ -70,6 +72,7 @@ class VendorRestaurantSupabaseDataSource implements VendorRestaurantDataSource {
     required bool isVeg,
     required String? promoText,
     required int etaMinutes,
+    required String imageUrl,
   }) async {
     try {
       await _db.rpc<void>(
@@ -81,6 +84,7 @@ class VendorRestaurantSupabaseDataSource implements VendorRestaurantDataSource {
           'p_is_veg': isVeg,
           'p_promo_text': promoText,
           'p_eta_minutes': etaMinutes,
+          'p_image_url': imageUrl,
         },
       );
     } on PostgrestException catch (e) {

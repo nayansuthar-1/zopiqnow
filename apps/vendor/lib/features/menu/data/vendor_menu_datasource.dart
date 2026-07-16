@@ -54,7 +54,7 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
   static const String _foreignKeyViolation = '23503';
 
   static const String _columns =
-      'id, name, description, price, is_veg, category, is_available';
+      'id, name, description, price, is_veg, category, is_available, image_url';
 
   @override
   Future<List<VendorMenuSection>> fetchMenu(String restaurantId) async {
@@ -115,6 +115,7 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
       'price': dish.price,
       'is_veg': dish.isVeg,
       'category': dish.category,
+      'image_url': dish.imageUrl,
     };
 
     try {
@@ -201,6 +202,7 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
     isVeg: row['is_veg'] as bool,
     category: row['category'] as String,
     isAvailable: row['is_available'] as bool,
+    imageUrl: row['image_url'] as String? ?? '',
   );
 }
 

@@ -39,6 +39,7 @@ class ProfileController extends Notifier<void> {
     required bool isVeg,
     required String? promoText,
     required int etaMinutes,
+    required String imageUrl,
   }) async {
     try {
       await ref
@@ -50,6 +51,7 @@ class ProfileController extends Notifier<void> {
             isVeg: isVeg,
             promoText: promoText,
             etaMinutes: etaMinutes,
+            imageUrl: imageUrl,
           );
       // The name lives in two places that must not drift: the profile the screen
       // shows, and the session the queue's header reads. Refresh one and update
