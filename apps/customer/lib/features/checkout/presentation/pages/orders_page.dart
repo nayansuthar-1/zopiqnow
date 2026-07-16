@@ -96,7 +96,12 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
     final AsyncValue<List<CustomerOrder>> orders = ref.watch(ordersProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Your orders')),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text('My orders'),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+      ),
       body: orders.when(
         loading: () => const _OrdersSkeleton(),
         error: (Object _, StackTrace _) => _OrdersMessage(
@@ -121,6 +126,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
             onRefresh: () async => ref.refresh(ordersProvider.future),
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.sm),
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
               itemCount: data.length,
               itemBuilder: (BuildContext context, int i) {
                 final CustomerOrder order = data[i];

@@ -22,7 +22,12 @@ class FavouritesPage extends ConsumerWidget {
     final AsyncValue<List<Restaurant>> favourites = ref.watch(favouritesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Favourites')),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text('Favourites'),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+      ),
       body: favourites.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (Object error, StackTrace _) => _Message(
@@ -48,6 +53,7 @@ class FavouritesPage extends ConsumerWidget {
           return RefreshIndicator(
             onRefresh: () async => ref.refresh(favouritesProvider.future),
             child: ListView.builder(
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
               padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.sm),
               itemCount: saved.length,
               itemBuilder: (BuildContext context, int i) => RepaintBoundary(

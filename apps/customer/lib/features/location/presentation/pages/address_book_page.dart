@@ -62,7 +62,12 @@ class AddressBookPage extends ConsumerWidget {
     final Address? selected = ref.watch(selectedAddressProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Address book')),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text('Address book'),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.pushNamed(Routes.addressNew),
         icon: const Icon(Icons.add_rounded),
@@ -125,6 +130,7 @@ class AddressBookPage extends ConsumerWidget {
           }
 
           return ListView.builder(
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             padding: const EdgeInsets.only(
               top: ZopiqSpacing.sm,
               // Clear of the FAB, which would otherwise sit on the last row.
@@ -178,66 +184,103 @@ class _AddressRow extends StatelessWidget {
         horizontal: ZopiqSpacing.pageGutter,
         vertical: ZopiqSpacing.xs,
       ),
-      child: ZopiqCard(
-        onTap: onEdit,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Icon(
-              address.label == 'Work'
-                  ? Icons.work_outline_rounded
-                  : Icons.home_outlined,
-              color: zc.primary,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: ZopiqRadii.rLg,
+          border: Border.all(color: zc.divider),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0x08000000),
+              blurRadius: 10,
+              offset: Offset(0, 4),
             ),
-            const SizedBox(width: ZopiqSpacing.md),
-            Expanded(
-              child: Column(
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onEdit,
+            child: Padding(
+              padding: const EdgeInsets.all(ZopiqSpacing.md),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      Flexible(
-                        child: Text(
-                          address.label ?? address.line1,
-                          style: t.titleSmall,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: zc.primary.withValues(alpha: 0.1),
+                      borderRadius: ZopiqRadii.rMd,
+                    ),
+                    child: Icon(
+                      address.label == 'Work'
+                          ? Icons.work_rounded
+                          : Icons.home_rounded,
+                      color: zc.primary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: ZopiqSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Flexible(
+                              child: Text(
+                                address.label ?? address.line1,
+                                style: t.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isSelected) ...<Widget>[
+                              const SizedBox(width: ZopiqSpacing.sm),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: ZopiqSpacing.sm,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: zc.primary.withValues(alpha: 0.12),
+                                  borderRadius: ZopiqRadii.rPill,
+                                ),
+                                child: Text(
+                                  'Delivering here',
+                                  style: t.labelSmall?.copyWith(color: zc.primary, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                      ),
-                      if (isSelected) ...<Widget>[
-                        const SizedBox(width: ZopiqSpacing.sm),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: ZopiqSpacing.sm,
-                            vertical: ZopiqSpacing.xxs,
-                          ),
-                          decoration: BoxDecoration(
-                            color: zc.primary.withValues(alpha: 0.12),
-                            borderRadius: ZopiqRadii.rPill,
-                          ),
-                          child: Text(
-                            'Delivering here',
-                            style: t.labelSmall?.copyWith(color: zc.primary),
-                          ),
+                        const SizedBox(height: 6),
+                        Text(
+                          address.shortDisplay,
+                          style: t.bodyMedium?.copyWith(color: zc.textMuted, height: 1.3),
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: ZopiqSpacing.xxs),
-                  Text(
-                    address.shortDisplay,
-                    style: t.bodySmall?.copyWith(color: zc.textMuted),
+                  const SizedBox(width: ZopiqSpacing.sm),
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: zc.textMuted.withValues(alpha: 0.05),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      color: zc.textMuted,
+                      iconSize: 20,
+                      tooltip: 'Delete address',
+                      onPressed: onDelete,
+                    ),
                   ),
                 ],
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline_rounded),
-              color: zc.textMuted,
-              tooltip: 'Delete address',
-              onPressed: onDelete,
-            ),
-          ],
+          ),
         ),
       ),
     );

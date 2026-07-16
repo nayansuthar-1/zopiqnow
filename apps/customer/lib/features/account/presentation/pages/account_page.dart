@@ -7,6 +7,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/app/providers/theme_mode_provider.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
+import 'package:zopiqnow/features/account/presentation/providers/customer_profile_provider.dart';
 
 /// The customer Account screen, opened from the Home profile button.
 ///
@@ -135,13 +136,13 @@ class AccountPage extends ConsumerWidget {
   }
 }
 
-class _ProfileCard extends StatelessWidget {
+class _ProfileCard extends ConsumerWidget {
   const _ProfileCard({required this.auth});
 
   final AuthState auth;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final TextTheme t = Theme.of(context).textTheme;
     final ZopiqColors zc = context.zc;
     final bool signedIn = auth is AuthSignedIn;
@@ -182,7 +183,7 @@ class _ProfileCard extends StatelessWidget {
       );
     }
 
-    final String name = 'Zopiq user';
+    final String name = ref.watch(customerProfileProvider).name;
 
     return Container(
       margin: ZopiqSpacing.pagePadding,

@@ -91,83 +91,139 @@ class OrderCard extends StatelessWidget {
         horizontal: ZopiqSpacing.pageGutter,
         vertical: ZopiqSpacing.xs,
       ),
-      child: ZopiqCard(
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                ClipRRect(
-                  borderRadius: ZopiqRadii.rMd,
-                  child: SizedBox(
-                    width: 56,
-                    height: 56,
-                    child: ZopiqNetworkImage(
-                      url: order.restaurantImageUrl,
-                      fallback: GradientImagePlaceholder(
-                        seed: order.restaurantId,
-                        icon: Icons.restaurant_rounded,
-                        iconSize: 24,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: ZopiqSpacing.md),
-                Expanded(
-                  child: Column(
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: ZopiqRadii.rLg,
+          border: Border.all(color: zc.divider),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0x08000000),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(ZopiqSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text(
-                        order.restaurantName,
-                        style: t.titleSmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: ZopiqRadii.rMd,
+                          boxShadow: const <BoxShadow>[
+                            BoxShadow(
+                              color: Color(0x11000000),
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: ZopiqRadii.rMd,
+                          child: SizedBox(
+                            width: 56,
+                            height: 56,
+                            child: ZopiqNetworkImage(
+                              url: order.restaurantImageUrl,
+                              fallback: GradientImagePlaceholder(
+                                seed: order.restaurantId,
+                                icon: Icons.restaurant_rounded,
+                                iconSize: 24,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: ZopiqSpacing.xxs),
-                      Text(
-                        '${order.id} · ${formatOrderTimestamp(order.placedAt)}',
-                        style: t.bodySmall?.copyWith(color: zc.textMuted),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      const SizedBox(width: ZopiqSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              order.restaurantName,
+                              style: t.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${order.id} · ${formatOrderTimestamp(order.placedAt)}',
+                              style: t.bodySmall?.copyWith(color: zc.textMuted),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: ZopiqSpacing.xs),
+                      OrderStatusChip(status: order.status),
+                    ],
+                  ),
+                  const SizedBox(height: ZopiqSpacing.md),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: zc.textMuted.withValues(alpha: 0.04),
+                      borderRadius: ZopiqRadii.rMd,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Icon(Icons.restaurant_menu_rounded, size: 16, color: zc.textMuted),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            order.itemsLabel,
+                            style: t.bodyMedium?.copyWith(height: 1.3),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: ZopiqSpacing.md),
+                  Divider(height: 1, color: zc.divider),
+                  const SizedBox(height: ZopiqSpacing.md),
+                  Row(
+                    children: <Widget>[
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text('₹${order.total}', style: t.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(
+                            '${order.itemCount} item${order.itemCount == 1 ? '' : 's'}',
+                            style: t.bodySmall?.copyWith(color: zc.textMuted),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      SizedBox(
+                        height: 36,
+                        child: ZopiqButton(
+                          label: 'Reorder',
+                          variant: ZopiqButtonVariant.outline,
+                          expand: false,
+                          isLoading: isReordering,
+                          onPressed: onReorder,
+                        ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: ZopiqSpacing.sm),
-                OrderStatusChip(status: order.status),
-              ],
+                ],
+              ),
             ),
-            const SizedBox(height: ZopiqSpacing.md),
-            Text(
-              order.itemsLabel,
-              style: t.bodyMedium,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: ZopiqSpacing.md),
-            Divider(height: 1, color: zc.divider),
-            const SizedBox(height: ZopiqSpacing.sm),
-            Row(
-              children: <Widget>[
-                Text('₹${order.total}', style: t.titleSmall),
-                const SizedBox(width: ZopiqSpacing.xs),
-                Text(
-                  '· ${order.itemCount} item${order.itemCount == 1 ? '' : 's'}',
-                  style: t.bodySmall?.copyWith(color: zc.textMuted),
-                ),
-                const Spacer(),
-                ZopiqButton(
-                  label: 'Reorder',
-                  variant: ZopiqButtonVariant.outline,
-                  expand: false,
-                  isLoading: isReordering,
-                  onPressed: onReorder,
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
