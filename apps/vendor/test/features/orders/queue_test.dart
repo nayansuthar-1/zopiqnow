@@ -172,6 +172,55 @@ void main() {
     });
   });
 
+  group('opening and closing the kitchen', () {
+    testWidgets('pausing orders flips the bar and writes it', (
+      WidgetTester tester,
+    ) async {
+      _tallSurface(tester);
+      final FakeVendorOrderDataSource orders = FakeVendorOrderDataSource();
+      addTearDown(orders.dispose);
+      final FakeVendorAuthDataSource auth = FakeVendorAuthDataSource(
+        signedInAs: testVendor,
+      );
+
+      await tester.pumpWidget(_app(orders: orders, auth: auth));
+      await tester.pumpAndSettle();
+
+      // Open to begin with — the seeded vendor is accepting orders.
+      expect(find.text('Taking orders'), findsOneWidget);
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      // The bar flips optimistically, and the write carried the new value.
+      expect(find.text('Orders paused'), findsOneWidget);
+      expect(auth.lastAcceptingOrders, isFalse);
+    });
+
+    testWidgets('a toggle the database refuses reverts and says so', (
+      WidgetTester tester,
+    ) async {
+      _tallSurface(tester);
+      final FakeVendorOrderDataSource orders = FakeVendorOrderDataSource();
+      addTearDown(orders.dispose);
+      final FakeVendorAuthDataSource auth = FakeVendorAuthDataSource(
+        signedInAs: testVendor,
+      )..failAcceptingOrders = true;
+
+      await tester.pumpWidget(_app(orders: orders, auth: auth));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      // The write failed, so the bar goes back to open rather than lying that
+      // the kitchen is closed while orders still arrive.
+      expect(find.text('Taking orders'), findsOneWidget);
+      expect(find.text('Orders paused'), findsNothing);
+      expect(find.textContaining('couldn\'t pause orders'), findsOneWidget);
+    });
+  });
+
   group('who is allowed in', () {
     testWidgets('a signed-out visitor gets the sign-in screen, not the queue', (
       WidgetTester tester,

@@ -18,6 +18,7 @@ class Restaurant {
     required this.isVeg,
     required this.imageUrl,
     this.promoText,
+    this.acceptingOrders = true,
   });
 
   final String id;
@@ -38,6 +39,15 @@ class Restaurant {
 
   /// Optional offer copy, e.g. "50% OFF up to ₹100". Null when no promo.
   final String? promoText;
+
+  /// Whether the kitchen is currently taking orders. The vendor's own switch
+  /// (`restaurants.accepting_orders`). When false the card is greyed and the
+  /// menu's ADD buttons are disabled — but the real refusal is `place_order`'s,
+  /// so a stale cart cannot slip past a client that thinks the kitchen is open.
+  ///
+  /// Defaults to true: a restaurant that has never touched the switch is open,
+  /// and every mock fixture predates it.
+  final bool acceptingOrders;
 
   @override
   bool operator ==(Object other) =>

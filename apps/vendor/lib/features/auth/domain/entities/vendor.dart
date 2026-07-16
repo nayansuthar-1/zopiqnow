@@ -13,9 +13,23 @@ class Vendor {
     required this.email,
     required this.restaurantId,
     required this.restaurantName,
+    required this.acceptingOrders,
   });
 
   final String email;
   final String restaurantId;
   final String restaurantName;
+
+  /// Whether the kitchen is currently taking orders. The vendor's own switch,
+  /// enforced in Postgres by `place_order` — flipping this in memory only
+  /// changes what the app *says*; the database is what actually refuses a closed
+  /// kitchen's orders.
+  final bool acceptingOrders;
+
+  Vendor copyWith({bool? acceptingOrders}) => Vendor(
+    email: email,
+    restaurantId: restaurantId,
+    restaurantName: restaurantName,
+    acceptingOrders: acceptingOrders ?? this.acceptingOrders,
+  );
 }

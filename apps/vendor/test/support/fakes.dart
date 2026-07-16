@@ -11,6 +11,7 @@ const Vendor testVendor = Vendor(
   email: 'kitchen@paradise.in',
   restaurantId: 'r1',
   restaurantName: 'Paradise Biryani',
+  acceptingOrders: true,
 );
 
 class FakeVendorAuthDataSource implements VendorAuthDataSource {
@@ -23,6 +24,12 @@ class FakeVendorAuthDataSource implements VendorAuthDataSource {
   final bool staff;
 
   String? lastCodeSentTo;
+
+  /// The last value `setAcceptingOrders` was asked to write, and whether that
+  /// write should throw — so a test can drive both the happy path and the
+  /// revert-on-failure path.
+  bool? lastAcceptingOrders;
+  bool failAcceptingOrders = false;
 
   @override
   Future<void> sendEmailOtp(String email) async => lastCodeSentTo = email;
@@ -38,6 +45,12 @@ class FakeVendorAuthDataSource implements VendorAuthDataSource {
 
   @override
   Future<Vendor?> restoreSession() async => signedInAs;
+
+  @override
+  Future<void> setAcceptingOrders(bool accepting) async {
+    if (failAcceptingOrders) throw Exception('offline');
+    lastAcceptingOrders = accepting;
+  }
 
   @override
   Future<void> signOut() async {}

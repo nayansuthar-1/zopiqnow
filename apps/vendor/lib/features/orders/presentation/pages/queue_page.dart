@@ -56,43 +56,128 @@ class QueuePage extends ConsumerWidget {
           ),
         ],
       ),
-      body: orders.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        // The socket dropped, or the first read failed. The kitchen is blind
-        // either way and has to be told so — a stale, empty list would read as
-        // "no orders", which is the most expensive lie this app could tell.
-        error: (Object _, StackTrace _) => _Message(
-          icon: Icons.cloud_off_rounded,
-          title: 'We\'ve lost the connection',
-          body:
-              'Orders can\'t reach you until this is back. '
-              'Check the internet and try again.',
-          actionLabel: 'Retry',
-          onAction: () => ref.invalidate(ordersProvider),
-        ),
-        data: (_) {
-          if (queue.isEmpty) {
-            return const _Message(
-              icon: Icons.done_all_rounded,
-              title: 'All caught up',
-              body: 'New orders appear here the moment they\'re placed.',
-            );
-          }
+      body: Column(
+        children: <Widget>[
+          if (vendor != null) _OpenClosedBar(vendor: vendor),
+          Expanded(
+            child: orders.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              // The socket dropped, or the first read failed. The kitchen is
+              // blind either way and has to be told so — a stale, empty list
+              // would read as "no orders", the most expensive lie this app
+              // could tell.
+              error: (Object _, StackTrace _) => _Message(
+                icon: Icons.cloud_off_rounded,
+                title: 'We\'ve lost the connection',
+                body:
+                    'Orders can\'t reach you until this is back. '
+                    'Check the internet and try again.',
+                actionLabel: 'Retry',
+                onAction: () => ref.invalidate(ordersProvider),
+              ),
+              data: (_) {
+                if (queue.isEmpty) {
+                  return const _Message(
+                    icon: Icons.done_all_rounded,
+                    title: 'All caught up',
+                    body: 'New orders appear here the moment they\'re placed.',
+                  );
+                }
 
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.sm),
-            itemCount: queue.length,
-            itemBuilder: (BuildContext context, int i) {
-              // One ticket's button spinning must not repaint the queue.
-              return RepaintBoundary(
-                child: OrderTicket(
-                  key: ValueKey<String>(queue[i].id),
-                  order: queue[i],
-                ),
-              );
-            },
-          );
-        },
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.sm),
+                  itemCount: queue.length,
+                  itemBuilder: (BuildContext context, int i) {
+                    // One ticket's button spinning must not repaint the queue.
+                    return RepaintBoundary(
+                      child: OrderTicket(
+                        key: ValueKey<String>(queue[i].id),
+                        order: queue[i],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The one switch that changes what customers can do: open the kitchen, or pause
+/// it. Sits above the queue because it is a fact about the whole screen — every
+/// order below it arrived while this said "open".
+///
+/// The colour carries the state as much as the words do: green when taking
+/// orders, red when paused, so a glance across the room reads it. Reuses the
+/// veg/non-veg tokens rather than inventing a new pair — the design system holds
+/// exactly one green and one red, and this is a stop/go, which is what they are.
+class _OpenClosedBar extends ConsumerWidget {
+  const _OpenClosedBar({required this.vendor});
+
+  final Vendor vendor;
+
+  Future<void> _toggle(BuildContext context, WidgetRef ref, bool open) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final String? error = await ref
+        .read(vendorAuthControllerProvider.notifier)
+        .setAcceptingOrders(open);
+    if (error != null) {
+      messenger.showSnackBar(SnackBar(content: Text(error)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+    final bool open = vendor.acceptingOrders;
+    final Color accent = open ? zc.veg : zc.nonVeg;
+
+    return Material(
+      color: accent.withValues(alpha: 0.10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: ZopiqSpacing.lg,
+          vertical: ZopiqSpacing.sm,
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              open ? Icons.storefront_rounded : Icons.no_meals_rounded,
+              color: accent,
+              size: 22,
+            ),
+            const SizedBox(width: ZopiqSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    open ? 'Taking orders' : 'Orders paused',
+                    style: t.titleSmall?.copyWith(
+                      color: accent,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    open
+                        ? 'Customers can order from you now.'
+                        : 'You won\'t receive new orders until you reopen.',
+                    style: t.bodySmall?.copyWith(color: zc.textMuted),
+                  ),
+                ],
+              ),
+            ),
+            Switch.adaptive(
+              value: open,
+              activeTrackColor: zc.veg,
+              onChanged: (bool value) => _toggle(context, ref, value),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -86,6 +86,30 @@ class VendorAuthController extends Notifier<VendorAuthState> {
     state = vendor == null ? AuthNotStaff(email) : AuthSignedIn(vendor);
   }
 
+  /// Open or close the kitchen. Optimistic: the switch flips first so a kitchen
+  /// mid-rush is not made to wait on a round trip, and the write confirms it. A
+  /// failure puts the state back and returns a sentence, exactly as the menu's
+  /// availability switch does — and for the same reason, a screen that says
+  /// "closed" while orders still arrive is the one lie this app must not tell.
+  ///
+  /// A no-op when not signed in: there is no restaurant to open or close.
+  Future<String?> setAcceptingOrders(bool accepting) async {
+    final VendorAuthState current = state;
+    if (current is! AuthSignedIn) return null;
+    if (current.vendor.acceptingOrders == accepting) return null;
+
+    state = AuthSignedIn(current.vendor.copyWith(acceptingOrders: accepting));
+    try {
+      await ref.read(vendorAuthDataSourceProvider).setAcceptingOrders(accepting);
+      return null;
+    } on Object {
+      state = current;
+      return accepting
+          ? 'We couldn\'t reopen the kitchen. Please try again.'
+          : 'We couldn\'t pause orders. Please try again.';
+    }
+  }
+
   Future<void> signOut() async {
     await ref.read(vendorAuthDataSourceProvider).signOut();
     state = const AuthSignedOut();

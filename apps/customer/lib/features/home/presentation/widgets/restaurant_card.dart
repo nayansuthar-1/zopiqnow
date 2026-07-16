@@ -325,6 +325,37 @@ class _CardImage extends StatelessWidget {
                 }),
               ),
             ),
+
+            // ─── "Closed for now" scrim ───
+            // Over everything, because "closed" is the first thing to read about
+            // this restaurant. The card stays tappable — a closed kitchen's menu
+            // is still worth browsing — and the scrim only paints; it absorbs no
+            // taps, so the heart beneath it still hearts.
+            if (!restaurant.acceptingOrders)
+              Positioned.fill(
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: ZopiqSpacing.md,
+                        vertical: ZopiqSpacing.xs + 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: ZopiqRadii.rPill,
+                      ),
+                      child: Text(
+                        'Closed for now',
+                        style: t.labelLarge?.copyWith(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

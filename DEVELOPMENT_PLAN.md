@@ -419,8 +419,22 @@ Decisions worth remembering:
   refusal puts it back and says why, because a screen reading "Sold out" over a dish that
   is still selling is the one lie this screen must not tell.
 
-**Still owed here** (the rest of the restaurant app): an open/closed switch, order
-history, and the restaurant's own profile. Menu management has no photo upload — that
+**Open/closed is live (2026-07-16).** A switch on the queue screen pauses and
+resumes orders — the vendor's own flag (`restaurants.accepting_orders`, migration
+0011), flipped through `set_accepting_orders`, the same one-column-only shape as
+`set_order_status` so a vendor pausing orders is never a `using` clause away from
+editing their rating or un-delisting themselves. The toggle is optimistic (the bar
+flips first, the write confirms it, a refusal reverts and says so), like the menu's
+availability switch. Enforcement is `place_order`'s, not the client's: it now reads
+`accepting_orders` and refuses a paused kitchen with its own sentence, so a cart
+assembled before the kitchen closed cannot slip through. Customer-side, a closed
+restaurant is greyed with "Closed for now" on its card and shows a banner with
+disabled ADD buttons on its menu — honesty, not enforcement. Verified live against
+Postgres (column defaults open for all 8 seeded rows; the guard is in the deployed
+function) and in widget tests, but not yet on the Android 10 device.
+
+**Still owed here** (the rest of the restaurant app): order history and the
+restaurant's own profile. Menu management has no photo upload — that
 needs a CDN this project does not have (PM §6) — and has been verified in widget tests
 and against the live database, but not yet on the Android 10 device. **Blocked, not
 deferred:** payouts, commission and settlement — PM_CHECKLIST §4 has no answer for the

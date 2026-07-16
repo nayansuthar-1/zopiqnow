@@ -68,6 +68,8 @@ class _MenuBody extends ConsumerWidget {
       slivers: <Widget>[
         MenuSliverAppBar(restaurant: restaurant),
         SliverToBoxAdapter(child: MenuVitals(restaurant: restaurant)),
+        if (!restaurant.acceptingOrders)
+          const SliverToBoxAdapter(child: _ClosedBanner()),
         const SliverToBoxAdapter(child: _VegOnlyToggle()),
         menu.when(
           loading: () => const SliverToBoxAdapter(child: _MenuLoading()),
@@ -121,8 +123,63 @@ class _MenuSection extends StatelessWidget {
               item: item,
               restaurantId: restaurant.id,
               restaurantName: restaurant.name,
+              enabled: restaurant.acceptingOrders,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Shown under the vitals when the kitchen has paused orders. It explains why
+/// every ADD below it is greyed out — without it, a disabled button is just a
+/// bug the customer can see.
+class _ClosedBanner extends StatelessWidget {
+  const _ClosedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ZopiqSpacing.pageGutter,
+        ZopiqSpacing.lg,
+        ZopiqSpacing.pageGutter,
+        0,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(ZopiqSpacing.md),
+        decoration: BoxDecoration(
+          color: zc.nonVeg.withValues(alpha: 0.10),
+          borderRadius: ZopiqRadii.rMd,
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(Icons.no_meals_rounded, color: zc.nonVeg, size: 22),
+            const SizedBox(width: ZopiqSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Closed for now',
+                    style: t.titleSmall?.copyWith(
+                      color: zc.nonVeg,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    'This restaurant has paused orders. You can browse the '
+                    'menu, but you can\'t order right now.',
+                    style: t.bodySmall?.copyWith(color: zc.textMuted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

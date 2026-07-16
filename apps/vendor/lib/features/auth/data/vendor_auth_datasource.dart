@@ -31,6 +31,12 @@ abstract interface class VendorAuthDataSource {
   /// someone who is not staff.
   Future<Vendor?> restoreSession();
 
+  /// Open or close the kitchen. Writes `restaurants.accepting_orders` for the
+  /// caller's own restaurant through an RPC — never a direct table write, which
+  /// RLS could not stop from reaching another column. Throws on failure so the
+  /// controller can put the switch back.
+  Future<void> setAcceptingOrders(bool accepting);
+
   Future<void> signOut();
 }
 
@@ -84,6 +90,12 @@ class VendorAuthSupabaseDataSource implements VendorAuthDataSource {
   }
 
   @override
+  Future<void> setAcceptingOrders(bool accepting) => _client.rpc<void>(
+    'set_accepting_orders',
+    params: <String, dynamic>{'p_accepting': accepting},
+  );
+
+  @override
   Future<void> signOut() => _client.auth.signOut();
 
   /// Two round trips, because there is no honest way to make it one.
@@ -106,7 +118,7 @@ class VendorAuthSupabaseDataSource implements VendorAuthDataSource {
 
     final Map<String, dynamic>? row = await _client
         .from('restaurants')
-        .select('name')
+        .select('name, accepting_orders')
         .eq('id', restaurantId)
         .maybeSingle();
 
@@ -117,6 +129,10 @@ class VendorAuthSupabaseDataSource implements VendorAuthDataSource {
       // a staff row without a restaurant cannot exist. If the read comes back
       // empty anyway, the id is still the truth and the name is decoration.
       restaurantName: row?['name'] as String? ?? 'Your restaurant',
+      // A missing read defaults to open — the queue is the safe place to fail:
+      // better a kitchen that thinks it is open and refuses at `place_order` than
+      // one shown closed when it is not. The database is the truth either way.
+      acceptingOrders: row?['accepting_orders'] as bool? ?? true,
     );
   }
 }

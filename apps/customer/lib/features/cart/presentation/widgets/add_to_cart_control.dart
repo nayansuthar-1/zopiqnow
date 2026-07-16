@@ -12,6 +12,7 @@ class AddToCartControl extends StatelessWidget {
     required this.onIncrement,
     required this.onDecrement,
     this.width = 104,
+    this.enabled = true,
     super.key,
   });
 
@@ -21,12 +22,17 @@ class AddToCartControl extends StatelessWidget {
   final VoidCallback onDecrement;
   final double width;
 
+  /// Whether the control accepts taps. False when the restaurant has stopped
+  /// taking orders: the control is greyed and inert, because an ADD that only
+  /// fails at checkout is a worse answer than one that plainly cannot be pressed.
+  final bool enabled;
+
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
     final Color surface = Theme.of(context).colorScheme.surface;
 
-    return SizedBox(
+    final Widget control = SizedBox(
       width: width,
       height: 38,
       child: quantity == 0
@@ -37,6 +43,12 @@ class AddToCartControl extends StatelessWidget {
               onIncrement: onIncrement,
               onDecrement: onDecrement,
             ),
+    );
+
+    if (enabled) return control;
+    return Opacity(
+      opacity: 0.4,
+      child: IgnorePointer(child: control),
     );
   }
 }

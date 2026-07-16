@@ -17,12 +17,17 @@ class MenuItemTile extends ConsumerWidget {
     required this.item,
     required this.restaurantId,
     required this.restaurantName,
+    this.enabled = true,
     super.key,
   });
 
   final MenuItem item;
   final String restaurantId;
   final String restaurantName;
+
+  /// Whether this dish can be added. False when the restaurant is closed — the
+  /// ADD control is inert, though the real refusal lives in `place_order`.
+  final bool enabled;
 
   Future<void> _add(BuildContext context, WidgetRef ref) async {
     final CartNotifier cart = ref.read(cartProvider.notifier);
@@ -108,6 +113,7 @@ class MenuItemTile extends ConsumerWidget {
           _ItemArtAndControl(
             item: item,
             quantity: quantity,
+            enabled: enabled,
             onAdd: () => _add(context, ref),
             onIncrement: () =>
                 ref.read(cartProvider.notifier).increment(item.id),
@@ -124,6 +130,7 @@ class _ItemArtAndControl extends StatelessWidget {
   const _ItemArtAndControl({
     required this.item,
     required this.quantity,
+    required this.enabled,
     required this.onAdd,
     required this.onIncrement,
     required this.onDecrement,
@@ -131,6 +138,7 @@ class _ItemArtAndControl extends StatelessWidget {
 
   final MenuItem item;
   final int quantity;
+  final bool enabled;
   final VoidCallback onAdd;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
@@ -170,6 +178,7 @@ class _ItemArtAndControl extends StatelessWidget {
             right: 7,
             child: AddToCartControl(
               quantity: quantity,
+              enabled: enabled,
               onAdd: onAdd,
               onIncrement: onIncrement,
               onDecrement: onDecrement,
