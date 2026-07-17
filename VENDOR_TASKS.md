@@ -90,15 +90,26 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
 
 **Phase 2 is complete.**
 
-## Phase 3 — Menu & availability  ⬜
+## Phase 3 — Menu & availability  🟡 IN PROGRESS
 
-- [ ] Categories: create/edit/delete/reorder/enable-disable (`ReorderableListView`)
-- [ ] Item extras: prep time, discounted price, bestseller toggle, food type, out-of-stock reason
-- [ ] Variants (Half/Full, sizes) and add-on groups (min/max/required)
-- [ ] Quick out-of-stock without opening the editor
+**Slice 1 — Categories management — DONE (migration `0016`):**
+- [x] Sections screen (`ReorderableListView`): drag to reorder, rename, enable/
+      disable a whole section. Reached from the Menu app bar (swap-vert), pushed
+      over the Menu tab like the profile editor. Optimistic with revert-on-refusal.
+- [x] Migration `0016`: `menu_items.category_available` (default true) + customer
+      read RLS widened to `is_available and category_available` — non-lossy
+      (per-dish `is_available` untouched), zero customer-app code change (the
+      customer leans entirely on the RLS). Reorder stamps `category_rank`, rename
+      rewrites `category` across the section, both via the existing 0010 update grant.
+
+**Remaining Phase 3 slices:**
+- [ ] Item merchandising extras: bestseller toggle, discounted price, out-of-stock
+      reason, per-item prep time (adds columns to `menu_items` — customer reads them)
+- [ ] Variants (Half/Full, sizes) and add-on groups (min/max/required) — net-new tables
+- [ ] Quick out-of-stock without opening the editor  *(already exists: the dish availability toggle)*
 - [ ] Item availability schedules (breakfast/lunch/dinner)
-- [ ] Restaurant hours + pause-with-reason
-- **Backend:** migrations `0015` (menu structure), `0016` (restaurant ops/hours).
+- [ ] Restaurant hours + pause-with-reason (kitchen open/close exists via `0011`)
+- **Backend:** further migrations `0017`+ (item extras, variants/add-ons, schedules, hours).
 - **Deps:** none.
 
 ## Phase 4 — Dashboard / home  ⬜
@@ -161,3 +172,8 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
 - **2026-07-17** — Phase 2 leftovers: migration `0015` (`ready_by` + prep-time param);
   prep-time sheet on accept + `Ready in Xm`/`Over by Xm` countdown chip; History `Rejected`
   chip; guard/offline audit (no change needed). Phase 2 complete.
+- **2026-07-17** — Phase 3 Slice 1 (Categories management): new Sections screen —
+  reorder (drag), rename, enable/disable a whole section — reached from the Menu app
+  bar, optimistic with revert-on-refusal. Migration `0016` applied: `category_available`
+  column (default true) + customer read RLS widened to `is_available and category_available`
+  (non-lossy, zero customer-app change). Vendor 37/37 green, analyze clean.

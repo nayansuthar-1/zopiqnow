@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_vendor/app/router.dart';
 import 'package:zopiq_vendor/features/menu/domain/entities/vendor_dish.dart';
 import 'package:zopiq_vendor/features/menu/presentation/providers/menu_providers.dart';
 import 'package:zopiq_vendor/features/menu/presentation/widgets/dish_editor.dart';
@@ -20,8 +22,22 @@ class MenuPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<VendorMenuSection>> menu = ref.watch(menuProvider);
 
+    // The section manager is only reachable once there is a section to manage —
+    // an empty menu has nothing to reorder.
+    final bool hasSections = menu.valueOrNull?.isNotEmpty ?? false;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Menu')),
+      appBar: AppBar(
+        title: const Text('Menu'),
+        actions: <Widget>[
+          if (hasSections)
+            IconButton(
+              icon: const Icon(Icons.swap_vert_rounded),
+              tooltip: 'Sections',
+              onPressed: () => context.pushNamed(Routes.menuCategories),
+            ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showDishEditor(context),
         icon: const Icon(Icons.add_rounded),

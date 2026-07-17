@@ -8,6 +8,7 @@ import 'package:zopiq_vendor/features/auth/presentation/pages/otp_page.dart';
 import 'package:zopiq_vendor/features/auth/presentation/pages/sign_in_page.dart';
 import 'package:zopiq_vendor/features/auth/presentation/pages/splash_page.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
+import 'package:zopiq_vendor/features/menu/presentation/pages/manage_categories_page.dart';
 import 'package:zopiq_vendor/features/menu/presentation/pages/menu_page.dart';
 import 'package:zopiq_vendor/features/orders/presentation/pages/history_page.dart';
 import 'package:zopiq_vendor/features/orders/presentation/pages/queue_page.dart';
@@ -18,6 +19,7 @@ abstract final class Routes {
   static const String queue = 'queue';
   static const String history = 'history';
   static const String menu = 'menu';
+  static const String menuCategories = 'menuCategories';
   static const String profile = 'profile';
   static const String profileEdit = 'profileEdit';
   static const String splash = 'splash';
@@ -124,6 +126,15 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                 path: '/menu',
                 name: Routes.menu,
                 builder: (_, _) => const MenuPage(),
+                routes: <RouteBase>[
+                  // Pushed over the menu tab, like the profile editor: a back
+                  // button, and the bottom nav stays put.
+                  GoRoute(
+                    path: 'categories',
+                    name: Routes.menuCategories,
+                    builder: (_, _) => const ManageCategoriesPage(),
+                  ),
+                ],
               ),
             ],
           ),

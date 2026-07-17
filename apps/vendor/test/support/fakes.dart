@@ -205,6 +205,10 @@ class FakeVendorMenuDataSource implements VendorMenuDataSource {
 
   List<VendorDish> _dishes;
 
+  /// Which sections are switched off. Absent means on — the same default the
+  /// `category_available` column carries.
+  final Map<String, bool> _categoryAvailable = <String, bool>{};
+
   /// Set to make the next add/edit/toggle fail with this sentence.
   String? writeFailure;
 
@@ -215,8 +219,13 @@ class FakeVendorMenuDataSource implements VendorMenuDataSource {
 
   List<VendorDish> get dishes => List<VendorDish>.unmodifiable(_dishes);
 
+  /// Whether a section is on the customer menu, as the store last recorded it.
+  bool categoryAvailable(String category) => _categoryAvailable[category] ?? true;
+
   @override
   Future<List<VendorMenuSection>> fetchMenu(String restaurantId) async {
+    // Insertion-ordered, like the real one: a section appears where its first
+    // dish sits, so reordering the dish list reorders the sections.
     final Map<String, List<VendorDish>> sections =
         <String, List<VendorDish>>{};
     for (final VendorDish d in _dishes) {
@@ -224,8 +233,11 @@ class FakeVendorMenuDataSource implements VendorMenuDataSource {
     }
     return sections.entries
         .map(
-          (MapEntry<String, List<VendorDish>> e) =>
-              VendorMenuSection(title: e.key, dishes: e.value),
+          (MapEntry<String, List<VendorDish>> e) => VendorMenuSection(
+            title: e.key,
+            dishes: e.value,
+            isAvailable: categoryAvailable(e.key),
+          ),
         )
         .toList(growable: false);
   }
@@ -276,6 +288,47 @@ class FakeVendorMenuDataSource implements VendorMenuDataSource {
     _dishes = _dishes
         .where((VendorDish d) => d.id != dishId)
         .toList(growable: false);
+  }
+
+  @override
+  Future<void> reorderCategories({
+    required String restaurantId,
+    required List<String> orderedTitles,
+  }) async {
+    if (writeFailure != null) throw MenuWriteFailure(writeFailure!);
+    // Regroup the flat list into the new section order, keeping each section's
+    // own dishes in place — the same way stamping category_rank re-sorts it.
+    _dishes = <VendorDish>[
+      for (final String title in orderedTitles)
+        ..._dishes.where((VendorDish d) => d.category == title),
+    ];
+  }
+
+  @override
+  Future<void> renameCategory({
+    required String restaurantId,
+    required String from,
+    required String to,
+  }) async {
+    if (writeFailure != null) throw MenuWriteFailure(writeFailure!);
+    _dishes = _dishes
+        .map(
+          (VendorDish d) => d.category == from ? d.copyWith(category: to) : d,
+        )
+        .toList(growable: false);
+    if (_categoryAvailable.containsKey(from)) {
+      _categoryAvailable[to] = _categoryAvailable.remove(from)!;
+    }
+  }
+
+  @override
+  Future<void> setCategoryAvailability({
+    required String restaurantId,
+    required String category,
+    required bool isAvailable,
+  }) async {
+    if (writeFailure != null) throw MenuWriteFailure(writeFailure!);
+    _categoryAvailable[category] = isAvailable;
   }
 }
 

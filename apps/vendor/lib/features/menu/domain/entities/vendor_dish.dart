@@ -91,8 +91,18 @@ class VendorDish {
 /// it, so no widget above has to understand `category_rank`.
 @immutable
 class VendorMenuSection {
-  const VendorMenuSection({required this.title, required this.dishes});
+  const VendorMenuSection({
+    required this.title,
+    required this.dishes,
+    this.isAvailable = true,
+  });
 
   final String title;
   final List<VendorDish> dishes;
+
+  /// Whether the whole section is on the customer menu. A section switched off
+  /// hides all its dishes at once without touching each dish's own sold-out
+  /// state — the `category_available` column (migration 0016), which every row
+  /// of the section shares.
+  final bool isAvailable;
 }

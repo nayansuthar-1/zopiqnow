@@ -24,6 +24,32 @@ abstract interface class VendorMenuDataSource {
   /// Remove a dish for good. Throws [MenuItemInUseFailure] when it appears on a
   /// past order and the database refuses to erase it.
   Future<void> deleteDish(String dishId);
+
+  /// Set the menu's section order. Every dish in `orderedTitles[i]` takes rank
+  /// `i`, so the whole menu re-sorts to the order the vendor dragged the sections
+  /// into. `orderedTitles` is every section, in the new order.
+  Future<void> reorderCategories({
+    required String restaurantId,
+    required List<String> orderedTitles,
+  });
+
+  /// Rename a section — change the `category` text across every dish in it. The
+  /// caller guarantees `to` is non-empty and not already another section's name;
+  /// renaming onto an existing section would silently merge two sections whose
+  /// ranks differ, and the screen prevents that before it gets here.
+  Future<void> renameCategory({
+    required String restaurantId,
+    required String from,
+    required String to,
+  });
+
+  /// Turn a whole section on or off — the `category_available` switch, written
+  /// across every dish in the section at once (migration 0016).
+  Future<void> setCategoryAvailability({
+    required String restaurantId,
+    required String category,
+    required bool isAvailable,
+  });
 }
 
 /// A dish that cannot be deleted because an order still points at it. The FK
@@ -60,7 +86,7 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
   Future<List<VendorMenuSection>> fetchMenu(String restaurantId) async {
     final List<Map<String, dynamic>> rows = await _db
         .from('menu_items')
-        .select('$_columns, category_rank, item_rank')
+        .select('$_columns, category_available, category_rank, item_rank')
         .eq('restaurant_id', restaurantId)
         // The vendor's merchandising order. `ascending: true` is load-bearing:
         // postgrest-dart's `order()` defaults to DESCENDING (the same trap the
@@ -69,19 +95,27 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
         .order('item_rank', ascending: true);
 
     // Insertion-ordered: a section appears in the position of its first dish,
-    // which — rows already sorted by rank — is the vendor's category order.
+    // which — rows already sorted by rank — is the vendor's category order. Its
+    // on/off state is shared by every row, so the first one to arrive settles it.
     final Map<String, List<VendorDish>> sections =
         <String, List<VendorDish>>{};
+    final Map<String, bool> available = <String, bool>{};
     for (final Map<String, dynamic> row in rows) {
-      sections
-          .putIfAbsent(row['category'] as String, () => <VendorDish>[])
-          .add(_toDish(row));
+      final String category = row['category'] as String;
+      sections.putIfAbsent(category, () => <VendorDish>[]).add(_toDish(row));
+      available.putIfAbsent(
+        category,
+        () => row['category_available'] as bool,
+      );
     }
 
     return sections.entries
         .map(
-          (MapEntry<String, List<VendorDish>> e) =>
-              VendorMenuSection(title: e.key, dishes: e.value),
+          (MapEntry<String, List<VendorDish>> e) => VendorMenuSection(
+            title: e.key,
+            dishes: e.value,
+            isAvailable: available[e.key] ?? true,
+          ),
         )
         .toList(growable: false);
   }
@@ -128,6 +162,10 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
               ...fields,
               'restaurant_id': restaurantId,
               'is_available': true,
+              // A dish added to a section that is currently switched off stays
+              // off with it — otherwise it would be the one item showing under a
+              // heading the vendor took down.
+              'category_available': place.categoryAvailable,
               'category_rank': place.categoryRank,
               'item_rank': place.nextItemRank,
             })
@@ -136,15 +174,17 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
         return _toDish(row);
       }
 
-      // On edit, only `category_rank` is touched, and only so a dish moved to a
-      // different section adopts that section's rank — otherwise it would keep
-      // its old one and split the section in two on the customer's menu (which
-      // groups by category but orders by rank). `item_rank` is left alone, so
-      // editing a price does not send the dish to the bottom of its own list.
+      // On edit, `category_rank` and `category_available` follow the section, and
+      // only so a dish *moved* to a different section adopts that section's rank
+      // and on/off state — otherwise it would keep its old ones and split the
+      // section in two on the customer's menu (which groups by category but
+      // orders by rank). `item_rank` is left alone, so editing a price does not
+      // send the dish to the bottom of its own list.
       final Map<String, dynamic> row = await _db
           .from('menu_items')
           .update(<String, dynamic>{
             ...fields,
+            'category_available': place.categoryAvailable,
             'category_rank': place.categoryRank,
           })
           .eq('id', dish.id)
@@ -166,23 +206,81 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
     }
   }
 
+  @override
+  Future<void> reorderCategories({
+    required String restaurantId,
+    required List<String> orderedTitles,
+  }) async {
+    try {
+      // One statement per section — a handful, not a table scan. Each stamps the
+      // section's new position onto every dish in it, which is how the flat list
+      // re-sorts to the order the vendor dragged the sections into.
+      for (int rank = 0; rank < orderedTitles.length; rank++) {
+        await _db
+            .from('menu_items')
+            .update(<String, dynamic>{'category_rank': rank})
+            .eq('restaurant_id', restaurantId)
+            .eq('category', orderedTitles[rank]);
+      }
+    } on PostgrestException catch (e) {
+      throw MenuWriteFailure(e.message);
+    }
+  }
+
+  @override
+  Future<void> renameCategory({
+    required String restaurantId,
+    required String from,
+    required String to,
+  }) async {
+    try {
+      await _db
+          .from('menu_items')
+          .update(<String, dynamic>{'category': to})
+          .eq('restaurant_id', restaurantId)
+          .eq('category', from);
+    } on PostgrestException catch (e) {
+      throw MenuWriteFailure(e.message);
+    }
+  }
+
+  @override
+  Future<void> setCategoryAvailability({
+    required String restaurantId,
+    required String category,
+    required bool isAvailable,
+  }) async {
+    try {
+      await _db
+          .from('menu_items')
+          .update(<String, dynamic>{'category_available': isAvailable})
+          .eq('restaurant_id', restaurantId)
+          .eq('category', category);
+    } on PostgrestException catch (e) {
+      throw MenuWriteFailure(e.message);
+    }
+  }
+
   /// Where a dish belongs in the menu ordering, for a given section. An existing
-  /// section keeps its `category_rank` and the dish appends after its last item;
-  /// a brand-new section is ranked after every existing one.
+  /// section keeps its `category_rank` and its on/off state, and the dish appends
+  /// after its last item; a brand-new section is ranked after every existing one
+  /// and starts on.
   Future<_Placement> _placementFor(String restaurantId, String category) async {
     final List<Map<String, dynamic>> rows = await _db
         .from('menu_items')
-        .select('category, category_rank, item_rank')
+        .select('category, category_available, category_rank, item_rank')
         .eq('restaurant_id', restaurantId);
 
     int maxCategoryRank = -1;
     int? categoryRank;
+    bool categoryAvailable = true;
     int maxItemRank = -1;
     for (final Map<String, dynamic> row in rows) {
       final int cRank = (row['category_rank'] as num).toInt();
       if (cRank > maxCategoryRank) maxCategoryRank = cRank;
       if (row['category'] == category) {
         categoryRank = cRank;
+        categoryAvailable = row['category_available'] as bool;
         final int iRank = (row['item_rank'] as num).toInt();
         if (iRank > maxItemRank) maxItemRank = iRank;
       }
@@ -190,6 +288,7 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
 
     return _Placement(
       categoryRank: categoryRank ?? maxCategoryRank + 1,
+      categoryAvailable: categoryAvailable,
       nextItemRank: maxItemRank + 1,
     );
   }
@@ -207,8 +306,13 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
 }
 
 class _Placement {
-  const _Placement({required this.categoryRank, required this.nextItemRank});
+  const _Placement({
+    required this.categoryRank,
+    required this.categoryAvailable,
+    required this.nextItemRank,
+  });
 
   final int categoryRank;
+  final bool categoryAvailable;
   final int nextItemRank;
 }
