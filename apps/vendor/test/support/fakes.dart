@@ -130,6 +130,7 @@ class FakeVendorOrderDataSource implements VendorOrderDataSource {
                   discount: o.discount,
                   total: o.total,
                   paymentMethod: o.paymentMethod,
+                  etaMinutes: o.etaMinutes,
                 )
               : o,
         )
@@ -151,6 +152,7 @@ VendorOrder order({
   int deliveryFee = 0,
   int taxes = 0,
   int discount = 0,
+  int etaMinutes = 30,
 }) => VendorOrder(
   id: id,
   status: status,
@@ -163,6 +165,7 @@ VendorOrder order({
   discount: discount,
   total: total,
   paymentMethod: paymentMethod,
+  etaMinutes: etaMinutes,
 );
 
 VendorDish dish({

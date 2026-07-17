@@ -63,16 +63,20 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
 - [x] Tests: 5 new History tests; `flutter analyze` clean, 29/29 green
 - No migration, no new dep, no customer-app coordination.
 
-## Phase 2 — Real-time order management  ⬜ NEXT
+## Phase 2 — Real-time order management  🟡 IN PROGRESS
 
-- [ ] New statuses: `ready_for_pickup`, `rejected` (distinct from cancelled), `refunded`
+**Slice A (vendor-only, no migration) — DONE:**
+- [x] `VendorOrder.etaMinutes` (existing `orders.eta_minutes` column) + `isLate`
+- [x] Delayed-order flag on live tickets — clean red `Late · Xm` pill, updates on the 30s clock
+
+**Slice B (breaking — needs review before applying):**
+- [ ] New statuses: `ready_for_pickup`, `rejected` (distinct from cancelled), later `refunded`
 - [ ] Reject-with-reason flow on new orders
-- [ ] Prep-time confirm + countdown timer on accepted/preparing tickets
-- [ ] Delayed-order visual flags (age past threshold)
+- [ ] Prep-time confirm + countdown (needs a stored prep target → column)
 - [ ] Duplicate-action guards audit; queue offline/retry polish
 - **Backend:** migration `0014` — extend `orders.status` check + `set_order_status`
-  transitions; optionally `customer_name` / `special_instructions` on `orders`
-  (needs `place_order` + customer-app change — review diff with user first).
+  transitions. **Blocked on:** customer app's `OrderStatus.fromWire` throws on unknown
+  values (`customer_order.dart:31`) — must be made tolerant FIRST, then migrate.
 - **Deps:** none. **Breaking:** customer app must understand new statuses — coordinate.
 
 ## Phase 3 — Menu & availability  ⬜
@@ -136,3 +140,6 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
 - **2026-07-17** — Analysis + phased plan approved. Phase 1 completed and pushed
   (`805f66e`): History rebuilt with filters/search/summary/detail sheet; `VendorOrder`
   widened; reusable widgets + `formatRupees` added. Analyze clean, 29/29 tests green.
+- **2026-07-17** — Phase 2 Slice A: `etaMinutes` + `isLate` on `VendorOrder`; clean
+  `Late · Xm` pill on overdue live tickets. No migration. Analyze clean, 30/30 green.
+  Slice B (new statuses) pending — needs customer-app tolerance + `0014`, review first.

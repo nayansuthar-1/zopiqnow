@@ -69,6 +69,29 @@ void main() {
       expect(find.text('Accept order'), findsOneWidget);
     });
 
+    testWidgets('an order past its promised window is flagged late', (
+      WidgetTester tester,
+    ) async {
+      _tallSurface(tester);
+      final FakeVendorOrderDataSource orders = FakeVendorOrderDataSource(
+        orders: <VendorOrder>[
+          // 45 minutes old against a 30-minute quote: the window has elapsed and
+          // the food is still in the kitchen.
+          order(
+            status: OrderStatus.preparing,
+            age: const Duration(minutes: 45),
+            etaMinutes: 30,
+          ),
+        ],
+      );
+      addTearDown(orders.dispose);
+
+      await tester.pumpWidget(_app(orders: orders));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Late'), findsOneWidget);
+    });
+
     testWidgets('accepting an order moves it on, and the button with it', (
       WidgetTester tester,
     ) async {

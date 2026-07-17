@@ -65,7 +65,8 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
   /// it needs no list; `fetchHistory`'s explicit `.select()` does.
   static const String _orderColumns =
       'id, status, created_at, user_phone, delivery_to, '
-      'subtotal, delivery_fee, taxes, discount, total, payment_method';
+      'subtotal, delivery_fee, taxes, discount, total, payment_method, '
+      'eta_minutes';
 
   @override
   Stream<List<VendorOrder>> watchOrders(String restaurantId) {
@@ -168,5 +169,6 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
     discount: (row['discount'] as num).toInt(),
     total: (row['total'] as num).toInt(),
     paymentMethod: PaymentMethod.fromWire(row['payment_method'] as String),
+    etaMinutes: (row['eta_minutes'] as num).toInt(),
   );
 }

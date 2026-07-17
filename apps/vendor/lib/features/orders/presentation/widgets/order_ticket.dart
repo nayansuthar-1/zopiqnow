@@ -77,6 +77,7 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
       ),
     );
     final bool isNew = order.status == OrderStatus.placed;
+    final bool isLate = order.isLate;
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -97,13 +98,19 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
                 ),
                 // The age, not the clock time. Nobody in a kitchen converts
                 // "7:42 pm" into "that one has been sitting for twenty minutes".
-                Text(
-                  formatAge(order.age),
-                  style: t.bodySmall?.copyWith(
-                    color: isNew ? zc.primary : zc.textMuted,
-                    fontWeight: isNew ? FontWeight.w700 : null,
+                // Once it is past the quoted window it stops being a timestamp
+                // and becomes a warning: red, labelled, the loudest thing on the
+                // ticket after the id.
+                if (isLate)
+                  _LatePill(label: formatAge(order.age))
+                else
+                  Text(
+                    formatAge(order.age),
+                    style: t.bodySmall?.copyWith(
+                      color: isNew ? zc.primary : zc.textMuted,
+                      fontWeight: isNew ? FontWeight.w700 : null,
+                    ),
                   ),
-                ),
               ],
             ),
             const SizedBox(height: ZopiqSpacing.md),
@@ -170,6 +177,46 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The overdue marker: a compact red pill reading `Late · 34 min`. A tint, not a
+/// glow — it has to catch the eye across a room without turning the ticket into a
+/// warning light.
+class _LatePill extends StatelessWidget {
+  const _LatePill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: ZopiqSpacing.sm,
+        vertical: ZopiqSpacing.xxs,
+      ),
+      decoration: BoxDecoration(
+        color: zc.nonVeg.withValues(alpha: 0.12),
+        borderRadius: ZopiqRadii.rSm,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(Icons.schedule_rounded, size: 14, color: zc.nonVeg),
+          const SizedBox(width: ZopiqSpacing.xxs),
+          Text(
+            'Late · $label',
+            style: t.labelMedium?.copyWith(
+              color: zc.nonVeg,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

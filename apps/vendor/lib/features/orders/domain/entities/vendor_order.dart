@@ -131,6 +131,7 @@ class VendorOrder {
     required this.discount,
     required this.total,
     required this.paymentMethod,
+    required this.etaMinutes,
   });
 
   final String id;
@@ -161,7 +162,18 @@ class VendorOrder {
 
   final PaymentMethod paymentMethod;
 
+  /// The delivery time the customer was quoted at checkout — prep plus the ride,
+  /// as `place_order` committed to it. The kitchen's yardstick for "late": if
+  /// this window has elapsed and the order is still open, the food is holding up
+  /// a promise someone is watching a screen for.
+  final int etaMinutes;
+
   /// How long this ticket has been sitting there. The number a kitchen is
   /// actually judged on, and the reason the queue sorts oldest-first.
   Duration get age => DateTime.now().difference(placedAt);
+
+  /// Still open, and past the window the customer was promised. Not a hard error
+  /// — an order can run a little late — but the one thing the ticket should say
+  /// loudly, because a late ticket is a customer about to call.
+  bool get isLate => status.isOpen && age.inMinutes > etaMinutes;
 }
