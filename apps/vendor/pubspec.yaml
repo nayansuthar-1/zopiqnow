@@ -39,6 +39,11 @@ dependencies:
   image_picker: 1.1.2
   http: 1.6.0
 
+  # Charts on the dashboard and earnings screens (approved Rule-3 change,
+  # 2026-07-17, Phase 4/5). Pure Dart, no platform channels; its only transitive
+  # dependency is `equatable`. Pinned exactly, like everything else here.
+  fl_chart: 1.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -9,6 +9,7 @@ import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/pages/queue_page.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
+import 'package:zopiq_vendor/features/payments/presentation/providers/payments_providers.dart';
 
 import '../../support/fakes.dart';
 
@@ -21,6 +22,7 @@ Widget _app({
       auth ?? FakeVendorAuthDataSource(signedInAs: testVendor),
     ),
     vendorOrderDataSourceProvider.overrideWithValue(orders),
+    paymentsDataSourceProvider.overrideWithValue(FakePaymentsDataSource()),
     // The age clock is a `Stream.periodic`, which never completes — a pending
     // timer the test binding rightly refuses to end a test on. Ages are computed
     // at build from `placedAt`, so a clock that never ticks changes nothing here
@@ -48,6 +50,9 @@ void main() {
       addTearDown(orders.dispose);
 
       await tester.pumpWidget(_app(orders: orders));
+      await tester.pumpAndSettle();
+      // The app lands on Home now; the queue is the Orders tab.
+      await tester.tap(find.text('Orders'));
       await tester.pumpAndSettle();
 
       expect(find.byType(QueuePage), findsOneWidget);
@@ -88,6 +93,9 @@ void main() {
 
       await tester.pumpWidget(_app(orders: orders));
       await tester.pumpAndSettle();
+      // The app lands on Home now; the queue is the Orders tab.
+      await tester.tap(find.text('Orders'));
+      await tester.pumpAndSettle();
 
       expect(find.textContaining('Late'), findsOneWidget);
     });
@@ -102,6 +110,9 @@ void main() {
       addTearDown(orders.dispose);
 
       await tester.pumpWidget(_app(orders: orders));
+      await tester.pumpAndSettle();
+      // The app lands on Home now; the queue is the Orders tab.
+      await tester.tap(find.text('Orders'));
       await tester.pumpAndSettle();
 
       // Accepting a new order asks for a prep time first.
@@ -132,6 +143,9 @@ void main() {
 
       await tester.pumpWidget(_app(orders: orders));
       await tester.pumpAndSettle();
+      // The app lands on Home now; the queue is the Orders tab.
+      await tester.tap(find.text('Orders'));
+      await tester.pumpAndSettle();
 
       // A new order is declined, not cancelled.
       await tester.tap(find.text('Reject'));
@@ -159,6 +173,9 @@ void main() {
 
       await tester.pumpWidget(_app(orders: orders));
       await tester.pumpAndSettle();
+      // The app lands on Home now; the queue is the Orders tab.
+      await tester.tap(find.text('Orders'));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Mark delivered'));
       await tester.pumpAndSettle();
@@ -177,6 +194,9 @@ void main() {
       addTearDown(orders.dispose);
 
       await tester.pumpWidget(_app(orders: orders));
+      await tester.pumpAndSettle();
+      // The app lands on Home now; the queue is the Orders tab.
+      await tester.tap(find.text('Orders'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Accept order'));
@@ -208,6 +228,9 @@ void main() {
 
       await tester.pumpWidget(_app(orders: orders));
       await tester.pumpAndSettle();
+      // The app lands on Home now; the queue is the Orders tab.
+      await tester.tap(find.text('Orders'));
+      await tester.pumpAndSettle();
 
       // The food has left the building. That is a refund conversation, not a
       // status change — and `set_order_status` would refuse it anyway.
@@ -225,6 +248,9 @@ void main() {
       addTearDown(orders.dispose);
 
       await tester.pumpWidget(_app(orders: orders));
+      await tester.pumpAndSettle();
+      // The app lands on Home now; the queue is the Orders tab.
+      await tester.tap(find.text('Orders'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Collect'), findsNothing);
@@ -244,6 +270,8 @@ void main() {
       );
 
       await tester.pumpWidget(_app(orders: orders, auth: auth));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Orders'));
       await tester.pumpAndSettle();
 
       // Open to begin with — the seeded vendor is accepting orders.
@@ -268,6 +296,8 @@ void main() {
       )..failAcceptingOrders = true;
 
       await tester.pumpWidget(_app(orders: orders, auth: auth));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Orders'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byType(Switch));

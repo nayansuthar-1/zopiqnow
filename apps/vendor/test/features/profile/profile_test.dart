@@ -6,6 +6,7 @@ import 'package:zopiq_vendor/app/vendor_app.dart';
 import 'package:zopiq_vendor/core/images/image_uploader.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
+import 'package:zopiq_vendor/features/payments/presentation/providers/payments_providers.dart';
 import 'package:zopiq_vendor/features/profile/presentation/pages/profile_edit_page.dart';
 import 'package:zopiq_vendor/features/profile/presentation/pages/profile_page.dart';
 import 'package:zopiq_vendor/features/profile/presentation/providers/profile_providers.dart';
@@ -24,6 +25,7 @@ Widget _app({
       FakeVendorOrderDataSource(),
     ),
     vendorRestaurantDataSourceProvider.overrideWithValue(restaurant),
+    paymentsDataSourceProvider.overrideWithValue(FakePaymentsDataSource()),
     imageUploaderProvider.overrideWithValue(uploader ?? FakeImageUploader()),
     clockProvider.overrideWith((Ref ref) => const Stream<DateTime>.empty()),
   ],
@@ -37,7 +39,10 @@ void _tallSurface(WidgetTester tester) {
 }
 
 Future<void> _openProfile(WidgetTester tester) async {
-  await tester.tap(find.text('Profile'));
+  // The profile now lives under the More hub, not on its own tab.
+  await tester.tap(find.text('More'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Restaurant profile'));
   await tester.pumpAndSettle();
 }
 
@@ -54,7 +59,14 @@ void main() {
     await _openProfile(tester);
 
     expect(find.byType(ProfilePage), findsOneWidget);
-    expect(find.text('Paradise Biryani'), findsOneWidget);
+    // Scoped to the profile: the More hub beneath it also shows the name.
+    expect(
+      find.descendant(
+        of: find.byType(ProfilePage),
+        matching: find.text('Paradise Biryani'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('₹500'), findsOneWidget);
     expect(find.text('32 min'), findsOneWidget);
     // A cuisine chip, and the offer line.

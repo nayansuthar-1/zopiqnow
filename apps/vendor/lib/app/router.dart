@@ -8,18 +8,26 @@ import 'package:zopiq_vendor/features/auth/presentation/pages/otp_page.dart';
 import 'package:zopiq_vendor/features/auth/presentation/pages/sign_in_page.dart';
 import 'package:zopiq_vendor/features/auth/presentation/pages/splash_page.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
+import 'package:zopiq_vendor/features/dashboard/presentation/pages/home_page.dart';
 import 'package:zopiq_vendor/features/menu/presentation/pages/manage_categories_page.dart';
 import 'package:zopiq_vendor/features/menu/presentation/pages/menu_page.dart';
+import 'package:zopiq_vendor/features/more/presentation/pages/more_page.dart';
 import 'package:zopiq_vendor/features/orders/presentation/pages/history_page.dart';
 import 'package:zopiq_vendor/features/orders/presentation/pages/queue_page.dart';
+import 'package:zopiq_vendor/features/payments/presentation/pages/payments_page.dart';
+import 'package:zopiq_vendor/features/payments/presentation/pages/settlement_detail_page.dart';
 import 'package:zopiq_vendor/features/profile/presentation/pages/profile_edit_page.dart';
 import 'package:zopiq_vendor/features/profile/presentation/pages/profile_page.dart';
 
 abstract final class Routes {
+  static const String home = 'home';
   static const String queue = 'queue';
   static const String history = 'history';
   static const String menu = 'menu';
   static const String menuCategories = 'menuCategories';
+  static const String more = 'more';
+  static const String payments = 'payments';
+  static const String settlementDetail = 'settlementDetail';
   static const String profile = 'profile';
   static const String profileEdit = 'profileEdit';
   static const String splash = 'splash';
@@ -28,7 +36,7 @@ abstract final class Routes {
   static const String notStaff = 'notStaff';
 }
 
-const String _ordersPath = '/orders';
+const String _homePath = '/home';
 const String _splashPath = '/splash';
 const String _loginPath = '/login';
 const String _notStaffPath = '/not-a-partner';
@@ -65,7 +73,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
-    initialLocation: _ordersPath,
+    initialLocation: _homePath,
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
       final VendorAuthState auth = ref.read(vendorAuthControllerProvider);
@@ -87,7 +95,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         // itself — see its class doc.
         AuthSignedIn() =>
           onAuthRoute || location == _splashPath || location == _notStaffPath
-              ? _ordersPath
+              ? _homePath
               : null,
       };
     },
@@ -102,21 +110,22 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
               StatefulNavigationShell navigationShell,
             ) => VendorShell(navigationShell: navigationShell),
         branches: <StatefulShellBranch>[
+          // Home — the day at a glance, and where a signed-in vendor lands.
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: _ordersPath,
-                name: Routes.queue,
-                builder: (_, _) => const QueuePage(),
+                path: _homePath,
+                name: Routes.home,
+                builder: (_, _) => const HomePage(),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: '/history',
-                name: Routes.history,
-                builder: (_, _) => const HistoryPage(),
+                path: '/orders',
+                name: Routes.queue,
+                builder: (_, _) => const QueuePage(),
               ),
             ],
           ),
@@ -141,16 +150,49 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: '/profile',
-                name: Routes.profile,
-                builder: (_, _) => const ProfilePage(),
+                path: '/history',
+                name: Routes.history,
+                builder: (_, _) => const HistoryPage(),
+              ),
+            ],
+          ),
+          // More — the hub for everything that isn't taking orders. The profile
+          // and payments live *inside* this branch, pushed over the hub, so each
+          // keeps a back button and the bottom nav stays put.
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/more',
+                name: Routes.more,
+                builder: (_, _) => const MorePage(),
                 routes: <RouteBase>[
-                  // Pushed over the profile tab, inside its branch — the form has
-                  // a back button and the bottom nav stays put.
                   GoRoute(
-                    path: 'edit',
-                    name: Routes.profileEdit,
-                    builder: (_, _) => const ProfileEditPage(),
+                    path: 'profile',
+                    name: Routes.profile,
+                    builder: (_, _) => const ProfilePage(),
+                    routes: <RouteBase>[
+                      GoRoute(
+                        path: 'edit',
+                        name: Routes.profileEdit,
+                        builder: (_, _) => const ProfileEditPage(),
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: 'payments',
+                    name: Routes.payments,
+                    builder: (_, _) => const PaymentsPage(),
+                    routes: <RouteBase>[
+                      GoRoute(
+                        path: 'settlement/:id',
+                        name: Routes.settlementDetail,
+                        builder: (BuildContext context, GoRouterState state) =>
+                            SettlementDetailPage(
+                          settlementId:
+                              int.parse(state.pathParameters['id']!),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

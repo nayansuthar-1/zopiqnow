@@ -7,6 +7,7 @@ import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/pages/history_page.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
+import 'package:zopiq_vendor/features/payments/presentation/providers/payments_providers.dart';
 import 'package:zopiq_vendor/features/profile/presentation/providers/profile_providers.dart';
 
 import '../../support/fakes.dart';
@@ -20,6 +21,7 @@ Widget _app({required FakeVendorOrderDataSource orders}) => ProviderScope(
     vendorRestaurantDataSourceProvider.overrideWithValue(
       FakeVendorRestaurantDataSource(),
     ),
+    paymentsDataSourceProvider.overrideWithValue(FakePaymentsDataSource()),
     clockProvider.overrideWith((Ref ref) => const Stream<DateTime>.empty()),
   ],
   child: const VendorApp(),
@@ -33,7 +35,9 @@ void _tallSurface(WidgetTester tester) {
 
 Future<void> _openHistory(WidgetTester tester) async {
   await tester.pumpAndSettle();
-  await tester.tap(find.text('History'));
+  // The nav tab, by its tooltip — the Home dashboard also has a "History"
+  // shortcut label, so a plain text finder would be ambiguous.
+  await tester.tap(find.byTooltip('History'));
   await tester.pumpAndSettle();
 }
 

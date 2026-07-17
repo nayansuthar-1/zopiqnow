@@ -7,6 +7,9 @@ import 'package:zopiq_vendor/features/menu/domain/entities/vendor_dish.dart';
 import 'package:zopiq_vendor/features/orders/data/vendor_order_datasource.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/core/images/image_uploader.dart';
+import 'package:zopiq_vendor/features/payments/data/payments_datasource.dart';
+import 'package:zopiq_vendor/features/payments/domain/entities/earnings_summary.dart';
+import 'package:zopiq_vendor/features/payments/domain/entities/settlement.dart';
 import 'package:zopiq_vendor/features/profile/data/vendor_restaurant_datasource.dart';
 import 'package:zopiq_vendor/features/profile/domain/entities/restaurant_profile.dart';
 
@@ -330,6 +333,43 @@ class FakeVendorMenuDataSource implements VendorMenuDataSource {
     if (writeFailure != null) throw MenuWriteFailure(writeFailure!);
     _categoryAvailable[category] = isAvailable;
   }
+}
+
+/// The money read side, in memory. Defaults to a kitchen with nothing earned
+/// yet, so the Home dashboard — always mounted first now — renders without
+/// reaching for Supabase. A test that cares about earnings passes its own.
+class FakePaymentsDataSource implements PaymentsDataSource {
+  FakePaymentsDataSource({
+    this.earnings,
+    this.settlements = const <Settlement>[],
+  });
+
+  final EarningsSummary? earnings;
+  final List<Settlement> settlements;
+
+  @override
+  Future<EarningsSummary> fetchEarnings({
+    required DateTime from,
+    required DateTime to,
+  }) async =>
+      earnings ??
+      EarningsSummary(
+        from: from,
+        to: to,
+        commissionBps: 2000,
+        orderCount: 0,
+        grossSales: 0,
+        commission: 0,
+        netEarnings: 0,
+        daily: const <DailyEarning>[],
+      );
+
+  @override
+  Future<List<Settlement>> fetchSettlements() async => settlements;
+
+  @override
+  Future<List<SettlementOrder>> fetchSettlementOrders(int settlementId) async =>
+      const <SettlementOrder>[];
 }
 
 const RestaurantProfile testProfile = RestaurantProfile(

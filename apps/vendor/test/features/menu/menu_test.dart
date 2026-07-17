@@ -9,6 +9,7 @@ import 'package:zopiq_vendor/features/menu/domain/entities/vendor_dish.dart';
 import 'package:zopiq_vendor/features/menu/presentation/pages/menu_page.dart';
 import 'package:zopiq_vendor/features/menu/presentation/providers/menu_providers.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
+import 'package:zopiq_vendor/features/payments/presentation/providers/payments_providers.dart';
 
 import '../../support/fakes.dart';
 
@@ -26,6 +27,7 @@ Widget _app({
     vendorOrderDataSourceProvider.overrideWithValue(
       FakeVendorOrderDataSource(),
     ),
+    paymentsDataSourceProvider.overrideWithValue(FakePaymentsDataSource()),
     imageUploaderProvider.overrideWithValue(uploader ?? FakeImageUploader()),
     clockProvider.overrideWith((Ref ref) => const Stream<DateTime>.empty()),
   ],

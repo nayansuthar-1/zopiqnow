@@ -34,6 +34,11 @@ class VendorShell extends ConsumerWidget {
           initialLocation: index == navigationShell.currentIndex,
         ),
         destinations: <Widget>[
+          const NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
           NavigationDestination(
             icon: Badge(
               label: newCount == 0 ? null : Text('$newCount'),
@@ -50,19 +55,19 @@ class VendorShell extends ConsumerWidget {
             label: 'Orders',
           ),
           const NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
-            label: 'History',
-          ),
-          const NavigationDestination(
             icon: Icon(Icons.restaurant_menu_outlined),
             selectedIcon: Icon(Icons.restaurant_menu),
             label: 'Menu',
           ),
           const NavigationDestination(
-            icon: Icon(Icons.storefront_outlined),
-            selectedIcon: Icon(Icons.storefront),
-            label: 'Profile',
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history),
+            label: 'History',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.more_horiz_outlined),
+            selectedIcon: Icon(Icons.more_horiz),
+            label: 'More',
           ),
         ],
       ),
