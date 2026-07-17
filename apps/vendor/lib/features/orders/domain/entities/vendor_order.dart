@@ -13,8 +13,10 @@ enum OrderStatus {
   placed('New'),
   accepted('Accepted'),
   preparing('Preparing'),
+  readyForPickup('Ready'),
   outForDelivery('Out for delivery'),
   delivered('Delivered'),
+  rejected('Rejected'),
   cancelled('Cancelled');
 
   const OrderStatus(this.label);
@@ -30,8 +32,10 @@ enum OrderStatus {
     'placed' => placed,
     'accepted' => accepted,
     'preparing' => preparing,
+    'ready_for_pickup' => readyForPickup,
     'out_for_delivery' => outForDelivery,
     'delivered' => delivered,
+    'rejected' => rejected,
     'cancelled' => cancelled,
     _ => throw ArgumentError.value(value, 'status', 'Unknown order status'),
   };
@@ -43,28 +47,31 @@ enum OrderStatus {
     placed => 'placed',
     accepted => 'accepted',
     preparing => 'preparing',
+    readyForPickup => 'ready_for_pickup',
     outForDelivery => 'out_for_delivery',
     delivered => 'delivered',
+    rejected => 'rejected',
     cancelled => 'cancelled',
   };
 
-  /// Still the kitchen's problem — it is neither delivered nor cancelled. The
+  /// Still the kitchen's problem — it has not ended, one way or another. The
   /// queue is exactly the set of open orders.
-  bool get isOpen => this != delivered && this != cancelled;
+  bool get isOpen => this != delivered && this != cancelled && this != rejected;
 
   /// The one status the kitchen can move this order to by pressing the big
   /// button, or null when there is nothing left to press.
   ///
-  /// This mirrors `set_order_status` in migration 0009, and mirroring it is the
+  /// This mirrors `set_order_status` in migration 0014, and mirroring it is the
   /// point: the button offers what the database will accept. If they ever
   /// disagree the database wins — it raises, and the ticket says so — but a
   /// button that is *usually* refused is a button nobody trusts.
   OrderStatus? get next => switch (this) {
     placed => accepted,
     accepted => preparing,
-    preparing => outForDelivery,
+    preparing => readyForPickup,
+    readyForPickup => outForDelivery,
     outForDelivery => delivered,
-    delivered || cancelled => null,
+    delivered || cancelled || rejected => null,
   };
 
   /// What the button *says*. "Accept" and "Start preparing" are imperatives; the
@@ -72,15 +79,23 @@ enum OrderStatus {
   String? get nextAction => switch (this) {
     placed => 'Accept order',
     accepted => 'Start preparing',
-    preparing => 'Hand to rider',
+    preparing => 'Mark ready',
+    readyForPickup => 'Hand to rider',
     outForDelivery => 'Mark delivered',
-    delivered || cancelled => null,
+    delivered || cancelled || rejected => null,
   };
 
-  /// Cancellable up to the moment the food leaves. Once it is with the rider it
-  /// is a refund conversation, not a status change — `set_order_status` refuses
-  /// it, and this is why the button is not offered.
-  bool get canCancel => this == placed || this == accepted || this == preparing;
+  /// Cancellable once accepted and up to the moment the food leaves. A *new*
+  /// order is not cancelled — it is [canReject]ed. Once it is with the rider it
+  /// is a refund conversation, not a status change; `set_order_status` refuses
+  /// it, and that is why the button is not offered.
+  bool get canCancel =>
+      this == accepted || this == preparing || this == readyForPickup;
+
+  /// A brand-new order can be turned away outright — declined before it was ever
+  /// accepted. That is a rejection, with its own word and its own reason, not a
+  /// cancellation.
+  bool get canReject => this == placed;
 }
 
 /// How the customer is paying — which the kitchen cares about for one reason.

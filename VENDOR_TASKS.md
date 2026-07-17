@@ -63,21 +63,25 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
 - [x] Tests: 5 new History tests; `flutter analyze` clean, 29/29 green
 - No migration, no new dep, no customer-app coordination.
 
-## Phase 2 — Real-time order management  🟡 IN PROGRESS
+## Phase 2 — Real-time order management  🟡 MOSTLY DONE
 
-**Slice A (vendor-only, no migration) — DONE:**
+**Slice A (vendor-only, no migration) — DONE (`eba8118`):**
 - [x] `VendorOrder.etaMinutes` (existing `orders.eta_minutes` column) + `isLate`
 - [x] Delayed-order flag on live tickets — clean red `Late · Xm` pill, updates on the 30s clock
 
-**Slice B (breaking — needs review before applying):**
-- [ ] New statuses: `ready_for_pickup`, `rejected` (distinct from cancelled), later `refunded`
-- [ ] Reject-with-reason flow on new orders
-- [ ] Prep-time confirm + countdown (needs a stored prep target → column)
+**Slice B (statuses) — DONE (customer tolerance `1a9ca66`; migration 0014 applied):**
+- [x] New statuses `ready_for_pickup` + `rejected` (customer app made tolerant first)
+- [x] Migration `0014`: widened `orders.status` check, `status_reason` column,
+      `set_order_status(text,text,text)` with new transitions — applied + verified
+- [x] Vendor flow: `ready_for_pickup` step ("Mark ready" → "Hand to rider"),
+      reject-with-reason (required preset) on new orders, cancel-with-reason
+      (optional) after acceptance; status badge + history include rejected
+
+**Still open in Phase 2:**
+- [ ] Prep-time confirm + countdown (needs a stored prep target → a later column)
 - [ ] Duplicate-action guards audit; queue offline/retry polish
-- **Backend:** migration `0014` — extend `orders.status` check + `set_order_status`
-  transitions. **Blocked on:** customer app's `OrderStatus.fromWire` throws on unknown
-  values (`customer_order.dart:31`) — must be made tolerant FIRST, then migrate.
-- **Deps:** none. **Breaking:** customer app must understand new statuses — coordinate.
+- [ ] History: a `Rejected` outcome chip (rejected currently shows under "All")
+- **Note:** `refunded` deferred to the payments phase.
 
 ## Phase 3 — Menu & availability  ⬜
 
@@ -142,4 +146,8 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
   widened; reusable widgets + `formatRupees` added. Analyze clean, 29/29 tests green.
 - **2026-07-17** — Phase 2 Slice A: `etaMinutes` + `isLate` on `VendorOrder`; clean
   `Late · Xm` pill on overdue live tickets. No migration. Analyze clean, 30/30 green.
-  Slice B (new statuses) pending — needs customer-app tolerance + `0014`, review first.
+- **2026-07-17** — Phase 2 Slice B: customer app made status-tolerant (`1a9ca66`);
+  migration `0014` applied (ready_for_pickup, rejected, status_reason, new transitions);
+  vendor got the ready step + reject/cancel-with-reason. Vendor 31/31 green, analyze clean.
+  Customer app: 4 pre-existing `ListTile`-in-`DecoratedBox` test failures (SDK assertion,
+  unrelated to this change) — flagged, not fixed.

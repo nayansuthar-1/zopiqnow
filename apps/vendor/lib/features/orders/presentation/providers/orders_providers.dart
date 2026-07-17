@@ -99,13 +99,13 @@ class OrderActionController extends Notifier<Set<String>> {
   /// too would mean two sources of truth that agree almost always — and the
   /// "almost" is a ticket that says "Preparing" in a kitchen where the order was
   /// actually cancelled.
-  Future<String?> move(VendorOrder order, OrderStatus to) async {
+  Future<String?> move(VendorOrder order, OrderStatus to, {String? reason}) async {
     if (state.contains(order.id)) return null;
     state = <String>{...state, order.id};
     try {
       await ref
           .read(vendorOrderDataSourceProvider)
-          .setStatus(orderId: order.id, status: to);
+          .setStatus(orderId: order.id, status: to, reason: reason);
       return null;
     } on OrderStatusFailure catch (failure) {
       return failure.message;

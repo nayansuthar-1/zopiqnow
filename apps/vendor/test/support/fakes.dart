@@ -112,6 +112,7 @@ class FakeVendorOrderDataSource implements VendorOrderDataSource {
   Future<OrderStatus> setStatus({
     required String orderId,
     required OrderStatus status,
+    String? reason,
   }) async {
     if (refusal != null) throw OrderStatusFailure(refusal!);
 

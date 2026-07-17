@@ -5,6 +5,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 import 'package:zopiq_vendor/features/orders/presentation/widgets/order_lines.dart';
+import 'package:zopiq_vendor/features/orders/presentation/widgets/order_reason_sheet.dart';
 
 /// One order, as a ticket.
 ///
@@ -27,39 +28,31 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
   /// attempt — an error from a button press two minutes ago is noise.
   String? _refusal;
 
-  Future<void> _move(OrderStatus to) async {
+  Future<void> _move(OrderStatus to, {String? reason}) async {
     setState(() => _refusal = null);
     final String? refusal = await ref
         .read(orderActionControllerProvider.notifier)
-        .move(widget.order, to);
+        .move(widget.order, to, reason: reason);
     if (mounted && refusal != null) setState(() => _refusal = refusal);
   }
 
+  /// Turning a *new* order away. The reason is required — the sheet enforces it,
+  /// and returns null if the kitchen backs out.
+  Future<void> _reject() async {
+    final String? reason = await showRejectReason(context, widget.order.id);
+    if (reason != null) await _move(OrderStatus.rejected, reason: reason);
+  }
+
+  /// Calling off an accepted order. The reason is optional: an empty string comes
+  /// back when confirmed without one, null when dismissed.
   Future<void> _cancel() async {
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('Cancel this order?'),
-        // A cancellation is the customer's evening, not a checkbox. It is the
-        // one irreversible thing on this screen, so it is the one thing that
-        // asks twice.
-        content: Text(
-          'Order ${widget.order.id} will be cancelled and the customer will be '
-          'told. This cannot be undone.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep it'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Cancel order'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed ?? false) await _move(OrderStatus.cancelled);
+    final String? reason = await showCancelReason(context, widget.order.id);
+    if (reason != null) {
+      await _move(
+        OrderStatus.cancelled,
+        reason: reason.isEmpty ? null : reason,
+      );
+    }
   }
 
   @override
@@ -147,7 +140,16 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
             const SizedBox(height: ZopiqSpacing.md),
             Row(
               children: <Widget>[
-                if (order.status.canCancel) ...<Widget>[
+                if (order.status.canReject) ...<Widget>[
+                  Expanded(
+                    child: ZopiqButton(
+                      label: 'Reject',
+                      variant: ZopiqButtonVariant.outline,
+                      onPressed: isBusy ? null : _reject,
+                    ),
+                  ),
+                  const SizedBox(width: ZopiqSpacing.sm),
+                ] else if (order.status.canCancel) ...<Widget>[
                   Expanded(
                     child: ZopiqButton(
                       label: 'Cancel',

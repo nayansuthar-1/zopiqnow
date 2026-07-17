@@ -16,7 +16,8 @@ class OrderStatusBadge extends StatelessWidget {
     final ZopiqColors zc = context.zc;
     final Color accent = switch (status) {
       OrderStatus.delivered => zc.veg,
-      OrderStatus.cancelled => zc.nonVeg,
+      // Turned away, one way or another — declined or called off.
+      OrderStatus.cancelled || OrderStatus.rejected => zc.nonVeg,
       // Everything still open — placed through out-for-delivery — is the brand
       // orange: a thing in motion, not a thing settled.
       _ => zc.primary,

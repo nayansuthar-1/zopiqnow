@@ -32,9 +32,13 @@ abstract interface class VendorOrderDataSource {
 
   /// Moves the order on. Throws [OrderStatusFailure] with the database's own
   /// sentence when the move is not allowed.
+  ///
+  /// [reason] rides along on a rejection or cancellation — the kitchen's note on
+  /// why an order was turned away. Ignored by the database for a forward step.
   Future<OrderStatus> setStatus({
     required String orderId,
     required OrderStatus status,
+    String? reason,
   });
 }
 
@@ -102,7 +106,7 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
         // restaurant; the `.eq` is here so the query returns one kitchen's book
         // rather than being refused row-by-row.
         .eq('restaurant_id', restaurantId)
-        .inFilter('status', const <String>['delivered', 'cancelled'])
+        .inFilter('status', const <String>['delivered', 'cancelled', 'rejected'])
         .gte('created_at', from.toUtc().toIso8601String())
         .lte('created_at', to.toUtc().toIso8601String())
         .order('created_at', ascending: false)
@@ -136,18 +140,20 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
   Future<OrderStatus> setStatus({
     required String orderId,
     required OrderStatus status,
+    String? reason,
   }) async {
     try {
-      // An id and a status. Not an order — there is no update grant on `orders`
-      // at all, so this function is the only way a vendor can write to one, and
-      // the only column it can reach is `status` (migration 0009). A restaurant
-      // that could `update` the row could edit the total of an order the
-      // customer has already agreed to.
+      // An id, a status, and a reason. Not an order — there is no update grant on
+      // `orders` at all, so this function is the only way a vendor can write to
+      // one, and the only columns it can reach are `status` and `status_reason`
+      // (migration 0014). A restaurant that could `update` the row could edit the
+      // total of an order the customer has already agreed to.
       final String written = await _db.rpc<String>(
         'set_order_status',
         params: <String, dynamic>{
           'p_order_id': orderId,
           'p_status': status.wire,
+          'p_reason': reason,
         },
       );
       return OrderStatus.fromWire(written);

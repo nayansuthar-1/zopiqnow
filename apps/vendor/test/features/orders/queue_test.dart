@@ -116,6 +116,33 @@ void main() {
       expect(find.text('1 in the queue'), findsOneWidget);
     });
 
+    testWidgets('rejecting a new order asks a reason, then declines it', (
+      WidgetTester tester,
+    ) async {
+      _tallSurface(tester);
+      final FakeVendorOrderDataSource orders = FakeVendorOrderDataSource(
+        orders: <VendorOrder>[order()],
+      );
+      addTearDown(orders.dispose);
+
+      await tester.pumpWidget(_app(orders: orders));
+      await tester.pumpAndSettle();
+
+      // A new order is declined, not cancelled.
+      await tester.tap(find.text('Reject'));
+      await tester.pumpAndSettle();
+
+      // The reason sheet asks before anything is written.
+      expect(find.text('Reject order ZPQ-1042?'), findsOneWidget);
+      await tester.tap(find.text('Kitchen closed'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Reject order'));
+      await tester.pumpAndSettle();
+
+      // Rejected leaves the queue like any ended order.
+      expect(find.text('All caught up'), findsOneWidget);
+    });
+
     testWidgets('a delivered order leaves the queue', (
       WidgetTester tester,
     ) async {
@@ -304,16 +331,23 @@ void main() {
     });
 
     test('the button offers exactly what set_order_status will accept', () {
-      // Mirrors the transition table in migration 0009. A button that is usually
+      // Mirrors the transition table in migration 0014. A button that is usually
       // refused is a button nobody trusts.
       expect(OrderStatus.placed.next, OrderStatus.accepted);
       expect(OrderStatus.accepted.next, OrderStatus.preparing);
-      expect(OrderStatus.preparing.next, OrderStatus.outForDelivery);
+      expect(OrderStatus.preparing.next, OrderStatus.readyForPickup);
+      expect(OrderStatus.readyForPickup.next, OrderStatus.outForDelivery);
       expect(OrderStatus.outForDelivery.next, OrderStatus.delivered);
       expect(OrderStatus.delivered.next, isNull);
       expect(OrderStatus.cancelled.next, isNull);
+      expect(OrderStatus.rejected.next, isNull);
 
-      expect(OrderStatus.preparing.canCancel, isTrue);
+      // A new order is rejected, not cancelled; cancellation is for orders
+      // already accepted, up to the moment the food leaves.
+      expect(OrderStatus.placed.canReject, isTrue);
+      expect(OrderStatus.placed.canCancel, isFalse);
+      expect(OrderStatus.accepted.canCancel, isTrue);
+      expect(OrderStatus.readyForPickup.canCancel, isTrue);
       expect(OrderStatus.outForDelivery.canCancel, isFalse);
     });
 
