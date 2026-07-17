@@ -36,6 +36,7 @@ class _DishEditorState extends ConsumerState<_DishEditor> {
   late final TextEditingController _price;
   late final TextEditingController _category;
   late bool _isVeg;
+  late bool _isBestseller;
   late String _imageUrl;
 
   bool _busy = false;
@@ -55,6 +56,7 @@ class _DishEditorState extends ConsumerState<_DishEditor> {
     _price = TextEditingController(text: d != null ? '${d.price}' : '');
     _category = TextEditingController(text: d?.category ?? '');
     _isVeg = d?.isVeg ?? true;
+    _isBestseller = d?.isBestseller ?? false;
     _imageUrl = d?.imageUrl ?? '';
   }
 
@@ -92,6 +94,7 @@ class _DishEditorState extends ConsumerState<_DishEditor> {
       description: _description.text.trim(),
       price: price,
       isVeg: _isVeg,
+      isBestseller: _isBestseller,
       category: category,
       imageUrl: _imageUrl,
     );
@@ -259,6 +262,36 @@ class _DishEditorState extends ConsumerState<_DishEditor> {
                       value: _isVeg,
                       activeTrackColor: zc.veg,
                       onChanged: (bool v) => setState(() => _isVeg = v),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Bestseller — the vendor's own claim, shown to customers as a badge.
+            // The star carries the meaning the way the veg mark does above it.
+            InkWell(
+              borderRadius: ZopiqRadii.rMd,
+              onTap: () => setState(() => _isBestseller = !_isBestseller),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.sm),
+                child: Row(
+                  children: <Widget>[
+                    Icon(
+                      _isBestseller
+                          ? Icons.star_rounded
+                          : Icons.star_border_rounded,
+                      size: 20,
+                      color: _isBestseller ? zc.rating : zc.textMuted,
+                    ),
+                    const SizedBox(width: ZopiqSpacing.md),
+                    Expanded(
+                      child: Text('Bestseller', style: t.bodyLarge),
+                    ),
+                    Switch(
+                      value: _isBestseller,
+                      activeTrackColor: zc.rating,
+                      onChanged: (bool v) => setState(() => _isBestseller = v),
                     ),
                   ],
                 ),

@@ -151,6 +151,34 @@ void main() {
       expect(tester.menu.dishes.length, 2);
     });
 
+    testWidgets('flagging a dish as a bestseller saves it and shows a badge', (
+      WidgetTester tester,
+    ) async {
+      _tallSurface(tester);
+      tester.menu = FakeVendorMenuDataSource();
+
+      await _openMenu(tester);
+      await tester.tap(find.byType(FloatingActionButton));
+      await tester.pumpAndSettle();
+
+      final Finder fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), 'Paneer Tikka');
+      await tester.enterText(fields.at(2), '260');
+      await tester.enterText(fields.at(3), 'Starters');
+      // The bestseller toggle — the customer menu already renders this as a badge.
+      await tester.tap(find.text('Bestseller'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Add dish'));
+      await tester.pumpAndSettle();
+
+      final VendorDish saved = tester.menu.dishes.firstWhere(
+        (VendorDish d) => d.name == 'Paneer Tikka',
+      );
+      expect(saved.isBestseller, isTrue);
+      // And the menu row carries the badge.
+      expect(find.text('Bestseller'), findsOneWidget);
+    });
+
     testWidgets('a photo added to a dish is uploaded and saved with it', (
       WidgetTester tester,
     ) async {

@@ -186,6 +186,7 @@ VendorDish dish({
   String description = '',
   int price = 320,
   bool isVeg = false,
+  bool isBestseller = false,
   String category = 'Biryanis',
   bool isAvailable = true,
 }) => VendorDish(
@@ -194,6 +195,7 @@ VendorDish dish({
   description: description,
   price: price,
   isVeg: isVeg,
+  isBestseller: isBestseller,
   category: category,
   isAvailable: isAvailable,
 );
@@ -272,6 +274,7 @@ class FakeVendorMenuDataSource implements VendorMenuDataSource {
         description: dish.description,
         price: dish.price,
         isVeg: dish.isVeg,
+        isBestseller: dish.isBestseller,
         category: dish.category,
         isAvailable: true,
         imageUrl: dish.imageUrl,

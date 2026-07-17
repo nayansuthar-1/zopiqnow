@@ -102,6 +102,23 @@ class _DishRowState extends ConsumerState<DishRow> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+                  if (dish.isBestseller) ...<Widget>[
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Icon(Icons.star_rounded, size: 13, color: zc.rating),
+                        const SizedBox(width: ZopiqSpacing.xxs),
+                        Text(
+                          'Bestseller',
+                          style: t.labelSmall?.copyWith(
+                            color: zc.rating,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: ZopiqSpacing.xxs),
+                  ],
                   Text(
                     dish.name,
                     style: t.titleSmall?.copyWith(

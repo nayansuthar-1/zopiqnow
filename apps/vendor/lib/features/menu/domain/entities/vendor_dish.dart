@@ -18,6 +18,7 @@ class VendorDish {
     required this.isVeg,
     required this.category,
     required this.isAvailable,
+    this.isBestseller = false,
     this.imageUrl = '',
   });
 
@@ -31,7 +32,8 @@ class VendorDish {
     this.category = '',
     this.imageUrl = '',
   }) : id = '',
-       isAvailable = true;
+       isAvailable = true,
+       isBestseller = false;
 
   final String id;
   final String name;
@@ -55,6 +57,11 @@ class VendorDish {
   /// customer menu without anyone touching the price or deleting anything.
   final bool isAvailable;
 
+  /// Whether the kitchen has flagged this as a bestseller. Shown to customers as
+  /// a badge (the `is_bestseller` column has existed since 0002 and the customer
+  /// menu already renders it) — this is the vendor finally getting to set it.
+  final bool isBestseller;
+
   bool get isNew => id.isEmpty;
 
   VendorDish copyWith({
@@ -64,6 +71,7 @@ class VendorDish {
     bool? isVeg,
     String? category,
     bool? isAvailable,
+    bool? isBestseller,
     String? imageUrl,
   }) => VendorDish(
     id: id,
@@ -73,6 +81,7 @@ class VendorDish {
     isVeg: isVeg ?? this.isVeg,
     category: category ?? this.category,
     isAvailable: isAvailable ?? this.isAvailable,
+    isBestseller: isBestseller ?? this.isBestseller,
     imageUrl: imageUrl ?? this.imageUrl,
   );
 
