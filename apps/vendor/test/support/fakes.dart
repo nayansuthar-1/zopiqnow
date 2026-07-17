@@ -87,6 +87,25 @@ class FakeVendorOrderDataSource implements VendorOrderDataSource {
   }
 
   @override
+  Future<List<VendorOrder>> fetchHistory({
+    required String restaurantId,
+    required DateTime from,
+    required DateTime to,
+    int limit = 500,
+  }) async {
+    final List<VendorOrder> matches = _orders
+        .where(
+          (VendorOrder o) =>
+              !o.status.isOpen &&
+              !o.placedAt.isBefore(from) &&
+              !o.placedAt.isAfter(to),
+        )
+        .toList();
+    matches.sort((VendorOrder a, VendorOrder b) => b.placedAt.compareTo(a.placedAt));
+    return matches.take(limit).toList(growable: false);
+  }
+
+  @override
   Future<List<OrderLine>> fetchLines(String orderId) async => lines;
 
   @override
@@ -105,6 +124,10 @@ class FakeVendorOrderDataSource implements VendorOrderDataSource {
                   placedAt: o.placedAt,
                   customerPhone: o.customerPhone,
                   deliveryTo: o.deliveryTo,
+                  subtotal: o.subtotal,
+                  deliveryFee: o.deliveryFee,
+                  taxes: o.taxes,
+                  discount: o.discount,
                   total: o.total,
                   paymentMethod: o.paymentMethod,
                 )
@@ -124,12 +147,20 @@ VendorOrder order({
   Duration age = const Duration(minutes: 4),
   PaymentMethod paymentMethod = PaymentMethod.cod,
   int total = 720,
+  int? subtotal,
+  int deliveryFee = 0,
+  int taxes = 0,
+  int discount = 0,
 }) => VendorOrder(
   id: id,
   status: status,
   placedAt: DateTime.now().subtract(age),
   customerPhone: '+919876543210',
   deliveryTo: 'Banjara Hills, Hyderabad',
+  subtotal: subtotal ?? total,
+  deliveryFee: deliveryFee,
+  taxes: taxes,
+  discount: discount,
   total: total,
   paymentMethod: paymentMethod,
 );

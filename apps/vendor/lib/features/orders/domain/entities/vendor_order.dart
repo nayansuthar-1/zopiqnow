@@ -125,6 +125,10 @@ class VendorOrder {
     required this.placedAt,
     required this.customerPhone,
     required this.deliveryTo,
+    required this.subtotal,
+    required this.deliveryFee,
+    required this.taxes,
+    required this.discount,
     required this.total,
     required this.paymentMethod,
   });
@@ -141,8 +145,18 @@ class VendorOrder {
 
   final String deliveryTo;
 
+  /// The bill, exactly as `place_order` priced it — never recomputed here. Not
+  /// shown on the live queue ticket (a cook does not reconcile the customer's
+  /// bill mid-rush), but the order-detail sheet lays it out, and History sums
+  /// `total` into the day's revenue. Whole rupees.
+  final int subtotal;
+  final int deliveryFee;
+  final int taxes;
+  final int discount;
+
   /// What the order came to. On a cash order this is what the rider collects,
-  /// which is the only reason it is on this screen.
+  /// which is the only reason it is on the live ticket. Equals
+  /// `subtotal + deliveryFee + taxes - discount` — the database enforces it.
   final int total;
 
   final PaymentMethod paymentMethod;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_vendor/core/formatting/formatters.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 
@@ -10,10 +11,15 @@ import 'package:zopiq_vendor/features/orders/presentation/providers/orders_provi
 /// Shared by the live ticket and the history card: an order's lines are written
 /// once by `place_order` and never change, so the same read serves both, and
 /// `orderLinesProvider` caches it per id.
+///
+/// The live ticket wants only *what* to cook, so it leaves prices off. The
+/// detail sheet reconciles a bill, so it turns [showPrices] on and each line
+/// carries its total.
 class OrderLines extends ConsumerWidget {
-  const OrderLines({required this.orderId, super.key});
+  const OrderLines({required this.orderId, this.showPrices = false, super.key});
 
   final String orderId;
+  final bool showPrices;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -89,6 +95,16 @@ class OrderLines extends ConsumerWidget {
                       ),
                     ),
                   ),
+                  if (showPrices) ...<Widget>[
+                    const SizedBox(width: ZopiqSpacing.sm),
+                    Text(
+                      formatRupees(line.lineTotal),
+                      style: t.titleSmall?.copyWith(
+                        color: zc.textMuted,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

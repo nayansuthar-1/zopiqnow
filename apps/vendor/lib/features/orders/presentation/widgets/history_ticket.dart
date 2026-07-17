@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_vendor/core/formatting/formatters.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
+import 'package:zopiq_vendor/features/orders/presentation/widgets/order_detail_sheet.dart';
 import 'package:zopiq_vendor/features/orders/presentation/widgets/order_lines.dart';
+import 'package:zopiq_vendor/features/orders/presentation/widgets/order_status_badge.dart';
 
 /// A finished order, as a record rather than a task.
 ///
 /// The same facts as the live ticket minus the buttons — there is nothing left
 /// to press. What it adds is the one thing the queue never shows: how the order
 /// *ended*, delivered or cancelled, because that is the only reason to open this
-/// screen at all.
+/// screen at all. Tapping it opens the full bill.
 class HistoryTicket extends StatelessWidget {
   const HistoryTicket({required this.order, super.key});
 
@@ -20,8 +23,6 @@ class HistoryTicket extends StatelessWidget {
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
-    final bool delivered = order.status == OrderStatus.delivered;
-    final Color accent = delivered ? zc.veg : zc.nonVeg;
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -29,6 +30,7 @@ class HistoryTicket extends StatelessWidget {
         vertical: ZopiqSpacing.xs,
       ),
       child: ZopiqCard(
+        onTap: () => showOrderDetail(context, order),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -40,23 +42,7 @@ class HistoryTicket extends StatelessWidget {
                     style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: ZopiqSpacing.sm,
-                    vertical: ZopiqSpacing.xxs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.12),
-                    borderRadius: ZopiqRadii.rSm,
-                  ),
-                  child: Text(
-                    order.status.label,
-                    style: t.labelMedium?.copyWith(
-                      color: accent,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+                OrderStatusBadge(status: order.status),
               ],
             ),
             const SizedBox(height: ZopiqSpacing.xxs),
@@ -77,8 +63,8 @@ class HistoryTicket extends StatelessWidget {
                   ? Icons.payments_outlined
                   : Icons.check_circle_outline_rounded,
               text: order.paymentMethod.isCash
-                  ? 'Cash · ₹${order.total}'
-                  : 'Paid online · ₹${order.total}',
+                  ? 'Cash · ${formatRupees(order.total)}'
+                  : 'Paid online · ${formatRupees(order.total)}',
             ),
             const SizedBox(height: ZopiqSpacing.sm),
             _Detail(icon: Icons.location_on_rounded, text: order.deliveryTo),

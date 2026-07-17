@@ -11,6 +11,18 @@ abstract interface class VendorOrderDataSource {
   /// is cheaper than two.
   Stream<List<VendorOrder>> watchOrders(String restaurantId);
 
+  /// The finished orders — delivered or cancelled — placed in a date window,
+  /// newest first. A one-shot read, not the live stream: History is looked back
+  /// on, not watched, and bounding it by date keeps a busy restaurant's book
+  /// from loading in full. Capped by [limit] as a backstop against a very wide
+  /// custom range.
+  Future<List<VendorOrder>> fetchHistory({
+    required String restaurantId,
+    required DateTime from,
+    required DateTime to,
+    int limit,
+  });
+
   /// The lines of one order. Fetched separately from the stream, and separately
   /// *because* of it: Realtime publishes row changes on a single table and does
   /// not do joins, so the embedded read that the customer's history uses is not
@@ -49,6 +61,12 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
   /// a human. Any other code is a bug or an outage.
   static const String _businessRuleErrorCode = 'P0001';
 
+  /// The order columns the app reads. The live `.stream()` returns whole rows so
+  /// it needs no list; `fetchHistory`'s explicit `.select()` does.
+  static const String _orderColumns =
+      'id, status, created_at, user_phone, delivery_to, '
+      'subtotal, delivery_fee, taxes, discount, total, payment_method';
+
   @override
   Stream<List<VendorOrder>> watchOrders(String restaurantId) {
     // The `.eq` is not the security boundary — the RLS policy from 0009 is, and
@@ -67,6 +85,29 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
           (List<Map<String, dynamic>> rows) =>
               rows.map(_orderFrom).toList(growable: false),
         );
+  }
+
+  @override
+  Future<List<VendorOrder>> fetchHistory({
+    required String restaurantId,
+    required DateTime from,
+    required DateTime to,
+    int limit = 500,
+  }) async {
+    final List<Map<String, dynamic>> rows = await _db
+        .from('orders')
+        .select(_orderColumns)
+        // The RLS policy from 0009 already scopes this to the caller's own
+        // restaurant; the `.eq` is here so the query returns one kitchen's book
+        // rather than being refused row-by-row.
+        .eq('restaurant_id', restaurantId)
+        .inFilter('status', const <String>['delivered', 'cancelled'])
+        .gte('created_at', from.toUtc().toIso8601String())
+        .lte('created_at', to.toUtc().toIso8601String())
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    return rows.map(_orderFrom).toList(growable: false);
   }
 
   @override
@@ -121,6 +162,10 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
     placedAt: DateTime.parse(row['created_at'] as String).toLocal(),
     customerPhone: row['user_phone'] as String,
     deliveryTo: row['delivery_to'] as String,
+    subtotal: (row['subtotal'] as num).toInt(),
+    deliveryFee: (row['delivery_fee'] as num).toInt(),
+    taxes: (row['taxes'] as num).toInt(),
+    discount: (row['discount'] as num).toInt(),
     total: (row['total'] as num).toInt(),
     paymentMethod: PaymentMethod.fromWire(row['payment_method'] as String),
   );
