@@ -113,6 +113,7 @@ class FakeVendorOrderDataSource implements VendorOrderDataSource {
     required String orderId,
     required OrderStatus status,
     String? reason,
+    int? prepMinutes,
   }) async {
     if (refusal != null) throw OrderStatusFailure(refusal!);
 
@@ -132,6 +133,11 @@ class FakeVendorOrderDataSource implements VendorOrderDataSource {
                   total: o.total,
                   paymentMethod: o.paymentMethod,
                   etaMinutes: o.etaMinutes,
+                  // Mirrors the database: a prep time stamps ready_by on accept.
+                  readyBy:
+                      status == OrderStatus.accepted && prepMinutes != null
+                      ? DateTime.now().add(Duration(minutes: prepMinutes))
+                      : o.readyBy,
                 )
               : o,
         )
@@ -154,6 +160,7 @@ VendorOrder order({
   int taxes = 0,
   int discount = 0,
   int etaMinutes = 30,
+  DateTime? readyBy,
 }) => VendorOrder(
   id: id,
   status: status,
@@ -167,6 +174,7 @@ VendorOrder order({
   total: total,
   paymentMethod: paymentMethod,
   etaMinutes: etaMinutes,
+  readyBy: readyBy,
 );
 
 VendorDish dish({

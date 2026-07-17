@@ -77,11 +77,18 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
       reject-with-reason (required preset) on new orders, cancel-with-reason
       (optional) after acceptance; status badge + history include rejected
 
-**Still open in Phase 2:**
-- [ ] Prep-time confirm + countdown (needs a stored prep target → a later column)
-- [ ] Duplicate-action guards audit; queue offline/retry polish
-- [ ] History: a `Rejected` outcome chip (rejected currently shows under "All")
+**Phase 2 leftovers — DONE (migration 0015):**
+- [x] Prep-time confirm + countdown: accepting opens a prep-time sheet (10/15/20/
+      30/45 min); migration `0015` adds `orders.ready_by` and stamps it via
+      `set_order_status(...,p_prep_minutes)`. Ticket shows a `Ready in Xm` chip
+      (orange) flipping to red `Over by Xm` past the promise, on the 30s clock.
+- [x] History: `Rejected` outcome chip added.
+- [x] Duplicate-guard / offline audit: guards already solid (per-order busy set in
+      `OrderActionController.move`; modal sheets block re-tap; buttons disabled on
+      busy). Queue + History both have error→Retry states. No code change needed.
 - **Note:** `refunded` deferred to the payments phase.
+
+**Phase 2 is complete.**
 
 ## Phase 3 — Menu & availability  ⬜
 
@@ -151,3 +158,6 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
   vendor got the ready step + reject/cancel-with-reason. Vendor 31/31 green, analyze clean.
   Customer app: 4 pre-existing `ListTile`-in-`DecoratedBox` test failures (SDK assertion,
   unrelated to this change) — flagged, not fixed.
+- **2026-07-17** — Phase 2 leftovers: migration `0015` (`ready_by` + prep-time param);
+  prep-time sheet on accept + `Ready in Xm`/`Over by Xm` countdown chip; History `Rejected`
+  chip; guard/offline audit (no change needed). Phase 2 complete.

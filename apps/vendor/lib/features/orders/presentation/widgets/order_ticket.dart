@@ -5,6 +5,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 import 'package:zopiq_vendor/features/orders/presentation/widgets/order_lines.dart';
+import 'package:zopiq_vendor/features/orders/presentation/widgets/order_prep_sheet.dart';
 import 'package:zopiq_vendor/features/orders/presentation/widgets/order_reason_sheet.dart';
 
 /// One order, as a ticket.
@@ -28,12 +29,21 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
   /// attempt — an error from a button press two minutes ago is noise.
   String? _refusal;
 
-  Future<void> _move(OrderStatus to, {String? reason}) async {
+  Future<void> _move(OrderStatus to, {String? reason, int? prepMinutes}) async {
     setState(() => _refusal = null);
     final String? refusal = await ref
         .read(orderActionControllerProvider.notifier)
-        .move(widget.order, to, reason: reason);
+        .move(widget.order, to, reason: reason, prepMinutes: prepMinutes);
     if (mounted && refusal != null) setState(() => _refusal = refusal);
+  }
+
+  /// Accepting a new order also sets a prep time — the sheet asks, and the food
+  /// is due `now + prep`. Null back means the cook closed the sheet; nothing moves.
+  Future<void> _accept() async {
+    final int? prepMinutes = await showPrepTime(context, widget.order.id);
+    if (prepMinutes != null) {
+      await _move(OrderStatus.accepted, prepMinutes: prepMinutes);
+    }
   }
 
   /// Turning a *new* order away. The reason is required — the sheet enforces it,
@@ -89,12 +99,15 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
                     style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
-                // The age, not the clock time. Nobody in a kitchen converts
-                // "7:42 pm" into "that one has been sitting for twenty minutes".
-                // Once it is past the quoted window it stops being a timestamp
-                // and becomes a warning: red, labelled, the loudest thing on the
-                // ticket after the id.
-                if (isLate)
+                // The time signal, in priority order. While the food is being
+                // made, the countdown to when it's due is what matters. Past the
+                // delivery window it becomes a red "Late". Otherwise it is just
+                // the age — how long the ticket has sat there.
+                if (order.readyBy != null &&
+                    (order.status == OrderStatus.accepted ||
+                        order.status == OrderStatus.preparing))
+                  _PrepCountdown(remaining: order.timeToReady!)
+                else if (isLate)
                   _LatePill(label: formatAge(order.age))
                 else
                   Text(
@@ -172,13 +185,64 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
                           ? ZopiqButtonVariant.cta
                           : ZopiqButtonVariant.primary,
                       isLoading: isBusy,
-                      onPressed: () => _move(next),
+                      // Accepting a new order runs through the prep-time sheet;
+                      // every later step is a direct move.
+                      onPressed: isNew ? _accept : () => _move(next),
                     ),
                   ),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The prep countdown, while the food is being made: `Ready in 12 min` in the
+/// brand orange, flipping to a red `Over by 5 min` once the kitchen's own promise
+/// has passed. Recomputed on the same 30s clock the age is.
+class _PrepCountdown extends StatelessWidget {
+  const _PrepCountdown({required this.remaining});
+
+  final Duration remaining;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    final bool overdue = remaining.isNegative;
+    final int minutes = remaining.inMinutes.abs();
+    final String label = overdue
+        ? 'Over by $minutes min'
+        : minutes == 0
+        ? 'Ready soon'
+        : 'Ready in $minutes min';
+    final Color color = overdue ? zc.nonVeg : zc.primary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: ZopiqSpacing.sm,
+        vertical: ZopiqSpacing.xxs,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: ZopiqRadii.rSm,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(Icons.timer_outlined, size: 14, color: color),
+          const SizedBox(width: ZopiqSpacing.xxs),
+          Text(
+            label,
+            style: t.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

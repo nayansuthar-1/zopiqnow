@@ -147,6 +147,7 @@ class VendorOrder {
     required this.total,
     required this.paymentMethod,
     required this.etaMinutes,
+    this.readyBy,
   });
 
   final String id;
@@ -183,9 +184,19 @@ class VendorOrder {
   /// a promise someone is watching a screen for.
   final int etaMinutes;
 
+  /// When the kitchen said the food would be ready — `now + prep` stamped at the
+  /// moment of accepting (migration 0015). Null until accepted, and null forever
+  /// for an order that was rejected. What the prep countdown counts down to.
+  final DateTime? readyBy;
+
   /// How long this ticket has been sitting there. The number a kitchen is
   /// actually judged on, and the reason the queue sorts oldest-first.
   Duration get age => DateTime.now().difference(placedAt);
+
+  /// Time until (positive) or since (negative) the food was due to be ready, or
+  /// null when no prep time was set. Only meaningful while the order is being
+  /// worked — once it is ready or gone, the countdown has nothing left to say.
+  Duration? get timeToReady => readyBy?.difference(DateTime.now());
 
   /// Still open, and past the window the customer was promised. Not a hard error
   /// — an order can run a little late — but the one thing the ticket should say

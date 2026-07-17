@@ -104,13 +104,18 @@ void main() {
       await tester.pumpWidget(_app(orders: orders));
       await tester.pumpAndSettle();
 
+      // Accepting a new order asks for a prep time first.
       await tester.tap(find.text('Accept order'));
+      await tester.pumpAndSettle();
+      expect(find.text('Accept order ZPQ-1042?'), findsOneWidget);
+      await tester.tap(find.textContaining('Accept · ready in'));
       await tester.pumpAndSettle();
 
       // The new status was not written locally — it came back on the stream,
       // because the database is what decides what an order's status is.
-      expect(find.text('Accept order'), findsNothing);
       expect(find.text('Start preparing'), findsOneWidget);
+      // And the ticket now counts down to when the food is due.
+      expect(find.textContaining('Ready in'), findsOneWidget);
       // "0 new" is not worth saying. The header stops shouting once nothing is
       // waiting on a human.
       expect(find.text('1 in the queue'), findsOneWidget);
@@ -175,6 +180,11 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Accept order'));
+      await tester.pumpAndSettle();
+
+      // Accepting now runs through the prep-time sheet; confirm it to reach the
+      // move the service refuses.
+      await tester.tap(find.text('Accept · ready in 20 min'));
       await tester.pumpAndSettle();
 
       // The database's sentence, not ours. "Please try again" would tell the

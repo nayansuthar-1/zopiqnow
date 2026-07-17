@@ -29,14 +29,15 @@ extension HistoryRangeLabel on HistoryRange {
   };
 }
 
-/// How an order ended, as a filter. `all` keeps both.
-enum HistoryOutcome { all, delivered, cancelled }
+/// How an order ended, as a filter. `all` keeps every outcome.
+enum HistoryOutcome { all, delivered, cancelled, rejected }
 
 extension HistoryOutcomeLabel on HistoryOutcome {
   String get label => switch (this) {
     HistoryOutcome.all => 'All',
     HistoryOutcome.delivered => 'Delivered',
     HistoryOutcome.cancelled => 'Cancelled',
+    HistoryOutcome.rejected => 'Rejected',
   };
 }
 
@@ -194,6 +195,7 @@ final Provider<List<VendorOrder>> filteredHistoryProvider =
           HistoryOutcome.all => true,
           HistoryOutcome.delivered => o.status == OrderStatus.delivered,
           HistoryOutcome.cancelled => o.status == OrderStatus.cancelled,
+          HistoryOutcome.rejected => o.status == OrderStatus.rejected,
         };
         if (!outcomeOk) return false;
 

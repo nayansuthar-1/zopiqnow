@@ -34,11 +34,14 @@ abstract interface class VendorOrderDataSource {
   /// sentence when the move is not allowed.
   ///
   /// [reason] rides along on a rejection or cancellation — the kitchen's note on
-  /// why an order was turned away. Ignored by the database for a forward step.
+  /// why an order was turned away. [prepMinutes] rides along on an *accept* and
+  /// sets when the food is due. Each is ignored by the database on any transition
+  /// it does not belong to.
   Future<OrderStatus> setStatus({
     required String orderId,
     required OrderStatus status,
     String? reason,
+    int? prepMinutes,
   });
 }
 
@@ -70,7 +73,7 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
   static const String _orderColumns =
       'id, status, created_at, user_phone, delivery_to, '
       'subtotal, delivery_fee, taxes, discount, total, payment_method, '
-      'eta_minutes';
+      'eta_minutes, ready_by';
 
   @override
   Stream<List<VendorOrder>> watchOrders(String restaurantId) {
@@ -141,6 +144,7 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
     required String orderId,
     required OrderStatus status,
     String? reason,
+    int? prepMinutes,
   }) async {
     try {
       // An id, a status, and a reason. Not an order — there is no update grant on
@@ -154,6 +158,7 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
           'p_order_id': orderId,
           'p_status': status.wire,
           'p_reason': reason,
+          'p_prep_minutes': prepMinutes,
         },
       );
       return OrderStatus.fromWire(written);
@@ -176,5 +181,8 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
     total: (row['total'] as num).toInt(),
     paymentMethod: PaymentMethod.fromWire(row['payment_method'] as String),
     etaMinutes: (row['eta_minutes'] as num).toInt(),
+    readyBy: row['ready_by'] == null
+        ? null
+        : DateTime.parse(row['ready_by'] as String).toLocal(),
   );
 }
