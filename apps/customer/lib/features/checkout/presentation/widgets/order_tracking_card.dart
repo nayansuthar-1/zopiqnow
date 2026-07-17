@@ -23,9 +23,14 @@ class OrderTrackingCard extends ConsumerWidget {
     final OrderStatus status =
         ref.watch(orderStatusProvider(order.id)).valueOrNull ?? order.status;
 
+    // Cancelled and rejected have both left the journey — no timeline, just a
+    // line saying how it ended.
+    final bool ended =
+        status == OrderStatus.cancelled || status == OrderStatus.rejected;
+
     return ZopiqCard(
-      child: status == OrderStatus.cancelled
-          ? _Cancelled(placedAt: order.placedAt)
+      child: ended
+          ? _Ended(status: status, placedAt: order.placedAt)
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -49,9 +54,11 @@ class _Headline extends StatelessWidget {
     OrderStatus.placed => 'Waiting for the restaurant to accept',
     OrderStatus.accepted => 'Your order is confirmed',
     OrderStatus.preparing => 'Your food is being prepared',
+    OrderStatus.readyForPickup => 'Packed and ready for pickup',
     OrderStatus.outForDelivery => 'On its way to you',
     OrderStatus.delivered => 'Delivered. Enjoy!',
-    // Rendered by _Cancelled, which this never sees.
+    // Rendered by _Ended, which this never sees.
+    OrderStatus.rejected => 'This order wasn\'t accepted',
     OrderStatus.cancelled => 'This order was cancelled',
   };
 
@@ -59,8 +66,10 @@ class _Headline extends StatelessWidget {
     OrderStatus.placed => Icons.receipt_long_rounded,
     OrderStatus.accepted => Icons.check_circle_outline_rounded,
     OrderStatus.preparing => Icons.soup_kitchen_rounded,
+    OrderStatus.readyForPickup => Icons.shopping_bag_rounded,
     OrderStatus.outForDelivery => Icons.delivery_dining_rounded,
     OrderStatus.delivered => Icons.done_all_rounded,
+    OrderStatus.rejected => Icons.cancel_outlined,
     OrderStatus.cancelled => Icons.cancel_outlined,
   };
 
@@ -242,16 +251,22 @@ class _Step extends StatelessWidget {
   }
 }
 
-/// A cancelled order is not a timeline with a gap in it. It left the journey.
-class _Cancelled extends StatelessWidget {
-  const _Cancelled({required this.placedAt});
+/// An order that ended — cancelled after acceptance, or never accepted at all —
+/// is not a timeline with a gap in it. It left the journey, and the only thing
+/// that changes between the two is the sentence.
+class _Ended extends StatelessWidget {
+  const _Ended({required this.status, required this.placedAt});
 
+  final OrderStatus status;
   final DateTime placedAt;
 
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
+    final String title = status == OrderStatus.rejected
+        ? 'This order wasn\'t accepted'
+        : 'This order was cancelled';
 
     return Row(
       children: <Widget>[
@@ -261,7 +276,7 @@ class _Cancelled extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text('This order was cancelled', style: t.titleSmall),
+              Text(title, style: t.titleSmall),
               const SizedBox(height: ZopiqSpacing.xxs),
               Text(
                 'Placed ${formatClockTime(placedAt)}',

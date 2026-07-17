@@ -39,7 +39,8 @@ class OrderStatusChip extends StatelessWidget {
     final ZopiqColors zc = context.zc;
     final Color color = switch (status) {
       OrderStatus.delivered => zc.veg,
-      OrderStatus.cancelled => zc.textMuted,
+      // Ended without arriving — stated, not shouted about.
+      OrderStatus.cancelled || OrderStatus.rejected => zc.textMuted,
       _ => zc.primary,
     };
 

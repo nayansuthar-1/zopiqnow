@@ -2,14 +2,18 @@ import 'package:flutter/foundation.dart';
 
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 
-/// Where an order is in its life. The wire values are the six the `orders.status`
-/// check constraint allows — there is no seventh.
+/// Where an order is in its life. The wire values are the ones the `orders.status`
+/// check constraint allows.
 enum OrderStatus {
   placed('Placed'),
   accepted('Accepted'),
   preparing('Preparing'),
+  readyForPickup('Ready'),
   outForDelivery('Out for delivery'),
   delivered('Delivered'),
+  // The restaurant declined a new order before accepting it — different from a
+  // cancellation, which happens after. Both end the order; the words differ.
+  rejected('Not accepted'),
   cancelled('Cancelled');
 
   const OrderStatus(this.label);
@@ -18,39 +22,41 @@ enum OrderStatus {
   final String label;
 
   /// Throws [ArgumentError] on anything else. The database enumerates exactly
-  /// these six, so an unknown value is not a status we forgot to handle — it is
+  /// these values, so an unknown one is not a status we forgot to handle — it is
   /// the client and the schema having drifted apart, and a receipt rendered
   /// from a contract we no longer understand is worse than one that fails.
   static OrderStatus fromWire(String value) => switch (value) {
     'placed' => placed,
     'accepted' => accepted,
     'preparing' => preparing,
+    'ready_for_pickup' => readyForPickup,
     'out_for_delivery' => outForDelivery,
     'delivered' => delivered,
+    'rejected' => rejected,
     'cancelled' => cancelled,
     _ => throw ArgumentError.value(value, 'status', 'Unknown order status'),
   };
 
-  /// Still on its way — the order is neither delivered nor cancelled. An open
+  /// Still on its way — the order has not ended, one way or another. An open
   /// order is one worth watching: it is what decides whether the detail screen
   /// subscribes to live status or renders a receipt.
-  bool get isOpen => this != delivered && this != cancelled;
+  bool get isOpen => this != delivered && this != cancelled && this != rejected;
 
-  /// The five stages an order that goes well passes through, in order.
+  /// The stages an order that goes well passes through, in order.
   ///
-  /// [cancelled] is not among them, and that is not an omission: it is not a
-  /// step on the way to anywhere. A cancelled order has left the journey, and
-  /// the tracking screen says so instead of drawing a timeline it will never
-  /// finish.
+  /// Neither [cancelled] nor [rejected] is among them, and that is not an
+  /// omission: an order that ended has left the journey, and the tracking screen
+  /// says so instead of drawing a timeline it will never finish.
   static const List<OrderStatus> journey = <OrderStatus>[
     placed,
     accepted,
     preparing,
+    readyForPickup,
     outForDelivery,
     delivered,
   ];
 
-  /// How far along [journey] this status is; `-1` for [cancelled].
+  /// How far along [journey] this status is; `-1` for an order that ended.
   int get step => journey.indexOf(this);
 }
 
