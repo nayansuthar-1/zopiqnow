@@ -6,6 +6,7 @@ import 'package:zopiq_vendor/features/menu/data/vendor_menu_datasource.dart';
 import 'package:zopiq_vendor/features/menu/domain/entities/vendor_dish.dart';
 import 'package:zopiq_vendor/features/orders/data/vendor_order_datasource.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
+import 'package:zopiq_vendor/core/images/image_uploader.dart';
 import 'package:zopiq_vendor/features/profile/data/vendor_restaurant_datasource.dart';
 import 'package:zopiq_vendor/features/profile/domain/entities/restaurant_profile.dart';
 
@@ -215,6 +216,7 @@ class FakeVendorMenuDataSource implements VendorMenuDataSource {
         isVeg: dish.isVeg,
         category: dish.category,
         isAvailable: true,
+        imageUrl: dish.imageUrl,
       );
       _dishes = <VendorDish>[..._dishes, created];
       return created;
@@ -241,6 +243,7 @@ const RestaurantProfile testProfile = RestaurantProfile(
   isVeg: false,
   promoText: '50% OFF up to ₹100',
   etaMinutes: 32,
+  imageUrl: '',
   rating: 4.4,
   ratingCount: 12800,
 );
@@ -272,6 +275,7 @@ class FakeVendorRestaurantDataSource implements VendorRestaurantDataSource {
     required bool isVeg,
     required String? promoText,
     required int etaMinutes,
+    required String imageUrl,
   }) async {
     if (saveFailure != null) throw ProfileWriteFailure(saveFailure!);
     _profile = RestaurantProfile(
@@ -281,9 +285,31 @@ class FakeVendorRestaurantDataSource implements VendorRestaurantDataSource {
       isVeg: isVeg,
       promoText: promoText,
       etaMinutes: etaMinutes,
+      imageUrl: imageUrl,
       rating: _profile.rating,
       ratingCount: _profile.ratingCount,
     );
     lastSaved = _profile;
+  }
+}
+
+/// An uploader with neither a gallery nor a network: it hands back a fixed URL
+/// (or null, for the user backing out), or throws to rehearse a failed upload.
+class FakeImageUploader implements ImageUploader {
+  FakeImageUploader({
+    this.url = 'https://res.cloudinary.com/mqppsahn/image/upload/zopiqnow/x.jpg',
+    this.fail = false,
+  });
+
+  /// The URL a pick resolves to. Null models the user closing the picker.
+  final String? url;
+  final bool fail;
+  int calls = 0;
+
+  @override
+  Future<String?> pickAndUpload() async {
+    calls++;
+    if (fail) throw const ImageUploadFailure();
+    return url;
   }
 }

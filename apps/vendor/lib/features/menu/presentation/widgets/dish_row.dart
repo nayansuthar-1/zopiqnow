@@ -79,6 +79,20 @@ class _DishRowState extends ConsumerState<DishRow> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            if (dish.imageUrl.isNotEmpty) ...<Widget>[
+              ClipRRect(
+                borderRadius: ZopiqRadii.rSm,
+                child: SizedBox(
+                  width: 52,
+                  height: 52,
+                  child: ZopiqNetworkImage(
+                    url: dish.imageUrl,
+                    fallback: ColoredBox(color: zc.shimmerBase),
+                  ),
+                ),
+              ),
+              const SizedBox(width: ZopiqSpacing.md),
+            ],
             Padding(
               padding: const EdgeInsets.only(top: ZopiqSpacing.xxs),
               child: ZopiqVegIndicator(isVeg: dish.isVeg, size: 16),

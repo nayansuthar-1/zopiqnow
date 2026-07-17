@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_vendor/core/images/photo_field.dart';
 import 'package:zopiq_vendor/features/profile/domain/entities/restaurant_profile.dart';
 import 'package:zopiq_vendor/features/profile/presentation/providers/profile_providers.dart';
 
@@ -27,6 +28,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   late final TextEditingController _promo;
   late final TextEditingController _eta;
   bool _isVeg = false;
+  String _imageUrl = '';
   bool _saving = false;
   bool _prefilled = false;
 
@@ -52,6 +54,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
     _promo.text = p.promoText ?? '';
     _eta.text = p.etaMinutes.toString();
     _isVeg = p.isVeg;
+    _imageUrl = p.imageUrl;
   }
 
   @override
@@ -85,6 +88,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
           isVeg: _isVeg,
           promoText: promo.isEmpty ? null : promo,
           etaMinutes: int.parse(_eta.text.trim()),
+          imageUrl: _imageUrl,
         );
 
     if (!mounted) return;
@@ -123,6 +127,12 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
             child: ListView(
               padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),
               children: <Widget>[
+                PhotoField(
+                  imageUrl: _imageUrl,
+                  height: 170,
+                  onChanged: (String url) => setState(() => _imageUrl = url),
+                ),
+                const SizedBox(height: ZopiqSpacing.lg),
                 _TextField(
                   controller: _name,
                   label: 'Restaurant name',

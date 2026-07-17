@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zopiq_vendor/app/vendor_app.dart';
+import 'package:zopiq_vendor/core/images/image_uploader.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_vendor/features/menu/domain/entities/vendor_dish.dart';
 import 'package:zopiq_vendor/features/menu/presentation/pages/menu_page.dart';
@@ -11,7 +12,10 @@ import 'package:zopiq_vendor/features/orders/presentation/providers/orders_provi
 
 import '../../support/fakes.dart';
 
-Widget _app({required FakeVendorMenuDataSource menu}) => ProviderScope(
+Widget _app({
+  required FakeVendorMenuDataSource menu,
+  FakeImageUploader? uploader,
+}) => ProviderScope(
   overrides: <Override>[
     vendorAuthDataSourceProvider.overrideWithValue(
       FakeVendorAuthDataSource(signedInAs: testVendor),
@@ -22,6 +26,7 @@ Widget _app({required FakeVendorMenuDataSource menu}) => ProviderScope(
     vendorOrderDataSourceProvider.overrideWithValue(
       FakeVendorOrderDataSource(),
     ),
+    imageUploaderProvider.overrideWithValue(uploader ?? FakeImageUploader()),
     clockProvider.overrideWith((Ref ref) => const Stream<DateTime>.empty()),
   ],
   child: const VendorApp(),
@@ -142,6 +147,45 @@ void main() {
       expect(find.text('Paneer Tikka'), findsOneWidget);
       expect(find.text('STARTERS'), findsOneWidget);
       expect(tester.menu.dishes.length, 2);
+    });
+
+    testWidgets('a photo added to a dish is uploaded and saved with it', (
+      WidgetTester tester,
+    ) async {
+      _tallSurface(tester);
+      tester.menu = FakeVendorMenuDataSource();
+      final FakeImageUploader uploader = FakeImageUploader(
+        url: 'https://res.cloudinary.com/mqppsahn/image/upload/zopiqnow/d.jpg',
+      );
+
+      await tester.pumpWidget(_app(menu: tester.menu, uploader: uploader));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Menu'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(FloatingActionButton));
+      await tester.pumpAndSettle();
+
+      // Tap the photo well — the upload runs and the well shows the result.
+      await tester.tap(find.text('Add a photo'));
+      await tester.pumpAndSettle();
+      expect(uploader.calls, 1);
+
+      final Finder fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), 'Paneer Tikka');
+      await tester.enterText(fields.at(2), '260');
+      await tester.enterText(fields.at(3), 'Starters');
+      await tester.tap(find.widgetWithText(FilledButton, 'Add dish'));
+      await tester.pumpAndSettle();
+
+      // The dish saved with the URL the upload returned — which is exactly what
+      // the customer menu will render.
+      final VendorDish saved = tester.menu.dishes.firstWhere(
+        (VendorDish d) => d.name == 'Paneer Tikka',
+      );
+      expect(
+        saved.imageUrl,
+        'https://res.cloudinary.com/mqppsahn/image/upload/zopiqnow/d.jpg',
+      );
     });
 
     testWidgets('a new dish with no price is refused, not saved', (

@@ -61,6 +61,19 @@ class _ProfileView extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),
       children: <Widget>[
+        if (profile.imageUrl.isNotEmpty) ...<Widget>[
+          ClipRRect(
+            borderRadius: ZopiqRadii.rMd,
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: ZopiqNetworkImage(
+                url: profile.imageUrl,
+                fallback: ColoredBox(color: zc.shimmerBase),
+              ),
+            ),
+          ),
+          const SizedBox(height: ZopiqSpacing.lg),
+        ],
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[

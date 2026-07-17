@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_vendor/core/images/photo_field.dart';
 import 'package:zopiq_vendor/features/menu/domain/entities/vendor_dish.dart';
 import 'package:zopiq_vendor/features/menu/presentation/providers/menu_providers.dart';
 
@@ -35,6 +36,7 @@ class _DishEditorState extends ConsumerState<_DishEditor> {
   late final TextEditingController _price;
   late final TextEditingController _category;
   late bool _isVeg;
+  late String _imageUrl;
 
   bool _busy = false;
   String? _error;
@@ -53,6 +55,7 @@ class _DishEditorState extends ConsumerState<_DishEditor> {
     _price = TextEditingController(text: d != null ? '${d.price}' : '');
     _category = TextEditingController(text: d?.category ?? '');
     _isVeg = d?.isVeg ?? true;
+    _imageUrl = d?.imageUrl ?? '';
   }
 
   @override
@@ -90,6 +93,7 @@ class _DishEditorState extends ConsumerState<_DishEditor> {
       price: price,
       isVeg: _isVeg,
       category: category,
+      imageUrl: _imageUrl,
     );
 
     setState(() {
@@ -179,6 +183,13 @@ class _DishEditorState extends ConsumerState<_DishEditor> {
               style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: ZopiqSpacing.lg),
+
+            PhotoField(
+              imageUrl: _imageUrl,
+              height: 150,
+              onChanged: (String url) => setState(() => _imageUrl = url),
+            ),
+            const SizedBox(height: ZopiqSpacing.md),
 
             TextField(
               controller: _name,

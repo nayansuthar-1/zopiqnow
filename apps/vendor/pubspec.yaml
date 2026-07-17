@@ -10,10 +10,11 @@ resolution: workspace
 environment:
   sdk: ^3.12.2
 
-# Every dependency here is one the customer app already pins, at the version the
-# root lockfile already froze. A second app is not an excuse to take a new
-# dependency (Rule 4) — and it does not need one: this app reads orders, writes a
-# status, and edits a menu, which is Supabase and nothing else.
+# Almost every dependency here is one the customer app already pins, at the version
+# the root lockfile already froze. The one exception is `image_picker`, an approved
+# Rule 3 change request (2026-07-17): the vendor uploads dish and restaurant photos
+# to Cloudinary, and picking an image off the device is the one thing Supabase does
+# not do. Pinned exactly; the upload itself is an `http` multipart POST, no more deps.
 dependencies:
   flutter:
     sdk: flutter
@@ -32,6 +33,11 @@ dependencies:
   flutter_secure_storage: 10.3.1
 
   supabase_flutter: 2.8.0
+
+  # Photo upload (approved 2026-07-17). Picks a dish/restaurant photo off the
+  # device; the bytes go straight to Cloudinary, only the URL comes back.
+  image_picker: 1.1.2
+  http: 1.6.0
 
 dev_dependencies:
   flutter_test:

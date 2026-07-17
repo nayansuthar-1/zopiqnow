@@ -460,11 +460,28 @@ header follows without a re-login — which surfaced a real bug: the router's
 refuses a non-staff caller and writes only its six columns) and in widget tests, but not
 yet on the Android 10 device.
 
-**Still owed here:** dish and restaurant *photo upload* — blocked on a CDN this project does
-not have (PM §6). **Blocked, not deferred:** payouts, commission and settlement (PM §4 has
-no commission model, cadence, or bank account). Everything shipped in this app has been
-verified in widget tests and against the live database, but **not yet on the Android 10
-device** — the standing floor-verification debt. **Blocked, not
+**Photo upload is live (2026-07-17).** The CDN gap (PM §6) is closed — Cloudinary. A vendor
+adds a dish photo in the dish editor and a cover photo on the profile; both go straight to
+Cloudinary through an **unsigned upload preset** (`zopiqnow_unsigned`, image-only, folder-
+scoped) and only the returned URL is stored — on `menu_items.image_url` and, via
+`update_restaurant_profile` (now seven columns, migration 0013), on `restaurants.image_url`.
+Decisions worth remembering:
+- **The API secret is not in the app, and cannot be.** A mobile binary is decompilable, so a
+  secret compiled into it is a public secret. The unsigned preset is exactly the pattern that
+  needs none: the app carries only the *public* cloud name and preset name (in `Env`), and the
+  key/secret live in `.env`, used once to create and lock down the preset. `image_picker 1.1.2`
+  + `http` were an approved Rule 3 addition; the lockfile gained the picker family and **bumped
+  nothing**, `http` pinned to the frozen 1.6.0.
+- **This is the customer connection again.** Both apps read `image_url`; the vendor uploads,
+  the customer feed and menu render it, no customer change. Verified live: impersonating the
+  r1 vendor, the RPC wrote a Cloudinary URL to the exact column the customer reads (rolled back).
+- **The bytes never touch Postgres.** The image is on the CDN; the DB holds a URL string, the
+  same shape `image_url` always had.
+
+**Blocked, not deferred:** payouts, commission and settlement (PM §4 has no commission model,
+cadence, or bank account). Everything shipped in this app has been verified in widget tests and
+against the live database, but **not yet on the Android 10 device** — the standing floor-
+verification debt (and the photo picker, which talks to the OS gallery, most needs a real device). **Blocked, not
 deferred:** payouts, commission and settlement — PM_CHECKLIST §4 has no answer for the
 commission model, the settlement cadence, or the bank account, and those are not numbers
 to invent.
