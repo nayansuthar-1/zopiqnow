@@ -46,13 +46,14 @@ class MorePage extends ConsumerWidget {
             subtitle: 'The days and times you take orders',
             onTap: () => context.pushNamed(Routes.hours),
           ),
-
-          const _SectionLabel('Coming soon'),
-          const _Row(
+          _Row(
             icon: Icons.insights_rounded,
             label: 'Analytics',
             subtitle: 'Sales, top dishes and trends',
+            onTap: () => context.pushNamed(Routes.analytics),
           ),
+
+          const _SectionLabel('Coming soon'),
           const _Row(
             icon: Icons.local_offer_rounded,
             label: 'Offers',

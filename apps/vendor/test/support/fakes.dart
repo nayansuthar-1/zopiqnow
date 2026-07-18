@@ -7,6 +7,8 @@ import 'package:zopiq_vendor/features/menu/domain/entities/vendor_dish.dart';
 import 'package:zopiq_vendor/features/orders/data/vendor_order_datasource.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/core/images/image_uploader.dart';
+import 'package:zopiq_vendor/features/analytics/data/analytics_datasource.dart';
+import 'package:zopiq_vendor/features/analytics/domain/entities/analytics_summary.dart';
 import 'package:zopiq_vendor/features/payments/data/payments_datasource.dart';
 import 'package:zopiq_vendor/features/payments/domain/entities/earnings_summary.dart';
 import 'package:zopiq_vendor/features/payments/domain/entities/settlement.dart';
@@ -400,6 +402,30 @@ class FakeRestaurantHoursDataSource implements RestaurantHoursDataSource {
     _hours = List<OpeningHours>.of(hours);
     lastSaved = _hours;
   }
+}
+
+/// The analytics summary, served from memory. Defaults to an empty window.
+class FakeAnalyticsDataSource implements AnalyticsDataSource {
+  FakeAnalyticsDataSource({this.summary});
+
+  /// The summary to return; a zero window when null.
+  final AnalyticsSummary? summary;
+
+  @override
+  Future<AnalyticsSummary> fetch({
+    required DateTime from,
+    required DateTime to,
+  }) async =>
+      summary ??
+      AnalyticsSummary(
+        from: from,
+        to: to,
+        orderCount: 0,
+        itemsSold: 0,
+        avgOrderValue: 0,
+        topDishes: const <DishSales>[],
+        hourly: const <HourBucket>[],
+      );
 }
 
 const RestaurantProfile testProfile = RestaurantProfile(
