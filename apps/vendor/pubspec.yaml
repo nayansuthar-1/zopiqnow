@@ -44,6 +44,16 @@ dependencies:
   # dependency is `equatable`. Pinned exactly, like everything else here.
   fl_chart: 1.2.0
 
+  # Push notifications (approved Rule-3 change, 2026-07-18, Phase 7). The kitchen
+  # must hear a new order land whether the app is open on the counter or asleep in
+  # a pocket. Firebase Cloud Messaging carries the wake; `flutter_local_notifications`
+  # rings it — for a foreground order off the realtime stream, and for FCM messages
+  # the system won't post itself. Vendor-only; the customer app takes none of this.
+  # Pinned exactly.
+  firebase_core: 3.8.1
+  firebase_messaging: 15.1.6
+  flutter_local_notifications: 18.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

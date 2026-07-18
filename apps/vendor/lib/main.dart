@@ -8,6 +8,7 @@ import 'package:zopiq_vendor/app/env.dart';
 import 'package:zopiq_vendor/app/vendor_app.dart';
 import 'package:zopiq_vendor/core/storage/secure_store.dart';
 import 'package:zopiq_vendor/core/storage/supabase_secure_local_storage.dart';
+import 'package:zopiq_vendor/features/notifications/push_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,4 +33,9 @@ Future<void> main() async {
   );
 
   runApp(const ProviderScope(child: VendorApp()));
+
+  // After the first frame, not before: push brings up Firebase and asks the
+  // notification permission, and that prompt should land over a running app, not
+  // a blank screen. Guarded internally — if any of it fails, the app is unharmed.
+  await PushService.start();
 }
