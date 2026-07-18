@@ -30,81 +30,165 @@ class PaymentsPage extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Payments')),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(earningsProvider(range));
-          ref.invalidate(settlementsProvider);
-          await ref.read(settlementsProvider.future);
-        },
-        child: ListView(
-          padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),
-          children: <Widget>[
-            _RangeSelector(
-              range: range,
-              onChanged: (EarningsRange r) =>
-                  ref.read(earningsRangeProvider.notifier).state = r,
-            ),
-            const SizedBox(height: ZopiqSpacing.lg),
-            earnings.when(
-              loading: () => const _EarningsSkeleton(),
-              error: (Object _, StackTrace _) => VendorMessage(
-                icon: Icons.cloud_off_rounded,
-                title: 'We couldn\'t load your earnings',
-                body: 'Check the internet and try again.',
-                actionLabel: 'Retry',
-                onAction: () => ref.invalidate(earningsProvider(range)),
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: context.zc.primary,
+          onRefresh: () async {
+            ref.invalidate(earningsProvider(range));
+            ref.invalidate(settlementsProvider);
+            await ref.read(settlementsProvider.future);
+          },
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: ZopiqSpacing.xxl),
+            children: <Widget>[
+              // ── Custom Header ──
+              const ZopiqReveal(
+                index: 0,
+                child: _Header(),
               ),
-              data: (EarningsSummary e) => _EarningsCard(summary: e),
-            ),
-            const SizedBox(height: ZopiqSpacing.xl),
-            Text(
-              'Settlements',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+
+              ZopiqReveal(
+                index: 1,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.pageGutter),
+                  child: _RangeSelector(
+                    range: range,
+                    onChanged: (EarningsRange r) =>
+                        ref.read(earningsRangeProvider.notifier).state = r,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: ZopiqSpacing.xs),
-            Text(
-              'Delivered orders are paid out weekly, food value less commission.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: context.zc.textMuted,
-              ),
-            ),
-            const SizedBox(height: ZopiqSpacing.md),
-            settlements.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.all(ZopiqSpacing.xl),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (Object _, StackTrace _) => VendorMessage(
-                icon: Icons.cloud_off_rounded,
-                title: 'We couldn\'t load your settlements',
-                body: 'Check the internet and try again.',
-                actionLabel: 'Retry',
-                onAction: () => ref.invalidate(settlementsProvider),
-              ),
-              data: (List<Settlement> list) {
-                if (list.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: ZopiqSpacing.xxl),
-                    child: VendorMessage(
-                      icon: Icons.account_balance_wallet_outlined,
-                      title: 'No payouts yet',
-                      body: 'Your first settlement appears here once orders '
-                          'you\'ve delivered are rolled up.',
+              const SizedBox(height: ZopiqSpacing.lg),
+
+              ZopiqReveal(
+                index: 2,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.pageGutter),
+                  child: earnings.when(
+                    loading: () => const _EarningsSkeleton(),
+                    error: (Object _, StackTrace _) => VendorMessage(
+                      icon: Icons.cloud_off_rounded,
+                      title: 'We couldn\'t load your earnings',
+                      body: 'Check the internet and try again.',
+                      actionLabel: 'Retry',
+                      onAction: () => ref.invalidate(earningsProvider(range)),
                     ),
-                  );
-                }
-                return Column(
-                  children: <Widget>[
-                    for (final Settlement s in list) _SettlementTile(settlement: s),
-                  ],
-                );
-              },
-            ),
-          ],
+                    data: (EarningsSummary e) => _EarningsCard(summary: e),
+                  ),
+                ),
+              ),
+              const SizedBox(height: ZopiqSpacing.xl),
+              
+              ZopiqReveal(
+                index: 3,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.pageGutter),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Settlements',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: ZopiqSpacing.xs),
+                      Text(
+                        'Delivered orders are paid out weekly, food value less commission.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: context.zc.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: ZopiqSpacing.md),
+              
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.pageGutter),
+                child: settlements.when(
+                  loading: () => const Padding(
+                    padding: EdgeInsets.all(ZopiqSpacing.xl),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (Object _, StackTrace _) => VendorMessage(
+                    icon: Icons.cloud_off_rounded,
+                    title: 'We couldn\'t load your settlements',
+                    body: 'Check the internet and try again.',
+                    actionLabel: 'Retry',
+                    onAction: () => ref.invalidate(settlementsProvider),
+                  ),
+                  data: (List<Settlement> list) {
+                    if (list.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: ZopiqSpacing.xxl),
+                        child: VendorMessage(
+                          icon: Icons.account_balance_wallet_outlined,
+                          title: 'No payouts yet',
+                          body: 'Your first settlement appears here once orders '
+                              'you\'ve delivered are rolled up.',
+                        ),
+                      );
+                    }
+                    return Column(
+                      children: <Widget>[
+                        for (int i = 0; i < list.length; i++)
+                          ZopiqReveal(
+                            index: 4 + i,
+                            child: _SettlementTile(settlement: list[i]),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  const _Header();
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ZopiqSpacing.pageGutter,
+        ZopiqSpacing.lg,
+        ZopiqSpacing.pageGutter,
+        ZopiqSpacing.sm,
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Payments & Earnings',
+                  style: t.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: zc.textStrong,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: ZopiqSpacing.xxs),
+                Text(
+                  'Track your revenue and weekly payouts',
+                  style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -143,42 +227,79 @@ class _EarningsCard extends StatelessWidget {
     final TextTheme t = Theme.of(context).textTheme;
 
     return ZopiqCard(
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            'Net earnings',
-            style: t.bodyMedium?.copyWith(color: zc.textMuted),
-          ),
-          const SizedBox(height: ZopiqSpacing.xxs),
-          Text(
-            formatRupees(summary.netEarnings),
-            style: t.headlineLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: zc.textStrong,
+          // Top Accent Bar
+          Container(
+            height: 3,
+            decoration: BoxDecoration(
+              color: zc.primary.withValues(alpha: 0.6),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(ZopiqRadii.lg),
+              ),
             ),
           ),
-          const SizedBox(height: ZopiqSpacing.xs),
-          Text(
-            '${summary.orderCount} delivered '
-            '${summary.orderCount == 1 ? 'order' : 'orders'}',
-            style: t.bodySmall?.copyWith(color: zc.textMuted),
-          ),
-          const SizedBox(height: ZopiqSpacing.lg),
-          if (summary.daily.isNotEmpty) ...<Widget>[
-            SizedBox(
-              height: 160,
-              child: EarningsBarChart(daily: summary.daily),
+          Padding(
+            padding: const EdgeInsets.all(ZopiqSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: zc.primary.withValues(alpha: 0.10),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.account_balance_wallet_rounded,
+                        size: 16,
+                        color: zc.primary,
+                      ),
+                    ),
+                    const SizedBox(width: ZopiqSpacing.md),
+                    Text(
+                      'Net earnings',
+                      style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: ZopiqSpacing.md),
+                ZopiqAnimatedAmount(
+                  amount: summary.netEarnings,
+                  style: t.headlineLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: zc.textStrong,
+                  ),
+                ),
+                const SizedBox(height: ZopiqSpacing.xs),
+                Text(
+                  '${summary.orderCount} delivered '
+                  '${summary.orderCount == 1 ? 'order' : 'orders'}',
+                  style: t.bodySmall?.copyWith(color: zc.textMuted),
+                ),
+                const SizedBox(height: ZopiqSpacing.lg),
+                if (summary.daily.isNotEmpty) ...<Widget>[
+                  SizedBox(
+                    height: 160,
+                    child: EarningsBarChart(daily: summary.daily),
+                  ),
+                  const SizedBox(height: ZopiqSpacing.lg),
+                ],
+                const Divider(height: 1),
+                const SizedBox(height: ZopiqSpacing.md),
+                _Line(label: 'Gross sales', value: summary.grossSales),
+                _Line(
+                  label: 'Commission (${summary.commissionPercent.toStringAsFixed(0)}%)',
+                  value: -summary.commission,
+                  muted: true,
+                ),
+              ],
             ),
-            const SizedBox(height: ZopiqSpacing.lg),
-          ],
-          const Divider(height: 1),
-          const SizedBox(height: ZopiqSpacing.md),
-          _Line(label: 'Gross sales', value: summary.grossSales),
-          _Line(
-            label: 'Commission (${summary.commissionPercent.toStringAsFixed(0)}%)',
-            value: -summary.commission,
-            muted: true,
           ),
         ],
       ),
@@ -226,68 +347,102 @@ class _SettlementTile extends StatelessWidget {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
     final bool paid = settlement.status == SettlementStatus.paid;
-    final Color accent = paid ? zc.veg : zc.primary;
+    final Color accent = paid ? zc.veg : const Color(0xFFF59E0B); // Amber for pending
 
     return Padding(
       padding: const EdgeInsets.only(bottom: ZopiqSpacing.sm),
-      child: ZopiqCard(
-        padding: const EdgeInsets.all(ZopiqSpacing.md),
+      child: ZopiqPressable(
         onTap: () => context.pushNamed(
           Routes.settlementDetail,
           pathParameters: <String, String>{'id': '${settlement.id}'},
         ),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    periodLabel(settlement.periodStart, settlement.periodEnd),
-                    style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: ZopiqSpacing.xxs),
-                  Text(
-                    '${settlement.orderCount} '
-                    '${settlement.orderCount == 1 ? 'order' : 'orders'}',
-                    style: t.bodySmall?.copyWith(color: zc.textMuted),
-                  ),
-                ],
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: ZopiqRadii.rLg,
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: IntrinsicHeight(
+            child: Row(
               children: <Widget>[
-                Text(
-                  formatRupees(settlement.netPayable),
-                  style: t.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: zc.textStrong,
+                // Left accent strip
+                Container(
+                  width: 4,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(ZopiqRadii.lg),
+                    ),
                   ),
                 ),
-                const SizedBox(height: ZopiqSpacing.xxs),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: ZopiqSpacing.sm,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.12),
-                    borderRadius: ZopiqRadii.rPill,
-                  ),
-                  child: Text(
-                    settlement.status.label,
-                    style: t.labelSmall?.copyWith(
-                      color: accent,
-                      fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(ZopiqSpacing.md),
+                    child: Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                periodLabel(settlement.periodStart, settlement.periodEnd),
+                                style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: ZopiqSpacing.xxs),
+                              Text(
+                                '${settlement.orderCount} '
+                                '${settlement.orderCount == 1 ? 'order' : 'orders'}',
+                                style: t.bodySmall?.copyWith(color: zc.textMuted),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: <Widget>[
+                            Text(
+                              formatRupees(settlement.netPayable),
+                              style: t.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: zc.textStrong,
+                              ),
+                            ),
+                            const SizedBox(height: ZopiqSpacing.xxs),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: ZopiqSpacing.sm,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: accent.withValues(alpha: 0.12),
+                                borderRadius: ZopiqRadii.rPill,
+                              ),
+                              child: Text(
+                                settlement.status.label,
+                                style: t.labelSmall?.copyWith(
+                                  color: accent,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: ZopiqSpacing.sm),
+                        Icon(Icons.chevron_right_rounded, color: zc.textMuted, size: 20),
+                      ],
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(width: ZopiqSpacing.xs),
-            Icon(Icons.chevron_right_rounded, color: zc.textMuted),
-          ],
+          ),
         ),
       ),
     );

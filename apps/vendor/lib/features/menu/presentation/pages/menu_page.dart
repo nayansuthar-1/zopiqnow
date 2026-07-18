@@ -27,77 +27,147 @@ class MenuPage extends ConsumerWidget {
     final bool hasSections = menu.valueOrNull?.isNotEmpty ?? false;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Menu'),
-        actions: <Widget>[
-          if (hasSections)
-            IconButton(
-              icon: const Icon(Icons.swap_vert_rounded),
-              tooltip: 'Sections',
-              onPressed: () => context.pushNamed(Routes.menuCategories),
-            ),
-        ],
-      ),
       floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: context.zc.primary,
+        foregroundColor: Colors.white,
+        elevation: 2,
         onPressed: () => showDishEditor(context),
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Add dish'),
-      ),
-      body: menu.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (Object _, StackTrace _) => _Message(
-          icon: Icons.cloud_off_rounded,
-          title: 'We couldn\'t load your menu',
-          body: 'Check the internet and try again.',
-          onRetry: () => ref.invalidate(menuProvider),
+        label: const Text(
+          'Add dish',
+          style: TextStyle(fontWeight: FontWeight.w700),
         ),
-        data: (List<VendorMenuSection> sections) {
-          if (sections.isEmpty) {
-            return const _Message(
-              icon: Icons.restaurant_menu_rounded,
-              title: 'No dishes yet',
-              body: 'Add your first dish with the button below.',
-            );
-          }
-
-          // Flattened so the list stays lazy: a header and its dishes are just
-          // rows, built only as they scroll into view.
-          final List<_Entry> entries = <_Entry>[
-            for (final VendorMenuSection s in sections) ...<_Entry>[
-              _Entry.header(s.title),
-              for (final VendorDish d in s.dishes) _Entry.dish(d),
-            ],
-          ];
-
-          return RefreshIndicator(
-            onRefresh: () async => ref.refresh(menuProvider.future),
-            child: ListView.separated(
-              padding: const EdgeInsets.only(bottom: 96),
-              itemCount: entries.length,
-              separatorBuilder: (BuildContext context, int i) {
-                // A divider only between two dishes — never above a section
-                // header, which brings its own space.
-                final bool nextIsHeader =
-                    i + 1 < entries.length && entries[i + 1].isHeader;
-                if (entries[i].isHeader || nextIsHeader) {
-                  return const SizedBox.shrink();
-                }
-                return Divider(height: 1, color: context.zc.divider);
-              },
-              itemBuilder: (BuildContext context, int i) {
-                final _Entry entry = entries[i];
-                return RepaintBoundary(
-                  child: entry.isHeader
-                      ? _SectionHeader(title: entry.title!)
-                      : DishRow(
-                          key: ValueKey<String>(entry.dish!.id),
-                          dish: entry.dish!,
-                        ),
-                );
-              },
+      ),
+      body: SafeArea(
+        child: Column(
+          children: <Widget>[
+            // ── Custom Header ──
+            ZopiqReveal(
+              index: 0,
+              child: _Header(hasSections: hasSections),
             ),
-          );
-        },
+
+            Expanded(
+              child: menu.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (Object _, StackTrace _) => _Message(
+                  icon: Icons.cloud_off_rounded,
+                  title: 'We couldn\'t load your menu',
+                  body: 'Check the internet and try again.',
+                  onRetry: () => ref.invalidate(menuProvider),
+                ),
+                data: (List<VendorMenuSection> sections) {
+                  if (sections.isEmpty) {
+                    return const _Message(
+                      icon: Icons.restaurant_menu_rounded,
+                      title: 'No dishes yet',
+                      body: 'Add your first dish with the button below.',
+                    );
+                  }
+
+                  // Flattened so the list stays lazy: a header and its dishes are just
+                  // rows, built only as they scroll into view.
+                  final List<_Entry> entries = <_Entry>[
+                    for (final VendorMenuSection s in sections) ...<_Entry>[
+                      _Entry.header(s.title),
+                      for (final VendorDish d in s.dishes) _Entry.dish(d),
+                    ],
+                  ];
+
+                  return RefreshIndicator(
+                    color: context.zc.primary,
+                    onRefresh: () async => ref.refresh(menuProvider.future),
+                    child: ListView.separated(
+                      padding: const EdgeInsets.only(bottom: 96),
+                      itemCount: entries.length,
+                      separatorBuilder: (BuildContext context, int i) {
+                        // A divider only between two dishes — never above a section
+                        // header, which brings its own space.
+                        final bool nextIsHeader =
+                            i + 1 < entries.length && entries[i + 1].isHeader;
+                        if (entries[i].isHeader || nextIsHeader) {
+                          return const SizedBox.shrink();
+                        }
+                        return Divider(height: 1, color: context.zc.divider);
+                      },
+                      itemBuilder: (BuildContext context, int i) {
+                        final _Entry entry = entries[i];
+                        return RepaintBoundary(
+                          child: ZopiqReveal(
+                            index: 1 + i, // Staggered entrance
+                            child: entry.isHeader
+                                ? _SectionHeader(title: entry.title!)
+                                : DishRow(
+                                    key: ValueKey<String>(entry.dish!.id),
+                                    dish: entry.dish!,
+                                  ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  const _Header({required this.hasSections});
+
+  final bool hasSections;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ZopiqSpacing.pageGutter,
+        ZopiqSpacing.lg,
+        ZopiqSpacing.pageGutter,
+        ZopiqSpacing.sm,
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Menu Management',
+                  style: t.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: zc.textStrong,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: ZopiqSpacing.xxs),
+                Text(
+                  'Manage dishes, prices, and availability',
+                  style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                ),
+              ],
+            ),
+          ),
+          if (hasSections)
+            Container(
+              decoration: BoxDecoration(
+                color: zc.primary.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: Icon(Icons.swap_vert_rounded, color: zc.primary),
+                tooltip: 'Sections',
+                onPressed: () => context.pushNamed(Routes.menuCategories),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -124,12 +194,14 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
-    return Padding(
+    return Container(
+      width: double.infinity,
+      color: zc.primary.withValues(alpha: 0.04), // subtle tinted background for section
       padding: const EdgeInsets.fromLTRB(
         ZopiqSpacing.pageGutter,
         ZopiqSpacing.lg,
         ZopiqSpacing.pageGutter,
-        ZopiqSpacing.xs,
+        ZopiqSpacing.sm,
       ),
       child: Text(
         title.toUpperCase(),

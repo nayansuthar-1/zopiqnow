@@ -28,29 +28,85 @@ class HistoryPage extends ConsumerWidget {
     final List<VendorOrder> visible = ref.watch(filteredHistoryProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('History')),
-      body: Column(
+      body: SafeArea(
+        child: Column(
+          children: <Widget>[
+            // ── Custom Header ──
+            const ZopiqReveal(
+              index: 0,
+              child: _Header(),
+            ),
+
+            const ZopiqReveal(index: 1, child: _RangeChips()),
+            const ZopiqReveal(index: 2, child: _SearchField()),
+            const ZopiqReveal(index: 3, child: _RefineChips()),
+            
+            Divider(height: 1, color: context.zc.divider),
+            
+            Expanded(
+              child: orders.when(
+                loading: () => const VendorSkeletonList(),
+                error: (Object _, StackTrace _) => VendorMessage(
+                  icon: Icons.cloud_off_rounded,
+                  title: 'We\'ve lost the connection',
+                  body: 'Your past orders will be here once it\'s back.',
+                  actionLabel: 'Retry',
+                  onAction: () => ref.invalidate(historyOrdersProvider),
+                ),
+                data: (_) => RefreshIndicator(
+                  color: context.zc.primary,
+                  onRefresh: () => ref.refresh(historyOrdersProvider.future),
+                  child: visible.isEmpty
+                      ? _EmptyList(hasWindowOrders: orders.value?.isNotEmpty ?? false)
+                      : ZopiqReveal(
+                          index: 4,
+                          child: _HistoryList(orders: visible),
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  const _Header();
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ZopiqSpacing.pageGutter,
+        ZopiqSpacing.lg,
+        ZopiqSpacing.pageGutter,
+        ZopiqSpacing.sm,
+      ),
+      child: Row(
         children: <Widget>[
-          const _RangeChips(),
-          const _SearchField(),
-          const _RefineChips(),
-          Divider(height: 1, color: context.zc.divider),
           Expanded(
-            child: orders.when(
-              loading: () => const VendorSkeletonList(),
-              error: (Object _, StackTrace _) => VendorMessage(
-                icon: Icons.cloud_off_rounded,
-                title: 'We\'ve lost the connection',
-                body: 'Your past orders will be here once it\'s back.',
-                actionLabel: 'Retry',
-                onAction: () => ref.invalidate(historyOrdersProvider),
-              ),
-              data: (_) => RefreshIndicator(
-                onRefresh: () => ref.refresh(historyOrdersProvider.future),
-                child: visible.isEmpty
-                    ? _EmptyList(hasWindowOrders: orders.value?.isNotEmpty ?? false)
-                    : _HistoryList(orders: visible),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Order History',
+                  style: t.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: zc.textStrong,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: ZopiqSpacing.xxs),
+                Text(
+                  'Review completed and cancelled orders',
+                  style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                ),
+              ],
             ),
           ),
         ],
@@ -119,6 +175,7 @@ class _SummaryHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final HistorySummary s = ref.watch(historySummaryProvider);
+    final ZopiqColors zc = context.zc;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -128,16 +185,33 @@ class _SummaryHeader extends ConsumerWidget {
         ZopiqSpacing.xs,
       ),
       child: ZopiqCard(
-        elevated: false,
-        child: Row(
+        padding: EdgeInsets.zero,
+        child: Column(
           children: <Widget>[
-            _Stat(label: 'Orders', value: '${s.total}'),
-            const _StatDivider(),
-            _Stat(label: 'Delivered', value: '${s.delivered}'),
-            const _StatDivider(),
-            _Stat(label: 'Cancelled', value: '${s.cancelled}'),
-            const _StatDivider(),
-            _Stat(label: 'Gross', value: formatRupees(s.gross)),
+            // Accent bar at top
+            Container(
+              height: 3,
+              decoration: BoxDecoration(
+                color: zc.primary.withValues(alpha: 0.6),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(ZopiqRadii.lg),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(ZopiqSpacing.md),
+              child: Row(
+                children: <Widget>[
+                  _Stat(label: 'Orders', value: '${s.total}'),
+                  const _StatDivider(),
+                  _Stat(label: 'Delivered', value: '${s.delivered}', color: zc.veg),
+                  const _StatDivider(),
+                  _Stat(label: 'Cancelled', value: '${s.cancelled}', color: zc.nonVeg),
+                  const _StatDivider(),
+                  _Stat(label: 'Gross', value: formatRupees(s.gross), isMoney: true),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -146,10 +220,17 @@ class _SummaryHeader extends ConsumerWidget {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
+  const _Stat({
+    required this.label,
+    required this.value,
+    this.color,
+    this.isMoney = false,
+  });
 
   final String label;
   final String value;
+  final Color? color;
+  final bool isMoney;
 
   @override
   Widget build(BuildContext context) {
@@ -159,12 +240,24 @@ class _Stat extends StatelessWidget {
     return Expanded(
       child: Column(
         children: <Widget>[
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
+          if (isMoney)
+            ZopiqAnimatedAmount(
+              amount: int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+              style: t.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: color ?? zc.textStrong,
+              ),
+            )
+          else
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: t.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: color ?? zc.textStrong,
+              ),
+            ),
           const SizedBox(height: ZopiqSpacing.xxs),
           Text(
             label,
@@ -198,6 +291,16 @@ class _RangeChips extends ConsumerWidget {
       context: context,
       firstDate: DateTime(now.year - 2),
       lastDate: now,
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: context.zc.primary,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       ref
@@ -354,6 +457,10 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
             borderRadius: ZopiqRadii.rMd,
             borderSide: BorderSide(color: zc.divider),
           ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: ZopiqRadii.rMd,
+            borderSide: BorderSide(color: zc.primary, width: 2),
+          ),
         ),
       ),
     );
@@ -387,13 +494,15 @@ class _Chip extends StatelessWidget {
       );
     }
 
-    final Color fg = selected ? Colors.white : zc.textMuted;
+    final Color fg = selected ? zc.primary : zc.textMuted;
+    final Color bg = selected ? zc.primary.withValues(alpha: 0.12) : Colors.transparent;
+    final Color border = selected ? zc.primary.withValues(alpha: 0.3) : zc.divider;
 
     return Material(
-      color: selected ? zc.primary : Colors.transparent,
+      color: bg,
       shape: RoundedRectangleBorder(
         borderRadius: ZopiqRadii.rPill,
-        side: BorderSide(color: selected ? zc.primary : zc.divider),
+        side: BorderSide(color: border),
       ),
       child: InkWell(
         borderRadius: ZopiqRadii.rPill,
@@ -407,7 +516,7 @@ class _Chip extends StatelessWidget {
             label,
             style: t.labelLarge?.copyWith(
               color: fg,
-              fontWeight: FontWeight.w600,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
             ),
           ),
         ),
