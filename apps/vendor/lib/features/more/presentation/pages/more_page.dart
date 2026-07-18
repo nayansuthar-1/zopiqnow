@@ -52,6 +52,12 @@ class MorePage extends ConsumerWidget {
             subtitle: 'Sales, top dishes and trends',
             onTap: () => context.pushNamed(Routes.analytics),
           ),
+          _Row(
+            icon: Icons.help_outline_rounded,
+            label: 'Support',
+            subtitle: 'Answers, and how to reach us',
+            onTap: () => context.pushNamed(Routes.support),
+          ),
 
           const _SectionLabel('Coming soon'),
           const _Row(
@@ -73,11 +79,6 @@ class MorePage extends ConsumerWidget {
             icon: Icons.group_rounded,
             label: 'Staff',
             subtitle: 'Who can sign in to this kitchen',
-          ),
-          const _Row(
-            icon: Icons.help_outline_rounded,
-            label: 'Support',
-            subtitle: 'Get help with your account',
           ),
 
           const SizedBox(height: ZopiqSpacing.lg),
