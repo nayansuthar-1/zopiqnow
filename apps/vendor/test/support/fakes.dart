@@ -10,7 +10,9 @@ import 'package:zopiq_vendor/core/images/image_uploader.dart';
 import 'package:zopiq_vendor/features/payments/data/payments_datasource.dart';
 import 'package:zopiq_vendor/features/payments/domain/entities/earnings_summary.dart';
 import 'package:zopiq_vendor/features/payments/domain/entities/settlement.dart';
+import 'package:zopiq_vendor/features/profile/data/restaurant_hours_datasource.dart';
 import 'package:zopiq_vendor/features/profile/data/vendor_restaurant_datasource.dart';
+import 'package:zopiq_vendor/features/profile/domain/entities/opening_hours.dart';
 import 'package:zopiq_vendor/features/profile/domain/entities/restaurant_profile.dart';
 
 const Vendor testVendor = Vendor(
@@ -373,6 +375,31 @@ class FakePaymentsDataSource implements PaymentsDataSource {
   @override
   Future<List<SettlementOrder>> fetchSettlementOrders(int settlementId) async =>
       const <SettlementOrder>[];
+}
+
+/// The opening hours, in memory. Defaults to an empty week — "always open",
+/// which is what a restaurant that has never set an hour is.
+class FakeRestaurantHoursDataSource implements RestaurantHoursDataSource {
+  FakeRestaurantHoursDataSource({List<OpeningHours> initial = const <OpeningHours>[]})
+    : _hours = List<OpeningHours>.of(initial);
+
+  List<OpeningHours> _hours;
+
+  /// Set to make the next save fail with this sentence.
+  String? saveFailure;
+
+  /// The week the last successful save wrote.
+  List<OpeningHours>? lastSaved;
+
+  @override
+  Future<List<OpeningHours>> fetch(String restaurantId) async => _hours;
+
+  @override
+  Future<void> save(List<OpeningHours> hours) async {
+    if (saveFailure != null) throw HoursWriteFailure(saveFailure!);
+    _hours = List<OpeningHours>.of(hours);
+    lastSaved = _hours;
+  }
 }
 
 const RestaurantProfile testProfile = RestaurantProfile(

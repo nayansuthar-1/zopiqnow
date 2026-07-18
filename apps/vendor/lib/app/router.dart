@@ -16,6 +16,7 @@ import 'package:zopiq_vendor/features/orders/presentation/pages/history_page.dar
 import 'package:zopiq_vendor/features/orders/presentation/pages/queue_page.dart';
 import 'package:zopiq_vendor/features/payments/presentation/pages/payments_page.dart';
 import 'package:zopiq_vendor/features/payments/presentation/pages/settlement_detail_page.dart';
+import 'package:zopiq_vendor/features/profile/presentation/pages/hours_editor_page.dart';
 import 'package:zopiq_vendor/features/profile/presentation/pages/profile_edit_page.dart';
 import 'package:zopiq_vendor/features/profile/presentation/pages/profile_page.dart';
 
@@ -28,6 +29,7 @@ abstract final class Routes {
   static const String more = 'more';
   static const String payments = 'payments';
   static const String settlementDetail = 'settlementDetail';
+  static const String hours = 'hours';
   static const String profile = 'profile';
   static const String profileEdit = 'profileEdit';
   static const String splash = 'splash';
@@ -177,6 +179,11 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                         builder: (_, _) => const ProfileEditPage(),
                       ),
                     ],
+                  ),
+                  GoRoute(
+                    path: 'hours',
+                    name: Routes.hours,
+                    builder: (_, _) => const HoursEditorPage(),
                   ),
                   GoRoute(
                     path: 'payments',
