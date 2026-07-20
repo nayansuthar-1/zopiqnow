@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_vendor/features/orders/presentation/providers/new_order_alarm.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 
 /// The partner app's four rooms, held in a bottom-nav shell.
@@ -22,6 +23,10 @@ class VendorShell extends ConsumerWidget {
     final ZopiqColors zc = context.zc;
     // The badge on Orders: the count that makes someone look up.
     final int newCount = ref.watch(newOrderCountProvider);
+    // Keep the new-order alarm running for the whole signed-in session. Watching
+    // the notifier (not its value) holds it alive without rebuilding the nav when
+    // it fires — the shell is the only thing that keeps it from auto-disposing.
+    ref.watch(newOrderAlarmProvider.notifier);
 
     return Scaffold(
       body: navigationShell,

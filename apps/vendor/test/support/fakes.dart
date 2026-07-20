@@ -114,6 +114,14 @@ class FakeVendorOrderDataSource implements VendorOrderDataSource {
     return matches.take(limit).toList(growable: false);
   }
 
+  /// A brand-new order lands on the stream — the event the new-order alarm rings
+  /// for. `setStatus` only ever *moves* an order already here, so this is the one
+  /// way to rehearse arrival.
+  void arrive(VendorOrder newOrder) {
+    _orders = <VendorOrder>[..._orders, newOrder];
+    _controller.add(_orders);
+  }
+
   @override
   Future<List<OrderLine>> fetchLines(String orderId) async => lines;
 

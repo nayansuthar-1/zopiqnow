@@ -21,8 +21,18 @@ class PushService {
   static const String _channelId = 'new_orders';
   static const String _channelName = 'New orders';
 
+  /// A fixed id for the in-app chime, so a fresh order replaces the last chime in
+  /// the tray rather than stacking a new line every time — one ping, not a pile.
+  static const int _inAppChimeId = 424242;
+
   static final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
+
+  /// True once [start] has wired the channel. Guards [chimeNewOrder] so it is a
+  /// no-op until then — which is also what keeps the plugin off the test path:
+  /// tests never call [start], so they never reach a notification binding that
+  /// does not exist under `flutter test`.
+  static bool _started = false;
 
   /// Bring the whole thing up. Guarded end to end: a device with no Google
   /// Play services, a missing config, a denied permission — none of these is a
@@ -38,6 +48,8 @@ class PushService {
     }
 
     await _initLocalNotifications();
+    // The channel exists now, so the in-app alarm has somewhere to ring.
+    _started = true;
 
     final FirebaseMessaging messaging = FirebaseMessaging.instance;
     // On Android 13+ this raises the POST_NOTIFICATIONS prompt; on older
@@ -121,6 +133,32 @@ class PushService {
       );
     } on Object catch (e) {
       debugPrint('Could not unregister push token: $e.');
+    }
+  }
+
+  /// Ring an order that arrived while the app is open. The realtime stream, not
+  /// FCM, is what noticed it — but the *sound* comes off the same high-importance
+  /// channel a pushed order rings, so an open app and a woken one sound alike.
+  ///
+  /// A no-op until [start] has wired the channel (see [_started]).
+  static Future<void> chimeNewOrder() async {
+    if (!_started) return;
+    try {
+      await _local.show(
+        _inAppChimeId,
+        'New order',
+        'A customer just placed an order.',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+        ),
+      );
+    } on Object catch (e) {
+      debugPrint('Could not chime new order: $e.');
     }
   }
 
