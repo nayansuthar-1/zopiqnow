@@ -7,6 +7,7 @@ import 'package:zopiq_vendor/core/images/image_uploader.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 import 'package:zopiq_vendor/features/payments/presentation/providers/payments_providers.dart';
+import 'package:zopiq_vendor/features/notifications/presentation/providers/notifications_providers.dart';
 import 'package:zopiq_vendor/features/profile/presentation/pages/profile_edit_page.dart';
 import 'package:zopiq_vendor/features/profile/presentation/pages/profile_page.dart';
 import 'package:zopiq_vendor/features/profile/presentation/providers/profile_providers.dart';
@@ -26,6 +27,7 @@ Widget _app({
     ),
     vendorRestaurantDataSourceProvider.overrideWithValue(restaurant),
     paymentsDataSourceProvider.overrideWithValue(FakePaymentsDataSource()),
+    notificationsDataSourceProvider.overrideWithValue(FakeNotificationsDataSource()),
     imageUploaderProvider.overrideWithValue(uploader ?? FakeImageUploader()),
     clockProvider.overrideWith((Ref ref) => const Stream<DateTime>.empty()),
   ],
@@ -33,6 +35,9 @@ Widget _app({
 );
 
 void _tallSurface(WidgetTester tester) {
+  tester.platformDispatcher.accessibilityFeaturesTestValue =
+      const FakeAccessibilityFeatures(disableAnimations: true);
+  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
   tester.view.physicalSize = const Size(1200, 2600);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
@@ -135,8 +140,9 @@ void main() {
     expect(find.byType(ProfilePage), findsOneWidget);
     expect(find.text('Paradise Biryani (Jubilee Hills)'), findsWidgets);
 
-    // And the queue's header followed, without a re-login.
-    await tester.tap(find.text('Orders'));
+    // And the Home header followed, without a re-login — the redesign moved the
+    // live restaurant name off the queue and onto Home.
+    await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
     expect(find.text('Paradise Biryani (Jubilee Hills)'), findsOneWidget);
   });

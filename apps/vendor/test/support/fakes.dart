@@ -4,6 +4,8 @@ import 'package:zopiq_vendor/features/auth/data/vendor_auth_datasource.dart';
 import 'package:zopiq_vendor/features/auth/domain/entities/vendor.dart';
 import 'package:zopiq_vendor/features/menu/data/vendor_menu_datasource.dart';
 import 'package:zopiq_vendor/features/menu/domain/entities/vendor_dish.dart';
+import 'package:zopiq_vendor/features/notifications/data/notifications_datasource.dart';
+import 'package:zopiq_vendor/features/notifications/domain/entities/vendor_notification.dart';
 import 'package:zopiq_vendor/features/orders/data/vendor_order_datasource.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/core/images/image_uploader.dart';
@@ -378,6 +380,78 @@ class FakePaymentsDataSource implements PaymentsDataSource {
   Future<List<SettlementOrder>> fetchSettlementOrders(int settlementId) async =>
       const <SettlementOrder>[];
 }
+
+/// The inbox, in memory, with a stream that behaves like Postgres does: a write
+/// goes to the store, and the store pushes the new list at everyone. Defaults to
+/// an empty inbox, so the Home bell — always mounted — renders without Supabase.
+class FakeNotificationsDataSource implements NotificationsDataSource {
+  FakeNotificationsDataSource({
+    List<VendorNotification> initial = const <VendorNotification>[],
+  }) : _items = List<VendorNotification>.of(initial);
+
+  List<VendorNotification> _items;
+
+  final StreamController<List<VendorNotification>> _controller =
+      StreamController<List<VendorNotification>>.broadcast();
+
+  /// What the screen asked to mark read, so a test can assert the tap wrote.
+  final List<int> markedRead = <int>[];
+  int markAllCalls = 0;
+
+  @override
+  Stream<List<VendorNotification>> watch(String restaurantId) async* {
+    yield _items;
+    yield* _controller.stream;
+  }
+
+  @override
+  Future<void> markRead(int id) async {
+    markedRead.add(id);
+    _items = _items
+        .map((VendorNotification n) => n.id == id ? _seen(n) : n)
+        .toList(growable: false);
+    _controller.add(_items);
+  }
+
+  @override
+  Future<void> markAllRead() async {
+    markAllCalls++;
+    _items = _items.map(_seen).toList(growable: false);
+    _controller.add(_items);
+  }
+
+  static VendorNotification _seen(VendorNotification n) => n.isUnread
+      ? VendorNotification(
+          id: n.id,
+          kind: n.kind,
+          title: n.title,
+          body: n.body,
+          orderId: n.orderId,
+          createdAt: n.createdAt,
+          readAt: DateTime.now(),
+        )
+      : n;
+
+  void dispose() => _controller.close();
+}
+
+VendorNotification notification({
+  int id = 1,
+  NotificationKind kind = NotificationKind.newOrder,
+  String title = 'New order',
+  String? body = 'Order ZPQ-1042 · ₹720',
+  String? orderId = 'ZPQ-1042',
+  Duration age = const Duration(minutes: 2),
+  bool read = false,
+}) => VendorNotification(
+  id: id,
+  kind: kind,
+  title: title,
+  body: body,
+  orderId: orderId,
+  createdAt: DateTime.now().subtract(age),
+  readAt: read ? DateTime.now() : null,
+);
 
 /// The opening hours, in memory. Defaults to an empty week — "always open",
 /// which is what a restaurant that has never set an hour is.

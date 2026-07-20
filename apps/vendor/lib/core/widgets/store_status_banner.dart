@@ -168,7 +168,20 @@ class _BreathingDotState extends State<_BreathingDot>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: ZopiqDurations.breath,
-  )..repeat(reverse: true);
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Hold still when motion is reduced — the OS "reduce animations" setting, and
+    // the same signal a widget test sets so a perpetual pulse never keeps
+    // `pumpAndSettle` from ever settling.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.stop();
+    } else if (!_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
+  }
 
   @override
   void dispose() {

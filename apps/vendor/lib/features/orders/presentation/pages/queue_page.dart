@@ -4,6 +4,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_vendor/core/widgets/store_status_banner.dart';
 import 'package:zopiq_vendor/features/auth/domain/entities/vendor.dart';
+import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 import 'package:zopiq_vendor/features/orders/presentation/widgets/order_ticket.dart';

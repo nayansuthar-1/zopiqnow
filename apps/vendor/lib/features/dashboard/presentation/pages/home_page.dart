@@ -5,8 +5,10 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_vendor/core/widgets/store_status_banner.dart';
 
+import 'package:zopiq_vendor/app/router.dart';
 import 'package:zopiq_vendor/core/formatting/formatters.dart';
 import 'package:zopiq_vendor/features/auth/domain/entities/vendor.dart';
+import 'package:zopiq_vendor/features/notifications/presentation/providers/notifications_providers.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_vendor/features/dashboard/presentation/providers/dashboard_providers.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
@@ -76,7 +78,7 @@ class HomePage extends ConsumerWidget {
                 const SizedBox(height: ZopiqSpacing.xl),
 
               // ── 3. Today's Performance ──
-              ZopiqReveal(
+              const ZopiqReveal(
                 index: 3,
                 child: _SectionHeader(title: "Today's Performance"),
               ),
@@ -161,7 +163,9 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: ZopiqSpacing.md),
+        const SizedBox(width: ZopiqSpacing.sm),
+        const _NotificationBell(),
+        const SizedBox(width: ZopiqSpacing.sm),
         Container(
           width: 44,
           height: 44,
@@ -199,6 +203,74 @@ class _Header extends StatelessWidget {
     ];
     final DateTime now = DateTime.now();
     return '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
+  }
+}
+
+/// The header bell — a quiet count of what's unread, and the way into the inbox.
+///
+/// `goNamed`, like the Quick Actions: it builds the More → Notifications stack,
+/// so the bottom nav follows to More and Back returns to the hub.
+class _NotificationBell extends ConsumerWidget {
+  const _NotificationBell();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ZopiqColors zc = context.zc;
+    final int unread = ref.watch(unreadCountProvider);
+
+    return ZopiqPressable(
+      onTap: () => context.goNamed(Routes.notifications),
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: Stack(
+          alignment: Alignment.center,
+          children: <Widget>[
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: zc.textMuted.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.notifications_none_rounded,
+                color: zc.textStrong,
+                size: 22,
+              ),
+            ),
+            if (unread > 0)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  constraints: const BoxConstraints(minWidth: 16),
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: zc.primary,
+                    borderRadius: ZopiqRadii.rPill,
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.surface,
+                      width: 1.5,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    unread > 9 ? '9+' : '$unread',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 9,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

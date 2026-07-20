@@ -134,13 +134,14 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
 - **Backend:** migrations `0018` (offers), `0019` (reviews + rating aggregate trigger).
 - **Deps:** `fl_chart` (approval needed).
 
-## Phase 7 — Notifications & support  ⬜
+## Phase 7 — Notifications & support  🟡 MOSTLY DONE
 
-- [ ] In-app notification center (read/unread, mark-all, deep links) — **no deps**
+- [x] In-app notification center (read/unread, mark-all, deep link to queue) — **no deps**
+      (migration `0021`; `features/notifications`; Home header bell + More hub row)
 - [ ] Sound + haptic on new order (foreground) — **no deps**
-- [ ] Background push (FCM) — **deps: firebase_messaging + flutter_local_notifications (approval)**
-- [ ] Support tickets (create, list, conversation) + FAQ
-- **Backend:** migrations `0020` (notifications + FCM tokens + new-order trigger), `0021` (support).
+- [x] Background push (FCM) — device + send side committed; user still owes deploy (see roadmap memory)
+- [x] Support tickets → shipped as FAQ + contact (`features/support`)
+- **Backend:** migrations `0020` (FCM tokens), `0021` (notifications table + read RPCs + new-order trigger).
 
 ## Phase 8 — Staff roles & delivery-partner workflow  ⬜
 
@@ -172,6 +173,25 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
 - **2026-07-17** — Phase 2 leftovers: migration `0015` (`ready_by` + prep-time param);
   prep-time sheet on accept + `Ready in Xm`/`Over by Xm` countdown chip; History `Rejected`
   chip; guard/offline audit (no change needed). Phase 2 complete.
+- **2026-07-20** — Phase 7 in-app notification center. New `features/notifications`
+  (entity/datasource/providers/page). Migration `0021`: `notifications` table
+  (per-restaurant, RLS-scoped read), `mark_notification_read` /
+  `mark_all_notifications_read` RPCs (read_at-only, no update grant), an
+  exception-safe `AFTER INSERT` trigger on `orders` that writes a "New order" row
+  (approved — touches the shared orders surface; wrapped so it can never abort
+  placement), and the table added to the `supabase_realtime` publication. Applied
+  + verified (trigger writes on insert; rolled back, no prod pollution). Inbox at
+  More → Notifications, plus a live unread bell in the Home header; tap deep-links
+  to the queue. Vendor 47/47 green, analyze clean.
+  - **Pre-existing breakage found & fixed:** commit `490505f` ("ui changes in
+    vendor") had left `main` **not compiling** — its import cleanup dropped
+    `auth_providers` from `queue_page` (used `vendorProvider`) and `router` from
+    `home_page` (used `Routes`); re-added both. That same commit's new
+    `StoreStatusBanner` ran a perpetual `..repeat()` pulse that hung every widget
+    test's `pumpAndSettle`; now gated on reduced-motion, and the test harness sets
+    `disableAnimations`. Two queue-header assertions (restaurant name → now a fixed
+    "Active Orders" title; live name moved to the Home header) updated to match the
+    redesign. (These had never run because the commit didn't compile.)
 - **2026-07-17** — Phase 3 Slice 1 (Categories management): new Sections screen —
   reorder (drag), rename, enable/disable a whole section — reached from the Menu app
   bar, optimistic with revert-on-refusal. Migration `0016` applied: `category_available`

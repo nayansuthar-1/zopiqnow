@@ -83,6 +83,15 @@ class MorePage extends ConsumerWidget {
             ZopiqReveal(
               index: 6,
               child: _Row(
+                icon: Icons.notifications_rounded,
+                label: 'Notifications',
+                subtitle: 'New orders and updates',
+                onTap: () => context.pushNamed(Routes.notifications),
+              ),
+            ),
+            ZopiqReveal(
+              index: 7,
+              child: _Row(
                 icon: Icons.help_outline_rounded,
                 label: 'Support',
                 subtitle: 'Answers, and how to reach us',
@@ -91,11 +100,11 @@ class MorePage extends ConsumerWidget {
             ),
 
             const ZopiqReveal(
-              index: 7,
+              index: 8,
               child: _SectionLabel('Coming soon'),
             ),
             const ZopiqReveal(
-              index: 8,
+              index: 9,
               child: _Row(
                 icon: Icons.local_offer_rounded,
                 label: 'Offers',
@@ -103,19 +112,11 @@ class MorePage extends ConsumerWidget {
               ),
             ),
             const ZopiqReveal(
-              index: 9,
+              index: 10,
               child: _Row(
                 icon: Icons.reviews_rounded,
                 label: 'Reviews',
                 subtitle: 'What customers are saying',
-              ),
-            ),
-            const ZopiqReveal(
-              index: 10,
-              child: _Row(
-                icon: Icons.notifications_rounded,
-                label: 'Notifications',
-                subtitle: 'Alerts and quiet hours',
               ),
             ),
             const ZopiqReveal(

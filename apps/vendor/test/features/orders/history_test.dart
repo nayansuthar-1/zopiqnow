@@ -8,6 +8,7 @@ import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/pages/history_page.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 import 'package:zopiq_vendor/features/payments/presentation/providers/payments_providers.dart';
+import 'package:zopiq_vendor/features/notifications/presentation/providers/notifications_providers.dart';
 import 'package:zopiq_vendor/features/profile/presentation/providers/profile_providers.dart';
 
 import '../../support/fakes.dart';
@@ -22,12 +23,16 @@ Widget _app({required FakeVendorOrderDataSource orders}) => ProviderScope(
       FakeVendorRestaurantDataSource(),
     ),
     paymentsDataSourceProvider.overrideWithValue(FakePaymentsDataSource()),
+    notificationsDataSourceProvider.overrideWithValue(FakeNotificationsDataSource()),
     clockProvider.overrideWith((Ref ref) => const Stream<DateTime>.empty()),
   ],
   child: const VendorApp(),
 );
 
 void _tallSurface(WidgetTester tester) {
+  tester.platformDispatcher.accessibilityFeaturesTestValue =
+      const FakeAccessibilityFeatures(disableAnimations: true);
+  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
   tester.view.physicalSize = const Size(1200, 2600);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);

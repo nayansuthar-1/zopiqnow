@@ -10,6 +10,7 @@ import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/pages/queue_page.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 import 'package:zopiq_vendor/features/payments/presentation/providers/payments_providers.dart';
+import 'package:zopiq_vendor/features/notifications/presentation/providers/notifications_providers.dart';
 
 import '../../support/fakes.dart';
 
@@ -23,6 +24,7 @@ Widget _app({
     ),
     vendorOrderDataSourceProvider.overrideWithValue(orders),
     paymentsDataSourceProvider.overrideWithValue(FakePaymentsDataSource()),
+    notificationsDataSourceProvider.overrideWithValue(FakeNotificationsDataSource()),
     // The age clock is a `Stream.periodic`, which never completes — a pending
     // timer the test binding rightly refuses to end a test on. Ages are computed
     // at build from `placedAt`, so a clock that never ticks changes nothing here
@@ -33,6 +35,9 @@ Widget _app({
 );
 
 void _tallSurface(WidgetTester tester) {
+  tester.platformDispatcher.accessibilityFeaturesTestValue =
+      const FakeAccessibilityFeatures(disableAnimations: true);
+  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
   tester.view.physicalSize = const Size(1200, 2600);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
@@ -56,7 +61,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(QueuePage), findsOneWidget);
-      expect(find.text('Paradise Biryani'), findsOneWidget);
+      // The queue header is a fixed "Active Orders" title now; the restaurant
+      // name moved to the Home header in the redesign.
+      expect(find.text('Active Orders'), findsOneWidget);
       expect(find.text('1 new · 1 in the queue'), findsOneWidget);
 
       // What to cook.
