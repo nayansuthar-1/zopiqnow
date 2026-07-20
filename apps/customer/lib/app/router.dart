@@ -17,6 +17,9 @@ import 'package:zopiqnow/features/checkout/presentation/pages/order_success_page
 import 'package:zopiqnow/features/checkout/presentation/pages/orders_page.dart';
 import 'package:zopiqnow/features/design_showcase/presentation/design_showcase_page.dart';
 import 'package:zopiqnow/features/favourites/presentation/pages/favourites_page.dart';
+import 'package:zopiqnow/features/gifts/domain/entities/gift_shop.dart';
+import 'package:zopiqnow/features/gifts/presentation/pages/gift_shop_page.dart';
+import 'package:zopiqnow/features/gifts/presentation/pages/gifts_page.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/presentation/home_page.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
@@ -32,6 +35,8 @@ abstract final class Routes {
   static const String showcase = 'showcase';
   static const String search = 'search';
   static const String menu = 'menu';
+  static const String gifts = 'gifts';
+  static const String giftShop = 'giftShop';
   static const String cart = 'cart';
   static const String checkout = 'checkout';
   static const String orderSuccess = 'orderSuccess';
@@ -229,7 +234,34 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
               ),
             ],
           ),
-          // Branch 3: Cart
+          // Branch 3: Gifts — a second storefront beside food. Its own branch so
+          // it keeps its stack and scroll position, and so a shop opened inside
+          // it (the nested route below) stays under the Gifts tab.
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/gifts',
+                name: Routes.gifts,
+                builder: (BuildContext context, _) => GiftsPage(
+                  onOpenShop: (GiftShop shop) => context.pushNamed(
+                    Routes.giftShop,
+                    pathParameters: <String, String>{'id': shop.id},
+                  ),
+                ),
+                routes: <RouteBase>[
+                  // Path-based, not `extra`-based: a shop must resolve from its
+                  // id alone, with no Gifts feed in memory.
+                  GoRoute(
+                    path: 'shop/:id',
+                    name: Routes.giftShop,
+                    builder: (BuildContext context, GoRouterState state) =>
+                        GiftShopPage(shopId: state.pathParameters['id']!),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          // Branch 4: Cart
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(

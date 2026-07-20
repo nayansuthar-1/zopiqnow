@@ -35,16 +35,12 @@ class _ShellNavBar extends ConsumerWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  void _onTap(int index) {
-    if (index == 3) {
-      // Cart is index 3
-      navigationShell.goBranch(
-        3,
-        initialLocation: 3 == navigationShell.currentIndex,
-      );
-      return;
-    }
+  /// The Cart branch's index. It sits after the four left-pill tabs
+  /// (Delivery, Dining, Grocery, Gifts), and is reached from the separate Cart
+  /// pill rather than the pill row.
+  static const int _cartIndex = 4;
 
+  void _onTap(int index) {
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
@@ -58,7 +54,10 @@ class _ShellNavBar extends ConsumerWidget {
     final ZopiqColors zc = context.zc;
 
     final int currentIndex = navigationShell.currentIndex;
-    final int leftIndex = currentIndex < 3 ? currentIndex : 0; // fallback if cart selected
+    // The four pill tabs are indices 0–3; Cart is _cartIndex. When Cart is the
+    // selected branch, the sliding indicator has no pill to sit under, so it
+    // falls back to the first tab rather than sliding off the row.
+    final int leftIndex = currentIndex < _cartIndex ? currentIndex : 0;
 
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final Color glowColor = isDark ? Colors.black : Colors.white;
@@ -120,7 +119,7 @@ class _ShellNavBar extends ConsumerWidget {
                       ),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          final double tabWidth = constraints.maxWidth / 3;
+                          final double tabWidth = constraints.maxWidth / 4;
                           return Stack(
                             children: [
                               // Sliding indicator
@@ -170,6 +169,16 @@ class _ShellNavBar extends ConsumerWidget {
                                     isSelected: currentIndex == 2,
                                     zc: zc,
                                   ),
+                                  _buildNavItem(
+                                    context: context,
+                                    index: 3,
+                                    title: 'Gifts',
+                                    icon: Icons.card_giftcard_outlined,
+                                    activeIcon: Icons.card_giftcard,
+                                    width: tabWidth,
+                                    isSelected: currentIndex == 3,
+                                    zc: zc,
+                                  ),
                                 ],
                               ),
                             ],
@@ -186,7 +195,7 @@ class _ShellNavBar extends ConsumerWidget {
                   curve: Curves.easeInOutCubic,
                   offset: isVisible ? Offset.zero : const Offset(1.5, 0), // Slide right
                   child: GestureDetector(
-                    onTap: () => _onTap(3),
+                    onTap: () => _onTap(_cartIndex),
                     child: Container(
                       height: 57,
                       padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.lg),
