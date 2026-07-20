@@ -60,11 +60,7 @@ class _GiftItemSheet extends StatelessWidget {
                   borderRadius: ZopiqRadii.rLg,
                   child: AspectRatio(
                     aspectRatio: 4 / 3,
-                    child: GiftImage(
-                      url: item.imageUrl,
-                      seed: item.id,
-                      iconSize: 56,
-                    ),
+                    child: _Gallery(item: item),
                   ),
                 ),
                 const SizedBox(height: ZopiqSpacing.lg),
@@ -104,6 +100,80 @@ class _GiftItemSheet extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A swipeable gallery of a gift's photos, with a dot per page. Falls back to
+/// the single [GiftItem.imageUrl] when a product has no gallery, so a one-photo
+/// item still renders (with no dots).
+class _Gallery extends StatefulWidget {
+  const _Gallery({required this.item});
+
+  final GiftItem item;
+
+  @override
+  State<_Gallery> createState() => _GalleryState();
+}
+
+class _GalleryState extends State<_Gallery> {
+  final PageController _controller = PageController();
+  int _page = 0;
+
+  List<String> get _images => widget.item.imageUrls.isNotEmpty
+      ? widget.item.imageUrls
+      : <String>[widget.item.imageUrl];
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final List<String> images = _images;
+
+    return Stack(
+      children: <Widget>[
+        PageView.builder(
+          controller: _controller,
+          itemCount: images.length,
+          onPageChanged: (int i) => setState(() => _page = i),
+          itemBuilder: (BuildContext context, int i) => GiftImage(
+            url: images[i],
+            // Seed per page so a fallback placeholder still varies per photo.
+            seed: '${widget.item.id}-$i',
+            iconSize: 56,
+          ),
+        ),
+        // Dots — only worth drawing when there is more than one photo.
+        if (images.length > 1)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: ZopiqSpacing.sm,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                for (int i = 0; i < images.length; i++)
+                  Container(
+                    width: 7,
+                    height: 7,
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: ZopiqSpacing.xxs,
+                    ),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: i == _page
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.5),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

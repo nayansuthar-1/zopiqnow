@@ -16,6 +16,7 @@ class GiftItem {
     required this.category,
     required this.categoryRank,
     required this.itemRank,
+    this.imageUrls = const <String>[],
   });
 
   final String id;
@@ -26,8 +27,14 @@ class GiftItem {
   /// Whole rupees.
   final int price;
 
-  /// Remote image URL. Empty falls back to the branded gradient placeholder.
+  /// Primary image URL — the card thumbnail. Empty falls back to the branded
+  /// gradient placeholder.
   final String imageUrl;
+
+  /// The full gallery, in display order (the primary is the first). Empty for a
+  /// product with only the single [imageUrl]; the detail screen falls back to
+  /// `[imageUrl]` in that case.
+  final List<String> imageUrls;
 
   /// The shelf this sits on ("Home Decor", "Candles & Fragrance"). [categoryRank]
   /// orders the shelves, [itemRank] orders products within one.
