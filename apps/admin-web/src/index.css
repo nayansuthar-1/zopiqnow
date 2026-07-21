@@ -1,0 +1,36 @@
+@import 'tailwindcss';
+
+/* The design tokens, mirrored from packages/zopiq_ui/lib/src/tokens/.
+   That package is the source of truth; these are its hex values restated for
+   the web. Change them there first. Feature code uses the token names below
+   and never a raw hex (ENGINEERING_RULES Rule 2). */
+@theme {
+  --color-brand: #fc8019; /* primary — active states, highlights */
+  --color-brand-deep: #ff5200; /* strong CTAs */
+  --color-brand-soft: #fff4ea; /* tinted surface behind brand content */
+
+  --color-ink: #282c3f; /* headings / primary text */
+  --color-ink-muted: #7e808c; /* captions / secondary text */
+  --color-line: #e9e9eb; /* dividers, input borders */
+  --color-canvas: #f6f6f7; /* page background behind cards */
+
+  --color-veg: #267335;
+  --color-non-veg: #e43b4f;
+
+  --radius-card: 12px;
+  --radius-field: 8px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

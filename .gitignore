@@ -53,3 +53,11 @@ app.*.map.json
 
 # Local gift photos to bulk-upload to Cloudinary (never committed)
 gift_photos/
+
+# Web console (apps/admin-web). `build/` above already covers Flutter output;
+# these are the Node/Vite equivalents.
+node_modules/
+dist/
+.env.local
+.env.*.local
+*.tsbuildinfo
