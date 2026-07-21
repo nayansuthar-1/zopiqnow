@@ -171,11 +171,15 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
       backfill, every refusal, and that staff keep orders + menu writes.
       Vendor 58/58 green, analyze clean.
 
-**Slice 8b — Delivery partners — ⬜**
-- [ ] Delivery-partner domain: riders, assignment, ETA, pickup status, handover OTP
-- **Backend:** net-new delivery schema/RPCs. Largest backend effort; touches the
-  shared `orders` surface and changes what the customer app shows in transit, so
-  it needs the customer app to move in lockstep.
+**Slice 8b — Delivery partners — 🟡 IN PROGRESS.** Planned in full in
+[`DELIVERY_PLAN.md`](DELIVERY_PLAN.md); user chose a **platform-wide fleet** and a
+**rider app** in this phase.
+- [x] **8b-1 — the domain + the vendor's half (migration `0025`).** Riders,
+      self-claim dispatch, pickup-OTP handover. No new `orders.status` values and
+      no new policy on `orders`. Rider strip on the ticket. Vendor 62/62 green.
+- [ ] 8b-2 — `apps/rider`, a fourth workspace member (no new deps).
+- [ ] 8b-3 — the customer sees their rider on the tracking card.
+- [ ] 8b-4 — hardening: `/security-review`, the edge matrix, optional auto-assign.
 
 ## Phase 9 — Perf, security, hardening  ⬜
 

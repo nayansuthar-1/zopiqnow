@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:zopiq_vendor/features/auth/data/vendor_auth_datasource.dart';
 import 'package:zopiq_vendor/features/auth/domain/entities/vendor.dart';
+import 'package:zopiq_vendor/features/delivery/data/delivery_datasource.dart';
+import 'package:zopiq_vendor/features/delivery/domain/entities/order_delivery.dart';
 import 'package:zopiq_vendor/features/menu/data/vendor_menu_datasource.dart';
 import 'package:zopiq_vendor/features/menu/domain/entities/vendor_dish.dart';
 import 'package:zopiq_vendor/features/notifications/data/notifications_datasource.dart';
@@ -473,6 +475,31 @@ VendorNotification notification({
   orderId: orderId,
   createdAt: DateTime.now().subtract(age),
   readAt: read ? DateTime.now() : null,
+);
+
+/// Who is carrying what, in memory. Defaults to nobody — the ordinary case for
+/// a restaurant that hands bags to its own cousin with a scooter.
+class FakeDeliveryDataSource implements DeliveryDataSource {
+  FakeDeliveryDataSource({this.active = const <String, OrderDelivery>{}});
+
+  final Map<String, OrderDelivery> active;
+
+  @override
+  Future<Map<String, OrderDelivery>> fetchActive() async => active;
+}
+
+OrderDelivery delivery({
+  String orderId = 'ZPQ-1042',
+  String riderName = 'Asha',
+  String riderPhone = '+919000000001',
+  DeliveryState state = DeliveryState.claimed,
+  String pickupOtp = '5896',
+}) => OrderDelivery(
+  orderId: orderId,
+  riderName: riderName,
+  riderPhone: riderPhone,
+  state: state,
+  pickupOtp: pickupOtp,
 );
 
 /// The roster, in memory. Mirrors 0024's refusals that the screen actually

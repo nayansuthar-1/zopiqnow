@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_vendor/features/delivery/domain/entities/order_delivery.dart';
+import 'package:zopiq_vendor/features/delivery/presentation/providers/delivery_providers.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 import 'package:zopiq_vendor/features/orders/presentation/widgets/order_lines.dart';
@@ -145,6 +147,12 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
             const SizedBox(height: ZopiqSpacing.sm),
             _Detail(icon: Icons.location_on_rounded, text: order.deliveryTo),
 
+            if (ref.watch(orderDeliveryProvider(order.id))
+                case final OrderDelivery delivery) ...<Widget>[
+              const SizedBox(height: ZopiqSpacing.md),
+              _RiderStrip(delivery: delivery, orderStatus: order.status),
+            ],
+
             if (_refusal != null) ...<Widget>[
               const SizedBox(height: ZopiqSpacing.md),
               Text(_refusal!, style: t.bodySmall?.copyWith(color: zc.nonVeg)),
@@ -194,6 +202,90 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The rider on this order: who is coming, and the four digits that hand the bag
+/// over.
+///
+/// The code is the whole point of this strip, and it is shown *only* once the
+/// food is packed and the rider has not yet typed it. Before that there is
+/// nothing to hand over; after it, the digits are spent. A code left on screen
+/// for the rest of the order's life is a code somebody reads out to the wrong
+/// person.
+class _RiderStrip extends StatelessWidget {
+  const _RiderStrip({required this.delivery, required this.orderStatus});
+
+  final OrderDelivery delivery;
+  final OrderStatus orderStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    final bool handOverNow =
+        delivery.showsPickupCode &&
+        orderStatus == OrderStatus.readyForPickup;
+
+    return Container(
+      padding: const EdgeInsets.all(ZopiqSpacing.md),
+      decoration: BoxDecoration(
+        color: zc.textMuted.withValues(alpha: 0.06),
+        borderRadius: ZopiqRadii.rMd,
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.delivery_dining_rounded, size: 20, color: zc.textMuted),
+          const SizedBox(width: ZopiqSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  delivery.riderName,
+                  style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  switch (delivery.state) {
+                    DeliveryState.claimed =>
+                      handOverNow
+                          ? 'Read the code to hand over'
+                          : 'On the way to collect',
+                    DeliveryState.pickedUp => 'Picked up',
+                    DeliveryState.delivered => 'Delivered',
+                    DeliveryState.cancelled => 'Dropped the job',
+                  },
+                  style: t.bodySmall?.copyWith(color: zc.textMuted),
+                ),
+              ],
+            ),
+          ),
+          if (handOverNow)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: ZopiqSpacing.md,
+                vertical: ZopiqSpacing.xs,
+              ),
+              decoration: BoxDecoration(
+                color: zc.primary.withValues(alpha: 0.10),
+                borderRadius: ZopiqRadii.rPill,
+              ),
+              child: Text(
+                delivery.pickupOtp,
+                style: t.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: zc.primary,
+                  // The one string on this screen somebody reads aloud, digit by
+                  // digit, over the noise of a kitchen.
+                  letterSpacing: 3,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
