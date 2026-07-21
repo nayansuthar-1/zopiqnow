@@ -130,38 +130,61 @@ verify passes. Work top to bottom; stop at the end of each phase for review.
 
 One migration per concern, so a mistake rolls back cleanly.
 
-- [ ] **1.1** `0027_restaurant_id_and_contact.sql`
+- [x] **1.1** `0027_restaurant_id_and_contact.sql`
       - `alter table restaurants alter column id set default gen_random_uuid()::text`
       - add `owner_name text`, `contact_phone text`, `address_line text`, `city text`,
         `state text`, `pincode text` (checked `^[1-9][0-9]{5}$` when present)
       - all nullable, because the eight seeded rows have none of it
       → **verify:** an insert with no id succeeds; the seeded rows still read fine in the customer app.
-- [ ] **1.2** `0028_restaurant_legal.sql` — `restaurant_legal (restaurant_id pk,
+- [x] **1.2** `0028_restaurant_legal.sql` — `restaurant_legal (restaurant_id pk,
       fssai_number, fssai_expiry date, fssai_doc_url, gst_number, pan_number,
       pan_doc_url, updated_at)`. RLS on, **admin-only select/write** (via RPC).
       A vendor must not be able to read or edit their own licence numbers.
       → **verify:** a vendor JWT selecting the table gets zero rows.
-- [ ] **1.3** `0029_restaurant_bank.sql` — `restaurant_bank_accounts (restaurant_id pk,
+- [x] **1.3** `0029_restaurant_bank.sql` — `restaurant_bank_accounts (restaurant_id pk,
       account_holder, account_number, ifsc checked `^[A-Z]{4}0[A-Z0-9]{6}$`, bank_name,
       verified boolean default false, updated_at)`. Admin-only, same as legal.
       → **verify:** vendor JWT reads nothing; admin RPC round-trips a record.
-- [ ] **1.4** `0030_admin_rpcs.sql` — the write surface, every function
-      `security definer` + `set search_path = public` + first line `if not is_admin()
-      then raise`:
-      - `admin_create_restaurant(jsonb) → text` (returns new id, `is_active = false`)
-      - `admin_update_restaurant(p_id text, jsonb)`
-      - `admin_set_legal(p_id, jsonb)` / `admin_set_bank(p_id, jsonb)`
-      - `admin_set_hours(p_id, jsonb)` — admin-scoped twin of `set_restaurant_hours`
-      - `admin_set_commission(p_id, p_bps)`
-      - `admin_add_staff(p_id, p_email, p_role)` / `admin_remove_staff(p_id, p_email)`
-      - `admin_upsert_menu_item(p_id, jsonb) → text`, `admin_delete_menu_item(p_item_id)`
-      - `admin_reorder_menu(p_id, jsonb)` — bulk category_rank/item_rank write
-      - `admin_publish_restaurant(p_id)` / `admin_unpublish_restaurant(p_id)`
-      - `admin_list_restaurants()` — includes drafts, which the anon policy hides
-      → **verify:** each RPC raises `'Not authorized.'` under a vendor JWT and succeeds under manav's.
-- [ ] **1.5** Apply 0026–0030 to the live project and re-run the vendor + customer
-      apps against it.
-      → **verify:** vendor app menu editing, order queue, and the customer feed all still work.
+- [x] **1.4** The write surface — **split into two migrations**, because the
+      restaurant and its menu are separate concerns and one file would have been
+      900 lines. Every function is `security definer` + `set search_path = public`,
+      opens with `perform assert_admin()`, and has `execute` revoked from `public`
+      (Postgres grants it by default, so a bare `grant … to authenticated` would
+      have left the door open to `anon`).
+      - `0030_admin_restaurant_rpcs.sql` — `assert_admin`, `admin_create_restaurant`,
+        `admin_update_restaurant`, `admin_list_restaurants`, `admin_get_restaurant`,
+        `admin_set_legal`, `admin_set_bank`, `admin_set_hours`, `admin_add_staff`,
+        `admin_set_staff_role`, `admin_remove_staff`, `admin_publish_restaurant`,
+        `admin_unpublish_restaurant`
+      - `0031_admin_menu_rpcs.sql` — `admin_list_menu`, `admin_upsert_menu_item`,
+        `admin_delete_menu_item`, `admin_reorder_menu`, `admin_rename_category`,
+        `admin_set_category_available`
+      - **Deviations from the sketch above:** commission folded into
+        `admin_update_restaurant` rather than its own `admin_set_commission` (same
+        table, same guard, one fewer thing to keep in step); `admin_get_restaurant`
+        and `admin_list_menu` added, because an admin cannot read a draft or a
+        sold-out dish through RLS at all; the publish gate implemented here in full
+        rather than deferred to 6.2, so Phase 6 builds UI against a finished rule.
+      → **verify:** ✅ six representative RPCs each raise *"You are not a Zopiqnow
+        admin."* under a vendor JWT and succeed under manav's.
+- [x] **1.5** Apply 0026–0032 to the live project and re-check the vendor and
+      customer surfaces against it.
+      → **verify:** ✅ full lifecycle exercised — draft created with a generated id,
+        all eight publish-gate refusals fired with their own sentences, menu ranks
+        auto-assigned, publish flipped `is_active`, `rating` ignored when an admin
+        tried to set it, last-owner removal refused, bank returned as last-4 only.
+        Vendor policies unchanged (own menu 9 items, own restaurant, role `owner`);
+        the 8 seeded restaurants and 72 menu items intact; test row cascaded away.
+- [x] **1.6** `0032_unlisted_menus_are_not_public.sql` — **unplanned, found by the
+      1.5 verification.** A draft restaurant was correctly invisible to the anon key
+      while its entire menu was not: `menu_items`' public policy asked only
+      `is_available and category_available`, never whether the restaurant was
+      listed. Not exploitable into an order (`place_order` refuses an inactive
+      restaurant), but an unlaunched kitchen's dishes and prices were world-readable.
+      The policy now joins back to `restaurants.is_active`, like `restaurant_hours`
+      already did. The vendor's own read policy is untouched — a delisted kitchen
+      must still see its menu.
+      → **verify:** ✅ draft menu now 0 items to anon; live r1 menu still 9.
 
 ---
 
