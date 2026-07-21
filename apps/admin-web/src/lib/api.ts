@@ -42,6 +42,25 @@ async function rpc<T>(fn: string, params?: Record<string, unknown>): Promise<T> 
   return data as T
 }
 
+/// A dish, as `admin_list_menu` returns it — including the rows a customer cannot
+/// see. The world-readable policy is `is_available and category_available`, which
+/// hides exactly what an editor most needs: the sold-out dish somebody has to
+/// switch back on.
+export type MenuItemRow = {
+  id: string
+  name: string
+  description: string
+  price: number
+  is_veg: boolean
+  is_bestseller: boolean
+  image_url: string
+  category: string
+  category_rank: number
+  item_rank: number
+  is_available: boolean
+  category_available: boolean
+}
+
 /// The shape `admin_get_restaurant` returns. `bank` never carries the account
 /// number — only its last four digits — so there is no field here to leak one.
 export type RestaurantDetail = {
@@ -121,6 +140,32 @@ export const api = {
 
   removeStaff: (id: string, email: string) =>
     rpc<void>('admin_remove_staff', { p_id: id, p_email: email }),
+
+  listMenu: (id: string) => rpc<MenuItemRow[]>('admin_list_menu', { p_id: id }),
+
+  upsertMenuItem: (id: string, item: Record<string, unknown>) =>
+    rpc<string>('admin_upsert_menu_item', { p_id: id, p_item: item }),
+
+  deleteMenuItem: (itemId: string) =>
+    rpc<void>('admin_delete_menu_item', { p_item_id: itemId }),
+
+  /// The menu's whole running order, not just the rows that moved — ranks are only
+  /// meaningful relative to each other, and dragging one dish renumbers everything
+  /// under it.
+  reorderMenu: (
+    id: string,
+    order: { id: string; category: string; category_rank: number; item_rank: number }[],
+  ) => rpc<void>('admin_reorder_menu', { p_id: id, p_order: order }),
+
+  renameCategory: (id: string, from: string, to: string) =>
+    rpc<void>('admin_rename_category', { p_id: id, p_from: from, p_to: to }),
+
+  setCategoryAvailable: (id: string, category: string, available: boolean) =>
+    rpc<void>('admin_set_category_available', {
+      p_id: id,
+      p_category: category,
+      p_available: available,
+    }),
 
   unpublishRestaurant: (id: string) =>
     rpc<void>('admin_unpublish_restaurant', { p_id: id }),

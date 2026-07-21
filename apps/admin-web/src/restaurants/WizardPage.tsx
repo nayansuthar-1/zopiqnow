@@ -9,6 +9,7 @@ import { LegalStep } from './steps/LegalStep'
 import { BankStep } from './steps/BankStep'
 import { HoursStep } from './steps/HoursStep'
 import { TeamStep } from './steps/TeamStep'
+import { MenuStep } from '../menu/MenuStep'
 
 /// The onboarding wizard, and the reason it is a wizard rather than one long form:
 /// a restaurant is six unrelated conversations (what it sells, where it is, what it
@@ -128,7 +129,9 @@ export function WizardPage() {
           </p>
         )}
 
-        <div className="max-w-2xl">
+        {/* The menu is a list of lists and needs the width; the forms read better
+            narrow. */}
+        <div className={step === 6 ? 'max-w-4xl' : 'max-w-2xl'}>
           {step === 0 && (
             <StorefrontStep
               detail={detail}
@@ -152,7 +155,8 @@ export function WizardPage() {
           {step === 5 && id && (
             <TeamStep id={id} detail={detail} onSaved={reload} onNext={() => setStep(6)} />
           )}
-          {step > 5 && (
+          {step === 6 && id && <MenuStep id={id} onNext={() => setStep(7)} />}
+          {step > 6 && (
             <p className="text-sm text-ink-muted">
               This step arrives in the next phase.
             </p>

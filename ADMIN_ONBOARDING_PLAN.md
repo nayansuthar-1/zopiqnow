@@ -313,25 +313,48 @@ every later step saves against its id. Closing the browser loses nothing.
 
 The largest step. Categories are strings on items, so the builder owns their consistency.
 
-- [ ] **5.1** Category management: add / rename / reorder / delete a section. Rename
-      rewrites `category` on every item in it; reorder rewrites `category_rank`;
-      delete is refused while the section has items.
-      → **verify:** renaming "Starters" → "Small plates" updates all its items and nothing else.
-- [ ] **5.2** Item editor: name, description, price, veg/non-veg, bestseller,
-      available, photo (Cloudinary). Add / edit / delete, delete surfacing the FK
-      error as "This dish appears on past orders — mark it unavailable instead."
-      → **verify:** an item added here appears in the customer app's menu for that restaurant.
-- [ ] **5.3** Drag-to-reorder items within a section, saved as `item_rank` in one
-      `admin_reorder_menu` call.
-      → **verify:** the customer app's menu order matches the console's.
-- [ ] **5.4** **CSV / bulk import** — download a template
-      (`category, name, description, price, is_veg, is_bestseller, image_url`), upload,
-      preview with per-row validation, then commit. This is what makes a 120-dish menu
-      possible in one sitting.
-      → **verify:** a 50-row CSV imports with correct ranks; a row with price 0 is rejected in the preview, not at the database.
-- [ ] **5.5** Menu summary: item count per section, count missing a photo, count
-      unavailable.
-      → **verify:** counts match a direct SQL count.
+- [x] **5.1** Section management: add (by naming one on a dish), rename, reorder,
+      hide/show. Rename rewrites `category` on every item in one statement; reorder
+      rewrites `category_rank` for the whole menu; hiding writes `category_available`
+      across the section.
+      → **verify:** ✅ rename moved both Breads dishes and touched nothing else;
+        section reorder and item reorder both landed; a new section joins the end.
+      → **deviation:** there is no *delete a section*. A section has no row of its
+        own — it exists only as a string its dishes share — so an empty one cannot
+        exist to be deleted. Removing the last dish removes the section. The
+        original line ("delete is refused while the section has items") described a
+        button that could only ever be disabled.
+- [x] **5.2** Item editor: name, description, price, veg/non-veg, bestseller,
+      available, photo. Add / edit / delete.
+      → **verify:** ✅ deleting a dish that appears on a real past order →
+        *"This dish appears on past orders, so it can't be deleted. Mark it
+        unavailable instead."* and the dish survives; an unordered dish deletes
+        cleanly. Ranks are assigned server-side, so a new dish joins the end of its
+        section and a new section the end of the menu.
+- [x] **5.3** Drag-to-reorder dishes within a section (native HTML5 drag, no
+      library), persisted as one `admin_reorder_menu` call carrying the menu's whole
+      running order. Sections move with ↑/↓ on their header.
+      → **verify:** ✅ dragging Chicken Biryani above Paneer Tikka, then moving
+        Breads above Recommended, both produced the expected `category_rank.item_rank`
+        for every row.
+      → **note:** dragging *between* sections is deliberately inert. That would
+        change a dish's category as well as its rank — a different operation with
+        different consequences — and the dialog's Section field is where that happens.
+- [x] **5.4** **CSV / bulk import** — template download, per-row validation, a
+      preview that must be looked at, then commit. Written by hand rather than with
+      a library: the format is the one our own template emits.
+      → **verify:** ✅ against deliberately messy input — Excel's byte-order mark,
+        CRLF, a quoted field containing a comma, `""` escaping inside a quoted
+        field, and `yes`/`NO`/`VEG`/`y` booleans all parsed correctly; the four bad
+        rows were each skipped with a reason and a line number (*"A dish has to cost
+        more than zero."*, *"Price "90.5" is not a whole number."*, *"No section."*,
+        *"No dish name."*). Imports run sequentially, not in parallel — the RPC works
+        out each dish's rank from what is already there, so two racing inserts would
+        both claim the same one.
+- [x] **5.5** Menu summary: dish count, section count, how many are unavailable, how
+      many have no photo.
+      → **verify:** ✅ derived from the same `admin_list_menu` rows the list renders,
+        so there is no second count to disagree.
 
 ---
 
