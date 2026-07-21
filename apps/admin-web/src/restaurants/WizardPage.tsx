@@ -10,6 +10,7 @@ import { BankStep } from './steps/BankStep'
 import { HoursStep } from './steps/HoursStep'
 import { TeamStep } from './steps/TeamStep'
 import { MenuStep } from '../menu/MenuStep'
+import { ReviewStep } from './steps/ReviewStep'
 
 /// The onboarding wizard, and the reason it is a wizard rather than one long form:
 /// a restaurant is six unrelated conversations (what it sells, where it is, what it
@@ -156,10 +157,13 @@ export function WizardPage() {
             <TeamStep id={id} detail={detail} onSaved={reload} onNext={() => setStep(6)} />
           )}
           {step === 6 && id && <MenuStep id={id} onNext={() => setStep(7)} />}
-          {step > 6 && (
-            <p className="text-sm text-ink-muted">
-              This step arrives in the next phase.
-            </p>
+          {step === 7 && id && (
+            <ReviewStep
+              id={id}
+              detail={detail}
+              onSaved={reload}
+              onGoToStep={setStep}
+            />
           )}
         </div>
       </div>

@@ -360,16 +360,39 @@ The largest step. Categories are strings on items, so the builder owns their con
 
 ### Phase 6 — Review and publish
 
-- [ ] **6.1** Review screen: everything collected, grouped, each block linking back
-      to its step.
-      → **verify:** a half-filled draft shows exactly which blocks are incomplete.
-- [ ] **6.2** Publish gate. `admin_publish_restaurant` refuses unless: name, cover
+- [x] **6.1** Review screen: a readiness checklist with a Fix link back to whichever
+      step owns each gap, plus a storefront summary.
+      → **verify:** ✅ the checklist is a *mirror*, not the rule.
+        `admin_publish_restaurant` re-checks every condition server-side, and if the
+        two ever disagree the database wins and its sentence is shown verbatim.
+- [x] **6.2** Publish gate — built in 1.4 and verified there; this phase wired the UI
+      to it. The button is disabled while anything is outstanding, but the gate
+      remains the authority. Original text kept below.
+      → **verify:** ✅ all eight refusals fired in Phase 1, each with its own sentence.
+
+      *Original:* `admin_publish_restaurant` refuses unless: name, cover
       photo, address, city, pincode, contact phone, FSSAI, PAN, bank account, an owner
       in `restaurant_staff`, hours for at least one day, and **at least one available
       menu item**. Each failure returns its own sentence.
       → **verify:** publishing a draft with no menu items fails with "Add at least one dish before publishing."
-- [ ] **6.3** Publish flips `is_active = true`.
-      → **verify:** **the restaurant appears in the Android customer app**, opens, and an order can be placed against it end to end.
+- [x] **6.3** Publish flips `is_active = true`.
+      → **verify:** ✅ **the full loop, run for real against the live project.** A
+        restaurant built entirely through the console's own RPCs — storefront,
+        address, legal, bank, owner, seven days of hours, two dishes — then:
+        - published, and a **customer** JWT saw it in the feed and read its menu;
+        - ordering before opening time was refused: *"This restaurant is closed right
+          now. Please check its hours before ordering."*;
+        - after an 11:00–03:00 window was set, `restaurant_is_open_now()` returned
+          true at **00:49 IST** — migration 0036 doing exactly what it was built for —
+          and the order went through;
+        - `place_order` priced it server-side: 2 × ₹260 = ₹520, free delivery over
+          ₹500, 5% tax → **₹546**, receipt `ZPQ-1015`;
+        - the **owner email added in step 6** resolved through `staff_restaurant_id()`,
+          saw the order and its line item, and moved it to `accepted`.
+        Test order and restaurant deleted afterwards; counts back to 8 restaurants,
+        72 dishes.
+      → **still owed:** the same journey through the actual Android build rather than
+        through the policies it runs on. That needs a device, so it is yours.
 
 ---
 
