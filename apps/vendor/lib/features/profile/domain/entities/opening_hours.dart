@@ -18,8 +18,11 @@ class OpeningHours {
   /// `day_of_week` column, so neither side does modular arithmetic.
   final int weekday;
 
-  /// Minutes since midnight. `closesMinutes` is always greater than
-  /// `opensMinutes` — the database's `closes > opens` check is the backstop.
+  /// Minutes since midnight. `closesMinutes` **may be less than** `opensMinutes`,
+  /// which means the window runs past midnight — 18:00–01:00 is a kitchen serving
+  /// until 1am, filed under the day it opened. Migration 0036 widened the
+  /// database's check to `closes <> opens` and taught `restaurant_is_open_now`
+  /// to read both shapes; the only thing still refused is a zero-length window.
   final int opensMinutes;
   final int closesMinutes;
 

@@ -6,6 +6,9 @@ import { PageHeader } from '../ui/AppShell'
 import { StorefrontStep } from './steps/StorefrontStep'
 import { AddressStep } from './steps/AddressStep'
 import { LegalStep } from './steps/LegalStep'
+import { BankStep } from './steps/BankStep'
+import { HoursStep } from './steps/HoursStep'
+import { TeamStep } from './steps/TeamStep'
 
 /// The onboarding wizard, and the reason it is a wizard rather than one long form:
 /// a restaurant is six unrelated conversations (what it sells, where it is, what it
@@ -120,7 +123,7 @@ export function WizardPage() {
 
       <div className="p-6">
         {error && (
-          <p className="mb-4 max-w-2xl rounded-[8px] bg-[#fdeaec] px-4 py-3 text-sm text-non-veg">
+          <p className="mb-4 max-w-2xl rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
             {error}
           </p>
         )}
@@ -140,7 +143,16 @@ export function WizardPage() {
           {step === 2 && id && (
             <LegalStep id={id} detail={detail} onSaved={reload} onNext={() => setStep(3)} />
           )}
-          {step > 2 && (
+          {step === 3 && id && (
+            <BankStep id={id} detail={detail} onSaved={reload} onNext={() => setStep(4)} />
+          )}
+          {step === 4 && id && (
+            <HoursStep id={id} detail={detail} onSaved={reload} onNext={() => setStep(5)} />
+          )}
+          {step === 5 && id && (
+            <TeamStep id={id} detail={detail} onSaved={reload} onNext={() => setStep(6)} />
+          )}
+          {step > 5 && (
             <p className="text-sm text-ink-muted">
               This step arrives in the next phase.
             </p>

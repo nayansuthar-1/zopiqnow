@@ -105,6 +105,23 @@ export const api = {
   setLegal: (id: string, legal: Record<string, unknown>) =>
     rpc<void>('admin_set_legal', { p_id: id, p_legal: legal }),
 
+  setBank: (id: string, bank: Record<string, unknown>) =>
+    rpc<void>('admin_set_bank', { p_id: id, p_bank: bank }),
+
+  /// The whole week, every time. A schedule saved a day at a time is how a
+  /// Tuesday gets left behind, so the RPC deletes and reinserts.
+  setHours: (id: string, hours: { day: number; opens: string; closes: string }[]) =>
+    rpc<void>('admin_set_hours', { p_id: id, p_hours: hours }),
+
+  addStaff: (id: string, email: string, role: 'owner' | 'staff') =>
+    rpc<void>('admin_add_staff', { p_id: id, p_email: email, p_role: role }),
+
+  setStaffRole: (id: string, email: string, role: 'owner' | 'staff') =>
+    rpc<void>('admin_set_staff_role', { p_id: id, p_email: email, p_role: role }),
+
+  removeStaff: (id: string, email: string) =>
+    rpc<void>('admin_remove_staff', { p_id: id, p_email: email }),
+
   unpublishRestaurant: (id: string) =>
     rpc<void>('admin_unpublish_restaurant', { p_id: id }),
 

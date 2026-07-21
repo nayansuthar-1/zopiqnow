@@ -65,12 +65,18 @@ class _HoursEditorPageState extends ConsumerState<HoursEditorPage> {
   }
 
   Future<void> _save() async {
-    // Every open day must close after it opens — the same rule the database's
-    // `closes > opens` check enforces, said here as a sentence.
+    // A closing time *earlier* than the opening time is no longer an error: it
+    // means the kitchen serves past midnight, and migration 0036 taught
+    // `restaurant_is_open_now` to read it that way. What is still refused is a
+    // window of zero length, which the database's `closes <> opens` check backs
+    // up — it would be ambiguous between "closed all day" (the absence of a row)
+    // and "open all day" (which nothing in the schema means).
     for (int i = 0; i < 7; i++) {
       final _DayDraft d = _days[i];
-      if (d.open && _minutes(d.closes) <= _minutes(d.opens)) {
-        setState(() => _error = '${_dayNames[i]} closes before it opens.');
+      if (d.open && _minutes(d.closes) == _minutes(d.opens)) {
+        setState(
+          () => _error = '${_dayNames[i]} opens and closes at the same time.',
+        );
         return;
       }
     }
@@ -252,6 +258,17 @@ class _DayRow extends StatelessWidget {
                         child: Text('–', style: t.bodyMedium),
                       ),
                       _TimeChip(label: day.closes.format(context), onTap: onPickClose),
+                      // A window that ends before it starts runs past midnight.
+                      // Said out loud, because "18:00 – 01:00" on one row reads
+                      // like a typo until you are told it is not.
+                      if (day.closesNextDay)
+                        Padding(
+                          padding: const EdgeInsets.only(left: ZopiqSpacing.sm),
+                          child: Text(
+                            'next day',
+                            style: t.labelSmall?.copyWith(color: zc.textMuted),
+                          ),
+                        ),
                     ],
                   )
                 : Text(
@@ -316,6 +333,12 @@ class _DayDraft {
   final bool open;
   final TimeOfDay opens;
   final TimeOfDay closes;
+
+  /// A window that ends before it starts runs past midnight — legal since
+  /// migration 0036, and the row says so rather than leaving it looking like a
+  /// typo.
+  bool get closesNextDay =>
+      closes.hour * 60 + closes.minute < opens.hour * 60 + opens.minute;
 
   _DayDraft copyWith({bool? open, TimeOfDay? opens, TimeOfDay? closes}) =>
       _DayDraft(

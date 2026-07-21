@@ -39,7 +39,7 @@ export function StepFrame({
       <div className="mt-6 space-y-5">{children}</div>
 
       {error && (
-        <p className="mt-5 rounded-[8px] bg-[#fdeaec] px-4 py-3 text-sm text-non-veg">
+        <p className="mt-5 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
           {error}
         </p>
       )}

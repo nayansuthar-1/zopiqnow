@@ -263,20 +263,49 @@ every later step saves against its id. Closing the browser loses nothing.
 
 ### Phase 4 — Steps 4–6 (money, hours, the owner's login)
 
-- [ ] **4.1 Step 4 — Bank & commission.** Account holder, account number
-      (entered twice, must match), IFSC (format-checked, uppercased), bank name;
-      commission in **percent** in the UI, stored as `commission_bps`.
-      → **verify:** 20% saves as 2000 bps; mismatched account numbers block Save.
-- [ ] **4.2 Step 5 — Hours.** Seven day rows, open/closed toggle, opens/closes
-      pickers, "copy to all days". **Decide first:** `closes > opens` forbids an
-      overnight kitchen (18:00 → 01:00). Recommended fix is a migration splitting an
-      overnight window into two rows (18:00–23:59 today, 00:00–01:00 tomorrow) so
-      `restaurant_is_open_now()` needs no change. Flag to the user before building.
-      → **verify:** hours land in `restaurant_hours`; `restaurant_is_open_now()` returns the right answer at a time inside and outside the window.
-- [ ] **4.3 Step 6 — Team.** Owner email (required — this is the vendor app login),
-      optional extra staff. Writes `restaurant_staff` via `admin_add_staff`, with the
-      "already on another restaurant's team" case handled.
-      → **verify:** the owner email signs into the **vendor Flutter app** and sees this restaurant.
+- [x] **4.1 Step 4 — Bank & commission.** Account holder, account number
+      (entered twice, **paste disabled** — pasting the same wrong number twice
+      defeats the only check this field exists for), IFSC format-checked and
+      uppercased, bank name; commission in percent, stored as `commission_bps`.
+      The stored number is never sent back to the browser, so the field starts
+      empty and the screen shows the last four digits of what is on file.
+      → **verify:** ✅ 17.5% → 1750 bps; a bad IFSC → *"That IFSC code doesn't look
+        right."*; the account survives a save that does not mention it (see 4.4).
+- [x] **4.2 Step 5 — Hours.** Seven day rows, open/closed toggle, time pickers,
+      "copy to all days". **Decided 2026-07-22: support overnight properly** rather
+      than the split-row workaround this plan originally sketched — the workaround
+      leaves the vendor looking at two confusing rows in their own app and unable
+      to edit either without breaking the pair.
+      `0036_overnight_hours.sql` widens `closes > opens` to `closes <> opens`,
+      teaches `restaurant_is_open_now()` that `closes < opens` crosses midnight
+      (and to look at *yesterday's* row at 00:30), and the vendor app's Dart
+      validation is updated in the same commit so a kitchen can set it there too.
+      → **verify:** ✅ nine scenarios through the rewritten logic — Mon 19:00 open,
+        Mon 17:59 closed, **Tue 00:30 open under Monday's row**, Tue 01:30 closed,
+        Sun→Mon wrap open, and a normal day still closed at exactly its closing
+        time. `flutter analyze` clean, all 62 vendor tests pass.
+      → **behaviour change:** the window is now half-open (`>= opens and < closes`)
+        where 0018 used `between`. A kitchen closing at 22:00 is closed at 22:00;
+        the old version accepted an order at exactly 22:00:00.
+- [x] **4.3 Step 6 — Team.** Owner email (this is the vendor app login), optional
+      extra staff, role changes and removal in place.
+      → **verify:** ✅ owner + staff added and read back lower-cased; an address
+        already on another restaurant's team is refused by name. **Still owed:**
+        the owner email actually signing into the vendor Flutter app — needs a real
+        inbox, so it is yours to confirm.
+- [x] **4.4** `0037_partial_saves_do_not_erase.sql` — **a bug I wrote, caught by
+      4.1's verify.** `admin_set_bank` was a plain upsert, so a key absent from the
+      payload was written as null. The bank step deliberately omits the account
+      number unless it is being replaced — correct on the client, destructive on the
+      server: an admin fixing a typo in the bank's name would have wiped the account
+      settlements are paid to, and the only symptom would be a publish gate that
+      suddenly failed. Both `admin_set_bank` and `admin_set_legal` now use the same
+      `?` presence test `admin_update_restaurant` had from the start: **absent means
+      leave it, present-and-empty means clear it.** `admin_set_hours` is left alone —
+      its payload is the whole week on purpose.
+      → **verify:** ✅ a bank-name-only save keeps last4 and IFSC; a GST-only save
+        keeps the FSSAI and PAN; an explicit `""` still clears; a null payload is
+        refused instead of erasing the row.
 
 ---
 
@@ -351,7 +380,8 @@ The largest step. Categories are strings on items, so the builder owns their con
 
 ## Open questions to settle before the phase that needs them
 
-1. **Overnight hours** (Phase 4.2) — split-row workaround, or relax the constraint?
+1. ~~**Overnight hours** (Phase 4.2).~~ **Settled 2026-07-22:** relaxed properly —
+   migration 0036 plus a matching change to the vendor app. See 4.2.
 2. ~~**Cloudinary folder layout** for legal documents.~~ **Settled 2026-07-22:**
    a private Supabase Storage bucket (`restaurant-docs`, migration 0034), admin-only
    RLS on all four verbs, paths in the database instead of URLs, five-minute signed

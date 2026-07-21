@@ -13,10 +13,10 @@ const statusLabels: Record<Status, string> = {
 }
 
 const statusStyles: Record<Status, string> = {
-  live: 'bg-[#e8f3ea] text-veg',
-  paused: 'bg-[#fdf1e3] text-[#b06a1c]',
+  live: 'bg-veg-soft text-veg',
+  paused: 'bg-warn-soft text-warn',
   draft: 'bg-canvas text-ink-muted',
-  delisted: 'bg-[#fdeaec] text-non-veg',
+  delisted: 'bg-non-veg-soft text-non-veg',
 }
 
 function StatusPill({ status }: { status: Status }) {
@@ -118,7 +118,7 @@ export function RestaurantsPage() {
         </div>
 
         {error && (
-          <p className="mb-4 rounded-[8px] bg-[#fdeaec] px-4 py-3 text-sm text-non-veg">
+          <p className="mb-4 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
             {error}
           </p>
         )}

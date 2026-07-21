@@ -17,6 +17,14 @@
   --color-veg: #267335;
   --color-non-veg: #e43b4f;
 
+  /* Tints for the status pills and inline banners. Web-only: the Flutter apps
+     derive these with an alpha, which CSS cannot do without a blend mode, so
+     they are pre-mixed against white here. */
+  --color-veg-soft: #e8f3ea;
+  --color-non-veg-soft: #fdeaec;
+  --color-warn: #b06a1c;
+  --color-warn-soft: #fdf1e3;
+
   --radius-card: 12px;
   --radius-field: 8px;
 }
