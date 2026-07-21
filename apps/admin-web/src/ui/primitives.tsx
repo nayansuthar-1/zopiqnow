@@ -62,6 +62,47 @@ export function Field({
   )
 }
 
+/// A modal that states what is about to happen before it happens. Used for the
+/// handful of actions a customer would notice — never for a save.
+export function ConfirmDialog({
+  title,
+  body,
+  confirmLabel,
+  busy = false,
+  onConfirm,
+  onCancel,
+}: {
+  title: string
+  body: string
+  confirmLabel: string
+  busy?: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-md rounded-[12px] bg-white p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-base font-bold text-ink">{title}</h2>
+        <p className="mt-2 text-sm text-ink-muted">{body}</p>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="secondary" onClick={onCancel} disabled={busy}>
+            Cancel
+          </Button>
+          <Button onClick={onConfirm} loading={busy}>
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Card({
   children,
   className = '',

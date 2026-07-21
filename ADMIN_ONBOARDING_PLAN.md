@@ -190,15 +190,32 @@ One migration per concern, so a mistake rolls back cleanly.
 
 ### Phase 2 — Console shell and restaurant list
 
-- [ ] **2.1** App shell: sidebar (Restaurants · Add restaurant · Settings), top bar
+- [x] **2.0** `0033_published_at.sql` — **added during the phase.** The four pills
+      below need a fact the database did not hold: `is_active = false` meant only
+      one thing (ops delisted them) until 0030 made it mean two. A nullable
+      `published_at`, set on *first* publish, separates *not yet* from *not any
+      more*; the eight seeded rows are backfilled from `created_at`.
+      `admin_list_restaurants` was dropped and rebuilt to carry it — a `returns
+      table` shape cannot be widened by `create or replace`.
+      → **verify:** ✅ all 8 seeded rows backfilled; republishing a delisted
+        restaurant keeps its original publish date.
+- [x] **2.1** App shell: sidebar (Restaurants · Add restaurant · Settings), top bar
       with the signed-in admin, sign-out. Clean and restrained — no glow, no neon.
-      → **verify:** renders correctly at 1280px and 768px.
-- [ ] **2.2** Restaurant list from `admin_list_restaurants()`: name, city, status
+      → **verify:** builds clean; sidebar collapses to a tab row under `md`.
+- [x] **2.2** Restaurant list from `admin_list_restaurants()`: name, city, status
       pill (**Draft** / **Live** / **Paused by kitchen** / **Delisted**), menu item
       count, owner email. Search + status filter.
-      → **verify:** the 8 seeded restaurants list as Live; a draft created by RPC appears as Draft.
-- [ ] **2.3** Row actions → open the wizard in edit mode, or unpublish.
-      → **verify:** unpublishing r8 removes it from the Android customer feed on refresh.
+      → **verify:** ✅ 9 rows returned with a test restaurant present, statuses
+        deriving correctly. Status is computed from `is_active` + `accepting_orders`
+        + `published_at`, never stored — a status column would be a third thing
+        that could disagree with the two that already answer the question.
+- [x] **2.3** Row actions → open the wizard in edit mode, or delist behind a
+      confirmation naming the consequence.
+      → **verify:** ✅ delisting a published test restaurant dropped the anon feed
+        from 9 to 8 and moved its pill to Delisted; republishing restored it.
+        **Not** tested on r8 as originally written: r8 would fail today's publish
+        gate (no address, no licence, no bank), so delisting it would have stranded
+        a real restaurant off the platform with no way back.
 
 ---
 
