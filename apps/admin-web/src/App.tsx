@@ -3,6 +3,7 @@ import { useSession } from './auth/session'
 import { NotAdminPage, SignInPage } from './auth/SignInPage'
 import { AppShell, PageHeader } from './ui/AppShell'
 import { RestaurantsPage } from './restaurants/RestaurantsPage'
+import { WizardPage } from './restaurants/WizardPage'
 
 /// Filled in by Phase 3 (the wizard) and Phase 7 (settings). Routed now so the
 /// sidebar links and the list's Edit buttons are real from the start.
@@ -34,8 +35,11 @@ export default function App() {
       <AppShell>
         <Routes>
           <Route path="/" element={<RestaurantsPage />} />
-          <Route path="/restaurants/new" element={<Placeholder what="Add restaurant" />} />
-          <Route path="/restaurants/:id" element={<Placeholder what="Edit restaurant" />} />
+          {/* Keyed so switching from an existing restaurant to /new remounts the
+              wizard — otherwise React keeps the old form state and the new draft
+              starts life pre-filled with someone else's restaurant. */}
+          <Route path="/restaurants/new" element={<WizardPage key="new" />} />
+          <Route path="/restaurants/:id" element={<WizardPage key="edit" />} />
           <Route path="/settings" element={<Placeholder what="Settings" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

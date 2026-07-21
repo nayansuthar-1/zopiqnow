@@ -224,19 +224,40 @@ One migration per concern, so a mistake rolls back cleanly.
 A stepper with a **persistent draft**: step 1 creates the row (`is_active = false`),
 every later step saves against its id. Closing the browser loses nothing.
 
-- [ ] **3.1 Step 1 — Storefront.** Name, cuisines (multi-select with free entry),
+- [x] **3.1 Step 1 — Storefront.** Name, cuisines (multi-select with free entry),
       price for two, pure-veg toggle, promo line, prep time (eta_minutes), cover photo
       → unsigned Cloudinary upload, store the returned URL. `rating` / `rating_count`
       seed to 0.
-      → **verify:** Save creates a `restaurants` row with `is_active = false`, invisible to the customer app.
-- [ ] **3.2 Step 2 — Address & contact.** Owner name, contact phone (10-digit),
+      → **verify:** ✅ draft created with `is_active = false`, `published_at` null,
+        rating 0/0 — and invisible in a plain `select` even to the admin's own
+        `authenticated` role, which is the customer-facing policy doing its job.
+- [x] **3.2 Step 2 — Address & contact.** Owner name, contact phone (10-digit),
       address line, city, state, pincode, latitude/longitude (paste or map pick),
       `distance_km` left 0 until delivery zones land.
-      → **verify:** values round-trip through `admin_update_restaurant`; pincode/phone validation rejects bad input with a sentence, not a constraint dump.
-- [ ] **3.3 Step 3 — Legal.** FSSAI number + expiry + document upload, GST number
-      (15-char format check), PAN + document upload. Documents to Cloudinary under a
-      `legal/` folder.
-      → **verify:** `restaurant_legal` row written; an expired FSSAI date is refused at submit.
+      → **verify:** ✅ every field round-trips; step 1's name/cuisines/veg survive a
+        step 2 save untouched (the `p_profile ? 'key'` partial update); clearing a
+        field to empty stores null without touching its neighbours.
+- [x] **3.3 Step 3 — Legal.** FSSAI number + expiry + document upload, GST number
+      (15-char format check), PAN + document upload. Documents to a **private
+      Supabase bucket** (see 3.0), not Cloudinary.
+      → **verify:** ✅ `restaurant_legal` row written and read back; `"NOTAPAN"` →
+        *"That PAN doesn't look right."*, a 3-digit FSSAI → *"An FSSAI licence
+        number is 14 digits."*, and an expired licence is refused at publish.
+- [x] **3.0** `0034_restaurant_docs_bucket.sql` — **the open question, settled.**
+      Private `restaurant-docs` bucket; admin-only policies on select/insert/update/
+      delete, each naming the bucket so they do not grant the run of all storage.
+      `restaurant_legal.*_doc_url` renamed to `*_doc_path`, because a column called
+      `url` holding a bucket path is a small lie that costs someone an afternoon
+      later — free to fix while the table has no rows.
+      → **verify:** ✅ anon upload → *"new row violates row-level security"*; anon
+        download → 404; the public-URL route → *"Bucket not found"*.
+- [x] **3.4** `0035_address_gets_sentences.sql` — **added after 3.2's verify.** The
+      address constraints from 0027 had no matching sentence in the RPC, so a bad
+      phone came back as a raw `violates check constraint` dump. The constraints are
+      unchanged — they are the guard; this is the explanation.
+      → **verify:** ✅ *"An Indian mobile number is 10 digits starting 6, 7, 8 or 9."*,
+        *"A pincode is 6 digits and cannot start with a zero."*, *"That latitude is
+        not a real place."*, *"Commission has to be between 0% and 100%."*
 
 ---
 
@@ -331,9 +352,11 @@ The largest step. Categories are strings on items, so the builder owns their con
 ## Open questions to settle before the phase that needs them
 
 1. **Overnight hours** (Phase 4.2) — split-row workaround, or relax the constraint?
-2. **Cloudinary folder layout** for legal documents — those are sensitive scans on a
-   public CDN with an unsigned preset. Signed uploads or a private Supabase Storage
-   bucket may be the right answer before 3.3 ships.
+2. ~~**Cloudinary folder layout** for legal documents.~~ **Settled 2026-07-22:**
+   a private Supabase Storage bucket (`restaurant-docs`, migration 0034), admin-only
+   RLS on all four verbs, paths in the database instead of URLs, five-minute signed
+   links to view. A PAN scan is identity-theft material and a Cloudinary URL is
+   permanent, unauthenticated, and edge-cached — there is no revoking one.
 3. **`rating` on a new restaurant** (Phase 6.3) — the customer app will render `0.0`.
    Either the card treats `rating_count = 0` as a "New" badge (a small customer-app
    change), or we accept it.

@@ -42,8 +42,68 @@ async function rpc<T>(fn: string, params?: Record<string, unknown>): Promise<T> 
   return data as T
 }
 
+/// The shape `admin_get_restaurant` returns. `bank` never carries the account
+/// number — only its last four digits — so there is no field here to leak one.
+export type RestaurantDetail = {
+  restaurant: {
+    id: string
+    name: string
+    cuisines: string[]
+    price_for_two: number
+    eta_minutes: number
+    is_veg: boolean
+    promo_text: string | null
+    image_url: string
+    owner_name: string | null
+    contact_phone: string | null
+    address_line: string | null
+    city: string | null
+    state: string | null
+    pincode: string | null
+    latitude: number | null
+    longitude: number | null
+    commission_bps: number
+    is_active: boolean
+    published_at: string | null
+    rating: number
+    rating_count: number
+  }
+  legal: {
+    fssai_number: string | null
+    fssai_expiry: string | null
+    fssai_doc_path: string | null
+    gst_number: string | null
+    pan_number: string | null
+    pan_doc_path: string | null
+  } | null
+  bank: {
+    account_holder: string | null
+    account_last4: string | null
+    ifsc: string | null
+    bank_name: string | null
+    verified: boolean
+  } | null
+  hours: { day: number; opens: string; closes: string }[]
+  staff: { email: string; role: 'owner' | 'staff' }[]
+}
+
 export const api = {
   listRestaurants: () => rpc<RestaurantRow[]>('admin_list_restaurants'),
+
+  getRestaurant: (id: string) =>
+    rpc<RestaurantDetail>('admin_get_restaurant', { p_id: id }),
+
+  createRestaurant: (profile: Record<string, unknown>) =>
+    rpc<string>('admin_create_restaurant', { p_profile: profile }),
+
+  /// Only the keys present are written — that is the contract of the RPC, not a
+  /// convenience here. Sending a subset is how a wizard step saves its own four
+  /// fields without resending, and possibly clobbering, the other twelve.
+  updateRestaurant: (id: string, profile: Record<string, unknown>) =>
+    rpc<void>('admin_update_restaurant', { p_id: id, p_profile: profile }),
+
+  setLegal: (id: string, legal: Record<string, unknown>) =>
+    rpc<void>('admin_set_legal', { p_id: id, p_legal: legal }),
 
   unpublishRestaurant: (id: string) =>
     rpc<void>('admin_unpublish_restaurant', { p_id: id }),
