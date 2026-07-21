@@ -1,0 +1,51 @@
+name: zopiq_rider
+description: "Zopiqnow for delivery partners — the bike's side of an order."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+# Part of the zopiqnow pub workspace: shares the single root lockfile (Rule 3).
+resolution: workspace
+
+environment:
+  sdk: ^3.12.2
+
+# Every dependency here is one the customer or vendor app already pins, at the
+# version the root lockfile already froze. **Not one new package**, and that is
+# deliberate: a third app is a big enough change on its own without also being a
+# reason to move a version (Rule 3). A rider needs a list and four text fields —
+# nothing here needs a library the other two apps did not already earn.
+#
+# Notably absent: `firebase_messaging`. A rider does need waking when a job
+# appears, and that is real work — but it belongs to a later slice, not to the
+# one that has never yet run its own sign-in.
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: 1.0.9
+
+  # The same design system as the other two apps, so all three read as one
+  # company. The rider app is the one an outsider sees least, which is exactly
+  # why it should not be left to drift into its own look.
+  zopiq_ui:
+    path: ../../packages/zopiq_ui
+
+  flutter_riverpod: 2.6.1
+  go_router: 14.8.1
+
+  # The rider's session, in the Keystore. Same reasoning as the other two apps:
+  # a refresh token in SharedPreferences is a refresh token in a plaintext file,
+  # and this one opens a list of customers' addresses and phone numbers.
+  flutter_secure_storage: 10.3.1
+
+  supabase_flutter: 2.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: 6.0.0
+
+flutter:
+  uses-material-design: true

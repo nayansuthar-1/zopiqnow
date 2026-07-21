@@ -14,7 +14,9 @@ the frozen dependency set, Rule 3) with **Melos** for cross-package tasks.
 ```
 zopiqnow/
 ├── apps/
-│   └── customer/         # Flutter customer app (Riverpod + go_router)
+│   ├── customer/         # Flutter customer app (Riverpod + go_router)
+│   ├── vendor/           # The restaurant's side: the order queue, menu, earnings
+│   └── rider/            # The delivery partner's side: the job board and one bag
 ├── packages/
 │   └── zopiq_ui/         # Design system: Swiggy-grade tokens, theme, components (Rule 2)
 ├── pubspec.yaml          # workspace root (members + Melos)
@@ -23,8 +25,11 @@ zopiqnow/
 └── .fvmrc                # pinned Flutter 3.44.5 (Rule 3)
 ```
 
-More apps (delivery-partner, restaurant) and packages (core, data) join under
-`apps/` and `packages/` as they are built.
+Three apps, one database, one design system. Who you are is decided entirely by
+which table your email address is in — `restaurant_staff` (migration 0009) makes
+you a vendor, `delivery_partners` (0025) makes you a rider, neither makes you a
+customer. No app holds a key that grants anything; row-level security does all of
+it. Further packages (core, data) join under `packages/` as they are built.
 
 ## Getting started
 

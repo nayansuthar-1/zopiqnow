@@ -177,7 +177,9 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
 - [x] **8b-1 — the domain + the vendor's half (migration `0025`).** Riders,
       self-claim dispatch, pickup-OTP handover. No new `orders.status` values and
       no new policy on `orders`. Rider strip on the ticket. Vendor 62/62 green.
-- [ ] 8b-2 — `apps/rider`, a fourth workspace member (no new deps).
+- [x] **8b-2 — `apps/rider`**, a fourth workspace member, no new deps. Email-OTP
+      auth, the job board, claim/drop, the pickup-code handover, delivery.
+      12/12 green; debug + release APKs build. First partner seeded (`seed/0006`).
 - [ ] 8b-3 — the customer sees their rider on the tracking card.
 - [ ] 8b-4 — hardening: `/security-review`, the edge matrix, optional auto-assign.
 

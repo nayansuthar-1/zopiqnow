@@ -127,18 +127,32 @@ rider app yet — this slice is the foundation both later slices read.
 > row to `picked_up` too and hit the partial unique index. The reclaim path is the
 > only way to see it, which is exactly why it was worth walking.
 
-### 8b-2 — `apps/rider`  *(the big one)*
+### 8b-2 — `apps/rider`  ✅ **DONE**
 
-A fourth workspace member. **No new dependencies**: it takes the versions the root
-lockfile already froze (`flutter_riverpod`, `go_router`, `supabase_flutter`,
+A fourth workspace member. **No new dependencies** — it takes only versions the
+root lockfile already froze (`flutter_riverpod`, `go_router`, `supabase_flutter`,
 `flutter_secure_storage`, `zopiq_ui`). The version freeze holds.
 
-- Auth: email OTP, the vendor app's flow almost exactly — including its
-  "authenticated but not a partner" fourth state, which is the same problem here.
-- The board: unclaimed ready orders; claim one.
-- The job: pickup (enter the vendor's code) → on the way → delivered.
-- Tests mirror the vendor app's harness: fakes for every data source, no Supabase.
-- **Verify:** `flutter analyze` clean, tests green, and a debug APK that builds.
+- [x] Auth: email OTP, the vendor app's flow almost exactly — including its
+      "authenticated but not a partner" fourth state, which is the same problem
+      here. Session in the Keystore under its **own** key: one person can be a
+      customer *and* a rider on the same phone, and a shared key would mean
+      signing into one signs you out of the other.
+- [x] The board, and the job in hand — as *one* screen with two moods, not two
+      tabs. A rider carrying a bag has exactly one thing to do, and a board of
+      other people's jobs underneath it is an invitation to do the wrong one.
+- [x] Claim → (drop) → enter the restaurant's code → delivered.
+- [x] Tests mirror the vendor harness: fakes for every data source, no Supabase.
+      **12/12 green**, analyze clean, **debug and release APKs both build.**
+- [x] First rider seeded (`seed/0006`): `nayan@siteonlab.com`.
+
+> **Two things worth carrying forward.** The `is_active` filter in
+> `_resolveRider` is load-bearing: `delivery_partner_email()` returns null for a
+> deactivated partner but the *select policy* has no such clause, so without it a
+> deactivated rider gets all the way in and is then refused by every single
+> action. And a fresh `flutter create` does **not** carry this repo's
+> `kotlin.incremental=false` workaround, without which the Android build fails
+> outright on Windows — the other two apps both document it.
 
 ### 8b-3 — The customer sees their rider
 
@@ -164,10 +178,14 @@ delivery. A read-only policy on `deliveries` for the order's own customer.
   security review in 8b-4 still stands, but this particular hazard no longer exists.
 - **A rider app is a real app.** Auth, session storage, release signing, a store
   listing eventually. 8b-2 is scoped to "builds and runs", not "shipped to a store".
-- **Nobody can sign in as a rider yet.** `delivery_partners` is empty and, like
-  `restaurant_staff` before 0024, is filled by hand. 8b-2 needs a **real email
-  address the user can receive OTPs at** to seed as the first rider — the vendor
-  owner's address is already taken by a restaurant and one address cannot be both.
+- ~~**Nobody can sign in as a rider yet.**~~ **Resolved in 8b-2** —
+  `nayan@siteonlab.com` seeded as the first partner. Onboarding is still a seed
+  file, and still stops scaling around the tenth rider; the admin dashboard is
+  the honest next dependency after this phase.
+- **The board does not refresh itself.** `available_deliveries` is a function, and
+  Realtime rides table policies, not functions — and riders have no policy on
+  `orders` by design. So a new job appears on pull-to-refresh and not before. A
+  job-offer push is the fix and belongs in 8b-4.
 - **No ops console still hurts.** Onboarding riders by seed file is fine for the
   first ten and untenable at a hundred. The admin dashboard is the honest next
   dependency after this phase.
@@ -182,3 +200,7 @@ delivery. A read-only policy on `deliveries` for the order's own customer.
   `confirm_pickup`, `confirm_delivered`). Vendor app gained `features/delivery`
   and the rider strip on the order ticket. `orders.status` untouched — not one new
   value — so every customer build in the wild is unaffected. Vendor 62/62 green.
+- **2026-07-21** — **8b-2 landed.** `apps/rider`, the fourth workspace member, with
+  no new dependencies. Email-OTP auth (four states, own Keystore key), the board,
+  claim/drop, the pickup-code handover and delivery. 12/12 green, analyze clean,
+  debug + release APKs build. First partner seeded (`seed/0006`).

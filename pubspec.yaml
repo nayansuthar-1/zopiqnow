@@ -12,6 +12,7 @@ environment:
 workspace:
   - apps/customer
   - apps/vendor
+  - apps/rider
   - packages/zopiq_ui
 
 # Tooling only — Melos runs scripts (analyze/test/format) across all members.
