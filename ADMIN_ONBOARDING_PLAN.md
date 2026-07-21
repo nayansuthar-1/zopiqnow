@@ -398,16 +398,37 @@ The largest step. Categories are strings on items, so the builder owns their con
 
 ### Phase 7 — Managing what's already live
 
-- [ ] **7.1** Edit mode: the same wizard over an existing restaurant, with published
-      state shown and changes taking effect immediately.
-      → **verify:** editing r1's promo line changes the customer app card.
-- [ ] **7.2** Unpublish / delist, with a confirmation naming the consequence
-      ("customers will no longer see this restaurant; existing orders are unaffected").
-      → **verify:** delisting does not break an in-flight order's tracking screen.
-- [ ] **7.3** Team management for a live restaurant — list, add, change role, remove.
-      → **verify:** a removed staff email loses vendor app access on next sign-in.
-- [ ] **7.4** Admin management under Settings — add/remove other platform admins.
-      → **verify:** a second admin signs in; an admin cannot remove themselves.
+- [x] **7.1** Edit mode — no new screen. The wizard loads by id and every step
+      saves against it, so editing a live restaurant is the same eight tabs with
+      "Live — changes take effect immediately" in the header instead of "Draft".
+      → **verify:** ✅ **r1's offer line, edited on the live row** — "50% OFF up to
+        ₹100" → "Edited by the console" → restored. `is_active` stayed true
+        throughout; a customer would have seen the card change and change back.
+- [x] **7.2** Delist behind a confirmation naming the consequence *and* the
+      non-consequence, from both the list and the review screen.
+      → **verify:** ✅ **the in-flight case, run for real.** Order ZPQ-1016 placed,
+        restaurant delisted underneath it, then: the customer still read the order,
+        its name, and its lines (`orders` denormalises `restaurant_name`, and the
+        customer's read policy is `user_id = auth.uid()` with no `is_active`
+        clause); the restaurant was gone from the feed; and the **delisted kitchen
+        still saw the order and moved it to `accepted`** — 0009's staff policy has
+        no `is_active` clause either, deliberately.
+- [x] **7.3** Team management for a live restaurant — list, add, change role, remove.
+      → **verify:** ✅ added a cook to r2, promoted them to owner, and the attempt to
+        remove them was refused: *"That is the only owner. Add another owner before
+        removing this one."* Demoted and removed cleanly; r2 back to no staff.
+      → **still owed:** a removed address actually losing access on next sign-in.
+        That is a real inbox and a real device, so it is yours.
+- [x] **7.4** `0038_admin_roster.sql` + Settings — add and remove platform admins.
+      Two rules, both guarding the same failure (a platform with nobody who can run
+      it): you cannot remove yourself, and you cannot remove the last admin. Until
+      today there was exactly one admin, and losing that account would have meant no
+      restaurant could ever be onboarded again without a migration.
+      → **verify:** ✅ *"You can't remove yourself."*, *"Who is this? Add a name."*
+        (a roster of bare addresses is one nobody can audit later), *"That doesn't
+        look like an email address."*, adding twice refused by name; add → list →
+        remove round-tripped and the roster is back to one.
+      → **still owed:** a second admin actually signing in. Needs their inbox.
 
 ---
 

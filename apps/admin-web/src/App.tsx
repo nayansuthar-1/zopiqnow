@@ -1,20 +1,10 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useSession } from './auth/session'
 import { NotAdminPage, SignInPage } from './auth/SignInPage'
-import { AppShell, PageHeader } from './ui/AppShell'
+import { AppShell } from './ui/AppShell'
 import { RestaurantsPage } from './restaurants/RestaurantsPage'
 import { WizardPage } from './restaurants/WizardPage'
-
-/// Filled in by Phase 3 (the wizard) and Phase 7 (settings). Routed now so the
-/// sidebar links and the list's Edit buttons are real from the start.
-function Placeholder({ what }: { what: string }) {
-  return (
-    <>
-      <PageHeader title={what} subtitle="Coming in the next phase." />
-      <div className="p-6 text-sm text-ink-muted">Not built yet.</div>
-    </>
-  )
-}
+import { SettingsPage } from './settings/SettingsPage'
 
 export default function App() {
   const { loading, session, isAdmin, email, signOut } = useSession()
@@ -40,7 +30,7 @@ export default function App() {
               starts life pre-filled with someone else's restaurant. */}
           <Route path="/restaurants/new" element={<WizardPage key="new" />} />
           <Route path="/restaurants/:id" element={<WizardPage key="edit" />} />
-          <Route path="/settings" element={<Placeholder what="Settings" />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppShell>

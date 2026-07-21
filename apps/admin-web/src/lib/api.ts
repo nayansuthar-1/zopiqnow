@@ -172,4 +172,13 @@ export const api = {
 
   publishRestaurant: (id: string) =>
     rpc<void>('admin_publish_restaurant', { p_id: id }),
+
+  listAdmins: () => rpc<AdminRow[]>('admin_list_admins'),
+
+  addAdmin: (email: string, name: string) =>
+    rpc<void>('admin_add_admin', { p_email: email, p_name: name }),
+
+  removeAdmin: (email: string) => rpc<void>('admin_remove_admin', { p_email: email }),
 }
+
+export type AdminRow = { email: string; name: string; created_at: string }
