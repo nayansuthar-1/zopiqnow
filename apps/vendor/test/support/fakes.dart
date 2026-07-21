@@ -18,9 +18,23 @@ import 'package:zopiq_vendor/features/profile/data/restaurant_hours_datasource.d
 import 'package:zopiq_vendor/features/profile/data/vendor_restaurant_datasource.dart';
 import 'package:zopiq_vendor/features/profile/domain/entities/opening_hours.dart';
 import 'package:zopiq_vendor/features/profile/domain/entities/restaurant_profile.dart';
+import 'package:zopiq_vendor/features/staff/data/staff_datasource.dart';
+import 'package:zopiq_vendor/features/staff/domain/entities/staff_member.dart';
 
+/// The default signed-in vendor: the owner, because that is what every existing
+/// test was written against (before 0024 there was only one kind of vendor, and
+/// it could do everything).
 const Vendor testVendor = Vendor(
   email: 'kitchen@paradise.in',
+  restaurantId: 'r1',
+  restaurantName: 'Paradise Biryani',
+  acceptingOrders: true,
+  role: StaffRole.owner,
+);
+
+/// The same kitchen, seen by someone who is not the owner.
+const Vendor testStaffVendor = Vendor(
+  email: 'cook@paradise.in',
   restaurantId: 'r1',
   restaurantName: 'Paradise Biryani',
   acceptingOrders: true,
@@ -459,6 +473,99 @@ VendorNotification notification({
   orderId: orderId,
   createdAt: DateTime.now().subtract(age),
   readAt: read ? DateTime.now() : null,
+);
+
+/// The roster, in memory. Mirrors 0024's refusals that the screen actually
+/// renders — acting on yourself, and an address already on another team.
+class FakeStaffDataSource implements StaffDataSource {
+  FakeStaffDataSource({
+    List<StaffMember> initial = const <StaffMember>[],
+    this.callerEmail = 'kitchen@paradise.in',
+  }) : _members = List<StaffMember>.of(initial);
+
+  List<StaffMember> _members;
+
+  /// Who the database would see as the caller — used for the self-action rules.
+  final String callerEmail;
+
+  /// Addresses the database would report as belonging to another restaurant.
+  final Set<String> takenElsewhere = <String>{};
+
+  List<StaffMember> get members => List<StaffMember>.unmodifiable(_members);
+
+  @override
+  Future<List<StaffMember>> fetch() async => _sorted(_members);
+
+  @override
+  Future<void> add({required String email, required StaffRole role}) async {
+    if (_members.any((StaffMember m) => m.email == email)) {
+      throw StaffWriteFailure('$email already works here.');
+    }
+    if (takenElsewhere.contains(email)) {
+      throw StaffWriteFailure(
+        '$email is already on another restaurant\'s team.',
+      );
+    }
+    _members = <StaffMember>[
+      ..._members,
+      StaffMember(email: email, role: role, createdAt: DateTime.now()),
+    ];
+  }
+
+  @override
+  Future<void> setRole({
+    required String email,
+    required StaffRole role,
+  }) async {
+    if (email == callerEmail) {
+      throw const StaffWriteFailure('You can\'t change your own role.');
+    }
+    _require(email);
+    _members = _members
+        .map(
+          (StaffMember m) => m.email == email
+              ? StaffMember(email: m.email, role: role, createdAt: m.createdAt)
+              : m,
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> remove(String email) async {
+    if (email == callerEmail) {
+      throw const StaffWriteFailure('You can\'t remove yourself.');
+    }
+    _require(email);
+    _members = _members
+        .where((StaffMember m) => m.email != email)
+        .toList(growable: false);
+  }
+
+  void _require(String email) {
+    if (!_members.any((StaffMember m) => m.email == email)) {
+      throw StaffWriteFailure('$email is not on your team.');
+    }
+  }
+
+  /// Owners first, then oldest first — the order the RPC returns.
+  static List<StaffMember> _sorted(List<StaffMember> members) {
+    final List<StaffMember> copy = List<StaffMember>.of(members)
+      ..sort((StaffMember a, StaffMember b) {
+        if (a.role != b.role) return a.role.isOwner ? -1 : 1;
+        return a.createdAt.compareTo(b.createdAt);
+      });
+    return List<StaffMember>.unmodifiable(copy);
+  }
+}
+
+StaffMember staffMember({
+  String email = 'cook@paradise.in',
+  StaffRole role = StaffRole.staff,
+  Duration age = const Duration(days: 3),
+}) => StaffMember(
+  email: email,
+  role: role,
+  createdAt: DateTime.now().subtract(age),
 );
 
 /// The opening hours, in memory. Defaults to an empty week — "always open",

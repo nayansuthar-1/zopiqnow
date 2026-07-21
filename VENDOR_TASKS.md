@@ -143,11 +143,39 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
 - [x] Support tickets → shipped as FAQ + contact (`features/support`)
 - **Backend:** migrations `0020` (FCM tokens), `0021` (notifications table + read RPCs + new-order trigger).
 
-## Phase 8 — Staff roles & delivery-partner workflow  ⬜
+## Phase 8 — Staff roles & delivery-partner workflow  🟡 8a DONE
 
-- [ ] `restaurant_staff.role` (owner/manager/order_manager/kitchen); gate bank/settlements to owner
+**Slice 8a — Staff roles — DONE (migration `0024`):**
+- [x] `restaurant_staff.role` — **two roles, `owner` + `staff`**, not the four
+      originally sketched. Four roles where three of them gate nothing identical
+      is a distinction the UI would have to fake; two each gate something real.
+      Widening the check constraint later adds more without changing any existing
+      row's meaning. Default `owner`, so every pre-0024 row backfills to full
+      access and nobody loses anything the day it lands.
+- [x] Gated to owner, **in Postgres**: the `settlements` select policy, the
+      `vendor_earnings_summary` RPC, and all four staff-management RPCs.
+      Deliberately *not* gated: orders, menu, hours, profile, analytics — the
+      line is drawn around money and access, not around the working day.
+- [x] `staff_role()` helper (twin of `staff_restaurant_id()`); `Vendor.role`
+      resolved at sign-in and defaulting to least privilege on a failed read.
+- [x] Owner-only in the app: More → Team, More → Payments, Home's weekly earnings
+      card and Payments shortcut. Hidden, not greyed — a "Soon" chip means the
+      app owes you this, a dead row would mean *you personally* may not.
+- [x] `features/staff`: roster (owners first), add by email with a role, promote/
+      demote, remove — each behind a confirm, none optimistic.
+- [x] **An owner may not act on themselves.** Written against the self-lockout
+      footgun; it also proves the property that would otherwise need its own
+      check — since the caller is always an owner and always untouchable, no
+      sequence of calls can leave a restaurant with zero owners.
+- [x] Verified against the real database (psql, in a rolled-back transaction):
+      backfill, every refusal, and that staff keep orders + menu writes.
+      Vendor 58/58 green, analyze clean.
+
+**Slice 8b — Delivery partners — ⬜**
 - [ ] Delivery-partner domain: riders, assignment, ETA, pickup status, handover OTP
-- **Backend:** migration `0022` (roles) + net-new delivery schema/RPCs. Largest backend effort.
+- **Backend:** net-new delivery schema/RPCs. Largest backend effort; touches the
+  shared `orders` surface and changes what the customer app shows in transit, so
+  it needs the customer app to move in lockstep.
 
 ## Phase 9 — Perf, security, hardening  ⬜
 
@@ -192,6 +220,20 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
     `disableAnimations`. Two queue-header assertions (restaurant name → now a fixed
     "Active Orders" title; live name moved to the Home header) updated to match the
     redesign. (These had never run because the commit didn't compile.)
+- **2026-07-21** — Phase 8a (Staff roles). Migration `0024` applied: `role` on
+  `restaurant_staff` (`owner`/`staff`, default `owner` so the backfill costs
+  nobody access), `staff_role()`, the settlements policy and
+  `vendor_earnings_summary` narrowed to owners, and four owner-only RPCs
+  (`list_restaurant_staff`, `add_restaurant_staff`, `set_staff_role`,
+  `remove_restaurant_staff`). Scope decision: **two roles, not four** — a role
+  that gates nothing is a lie the UI tells. An owner adds colleagues in-app,
+  which does not reopen 0009's self-service hole: the caller already holds the
+  authority being granted and can only grant it inside the one restaurant they
+  already run; an address on another team is refused, never reassigned. New
+  `features/staff` (Team screen) + owner-only Payments/Team rows in More and on
+  Home. Every guard exercised against the real database inside a rolled-back
+  transaction, including the negative cases (staff keep orders and menu writes).
+  Vendor 58/58 green, analyze clean.
 - **2026-07-17** — Phase 3 Slice 1 (Categories management): new Sections screen —
   reorder (drag), rename, enable/disable a whole section — reached from the Menu app
   bar, optimistic with revert-on-refusal. Migration `0016` applied: `category_available`

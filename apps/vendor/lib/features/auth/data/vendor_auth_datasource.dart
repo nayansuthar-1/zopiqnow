@@ -98,22 +98,26 @@ class VendorAuthSupabaseDataSource implements VendorAuthDataSource {
   @override
   Future<void> signOut() => _client.auth.signOut();
 
-  /// Two round trips, because there is no honest way to make it one.
+  /// Three round trips, because there is no honest way to make it fewer.
   ///
   /// `restaurant_staff` is not readable through the API — deliberately, so that
   /// no one can enumerate which addresses run which kitchens. What is exposed is
-  /// `staff_restaurant_id()`, which answers only about the caller. The name then
-  /// comes from `restaurants`, which the caller may read *because* they are
-  /// staff (the policy in 0009 lets them see their own row even when it is
-  /// inactive — a delisted vendor still has to be told something).
+  /// `staff_restaurant_id()` and its twin `staff_role()`, each of which answers
+  /// only about the caller. The two are asked at once, since neither depends on
+  /// the other. The name then comes from `restaurants`, which the caller may
+  /// read *because* they are staff (the policy in 0009 lets them see their own
+  /// row even when it is inactive — a delisted vendor still has to be told
+  /// something).
   Future<Vendor?> _resolveVendor() async {
     final User? user = _client.auth.currentUser;
     final String? email = user?.email;
     if (email == null) return null;
 
-    final String? restaurantId = await _client.rpc<String?>(
-      'staff_restaurant_id',
-    );
+    final List<String?> identity = await Future.wait<String?>(<Future<String?>>[
+      _client.rpc<String?>('staff_restaurant_id'),
+      _client.rpc<String?>('staff_role'),
+    ]);
+    final String? restaurantId = identity[0];
     if (restaurantId == null) return null;
 
     final Map<String, dynamic>? row = await _client
@@ -133,6 +137,7 @@ class VendorAuthSupabaseDataSource implements VendorAuthDataSource {
       // better a kitchen that thinks it is open and refuses at `place_order` than
       // one shown closed when it is not. The database is the truth either way.
       acceptingOrders: row?['accepting_orders'] as bool? ?? true,
+      role: StaffRole.fromDb(identity[1]),
     );
   }
 }

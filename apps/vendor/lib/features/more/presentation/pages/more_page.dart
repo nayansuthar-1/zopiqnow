@@ -19,6 +19,13 @@ class MorePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final Vendor? vendor = ref.watch(vendorProvider);
+    // What the restaurant earns, and who may sign in to it, are the owner's
+    // (migration 0024). The rows are absent rather than greyed: a "Soon" chip
+    // says the app owes you this, and a disabled row says you personally may
+    // not — which is a thing to tell someone plainly, in one place, not to
+    // sprinkle across a hub. Hiding them decides nothing on its own; the
+    // policies and RPCs refuse a non-owner regardless of what is drawn here.
+    final bool isOwner = vendor?.role.isOwner ?? false;
 
     return Scaffold(
       body: SafeArea(
@@ -44,15 +51,16 @@ class MorePage extends ConsumerWidget {
                 ),
               ),
 
-            ZopiqReveal(
-              index: 2,
-              child: _Row(
-                icon: Icons.account_balance_wallet_rounded,
-                label: 'Payments',
-                subtitle: 'Earnings and weekly settlements',
-                onTap: () => context.pushNamed(Routes.payments),
+            if (isOwner)
+              ZopiqReveal(
+                index: 2,
+                child: _Row(
+                  icon: Icons.account_balance_wallet_rounded,
+                  label: 'Payments',
+                  subtitle: 'Earnings and weekly settlements',
+                  onTap: () => context.pushNamed(Routes.payments),
+                ),
               ),
-            ),
             ZopiqReveal(
               index: 3,
               child: _Row(
@@ -89,6 +97,16 @@ class MorePage extends ConsumerWidget {
                 onTap: () => context.pushNamed(Routes.notifications),
               ),
             ),
+            if (isOwner)
+              ZopiqReveal(
+                index: 7,
+                child: _Row(
+                  icon: Icons.group_rounded,
+                  label: 'Team',
+                  subtitle: 'Who can sign in to this kitchen',
+                  onTap: () => context.pushNamed(Routes.staff),
+                ),
+              ),
             ZopiqReveal(
               index: 7,
               child: _Row(
@@ -119,15 +137,7 @@ class MorePage extends ConsumerWidget {
                 subtitle: 'What customers are saying',
               ),
             ),
-            const ZopiqReveal(
-              index: 11,
-              child: _Row(
-                icon: Icons.group_rounded,
-                label: 'Staff',
-                subtitle: 'Who can sign in to this kitchen',
-              ),
-            ),
-            
+
             const SizedBox(height: ZopiqSpacing.xl),
           ],
         ),

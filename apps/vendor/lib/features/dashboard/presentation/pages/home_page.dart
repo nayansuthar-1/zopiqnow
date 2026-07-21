@@ -31,6 +31,7 @@ class HomePage extends ConsumerWidget {
     final Vendor? vendor = ref.watch(vendorProvider);
     final AsyncValue<List<VendorOrder>> ordersAsync = ref.watch(ordersProvider);
     final TodayStats stats = ref.watch(todayStatsProvider);
+    final bool isOwner = vendor?.role.isOwner ?? false;
 
     return Scaffold(
       body: SafeArea(
@@ -95,12 +96,16 @@ class HomePage extends ConsumerWidget {
               ),
               const SizedBox(height: ZopiqSpacing.xl),
 
-              // ── 4. Weekly Earnings ──
-              const ZopiqReveal(
-                index: 5,
-                child: _WeeklyEarningsCard(),
-              ),
-              const SizedBox(height: ZopiqSpacing.xl),
+              // ── 4. Weekly Earnings ── owner's, like the Payments screen it
+              // opens (0024). Staff get today's revenue in the grid above, which
+              // is the shift they are working; the week's take is the business's.
+              if (isOwner) ...<Widget>[
+                const ZopiqReveal(
+                  index: 5,
+                  child: _WeeklyEarningsCard(),
+                ),
+                const SizedBox(height: ZopiqSpacing.xl),
+              ],
 
               // ── 5. Quick Actions ──
               const ZopiqReveal(
@@ -108,9 +113,9 @@ class HomePage extends ConsumerWidget {
                 child: _SectionHeader(title: 'Quick Actions'),
               ),
               const SizedBox(height: ZopiqSpacing.md),
-              const ZopiqReveal(
+              ZopiqReveal(
                 index: 6,
-                child: _QuickActions(),
+                child: _QuickActions(isOwner: isOwner),
               ),
               const SizedBox(height: ZopiqSpacing.xxl),
             ],
@@ -544,7 +549,11 @@ class _WeeklyEarningsCard extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions();
+  const _QuickActions({required this.isOwner});
+
+  /// Payments is the owner's shortcut only — the row falls back to three tiles
+  /// for everyone else rather than offering a door the database would shut.
+  final bool isOwner;
 
   @override
   Widget build(BuildContext context) {
@@ -567,15 +576,17 @@ class _QuickActions extends StatelessWidget {
             onTap: () => context.goNamed(Routes.history),
           ),
         ),
-        const SizedBox(width: ZopiqSpacing.md),
-        Expanded(
-          child: _QuickActionTile(
-            icon: Icons.account_balance_wallet_rounded,
-            label: 'Payments',
-            color: const Color(0xFF10B981), // emerald green
-            onTap: () => context.goNamed(Routes.payments),
+        if (isOwner) ...<Widget>[
+          const SizedBox(width: ZopiqSpacing.md),
+          Expanded(
+            child: _QuickActionTile(
+              icon: Icons.account_balance_wallet_rounded,
+              label: 'Payments',
+              color: const Color(0xFF10B981), // emerald green
+              onTap: () => context.goNamed(Routes.payments),
+            ),
           ),
-        ),
+        ],
         const SizedBox(width: ZopiqSpacing.md),
         Expanded(
           child: _QuickActionTile(
