@@ -465,8 +465,20 @@ class _SectionCard extends StatelessWidget {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: children,
+      // The rows in here are `ListTile`s, and a ListTile paints its background
+      // and its tap ripple onto the nearest `Material` ancestor. Without this
+      // one, that ancestor is somewhere above the decorated Container — so the
+      // ripple was being painted *behind* an opaque white box and never seen.
+      //
+      // Flutter asserts on exactly this arrangement, which is why 11 tests
+      // across four files were failing: every one of them mounts a screen that
+      // reaches this card. Transparency, so the Container's own colour, border
+      // and shadow still show through unchanged.
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          children: children,
+        ),
       ),
     );
   }

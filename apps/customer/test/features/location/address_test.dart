@@ -309,7 +309,7 @@ void main() {
     Future<void> openBook(WidgetTester tester) async {
       await tester.tap(find.byIcon(Icons.person_rounded).first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Address book'));
+      await tester.tap(find.text('My addresses'));
       await tester.pumpAndSettle();
       expect(find.byType(AddressBookPage), findsOneWidget);
     }

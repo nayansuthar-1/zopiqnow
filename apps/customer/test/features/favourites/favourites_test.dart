@@ -147,7 +147,7 @@ void main() {
     Future<void> openFavourites(WidgetTester tester) async {
       await tester.tap(find.byIcon(Icons.person_rounded).first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Favourites'));
+      await tester.tap(find.text('Your collection'));
       await tester.pumpAndSettle();
     }
 

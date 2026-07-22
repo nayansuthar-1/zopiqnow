@@ -114,12 +114,12 @@ void _useTallSurface(WidgetTester tester) {
   addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 }
 
-/// Home → profile → "Your orders".
+/// Home → profile → "My orders".
 Future<void> _openOrders(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 50));
   await tester.tap(find.byIcon(Icons.person_rounded).first);
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Your orders'));
+  await tester.tap(find.text('My orders'));
   await tester.pumpAndSettle();
   expect(find.byType(OrdersPage), findsOneWidget);
 }
@@ -182,7 +182,13 @@ void main() {
       expect(find.textContaining('ZPQ-'), findsOneWidget);
       expect(find.text('Test Kitchen'), findsOneWidget);
       expect(find.text('₹609'), findsOneWidget);
-      expect(find.text('· 2 items'), findsOneWidget);
+      // The card lists what was ordered rather than counting it — it used to
+      // read "· 2 items". Naming the dishes is the stronger assertion anyway:
+      // a count of two would pass even if the wrong two arrived.
+      expect(
+        find.text('1 × Signature Chicken Biryani, 1 × Paneer Butter Masala'),
+        findsOneWidget,
+      );
       expect(find.text('Placed'), findsOneWidget);
     });
 
