@@ -424,3 +424,39 @@ builds.
   worse thing to have than a rare trip to the console.
 - Everything 8b-4 and 8c left open is still open: no cap on concurrent claims,
   the board cannot refresh itself, and the pre-claim board shows full addresses.
+
+## Phase 8e — the board stops waiting to be asked
+
+The oldest known gap in the rider app, open since 8b-2: `available_deliveries`
+is a function, Realtime rides table policies, and riders have no policy on
+`orders` — so there was nothing for a socket to deliver and a new job appeared
+only when a rider pulled down. A rider staring at "Nothing waiting" while a job
+sat on the board was the complaint of every shift.
+
+**This is a stopgap and is written as one.** A push knows; polling only asks. The
+job-offer push remains the real fix and remains blocked on the vendor send-side
+that has never been deployed — building a second sender against a pipeline never
+proven to fire once is not progress. Polling needs no new dependency and can be
+deleted in the commit that lands the push.
+
+- **Twenty seconds**, while the board is on screen and the rider is free. Short
+  enough that a glance down shows a job that appeared while they were riding;
+  long enough that a slow shift is three requests a minute, not sixty.
+- **The timer lives with `_BoardBody`**, which is only built when the rider has
+  no job. So polling starts when there is a board to poll and stops the moment
+  they claim something — no separate "should I be running" flag to fall out of
+  step with reality.
+- **Paused when the app is backgrounded**, and a resume re-asks immediately. A
+  phone in a pocket is not a rider reading the board.
+- **`boardPollIntervalProvider`**, not a constant, because a live `Timer.periodic`
+  outlives the widget tree and fails a widget test with a pending-timer error.
+  Every existing test overrides it to `null`; the auto-refresh has its own file
+  that drives the clock deliberately. The alternative — inferring "am I under
+  test" from `disableAnimations`, as the vendor once did — is a guess that reads
+  as one.
+
+One behaviour worth the test it now has: **a refresh must not blink the board
+away to a spinner.** Riverpod's `skipLoadingOnRefresh` already does the right
+thing, but a board that flashed a progress indicator every twenty seconds under a
+rider's thumb would be worse than one that never refreshed, and that is not a
+default worth leaving unpinned. Rider 25/25, analyze clean, release APK builds.

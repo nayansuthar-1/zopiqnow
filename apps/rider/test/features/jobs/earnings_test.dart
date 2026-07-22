@@ -17,6 +17,7 @@ Widget _app({Rider? signedInAs = testRider, required FakeJobsDataSource jobs}) =
           FakeRiderAuthDataSource(signedInAs: signedInAs),
         ),
         jobsDataSourceProvider.overrideWithValue(jobs),
+        boardPollIntervalProvider.overrideWithValue(null),
       ],
       child: const RiderApp(),
     );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
@@ -46,13 +48,66 @@ class HomePage extends ConsumerWidget {
 }
 
 /// What is going begging.
-class _BoardBody extends ConsumerWidget {
+///
+/// Stateful only so the board can re-ask on a timer. The widget's life is
+/// exactly the right life for that: this is built when the rider has no job, so
+/// polling starts when there is a board to poll and stops the moment they take
+/// something — no separate "should I be running" flag to get out of step.
+class _BoardBody extends ConsumerStatefulWidget {
   const _BoardBody({required this.riderName});
 
   final String riderName;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_BoardBody> createState() => _BoardBodyState();
+}
+
+class _BoardBodyState extends ConsumerState<_BoardBody>
+    with WidgetsBindingObserver {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _start();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// A phone in a pocket is not a rider reading the board. Polling through it
+  /// spends their battery on jobs nobody is looking at, and the first thing they
+  /// see on unlocking is a fresh fetch anyway.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(boardProvider);
+      _start();
+    } else {
+      _timer?.cancel();
+      _timer = null;
+    }
+  }
+
+  void _start() {
+    _timer?.cancel();
+    final Duration? every = ref.read(boardPollIntervalProvider);
+    if (every == null) return;
+    _timer = Timer.periodic(every, (_) {
+      // `ref.invalidate` on a disposed ref throws; the guard is cheaper than
+      // reasoning about whether cancel always wins the race with a pending tick.
+      if (mounted) ref.invalidate(boardProvider);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String riderName = widget.riderName;
     final AsyncValue<List<JobOffer>> board = ref.watch(boardProvider);
 
     return board.when(

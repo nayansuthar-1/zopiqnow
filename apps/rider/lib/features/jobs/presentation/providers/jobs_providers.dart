@@ -25,6 +25,25 @@ final FutureProvider<List<JobOffer>> boardProvider =
       return ref.watch(jobsDataSourceProvider).fetchBoard();
     });
 
+/// How often the board re-asks, while it is on screen and the rider is free.
+///
+/// Twenty seconds. Not a number with a theory behind it — it is short enough
+/// that a rider glancing down sees a job that appeared while they were riding,
+/// and long enough that a slow shift is three requests a minute rather than
+/// sixty.
+///
+/// Overridden to `null` in widget tests, which is the whole reason this is a
+/// provider and not a constant: a `Timer.periodic` left running when a test ends
+/// fails that test with a pending-timer error, and the alternative — inferring
+/// "am I in a test" from `disableAnimations` — is a guess that reads as one.
+///
+/// This is a stopgap and should be deleted when a job-offer push lands. Polling
+/// is what an app does when nothing can tell it the truth: `available_deliveries`
+/// is a function, Realtime rides table policies, and riders have no policy on
+/// `orders` (0025). A push knows; this only asks.
+final Provider<Duration?> boardPollIntervalProvider =
+    Provider<Duration?>((Ref ref) => const Duration(seconds: 20));
+
 /// This rider's jobs.
 final FutureProvider<List<Job>> myJobsProvider = FutureProvider<List<Job>>((
   Ref ref,

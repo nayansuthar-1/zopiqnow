@@ -19,6 +19,10 @@ Widget _app({
       FakeRiderAuthDataSource(signedInAs: signedInAs),
     ),
     jobsDataSourceProvider.overrideWithValue(jobs),
+    // No board polling under test. A live `Timer.periodic` outlives the widget
+    // tree and fails the test with a pending-timer error; the auto-refresh has
+    // its own test that drives the clock deliberately.
+    boardPollIntervalProvider.overrideWithValue(null),
   ],
   child: const RiderApp(),
 );

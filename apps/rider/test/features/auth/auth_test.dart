@@ -12,6 +12,8 @@ Widget _app({required FakeRiderAuthDataSource auth}) => ProviderScope(
   overrides: <Override>[
     riderAuthDataSourceProvider.overrideWithValue(auth),
     jobsDataSourceProvider.overrideWithValue(FakeJobsDataSource()),
+    // Signing in lands on the board, so these tests mount it too.
+    boardPollIntervalProvider.overrideWithValue(null),
   ],
   child: const RiderApp(),
 );

@@ -74,8 +74,21 @@ class FakeJobsDataSource implements JobsDataSource {
 
   List<Job> get mine => List<Job>.unmodifiable(_mine);
 
+  /// A kitchen finishes cooking something nobody has claimed. Nothing tells the
+  /// app — the next `fetchBoard` simply sees more than the last one did, which
+  /// is exactly how a new job reaches a rider in production.
+  void arrive(JobOffer o) => _board = <JobOffer>[..._board, o];
+
+  /// How long a board fetch takes. Zero everywhere except the test that checks
+  /// what is on screen *during* a refresh — with an instant fake there is no
+  /// during.
+  Duration fetchDelay = Duration.zero;
+
   @override
-  Future<List<JobOffer>> fetchBoard() async => List<JobOffer>.unmodifiable(_board);
+  Future<List<JobOffer>> fetchBoard() async {
+    if (fetchDelay > Duration.zero) await Future<void>.delayed(fetchDelay);
+    return List<JobOffer>.unmodifiable(_board);
+  }
 
   @override
   Future<List<Job>> fetchMine() async => List<Job>.unmodifiable(_mine);
