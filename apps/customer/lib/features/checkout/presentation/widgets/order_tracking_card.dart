@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_card.dart'
     show formatClockTime;
@@ -35,6 +36,10 @@ class OrderTrackingCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 _Headline(status: status, order: order),
+                // Only while the order is actually out for delivery — which is
+                // also the only window the policy behind it will answer in.
+                if (status == OrderStatus.outForDelivery)
+                  _Rider(orderId: order.id),
                 const SizedBox(height: ZopiqSpacing.lg),
                 _Timeline(status: status),
               ],
@@ -129,6 +134,83 @@ class _Headline extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Who is bringing it, and the number to ring.
+///
+/// Renders nothing at all until there is a rider to name — no placeholder, no
+/// spinner, no "finding a rider" line. The strip appears when the answer does,
+/// and a card that reserved space for it would leave a hole on every order a
+/// restaurant delivers with its own staff.
+class _Rider extends ConsumerWidget {
+  const _Rider({required this.orderId});
+
+  final String orderId;
+
+  static String _vehicleLabel(String vehicle) => switch (vehicle) {
+    'scooter' => 'On a scooter',
+    'bicycle' => 'On a bicycle',
+    _ => 'On a bike',
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final OrderRider? rider = ref.watch(orderRiderProvider(orderId)).valueOrNull;
+    if (rider == null) return const SizedBox.shrink();
+
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: ZopiqSpacing.lg),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: zc.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.delivery_dining_rounded,
+              color: zc.primary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: ZopiqSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  rider.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  _vehicleLabel(rider.vehicle),
+                  style: t.bodySmall?.copyWith(color: zc.textMuted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: ZopiqSpacing.sm),
+          // Shown, not dialled: placing a call needs a plugin this app does not
+          // carry, and a button that looks like it rings someone and doesn't is
+          // worse than a number the customer can read out.
+          Text(
+            rider.phone,
+            style: t.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
@@ -71,6 +72,16 @@ class OrderMockDataSource implements OrderDataSource {
     }
     return const Stream<OrderStatus>.empty();
   }
+
+  /// Nobody is ever carrying a mock order.
+  ///
+  /// A rider is not something this can fake honestly: one exists because a real
+  /// person opened the rider app and claimed the job, and inventing one here
+  /// would put a name and a phone number on the tracking card of an order that
+  /// no one is delivering. Null is the truthful answer, and it is also the one
+  /// the card is built to handle.
+  @override
+  Future<OrderRider?> fetchRider(String orderId) async => null;
 
   @override
   Future<AppliedCoupon> applyCoupon({

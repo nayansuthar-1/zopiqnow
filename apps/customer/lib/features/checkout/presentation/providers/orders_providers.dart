@@ -5,6 +5,7 @@ import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dar
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_category.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
@@ -56,6 +57,24 @@ final AutoDisposeStreamProviderFamily<OrderStatus, String> orderStatusProvider =
       String id,
     ) {
       return ref.watch(orderRepositoryProvider).watchOrderStatus(id);
+    });
+
+/// Who is carrying the order.
+///
+/// Fetched, not streamed. `deliveries` is readable by the customer only while
+/// the order is out for delivery, and Realtime rides that same policy — so a
+/// subscription opened a minute earlier would be a socket held open for a row
+/// it is not yet allowed to see. Instead the *status* is already live, and the
+/// card asks this question when the status answers "out for delivery".
+///
+/// Never in an error state: the repository returns null rather than throwing,
+/// because a missing name is not worth a broken tracking screen.
+final AutoDisposeFutureProviderFamily<OrderRider?, String> orderRiderProvider =
+    FutureProvider.autoDispose.family<OrderRider?, String>((
+      Ref ref,
+      String orderId,
+    ) {
+      return ref.watch(orderRepositoryProvider).getRider(orderId);
     });
 
 /// What a reorder actually managed to put in the cart.

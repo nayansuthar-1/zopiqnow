@@ -154,13 +154,27 @@ root lockfile already froze (`flutter_riverpod`, `go_router`, `supabase_flutter`
 > `kotlin.incremental=false` workaround, without which the Android build fails
 > outright on Windows — the other two apps both document it.
 
-### 8b-3 — The customer sees their rider
+### 8b-3 — The customer sees their rider  ✅ **DONE** *(migration `0039`)*
 
-Additive and small: name and phone on the tracking card while the order is out for
-delivery. A read-only policy on `deliveries` for the order's own customer.
+Name, vehicle and phone on the tracking card while the order is out for delivery.
+Two select policies and nothing else — no table, no function, no status, and
+`orders` untouched for the third slice running.
 
-- **Verify:** customer tests green; an order with no rider renders exactly as it
-  does today.
+Both policies are scoped to `state = 'picked_up'`, which is narrower than the
+kitchen's window. Not `claimed`: a rider who has taken the job but not reached the
+counter may still drop it, and a name that appears and then changes is worse than
+one that arrives a few minutes late. Not `delivered`: the job is over and the
+rider's personal number is theirs again. *(User decision, 2026-07-22.)*
+
+The app asks once, on a `FutureProvider`, when the live status says
+`out_for_delivery` — not a stream. Realtime rides the same policy, so a
+subscription opened any earlier would be a socket held open for a row it is not
+yet allowed to see.
+
+- **Verified:** all four cases exercised through the policies in a rolled-back
+  transaction — invisible while `claimed`, both rows visible to the order's owner
+  while `picked_up`, invisible to a *different* signed-in customer in that same
+  window, invisible again once `delivered`. Customer tracking tests 9/9.
 
 ### 8b-4 — Hardening
 
@@ -204,3 +218,16 @@ delivery. A read-only policy on `deliveries` for the order's own customer.
   no new dependencies. Email-OTP auth (four states, own Keystore key), the board,
   claim/drop, the pickup-code handover and delivery. 12/12 green, analyze clean,
   debug + release APKs build. First partner seeded (`seed/0006`).
+- **2026-07-22** — **8b-3 landed.** Migration `0039` (the admin console filled
+  0026–0038 in between): two select policies giving the order's own customer the
+  rider's name, vehicle and phone, and only while `picked_up`. `OrderRider` +
+  `getRider` through the existing repository; a strip on the tracking card that
+  renders nothing at all when nobody is carrying the order. Policies verified
+  against a rolled-back transaction including both negatives. Customer suite
+  122 pass / 11 fail — every one of those 11 pre-dates this slice (see below).
+- **2026-07-22** — **Main was already red.** `flutter test apps/customer` fails 11
+  tests on a clean checkout of `main`, in `app_shell`, `order_history`,
+  `address_test` and others. One of them — `OrderStatus.journey` asserting five
+  stages when Phase 2 made it six — was fixed here because it sits in the file
+  8b-3 touched. **The other 11 are untriaged and owed.** Run the suite early;
+  HEAD is not green.

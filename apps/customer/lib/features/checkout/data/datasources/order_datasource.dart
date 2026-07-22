@@ -1,6 +1,7 @@
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
@@ -53,4 +54,12 @@ abstract interface class OrderDataSource {
   /// "whose?" here as everywhere else — a subscription is a select that stays
   /// open, and it is filtered by exactly the rule that filters one.
   Stream<OrderStatus> watchOrderStatus(String orderId);
+
+  /// Who is carrying the order, or null when nobody is.
+  ///
+  /// Null is the ordinary answer and not an edge case: no rider has taken the
+  /// job yet, or one has but is still at the counter, or the order arrived and
+  /// the delivery is over. All three look the same from here — and they should,
+  /// because in all three there is no one to name.
+  Future<OrderRider?> fetchRider(String orderId);
 }

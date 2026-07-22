@@ -4,6 +4,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
@@ -165,6 +166,31 @@ class OrderSupabaseDataSource implements OrderDataSource {
           (List<Map<String, dynamic>> rows) =>
               OrderStatus.fromWire(rows.first['status'] as String),
         );
+  }
+
+  @override
+  Future<OrderRider?> fetchRider(String orderId) async {
+    // Two policies do the whole job (migration 0039): the delivery is readable
+    // only by the customer whose order it is, and only while `picked_up`, and
+    // the partner row only by way of such a delivery. So there is no state
+    // filter and no user filter here — a `.eq('state', …)` would be a second,
+    // weaker copy of a rule Postgres already enforces, and one the next reader
+    // would have to be told not to trust.
+    final Map<String, dynamic>? row = await _db
+        .from('deliveries')
+        .select('delivery_partners(name, phone, vehicle)')
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+    final Map<String, dynamic>? partner =
+        row?['delivery_partners'] as Map<String, dynamic>?;
+    if (partner == null) return null;
+
+    return OrderRider(
+      name: partner['name'] as String,
+      phone: partner['phone'] as String,
+      vehicle: partner['vehicle'] as String,
+    );
   }
 
   CustomerOrder _orderFrom(Map<String, dynamic> row) {

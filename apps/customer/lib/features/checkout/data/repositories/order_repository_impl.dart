@@ -2,6 +2,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
@@ -88,6 +89,18 @@ class OrderRepositoryImpl implements OrderRepository {
       // customer needs a sentence about: the order still renders from what was
       // fetched, and the only thing lost is the live-ness.
       _dataSource.watchOrderStatus(orderId);
+
+  @override
+  Future<OrderRider?> getRider(String orderId) async {
+    try {
+      return await _dataSource.fetchRider(orderId);
+    } on Object catch (_) {
+      // Swallowed on purpose, and the one place in this class where that is the
+      // right answer: the tracking card is already rendering the order. Failing
+      // it over a name would be trading the screen for a nicety.
+      return null;
+    }
+  }
 
   @override
   Future<List<String>> getCouponHints() async {

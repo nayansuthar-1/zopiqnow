@@ -1,6 +1,7 @@
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
@@ -64,6 +65,15 @@ abstract interface class OrderRepository {
   /// holds the order, so a broken subscription costs it live updates, not the
   /// receipt. It falls back to the status it fetched.
   Stream<OrderStatus> watchOrderStatus(String orderId);
+
+  /// The rider carrying this order, or null when there is nobody to name.
+  ///
+  /// Never throws. A rider is an addition to a tracking card that already says
+  /// everything essential, so a failed read costs a name and a phone number —
+  /// not the screen. Null on failure is indistinguishable from null because no
+  /// one has picked the order up, and the card renders both the same way: by
+  /// showing nothing.
+  Future<OrderRider?> getRider(String orderId);
 }
 
 /// Domain-level failure for reading order history.
