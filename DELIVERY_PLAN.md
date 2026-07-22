@@ -200,9 +200,11 @@ yet allowed to see.
   Realtime rides table policies, not functions — and riders have no policy on
   `orders` by design. So a new job appears on pull-to-refresh and not before. A
   job-offer push is the fix and belongs in 8b-4.
-- **No ops console still hurts.** Onboarding riders by seed file is fine for the
-  first ten and untenable at a hundred. The admin dashboard is the honest next
-  dependency after this phase.
+- ~~**No ops console still hurts.**~~ **Retired 2026-07-22** — the admin console
+  now has a Riders page (migration `0040`: `admin_list_riders`, `admin_add_rider`,
+  `admin_update_rider`, `admin_set_rider_active`). Riders are onboarded by an
+  admin, and the seed file is history rather than the mechanism. Dispatch is still
+  self-claim; nothing about the rider app changed.
 
 ## Progress log
 
@@ -225,6 +227,12 @@ yet allowed to see.
   renders nothing at all when nobody is carrying the order. Policies verified
   against a rolled-back transaction including both negatives. Customer suite
   122 pass / 11 fail — every one of those 11 pre-dates this slice (see below).
+- **2026-07-22** — **Riders moved into the admin console.** Migration `0040`: four
+  admin RPCs behind `assert_admin()`, a Riders page beside Restaurants, and one
+  refusal worth the whole slice — a rider carrying an order cannot be deactivated,
+  because `delivery_partner_email()` going null mid-job would strand that order
+  where no rider could claim it and no screen could finish it. Verified in a
+  rolled-back transaction including the non-admin and mid-delivery cases.
 - **2026-07-22** — **Main was already red.** `flutter test apps/customer` fails 11
   tests on a clean checkout of `main`, in `app_shell`, `order_history`,
   `address_test` and others. One of them — `OrderStatus.journey` asserting five

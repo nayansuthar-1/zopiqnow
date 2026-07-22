@@ -432,6 +432,40 @@ The largest step. Categories are strings on items, so the builder owns their con
 
 ---
 
+### Phase 7b — The rider fleet  ✅ **DONE** *(2026-07-22, migration `0040`)*
+
+Unplanned when this document was written, and pulled in from `DELIVERY_PLAN.md`,
+which had named an ops console "the honest next dependency" for the delivery
+phase: riders were added by editing a seed file. Fine for the first one,
+untenable by the tenth — the same argument this whole project rests on.
+
+- [x] **7b.1** `0040_admin_rider_roster.sql` — `admin_list_riders`,
+      `admin_add_rider`, `admin_update_rider`, `admin_set_rider_active`. All
+      `security definer` behind `assert_admin()`, no table write granted to the
+      browser, and **no select policy added for admins** — a policy would expose
+      every rider's address through PostgREST, and the RPC answers the only
+      question worth asking.
+      → **verified:** exercised in a rolled-back transaction — a signed-in
+      non-admin is refused both read and write; bad email, empty name and a
+      9-digit phone are each rejected; adding the same address twice is refused;
+      email is lower-cased, name trimmed, phone stripped to digits.
+- [x] **7b.2** Riders page in the console: roster with live-job and delivered
+      counts, add, edit, deactivate/reactivate.
+      → **verified:** `tsc -b` and `oxlint` clean.
+- [x] **7b.3** **Deactivating a rider mid-delivery is refused, by the database.**
+      Not a nicety: `delivery_partner_email()` returns null for a deactivated
+      rider, so they could no longer confirm pickup or delivery — and the partial
+      unique index keeps the job off the board for everyone else, because it is
+      live, not cancelled. The order would simply be undeliverable, by anyone,
+      with no screen able to fix it. The RPC refuses and names the order; the
+      rider drops it in their own app first. The console also greys the button
+      and says why, which is belt and braces on purpose.
+
+**Not built, deliberately:** there is no `admin_remove_rider`.
+`deliveries.partner_email` is a foreign key, so a delete would either fail or
+take the delivery history with it, and "who delivered this" is worth answering a
+year later. Deactivation is the removal, and it is reversible.
+
 ### Phase 8 — Ship
 
 - [ ] **8.1** Cross-check the console against all three Flutter apps: customer feed +

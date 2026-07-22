@@ -173,6 +173,33 @@ export const api = {
   publishRestaurant: (id: string) =>
     rpc<void>('admin_publish_restaurant', { p_id: id }),
 
+  listRiders: () => rpc<RiderRow[]>('admin_list_riders'),
+
+  addRider: (email: string, name: string, phone: string, vehicle: Vehicle) =>
+    rpc<void>('admin_add_rider', {
+      p_email: email,
+      p_name: name,
+      p_phone: phone,
+      p_vehicle: vehicle,
+    }),
+
+  /// No email here to change — it is the primary key, and the address a rider
+  /// signs in with. Editing it would not rename anyone, it would orphan every
+  /// delivery they have made.
+  updateRider: (email: string, name: string, phone: string, vehicle: Vehicle) =>
+    rpc<void>('admin_update_rider', {
+      p_email: email,
+      p_name: name,
+      p_phone: phone,
+      p_vehicle: vehicle,
+    }),
+
+  /// Refused by the database while the rider is carrying an order — deactivating
+  /// them mid-delivery would leave it undeliverable by anyone. The message says
+  /// which order, and this layer passes it through.
+  setRiderActive: (email: string, active: boolean) =>
+    rpc<void>('admin_set_rider_active', { p_email: email, p_active: active }),
+
   listAdmins: () => rpc<AdminRow[]>('admin_list_admins'),
 
   addAdmin: (email: string, name: string) =>
@@ -182,3 +209,20 @@ export const api = {
 }
 
 export type AdminRow = { email: string; name: string; created_at: string }
+
+/// The three vehicles `delivery_partners.vehicle` allows.
+export type Vehicle = 'bike' | 'scooter' | 'bicycle'
+
+/// A delivery partner, as the roster shows them. `live_order_id` is the order
+/// they are carrying right now — the reason the console can grey out the switch
+/// *and* say why, rather than letting the database refuse after the click.
+export type RiderRow = {
+  email: string
+  name: string
+  phone: string
+  vehicle: Vehicle
+  is_active: boolean
+  created_at: string
+  live_order_id: string | null
+  delivered_count: number
+}
