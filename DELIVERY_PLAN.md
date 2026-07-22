@@ -176,12 +176,56 @@ yet allowed to see.
   while `picked_up`, invisible to a *different* signed-in customer in that same
   window, invisible again once `delivered`. Customer tracking tests 9/9.
 
-### 8b-4 — Hardening
+### 8b-4 — Hardening  ✅ **DONE** *(migration `0041`)*
 
-- `/security-review` over every new policy and RPC.
-- The edge matrix: order cancelled while a rider carries it; rider abandons a claim;
-  two claims racing; a claimed order the kitchen then rejects; app killed mid-job.
-- Auto-assign, if wanted, lands here or later — the schema already allows it.
+Every policy and RPC from 0025, 0039 and 0040 read line by line, and the edge
+matrix run against the live database in a rolled-back transaction. **Ten
+scenarios, one failure**, plus two findings left deliberately unfixed.
+
+**Fixed in 0041:**
+
+1. **`confirm_delivered` never looked at the order.** It checked that the caller
+   held a `picked_up` row and then wrote `delivered` over whatever the order
+   said — its twin `confirm_pickup` has always checked. Not reachable today
+   (nothing moves an order out of `out_for_delivery` except this function: 0014
+   gives the kitchen no transition out of it, and the 0008 demo cron is
+   unscheduled — confirmed against `cron.job`, only the settlement batch runs).
+   The matrix had to fabricate the state to prove it. Closed anyway, because the
+   day customer-side cancellation lands it becomes a cancelled order that reports
+   itself delivered, settles, and is charged for.
+2. **The customer's phone outlived the delivery.** `my_deliveries` handed back
+   `user_phone` for every job a rider had ever held, so a rider a year in had a
+   contact list of everyone whose dinner they had carried. Now null once
+   `delivered` — the mirror of 0039's rule in the other direction. The address
+   stays: it is how a rider recognises a past job, and it is not a way to reach
+   anyone. No app change, because the rider app renders only the live job.
+   *(User decision, 2026-07-22.)*
+
+**Reviewed and left alone, with reasons:**
+
+- **No cap on concurrent claims.** Carrying three orders from one street is how
+  delivery works. The abuse case is answered by riders being hand-onboarded and
+  switchable off, not by a number in a function.
+- **`available_deliveries` shows the full delivery address before claiming.**
+  Narrowing it to an area is a real improvement and a bigger change than this:
+  the board is how a rider decides whether a job is worth taking, and "somewhere
+  in Banjara Hills" is a different decision from an address. **Still open.**
+- **A rider deactivated *while carrying* still strands the order.** 0040 refuses
+  it through the console, the only route ops has; direct SQL bypasses that as it
+  bypasses everything. Making it structural needs an admin force-abandon, which
+  is a support flow that does not exist yet — inventing its shape here would be
+  guessing. **Still open.**
+
+**Verified green:** two riders racing (one wins, the loser is told plainly) ·
+abandon returns the job to the board and another rider takes it · the kitchen
+cancelling a claimed order leaves the rider able to drop it and unable to pick it
+up · wrong pickup code refused twice, right one hands over and moves the order to
+`out_for_delivery` · a picked-up job cannot be dropped · a rider who is not
+carrying it cannot deliver it · delivering twice refused · the app being killed
+loses nothing, the job is in Postgres.
+
+Auto-assign and job-offer push remain unbuilt and unneeded — the schema still
+allows both without a migration.
 
 ---
 
@@ -233,6 +277,12 @@ yet allowed to see.
   because `delivery_partner_email()` going null mid-job would strand that order
   where no rider could claim it and no screen could finish it. Verified in a
   rolled-back transaction including the non-admin and mid-delivery cases.
+- **2026-07-22** — **8b-4 landed, and Phase 8b is closed.** Migration `0041`:
+  `confirm_delivered` now checks the order's status, and `my_deliveries` stops
+  returning the customer's phone number once the job is done. Ten-scenario edge
+  matrix run against the live database, all green after the fix. Rider 12/12,
+  analyze clean. Two findings left open on purpose (board addresses, admin
+  force-abandon) — both written up above rather than half-built.
 - **2026-07-22** — **Main was already red.** `flutter test apps/customer` fails 11
   tests on a clean checkout of `main`, in `app_shell`, `order_history`,
   `address_test` and others. One of them — `OrderStatus.journey` asserting five
