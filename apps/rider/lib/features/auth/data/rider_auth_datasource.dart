@@ -46,13 +46,24 @@ class RiderAuthSupabaseDataSource implements RiderAuthDataSource {
   SupabaseClient get _client => Supabase.instance.client;
 
   @override
-  Future<void> sendEmailOtp(String email) => _client.auth.signInWithOtp(
-    email: email.trim(),
-    // A rider's auth account is created on first sign-in like anyone else's. It
-    // grants nothing: authority comes from `delivery_partners`, and an account
-    // with no row there can read exactly nothing.
-    shouldCreateUser: true,
-  );
+  Future<void> sendEmailOtp(String email) async {
+    try {
+      await _client.auth.signInWithOtp(
+        email: email.trim(),
+        // A rider's auth account is created on first sign-in like anyone
+        // else's. It grants nothing: authority comes from `delivery_partners`,
+        // and an account with no row there can read exactly nothing.
+        shouldCreateUser: true,
+      );
+    } on AuthException catch (e) {
+      // Supabase writes these for humans — "For security purposes, you can only
+      // request this after 54 seconds" is the actual answer, and the rider can
+      // act on it. The screen used to replace every failure with one sentence
+      // that said nothing, which is how a missing INTERNET permission looked
+      // identical to a rate limit for four phases.
+      throw RiderAuthFailure(e.message);
+    }
+  }
 
   @override
   Future<Rider?> verifyEmailOtp({

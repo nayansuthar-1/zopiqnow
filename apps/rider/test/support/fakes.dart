@@ -21,8 +21,20 @@ class FakeRiderAuthDataSource implements RiderAuthDataSource {
 
   String? lastCodeSentTo;
 
+  /// Set to make the send fail the way the auth service does — with a sentence
+  /// of its own that the screen is supposed to pass through, not replace.
+  String? sendFailsWith;
+
+  /// Set to make the send fail the way a dead network does: not an auth error
+  /// at all, just an exception.
+  bool sendThrowsNetworkError = false;
+
   @override
-  Future<void> sendEmailOtp(String email) async => lastCodeSentTo = email;
+  Future<void> sendEmailOtp(String email) async {
+    if (sendThrowsNetworkError) throw Exception('SocketException');
+    if (sendFailsWith != null) throw RiderAuthFailure(sendFailsWith!);
+    lastCodeSentTo = email;
+  }
 
   @override
   Future<Rider?> verifyEmailOtp({

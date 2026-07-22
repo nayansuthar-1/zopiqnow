@@ -1,4 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Every screen in this app is a network call: the board, the claim, the
+         pickup code, the sign-in email. Without this the app installs, opens,
+         and fails at the first request with no useful message.
+
+         Flutter's template declares INTERNET only in the debug and profile
+         manifests, which is why this was invisible for four phases — every
+         `flutter run` worked and every release APK was dead. The customer and
+         vendor apps already carry it here; the rider app was created later and
+         nobody had run its release build on a real phone until now. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="zopiq_rider"
         android:name="${applicationName}"

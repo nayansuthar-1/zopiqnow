@@ -96,4 +96,52 @@ void main() {
     expect(find.textContaining('didn\'t work'), findsOneWidget);
     expect(find.text('Available jobs'), findsNothing);
   });
+
+  testWidgets('the auth service\'s own reason reaches the rider', (
+    WidgetTester tester,
+  ) async {
+    _tallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        auth: FakeRiderAuthDataSource()
+          ..sendFailsWith =
+              'For security purposes, you can only request this after 54 seconds.',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'nayan@siteonlab.com');
+    await tester.tap(find.text('Send code'));
+    await tester.pumpAndSettle();
+
+    // Passed through, not replaced. A rider can wait 54 seconds; they
+    // cannot do anything with 'please try again'.
+    expect(
+      find.text(
+        'For security purposes, you can only request this after 54 seconds.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a dead network is named as one, not blamed on the code', (
+    WidgetTester tester,
+  ) async {
+    _tallSurface(tester);
+    await tester.pumpWidget(
+      _app(auth: FakeRiderAuthDataSource()..sendThrowsNetworkError = true),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'nayan@siteonlab.com');
+    await tester.tap(find.text('Send code'));
+    await tester.pumpAndSettle();
+
+    // The shape of the bug that cost a release build: no INTERNET
+    // permission looks exactly like this, and the old copy blamed the send.
+    expect(
+      find.text('We couldn\'t reach Zopiqnow. Check your connection.'),
+      findsOneWidget,
+    );
+  });
 }

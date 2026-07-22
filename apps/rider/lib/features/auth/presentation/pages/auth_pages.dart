@@ -62,9 +62,19 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     try {
       await ref.read(riderAuthControllerProvider.notifier).sendEmailOtp(email);
       if (mounted) widget.onOtpSent(email);
+    } on RiderAuthFailure catch (e) {
+      // Supabase's own sentence, not ours. "You can only request this after 54
+      // seconds" is something a rider can act on; "please try again" is what
+      // they were told while the real problem went unnamed for four phases.
+      if (mounted) setState(() => _error = e.message);
     } on Object {
+      // Anything that is not the auth service talking — no signal, DNS, a dead
+      // socket. There is nothing specific to say, so say the honest general
+      // thing and point at the one cause the rider can actually fix.
       if (mounted) {
-        setState(() => _error = 'We couldn\'t send the code. Please try again.');
+        setState(
+          () => _error = 'We couldn\'t reach Zopiqnow. Check your connection.',
+        );
       }
     } finally {
       if (mounted) setState(() => _sending = false);
