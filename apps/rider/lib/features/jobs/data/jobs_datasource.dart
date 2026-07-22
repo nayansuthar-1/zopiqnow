@@ -36,6 +36,9 @@ abstract interface class JobsDataSource {
     required DateTime from,
     required DateTime to,
   });
+
+  /// This rider's weekly pay batches, newest first.
+  Future<List<Payout>> fetchPayouts();
 }
 
 /// A call the database refused — a rule in 0025 (`P0001`: somebody else claimed
@@ -131,6 +134,28 @@ class JobsSupabaseDataSource implements JobsDataSource {
         .cast<Map<String, dynamic>>()
         .map(EarningsDay.fromJson)
         .toList(growable: false);
+  }
+
+  /// The one table read in this file, and the exception is deliberate.
+  ///
+  /// Everything else here is an RPC because migration 0025 gave riders no policy
+  /// on `orders` at all — there is no table for those calls to read. `rider_payouts`
+  /// is different: it is the rider's own row, it has a select policy scoped by
+  /// `delivery_partner_email()` (0045), and wrapping that in a function would add
+  /// a layer that enforces nothing the policy does not already enforce. Exactly
+  /// what the vendor app does with `settlements`.
+  @override
+  Future<List<Payout>> fetchPayouts() async {
+    final List<Map<String, dynamic>> rows =
+        await _guard<List<Map<String, dynamic>>>(
+          () => _db
+              .from('rider_payouts')
+              .select()
+              // No `.eq('partner_email', …)`. The policy is the filter, and a
+              // client-side one would only be a second place to get it wrong.
+              .order('period_end', ascending: false),
+        );
+    return rows.map(Payout.fromJson).toList(growable: false);
   }
 
   static String _asDate(DateTime d) =>

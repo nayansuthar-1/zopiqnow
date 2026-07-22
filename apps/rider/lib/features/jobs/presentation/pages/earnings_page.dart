@@ -29,7 +29,8 @@ class EarningsPage extends ConsumerWidget {
           onRefresh: () async {
             ref
               ..invalidate(earningsProvider)
-              ..invalidate(myJobsProvider);
+              ..invalidate(myJobsProvider)
+              ..invalidate(payoutsProvider);
             await Future<void>.delayed(const Duration(milliseconds: 400));
           },
           child: days.hasError
@@ -44,6 +45,7 @@ class EarningsPage extends ConsumerWidget {
                   children: <Widget>[
                     _TotalsCard(summary: summary),
                     const SizedBox(height: ZopiqSpacing.lg),
+                    const _Payouts(),
                     Text(
                       'Completed jobs',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -68,6 +70,157 @@ class EarningsPage extends ConsumerWidget {
                       ...done.map((Job j) => _DoneJobCard(job: j)),
                   ],
                 ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Where the money is, as opposed to how much of it there is.
+///
+/// Renders nothing at all until the first batch exists. A rider in their first
+/// week would otherwise get an empty "Payouts" heading, which reads as something
+/// broken rather than something that has not happened yet — the totals above
+/// already told them they have earned.
+class _Payouts extends ConsumerWidget {
+  const _Payouts();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final List<Payout> payouts = ref
+        .watch(payoutsProvider)
+        .maybeWhen(
+          data: (List<Payout> p) => p,
+          orElse: () => const <Payout>[],
+        );
+    if (payouts.isEmpty) return const SizedBox.shrink();
+
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+    final int owed = payouts
+        .where((Payout p) => !p.isPaid)
+        .fold(0, (int sum, Payout p) => sum + p.amount);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                'Payouts',
+                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (owed > 0)
+              Text(
+                '₹$owed on the way',
+                style: t.bodySmall?.copyWith(
+                  color: zc.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: ZopiqSpacing.xs),
+        Text(
+          'Paid every Monday for the week before.',
+          style: t.bodySmall?.copyWith(color: zc.textMuted),
+        ),
+        const SizedBox(height: ZopiqSpacing.sm),
+        ...payouts.map((Payout p) => _PayoutCard(payout: p)),
+        const SizedBox(height: ZopiqSpacing.lg),
+      ],
+    );
+  }
+}
+
+class _PayoutCard extends StatelessWidget {
+  const _PayoutCard({required this.payout});
+
+  final Payout payout;
+
+  static const List<String> _months = <String>[
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  /// "13–19 Jul", collapsing the month when both ends share one.
+  String get _period {
+    final DateTime a = payout.periodStart;
+    final DateTime b = payout.periodEnd;
+    final String left = a.month == b.month
+        ? '${a.day}'
+        : '${a.day} ${_months[a.month - 1]}';
+    return '$left–${b.day} ${_months[b.month - 1]}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: ZopiqSpacing.sm),
+      child: ZopiqCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    _period,
+                    style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                Text(
+                  '₹${payout.amount}',
+                  style: t.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: payout.isPaid ? zc.textStrong : zc.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: ZopiqSpacing.xs),
+            Row(
+              children: <Widget>[
+                Icon(
+                  payout.isPaid
+                      ? Icons.check_circle_rounded
+                      : Icons.schedule_rounded,
+                  size: 16,
+                  color: payout.isPaid ? zc.veg : zc.textMuted,
+                ),
+                const SizedBox(width: ZopiqSpacing.xs),
+                Expanded(
+                  child: Text(
+                    payout.isPaid ? 'Paid' : 'Being processed',
+                    style: t.bodySmall?.copyWith(
+                      color: payout.isPaid ? zc.veg : zc.textMuted,
+                    ),
+                  ),
+                ),
+                Text(
+                  payout.deliveryCount == 1
+                      ? '1 delivery'
+                      : '${payout.deliveryCount} deliveries',
+                  style: t.bodySmall?.copyWith(color: zc.textMuted),
+                ),
+              ],
+            ),
+            // The bank reference, once there is one. Shown rather than kept for
+            // ops: a rider whose bank says nothing arrived needs the number to
+            // ask about, and having to request it costs them a day.
+            if (payout.reference != null) ...<Widget>[
+              const SizedBox(height: ZopiqSpacing.xs),
+              Text(
+                'Ref ${payout.reference}',
+                style: t.bodySmall?.copyWith(color: zc.textMuted),
+              ),
+            ],
+          ],
         ),
       ),
     );

@@ -46,8 +46,14 @@ class FakeJobsDataSource implements JobsDataSource {
   FakeJobsDataSource({
     List<JobOffer> board = const <JobOffer>[],
     List<Job> mine = const <Job>[],
+    this.payouts = const <Payout>[],
   }) : _board = List<JobOffer>.of(board),
        _mine = List<Job>.of(mine);
+
+  /// Pay batches, which nothing the rider does can create — the weekly rollup
+  /// makes them and an admin marks them paid (0045). So they are fixture, not
+  /// state this fake evolves.
+  final List<Payout> payouts;
 
   List<JobOffer> _board;
   List<Job> _mine;
@@ -180,6 +186,9 @@ class FakeJobsDataSource implements JobsDataSource {
         .toList(growable: false);
   }
 
+  @override
+  Future<List<Payout>> fetchPayouts() async => List<Payout>.unmodifiable(payouts);
+
   void _replace(Job job, {required JobState state, required String orderStatus}) {
     _mine = _mine
         .map(
@@ -254,4 +263,26 @@ Job job({
   deliveredAt:
       deliveredAt ??
       (state == JobState.delivered ? DateTime.now() : null),
+);
+
+Payout payout({
+  int id = 1,
+  DateTime? periodStart,
+  DateTime? periodEnd,
+  int deliveryCount = 3,
+  int amount = 132,
+  bool isPaid = false,
+  String? reference,
+}) => Payout(
+  id: id,
+  periodStart: periodStart ?? DateTime(2026, 7, 13),
+  periodEnd: periodEnd ?? DateTime(2026, 7, 19),
+  deliveryCount: deliveryCount,
+  amount: amount,
+  isPaid: isPaid,
+  // A paid batch always has a reference and a time — 0045 has a check
+  // constraint saying so, and a fixture that can violate it teaches the test
+  // suite a shape the database cannot produce.
+  reference: reference ?? (isPaid ? 'UTR123456789' : null),
+  paidAt: isPaid ? DateTime(2026, 7, 20, 9) : null,
 );

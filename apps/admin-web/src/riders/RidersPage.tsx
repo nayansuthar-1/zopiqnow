@@ -118,6 +118,7 @@ export function RidersPage() {
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<RiderRow | null>(null)
   const [deactivating, setDeactivating] = useState<RiderRow | null>(null)
+  const [banking, setBanking] = useState<RiderRow | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -244,6 +245,15 @@ export function RidersPage() {
                     Edit
                   </button>
 
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setBanking(r)}
+                    className="text-sm font-medium text-ink-muted hover:text-ink disabled:opacity-40"
+                  >
+                    Bank
+                  </button>
+
                   {r.is_active ? (
                     <button
                       type="button"
@@ -281,6 +291,10 @@ export function RidersPage() {
         </div>
       </div>
 
+      {banking && (
+        <BankDialog rider={banking} onClose={() => setBanking(null)} />
+      )}
+
       {deactivating && (
         <ConfirmDialog
           title={`Deactivate ${deactivating.name}?`}
@@ -296,5 +310,127 @@ export function RidersPage() {
         />
       )}
     </>
+  )
+}
+
+/// Where a rider's pay is sent.
+///
+/// Entered here and never by the rider, which is the whole reason this dialog
+/// exists rather than a screen in the rider app: a rider who can write their own
+/// payout destination is the entire fraud surface of a payout system in one form
+/// field. Same rule 0009 set for restaurant onboarding and 0040 reaffirmed for
+/// this roster.
+///
+/// Saving a different account clears `verified` in the database — whoever checked
+/// the old one against a document did not check this one.
+function BankDialog({ rider, onClose }: { rider: RiderRow; onClose: () => void }) {
+  const [holder, setHolder] = useState('')
+  const [account, setAccount] = useState('')
+  const [ifsc, setIfsc] = useState('')
+  const [bank, setBank] = useState('')
+  const [loaded, setLoaded] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void api
+      .getRiderBank(rider.email)
+      .then((rows) => {
+        if (!alive) return
+        const b = rows[0]
+        if (b) {
+          setHolder(b.account_holder ?? '')
+          setAccount(b.account_number ?? '')
+          setIfsc(b.ifsc ?? '')
+          setBank(b.bank_name ?? '')
+        }
+        setLoaded(true)
+      })
+      .catch((e: unknown) => {
+        if (alive) setError(e instanceof Error ? e.message : String(e))
+      })
+    return () => {
+      alive = false
+    }
+  }, [rider.email])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+      <div className="w-full max-w-md rounded-[12px] bg-white p-6">
+        <h2 className="text-base font-bold text-ink">Bank details · {rider.name}</h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          Where their weekly payout is sent. The rider never sees or edits this.
+        </p>
+
+        {error && (
+          <p className="mt-4 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
+            {error}
+          </p>
+        )}
+
+        {!loaded ? (
+          <p className="mt-5 text-sm text-ink-muted">Loading…</p>
+        ) : (
+          <form
+            className="mt-5 grid gap-4"
+            onSubmit={(e) => {
+              e.preventDefault()
+              setBusy(true)
+              setError(null)
+              void api
+                .setRiderBank(rider.email, {
+                  account_holder: holder,
+                  account_number: account,
+                  ifsc,
+                  bank_name: bank,
+                })
+                .then(onClose)
+                .catch((err: unknown) =>
+                  setError(err instanceof Error ? err.message : String(err)),
+                )
+                .finally(() => setBusy(false))
+            }}
+          >
+            <Field
+              label="Account holder"
+              value={holder}
+              onChange={(e) => setHolder(e.target.value)}
+              placeholder="As printed on the passbook"
+            />
+            <Field
+              label="Account number"
+              value={account}
+              onChange={(e) => setAccount(e.target.value)}
+              placeholder="123456789012"
+              hint="9 to 18 digits."
+            />
+            <Field
+              label="IFSC"
+              value={ifsc}
+              onChange={(e) => setIfsc(e.target.value)}
+              placeholder="SBIN0001234"
+              // Upper-cased server-side, so a rider's handwriting copied in
+              // lower case is not an error worth showing anybody.
+              hint="Eleven characters. Case does not matter."
+            />
+            <Field
+              label="Bank name"
+              value={bank}
+              onChange={(e) => setBank(e.target.value)}
+              placeholder="State Bank of India"
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={busy}>
+                Save
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
   )
 }

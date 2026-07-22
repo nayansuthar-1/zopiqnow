@@ -352,3 +352,75 @@ from them pays the base fee and says so on the rider's screen, in those words.
 - **No cap on concurrent claims** (carried over from 8b-4), and pay now gives that
   a sharper edge: claiming five jobs snapshots five fees.
 - **The board still cannot refresh itself.** Unchanged since 8b-2.
+
+## Phase 8d — the money moves
+
+8c worked out what a delivery is worth and stopped there. A number recorded and
+never settled is a promise, not a wage.
+
+Deliberately the **same machinery** `0017` built for restaurants rather than a
+second invention — a weekly Mon–Sun rollup, `pending`/`paid`, a bank reference,
+and a foreign key from the work to the batch that paid for it. An admin who has
+understood settlements already understands payouts.
+
+**One difference, and it is the whole difference: no commission.** A settlement
+is gross sales minus the platform's cut. A payout is what the rider earned, and
+the cut was already taken from the restaurant. One amount where settlements have
+three.
+
+**Bank details are admin-entered, never rider-entered.** Swiggy lets a rider type
+their own account in; a rider who can write their own payout destination is the
+entire fraud surface of a payout system in one form field. Same rule 0009 set for
+restaurant onboarding and 0040 reaffirmed for this roster.
+
+**This does not move money.** No bank integration exists. An admin makes the
+transfer in their banking app and returns with the UTR, which is why the
+reference is mandatory — the row is the only thing tying a rider's week to a line
+on a bank statement.
+
+- **`0045`** — `delivery_partner_bank_accounts`, `rider_payouts`,
+  `deliveries.payout_id`, `run_rider_payout_batch()` on pg_cron every Monday at
+  01:00, a rider select policy, and four admin RPCs.
+- **Rider app** — a Payouts section on Earnings: each week, what it paid, whether
+  it has landed, and the bank reference once it has. Renders nothing at all until
+  the first batch exists.
+- **Console** — a Rider payouts page (filter, mark paid with a mandatory UTR) and
+  a Bank dialog on the Riders page.
+
+### The security fix, which was not only ours
+
+`0017` wrote `revoke all on function public.run_settlement_batch() from public`
+and that is **not enough on Supabase**: the project ships default privileges
+granting `execute` on new functions in `public` directly to `anon`,
+`authenticated` and `service_role`, and revoking from `PUBLIC` does not touch a
+direct grant to a named role.
+
+So `run_settlement_batch` has been callable by anyone, signed in or not, since
+`0017` — and the new rider batch inherited the same mistake. Found by testing it:
+a rider ran their own payout batch in the verification for `0045`, which is
+exactly what the comment above it swore they could not do.
+
+Both now revoke from `public, anon, authenticated`. Every `admin_*` function
+carries the same untidy `anon` grant and is **not** exposed by it, because each
+calls `assert_admin()` on its first line and an anon caller has no JWT email to
+match — the two batch functions had no such guard, and the grant was the only
+thing standing in front of them.
+
+Verified in rolled-back transactions: the rollup buckets by rider and by IST week
+(a job delivered 23:40 Sunday and one at 00:20 Monday land in different payouts);
+it is idempotent; `claimed`, `picked_up` and `cancelled` work is never paid; a
+rider sees their own payouts and not another's and cannot read any bank row
+including their own; marking paid demands a reference and refuses a second time;
+changing an account un-verifies it; and rider and anon are refused on both
+batches while the owner still runs them. Rider 21/21, analyze clean, release APK
+builds.
+
+### Still open
+
+- **Nothing verifies a bank account.** `verified` is a column an admin sets by
+  hand after looking at a passbook. There is no penny-drop.
+- **No payout reversal.** A batch marked paid in error can only be corrected in
+  SQL. Deliberate for now — the alternative is an un-pay button, and that is a
+  worse thing to have than a rare trip to the console.
+- Everything 8b-4 and 8c left open is still open: no cap on concurrent claims,
+  the board cannot refresh itself, and the pre-claim board shows full addresses.

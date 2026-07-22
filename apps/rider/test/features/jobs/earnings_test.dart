@@ -119,6 +119,77 @@ void main() {
     expect(find.textContaining('Nothing delivered yet'), findsOneWidget);
   });
 
+  testWidgets('with no payouts yet, the section is absent rather than empty', (
+    WidgetTester tester,
+  ) async {
+    _tallSurface(tester);
+    await tester.pumpWidget(
+      _app(jobs: FakeJobsDataSource(mine: <Job>[job(state: JobState.delivered)])),
+    );
+    await tester.pumpAndSettle();
+    await _openEarnings(tester);
+
+    // A first-week rider should not see a "Payouts" heading over nothing —
+    // that reads as broken, not as not-yet.
+    expect(find.text('Payouts'), findsNothing);
+  });
+
+  testWidgets('a pending payout says what is owed and that it is on the way', (
+    WidgetTester tester,
+  ) async {
+    _tallSurface(tester);
+    await tester.pumpWidget(
+      _app(jobs: FakeJobsDataSource(payouts: <Payout>[payout()])),
+    );
+    await tester.pumpAndSettle();
+    await _openEarnings(tester);
+
+    expect(find.text('Payouts'), findsOneWidget);
+    expect(find.text('₹132 on the way'), findsOneWidget);
+    expect(find.text('Being processed'), findsOneWidget);
+    // The week, collapsed to one month name.
+    expect(find.text('13–19 Jul'), findsOneWidget);
+    expect(find.text('3 deliveries'), findsOneWidget);
+  });
+
+  testWidgets('a paid payout shows the bank reference and drops off the owed sum', (
+    WidgetTester tester,
+  ) async {
+    _tallSurface(tester);
+    await tester.pumpWidget(
+      _app(jobs: FakeJobsDataSource(payouts: <Payout>[payout(isPaid: true)])),
+    );
+    await tester.pumpAndSettle();
+    await _openEarnings(tester);
+
+    expect(find.text('Paid'), findsOneWidget);
+    // The rider needs this to ask their bank about a payment that never landed.
+    expect(find.text('Ref UTR123456789'), findsOneWidget);
+    expect(find.textContaining('on the way'), findsNothing);
+  });
+
+  testWidgets('a period spanning two months names both', (
+    WidgetTester tester,
+  ) async {
+    _tallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        jobs: FakeJobsDataSource(
+          payouts: <Payout>[
+            payout(
+              periodStart: DateTime(2026, 7, 27),
+              periodEnd: DateTime(2026, 8, 2),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _openEarnings(tester);
+
+    expect(find.text('27 Jul–2 Aug'), findsOneWidget);
+  });
+
   testWidgets('delivering moves the money into today\'s total', (
     WidgetTester tester,
   ) async {

@@ -127,6 +127,15 @@ final Provider<EarningsSummary> earningsSummaryProvider =
       );
     });
 
+/// The weekly pay batches. Separate from [earningsProvider] because they answer
+/// different questions: earnings is "what have I made", payouts is "where is it".
+final FutureProvider<List<Payout>> payoutsProvider =
+    FutureProvider<List<Payout>>((Ref ref) {
+      final Rider? rider = ref.watch(riderProvider);
+      if (rider == null) return Future<List<Payout>>.value(const <Payout>[]);
+      return ref.watch(jobsDataSourceProvider).fetchPayouts();
+    });
+
 /// Finished jobs, newest first — the "what have I done" list under the totals.
 final Provider<List<Job>> deliveredJobsProvider = Provider<List<Job>>((Ref ref) {
   return ref

@@ -214,6 +214,18 @@ export const api = {
 
   getRiderPayRates: () => rpc<RiderPayRates[]>('admin_get_rider_pay_rates'),
 
+  listRiderPayouts: (status?: 'pending' | 'paid') =>
+    rpc<RiderPayoutRow[]>('admin_list_rider_payouts', { p_status: status ?? null }),
+
+  markRiderPayoutPaid: (id: number, reference: string) =>
+    rpc<void>('admin_mark_rider_payout_paid', { p_id: id, p_reference: reference }),
+
+  getRiderBank: (email: string) =>
+    rpc<RiderBank[]>('admin_get_rider_bank', { p_email: email }),
+
+  setRiderBank: (email: string, bank: Record<string, unknown>) =>
+    rpc<void>('admin_set_rider_bank', { p_email: email, p_bank: bank }),
+
   setRiderPayRates: (baseFee: number, perKmFee: number) =>
     rpc<void>('admin_set_rider_pay_rates', {
       p_base_fee: baseFee,
@@ -225,6 +237,32 @@ export type AdminRow = { email: string; name: string; created_at: string }
 
 /// What a delivery pays a rider (migration 0043). One row, platform-wide — the
 /// RPC returns a table, so this arrives as an array of exactly one.
+/// One week's pay for one rider (migration 0045). `has_bank` rather than the
+/// account number: a payout list is read at a glance and over shoulders, and the
+/// number is only needed by whoever is actually making the transfer.
+export type RiderPayoutRow = {
+  id: number
+  partner_email: string
+  partner_name: string
+  period_start: string
+  period_end: string
+  delivery_count: number
+  amount: number
+  status: 'pending' | 'paid'
+  reference: string | null
+  has_bank: boolean
+  paid_at: string | null
+}
+
+export type RiderBank = {
+  account_holder: string | null
+  account_number: string | null
+  ifsc: string | null
+  bank_name: string | null
+  verified: boolean
+  updated_at: string
+}
+
 export type RiderPayRates = {
   base_fee: number
   per_km_fee: number

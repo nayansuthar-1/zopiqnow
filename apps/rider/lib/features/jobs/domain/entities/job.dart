@@ -99,6 +99,56 @@ class EarningsDay {
   final int earnings;
 }
 
+/// One week's pay, as a batch (migration 0045).
+///
+/// The rider's twin of a restaurant's settlement, and the same shape: a Mon–Sun
+/// window, a count, an amount, and whether the money has actually left. Born in
+/// the weekly rollup, marked paid by an admin with the bank's reference — never
+/// by anything the rider does.
+@immutable
+class Payout {
+  const Payout({
+    required this.id,
+    required this.periodStart,
+    required this.periodEnd,
+    required this.deliveryCount,
+    required this.amount,
+    required this.isPaid,
+    required this.reference,
+    required this.paidAt,
+  });
+
+  factory Payout.fromJson(Map<String, dynamic> json) => Payout(
+    id: json['id'] as int,
+    periodStart: DateTime.parse(json['period_start'] as String),
+    periodEnd: DateTime.parse(json['period_end'] as String),
+    deliveryCount: json['delivery_count'] as int? ?? 0,
+    amount: json['amount'] as int? ?? 0,
+    isPaid: json['status'] == 'paid',
+    reference: json['reference'] as String?,
+    paidAt: json['paid_at'] == null
+        ? null
+        : DateTime.parse(json['paid_at'] as String).toLocal(),
+  );
+
+  final int id;
+
+  /// Calendar dates, not instants — the same reasoning as [EarningsDay.day].
+  final DateTime periodStart;
+  final DateTime periodEnd;
+
+  final int deliveryCount;
+  final int amount;
+  final bool isPaid;
+
+  /// The bank's reference (a UTR), and the reason it is shown rather than kept
+  /// for ops: a rider whose bank says nothing arrived needs the number to ask
+  /// about, and asking the platform for it is a day lost.
+  final String? reference;
+
+  final DateTime? paidAt;
+}
+
 /// A job this rider is actually carrying.
 @immutable
 class Job {

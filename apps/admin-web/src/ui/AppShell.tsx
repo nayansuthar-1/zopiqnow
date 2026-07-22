@@ -10,6 +10,7 @@ const links = [
   { to: '/', label: 'Restaurants', end: true },
   { to: '/restaurants/new', label: 'Add restaurant', end: false },
   { to: '/riders', label: 'Riders', end: false },
+  { to: '/payouts', label: 'Rider payouts', end: false },
   { to: '/settings', label: 'Settings', end: false },
 ]
 
