@@ -64,7 +64,7 @@ void main() {
     expect(find.text('+919876543210'), findsNothing);
   });
 
-  testWidgets('taking a job replaces the board with the job in hand', (
+  testWidgets('taking a job opens the run, with the board a tap away', (
     WidgetTester tester,
   ) async {
     _tallSurface(tester);
@@ -78,11 +78,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(jobs.mine.length, 1);
-    expect(find.text('Your job'), findsOneWidget);
+    expect(find.text('Your run'), findsOneWidget);
     expect(find.text('Collect from'), findsOneWidget);
     // Now that it is theirs, the number is there.
     expect(find.text('+919876543210'), findsOneWidget);
+    // The board is no longer showing — but it is reachable, which is what
+    // changed when stacked deliveries arrived.
     expect(find.text('Take this job'), findsNothing);
+    expect(find.text('Board'), findsOneWidget);
   });
 
   testWidgets('losing the race is said plainly, and takes nothing on', (

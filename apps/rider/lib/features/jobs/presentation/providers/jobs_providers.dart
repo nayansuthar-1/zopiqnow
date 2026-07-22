@@ -53,20 +53,40 @@ final FutureProvider<List<Job>> myJobsProvider = FutureProvider<List<Job>>((
   return ref.watch(jobsDataSourceProvider).fetchMine();
 });
 
-/// The one job the rider is actually on, if any.
+/// Everything the rider is currently carrying or collecting — their run.
 ///
-/// One at a time, deliberately. Nothing in the database stops a rider claiming
-/// five orders — and a later slice may well want stacked deliveries — but a
-/// screen that shows one bag and one address is the difference between an app
-/// somebody can use while holding a helmet and one they cannot.
-final Provider<Job?> activeJobProvider = Provider<Job?>((Ref ref) {
-  return ref
+/// 8b-2 showed one job at a time and said why: a screen with one bag and one
+/// address is the difference between an app somebody can use while holding a
+/// helmet and one they cannot. That was right for one job and wrong as a limit.
+/// The database never enforced it (8b-4 left concurrent claims uncapped on
+/// purpose — "batching is the job"), so the app was the only thing stopping a
+/// rider doing what riders actually do: take three orders from one street.
+///
+/// **Ordered by what can be acted on now, and deliberately not by route.** The
+/// app knows two dots on a map and nothing about the roads between them; a list
+/// that looked like a planned route would be a claim it cannot support. So:
+/// packed and waiting first, then what is already on the bike, then what is
+/// still cooking — and within each, oldest first.
+final Provider<List<Job>> activeJobsProvider = Provider<List<Job>>((Ref ref) {
+  final List<Job> live = ref
       .watch(myJobsProvider)
       .maybeWhen(
         data: (List<Job> jobs) =>
-            jobs.where((Job j) => j.state.isLive).firstOrNull,
-        orElse: () => null,
+            jobs.where((Job j) => j.state.isLive).toList(),
+        orElse: () => <Job>[],
       );
+
+  int rank(Job j) {
+    if (!j.isCarrying && j.isReadyToCollect) return 0;
+    if (j.isCarrying) return 1;
+    return 2;
+  }
+
+  live.sort((Job a, Job b) {
+    final int byRank = rank(a).compareTo(rank(b));
+    return byRank != 0 ? byRank : a.claimedAt.compareTo(b.claimedAt);
+  });
+  return List<Job>.unmodifiable(live);
 });
 
 /// The last 30 days of earnings, by day.

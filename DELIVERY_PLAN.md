@@ -460,3 +460,49 @@ away to a spinner.** Riverpod's `skipLoadingOnRefresh` already does the right
 thing, but a board that flashed a progress indicator every twenty seconds under a
 rider's thumb would be worse than one that never refreshed, and that is not a
 default worth leaving unpinned. Rider 25/25, analyze clean, release APK builds.
+
+## Phase 8f — a run, not a job
+
+The database has allowed a rider to hold several jobs since `0025`, and 8b-4 left
+that uncapped deliberately: *"carrying three orders from the same street is how
+delivery actually works."* The app was the only thing enforcing one at a time.
+
+**What 8b-2 got right, and where it stopped.** Its rule was that the board is
+*replaced*, never pushed aside, because a board of other people's jobs sitting
+under a job in hand is an invitation to do the wrong one. That instinct survives:
+a rider carrying something still opens on their run, and the board is a
+deliberate second tap. What could not survive was hiding the board entirely — a
+rider batching three orders from one street has to reach it while holding the
+first.
+
+- **`activeJobProvider` → `activeJobsProvider`.** Ordered by what can be acted on
+  now: packed and waiting, then what is on the bike, then what the kitchen has
+  not finished; oldest first within each.
+- **Explicitly not a route.** The app knows two dots and nothing about the roads
+  between them. A list that looked like a planned sequence would be a claim it
+  cannot support, so the order is by actionability and the code says so.
+- **Each card owns its own busy flag.** With one job the distinction did not
+  exist; with three it is the difference between "the job I tapped is working"
+  and every button on the screen going dead because one of them is.
+- **Cards are keyed by order id** — without it, finishing the second of three
+  hands the third's state to the card that used to be the second's.
+- **A status pill per card** (Packed / On the bike / Cooking). With one job the
+  button said it; with three, a rider scanning the list should not have to read
+  to the bottom of every card.
+- **The tab badge carries the count**, but only past one: "1" on a badge is noise
+  when the icon already means "you have a job".
+
+A free rider's screen is unchanged — no switch, no chrome, exactly as before. The
+switch appears with the run that justifies it and disappears with it.
+
+Rider 30/30 (five new), analyze clean, release APK builds.
+
+### Still open after 8f
+
+- **No cap on concurrent claims**, now reachable from the UI rather than only by
+  API. Still answered by riders being hand-onboarded and switchable off, but the
+  surface is real in a way it was not before.
+- **No route optimisation, and none is planned here.** That needs a distance
+  matrix, which needs the routing service `0043` also wanted for honest per-km
+  pay. One dependency, two features — worth doing once, deliberately, not twice
+  by halves.

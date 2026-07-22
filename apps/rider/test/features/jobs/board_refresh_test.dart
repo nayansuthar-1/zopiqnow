@@ -110,7 +110,7 @@ void main() {
 
     await tester.tap(find.text('Take this job'));
     await tester.pumpAndSettle();
-    expect(find.text('Your job'), findsOneWidget);
+    expect(find.text('Your run'), findsOneWidget);
 
     // The board is gone, so its timer is gone with it. If it were not, this
     // pump would leave a pending timer and fail the test — which is the

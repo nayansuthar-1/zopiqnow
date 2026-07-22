@@ -12,37 +12,126 @@ import 'package:zopiq_rider/features/jobs/presentation/widgets/pickup_sheet.dart
 
 /// The whole app, very nearly.
 ///
-/// One screen with two moods, and which one you get is not a tab the rider
-/// chooses — it is whether they are currently carrying something. A rider with a
-/// bag on their bike has exactly one thing to do, and a board of other people's
-/// jobs underneath it would be an invitation to do the wrong one. So the board
-/// is *replaced*, not pushed aside.
-class HomePage extends ConsumerWidget {
+/// A rider with nothing in hand sees the board and only the board — no tabs, no
+/// chrome, exactly as in 8b-2. The moment they are carrying something the screen
+/// grows a choice, because stacked deliveries made the old rule untenable.
+///
+/// That old rule was: the board is *replaced*, never pushed aside, since a board
+/// of other people's jobs under a job in hand is an invitation to do the wrong
+/// one. The instinct still holds — which is why the run is what opens, and the
+/// board is a deliberate second tap rather than something sitting underneath.
+/// But a rider batching three orders from one street has to be able to reach the
+/// board while holding the first, and hiding it made that impossible.
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
+  /// Only ever true by an explicit tap. A rider who finishes their last job
+  /// falls back to the board because the run is empty, not because of this.
+  bool _wantBoard = false;
+
+  @override
+  Widget build(BuildContext context) {
     final Rider? rider = ref.watch(riderProvider);
-    final Job? active = ref.watch(activeJobProvider);
+    final List<Job> run = ref.watch(activeJobsProvider);
+    final bool showBoard = run.isEmpty || _wantBoard;
 
     return Scaffold(
       // Sign-out moved to Profile when the shell arrived: an unlabelled icon in
       // the corner of the busiest screen is one mis-tap from ending a shift.
-      appBar: AppBar(title: Text(active == null ? 'Available jobs' : 'Your job')),
+      appBar: AppBar(
+        title: Text(showBoard ? 'Available jobs' : 'Your run'),
+      ),
       body: SafeArea(
-        child: RefreshIndicator(
-          color: context.zc.primary,
-          onRefresh: () async {
-            ref
-              ..invalidate(boardProvider)
-              ..invalidate(myJobsProvider);
-            await Future<void>.delayed(const Duration(milliseconds: 400));
-          },
-          child: active != null
-              ? _ActiveJobBody(job: active)
-              : _BoardBody(riderName: rider?.name ?? ''),
+        child: Column(
+          children: <Widget>[
+            // No switch at all until there is something to switch between. A
+            // free rider's screen is exactly what it always was.
+            if (run.isNotEmpty)
+              _RunBoardSwitch(
+                runCount: run.length,
+                showingBoard: showBoard,
+                onChanged: (bool board) => setState(() => _wantBoard = board),
+              ),
+            Expanded(
+              child: RefreshIndicator(
+                color: context.zc.primary,
+                onRefresh: () async {
+                  ref
+                    ..invalidate(boardProvider)
+                    ..invalidate(myJobsProvider);
+                  await Future<void>.delayed(const Duration(milliseconds: 400));
+                },
+                child: showBoard
+                    ? _BoardBody(riderName: rider?.name ?? '')
+                    : _RunBody(run: run),
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+/// Two segments, and the run's count on it because that is the number a rider
+/// glancing at their phone actually wants.
+class _RunBoardSwitch extends StatelessWidget {
+  const _RunBoardSwitch({
+    required this.runCount,
+    required this.showingBoard,
+    required this.onChanged,
+  });
+
+  final int runCount;
+  final bool showingBoard;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ZopiqSpacing.pageGutter,
+        ZopiqSpacing.sm,
+        ZopiqSpacing.pageGutter,
+        0,
+      ),
+      child: SegmentedButton<bool>(
+        showSelectedIcon: false,
+        segments: <ButtonSegment<bool>>[
+          ButtonSegment<bool>(
+            value: false,
+            label: Text(runCount == 1 ? 'Your run · 1' : 'Your run · $runCount'),
+          ),
+          const ButtonSegment<bool>(value: true, label: Text('Board')),
+        ],
+        selected: <bool>{showingBoard},
+        onSelectionChanged: (Set<bool> s) => onChanged(s.first),
+      ),
+    );
+  }
+}
+
+/// The jobs in hand, in the order [activeJobsProvider] put them.
+class _RunBody extends StatelessWidget {
+  const _RunBody({required this.run});
+
+  final List<Job> run;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),
+      itemCount: run.length,
+      // Keyed by order id: without it, finishing the second of three jobs would
+      // hand the third's state to the card that used to be the second's.
+      itemBuilder: (BuildContext context, int i) =>
+          _RunJobCard(key: ValueKey<String>(run[i].orderId), job: run[i]),
     );
   }
 }
@@ -222,17 +311,22 @@ class _OfferCardState extends ConsumerState<_OfferCard> {
   }
 }
 
-/// The one job in hand.
-class _ActiveJobBody extends ConsumerStatefulWidget {
-  const _ActiveJobBody({required this.job});
+/// One job in the run, with its own buttons.
+///
+/// Each card owns its own `_busy` flag rather than the screen owning one. With a
+/// single job that distinction did not exist; with three it is the difference
+/// between "the job I tapped is working" and every button on the screen going
+/// dead because one of them is.
+class _RunJobCard extends ConsumerStatefulWidget {
+  const _RunJobCard({super.key, required this.job});
 
   final Job job;
 
   @override
-  ConsumerState<_ActiveJobBody> createState() => _ActiveJobBodyState();
+  ConsumerState<_RunJobCard> createState() => _RunJobCardState();
 }
 
-class _ActiveJobBodyState extends ConsumerState<_ActiveJobBody> {
+class _RunJobCardState extends ConsumerState<_RunJobCard> {
   bool _busy = false;
 
   Future<void> _run(Future<String?> Function() write) async {
@@ -330,71 +424,91 @@ class _ActiveJobBodyState extends ConsumerState<_ActiveJobBody> {
     final TextTheme t = Theme.of(context).textTheme;
     final Job job = widget.job;
 
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),
-      children: <Widget>[
-        ZopiqCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                job.isCarrying ? 'Deliver to' : 'Collect from',
-                style: t.labelMedium?.copyWith(color: zc.textMuted),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: ZopiqSpacing.md),
+      child: ZopiqCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    job.isCarrying ? 'Deliver to' : 'Collect from',
+                    style: t.labelMedium?.copyWith(color: zc.textMuted),
+                  ),
+                ),
+                // What this job is waiting on, in two words. With one job the
+                // button said it; with three, a rider scanning the list needs
+                // to see it without reading to the bottom of every card.
+                _Pill(
+                  label: job.isCarrying
+                      ? 'On the bike'
+                      : job.isReadyToCollect
+                      ? 'Packed'
+                      : 'Cooking',
+                  color: job.isCarrying
+                      ? zc.primary
+                      : job.isReadyToCollect
+                      ? zc.veg
+                      : zc.textMuted,
+                ),
+              ],
+            ),
+            const SizedBox(height: ZopiqSpacing.xs),
+            Text(
+              job.isCarrying ? job.deliverTo : job.restaurantName,
+              style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: ZopiqSpacing.md),
+            Divider(height: 1, color: zc.divider),
+            const SizedBox(height: ZopiqSpacing.md),
+            _Line(icon: Icons.receipt_long_rounded, text: job.orderId),
+            const SizedBox(height: ZopiqSpacing.xs),
+            // The customer's number arrives only once the job is theirs — the
+            // board never carries it.
+            _Line(icon: Icons.phone_rounded, text: job.customerPhone),
+            const SizedBox(height: ZopiqSpacing.xs),
+            _Line(
+              icon: job.isCash
+                  ? Icons.payments_outlined
+                  : Icons.check_circle_outline_rounded,
+              text: job.isCash
+                  ? 'Collect ₹${job.total} in cash'
+                  : 'Paid online · ₹${job.total}',
+              emphasis: job.isCash,
+            ),
+            const SizedBox(height: ZopiqSpacing.md),
+
+            if (job.isCarrying)
+              ZopiqButton(
+                label: 'Mark delivered',
+                variant: ZopiqButtonVariant.cta,
+                isLoading: _busy,
+                onPressed: _busy ? null : _deliver,
+              )
+            else ...<Widget>[
+              // Until the kitchen says packed there is no code to type, because
+              // there is nothing on the counter yet. Saying so is kinder than a
+              // button that fails.
+              ZopiqButton(
+                label: job.isReadyToCollect
+                    ? 'Enter pickup code'
+                    : 'Not packed yet',
+                variant: ZopiqButtonVariant.cta,
+                isLoading: _busy,
+                onPressed: (_busy || !job.isReadyToCollect) ? null : _pickup,
               ),
-              const SizedBox(height: ZopiqSpacing.xs),
-              Text(
-                job.isCarrying ? job.deliverTo : job.restaurantName,
-                style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: ZopiqSpacing.md),
-              Divider(height: 1, color: zc.divider),
-              const SizedBox(height: ZopiqSpacing.md),
-              _Line(icon: Icons.receipt_long_rounded, text: job.orderId),
-              const SizedBox(height: ZopiqSpacing.xs),
-              // The customer's number arrives only once the job is theirs — the
-              // board never carries it.
-              _Line(icon: Icons.phone_rounded, text: job.customerPhone),
-              const SizedBox(height: ZopiqSpacing.xs),
-              _Line(
-                icon: job.isCash
-                    ? Icons.payments_outlined
-                    : Icons.check_circle_outline_rounded,
-                text: job.isCash
-                    ? 'Collect ₹${job.total} in cash'
-                    : 'Paid online · ₹${job.total}',
-                emphasis: job.isCash,
+              const SizedBox(height: ZopiqSpacing.sm),
+              ZopiqButton(
+                label: 'Drop this job',
+                variant: ZopiqButtonVariant.outline,
+                onPressed: _busy ? null : _abandon,
               ),
             ],
-          ),
+          ],
         ),
-        const SizedBox(height: ZopiqSpacing.lg),
-
-        if (job.isCarrying)
-          ZopiqButton(
-            label: 'Mark delivered',
-            variant: ZopiqButtonVariant.cta,
-            isLoading: _busy,
-            onPressed: _busy ? null : _deliver,
-          )
-        else ...<Widget>[
-          // Until the kitchen says packed there is no code to type, because
-          // there is nothing on the counter yet. Saying so is kinder than a
-          // button that fails.
-          ZopiqButton(
-            label: job.isReadyToCollect ? 'Enter pickup code' : 'Not packed yet',
-            variant: ZopiqButtonVariant.cta,
-            isLoading: _busy,
-            onPressed: (_busy || !job.isReadyToCollect) ? null : _pickup,
-          ),
-          const SizedBox(height: ZopiqSpacing.sm),
-          ZopiqButton(
-            label: 'Drop this job',
-            variant: ZopiqButtonVariant.outline,
-            onPressed: _busy ? null : _abandon,
-          ),
-        ],
-      ],
+      ),
     );
   }
 }

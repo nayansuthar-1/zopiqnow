@@ -30,9 +30,10 @@ class _RiderShellState extends ConsumerState<RiderShell> {
 
   @override
   Widget build(BuildContext context) {
-    // A rider carrying a bag gets a badge on the tab they should be on. It is
-    // the one thing worth interrupting the other two screens about.
-    final Job? active = ref.watch(activeJobProvider);
+    // A rider with work in hand gets a badge on the tab they should be on, and
+    // the count now that a run can hold more than one. It is the one thing
+    // worth interrupting the other two screens about.
+    final List<Job> run = ref.watch(activeJobsProvider);
 
     return Scaffold(
       body: IndexedStack(
@@ -44,10 +45,14 @@ class _RiderShellState extends ConsumerState<RiderShell> {
         onDestinationSelected: (int i) => setState(() => _index = i),
         destinations: <NavigationDestination>[
           NavigationDestination(
-            icon: active == null
+            icon: run.isEmpty
                 ? const Icon(Icons.two_wheeler_outlined)
                 : Badge(
                     backgroundColor: context.zc.primary,
+                    // The count only once there is more than one — "1" on a
+                    // badge is noise when the icon already means "you have a
+                    // job".
+                    label: run.length > 1 ? Text('${run.length}') : null,
                     child: const Icon(Icons.two_wheeler_rounded),
                   ),
             selectedIcon: const Icon(Icons.two_wheeler_rounded),
