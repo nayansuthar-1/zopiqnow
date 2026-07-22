@@ -173,6 +173,11 @@ export const api = {
   publishRestaurant: (id: string) =>
     rpc<void>('admin_publish_restaurant', { p_id: id }),
 
+  /// Only ever succeeds for a delisted restaurant that has never taken an order
+  /// (migration 0044). The refusal names which of the two rules stopped it.
+  deleteRestaurant: (id: string) =>
+    rpc<void>('admin_delete_restaurant', { p_id: id }),
+
   listRiders: () => rpc<RiderRow[]>('admin_list_riders'),
 
   addRider: (email: string, name: string, phone: string, vehicle: Vehicle) =>

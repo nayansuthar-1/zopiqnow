@@ -79,7 +79,11 @@ export function StorefrontStep({
   return (
     <StepFrame
       title="Storefront"
-      description="What a customer sees on the restaurant card. Everything here is public once you publish."
+      description={
+        r
+          ? 'What a customer sees on the restaurant card. Everything here is public once you publish.'
+          : 'A name is all it takes to start. Everything else — here and in the later steps — can be filled in whenever, in any order.'
+      }
       error={error}
       busy={busy}
       saveLabel={r ? 'Save and continue' : 'Create draft'}
@@ -102,25 +106,27 @@ export function StorefrontStep({
       />
 
       <div className="grid gap-5 sm:grid-cols-2">
+        {/* Neither is required to create the draft (migration 0044): a cost for
+            two is a number you work out after the menu exists, and a prep time
+            is a guess until the kitchen has run a service. Both are required to
+            publish, because both are printed on the customer's card. */}
         <Field
           label="Cost for two (₹)"
           type="number"
-          min={1}
-          required
+          min={0}
           value={priceForTwo}
           onChange={(e) => setPriceForTwo(e.target.value)}
           placeholder="400"
-          hint="An estimate shown on the card, not a charge."
+          hint="An estimate shown on the card, not a charge. Needed before publishing."
         />
         <Field
           label="Prep time (minutes)"
           type="number"
-          min={1}
-          required
+          min={0}
           value={etaMinutes}
           onChange={(e) => setEtaMinutes(e.target.value)}
           placeholder="30"
-          hint="Becomes the ETA on the customer's order."
+          hint="Becomes the ETA on the customer's order. Needed before publishing."
         />
       </div>
 

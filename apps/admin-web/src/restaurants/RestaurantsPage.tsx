@@ -36,6 +36,7 @@ export function RestaurantsPage() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Status | 'all'>('all')
   const [confirming, setConfirming] = useState<RestaurantRow | null>(null)
+  const [deleting, setDeleting] = useState<RestaurantRow | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function load() {
@@ -73,6 +74,22 @@ export function RestaurantsPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setConfirming(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function destroy(r: RestaurantRow) {
+    setBusy(true)
+    try {
+      await api.deleteRestaurant(r.id)
+      setDeleting(null)
+      await load()
+    } catch (e) {
+      // The refusal is the useful part — "has 3 order(s) on record" — so it goes
+      // to the page banner rather than vanishing with the dialog.
+      setError(e instanceof Error ? e.message : String(e))
+      setDeleting(null)
     } finally {
       setBusy(false)
     }
@@ -185,13 +202,27 @@ export function RestaurantsPage() {
                           >
                             Edit
                           </Button>
-                          {r.is_active && (
+                          {r.is_active ? (
                             <Button
                               variant="ghost"
                               className="h-9 px-3"
                               onClick={() => setConfirming(r)}
                             >
                               Delist
+                            </Button>
+                          ) : (
+                            // Offered on anything not live, and the RPC decides:
+                            // a restaurant with orders is refused by name and
+                            // count (0044). The list does not carry an order
+                            // count, and adding one to grey out a button would
+                            // be a query on every row to pre-empt a sentence the
+                            // refusal already says better.
+                            <Button
+                              variant="ghost"
+                              className="h-9 px-3"
+                              onClick={() => setDeleting(r)}
+                            >
+                              Delete
                             </Button>
                           )}
                         </div>
@@ -216,6 +247,20 @@ export function RestaurantsPage() {
           busy={busy}
           onCancel={() => setConfirming(null)}
           onConfirm={() => void unpublish(confirming)}
+        />
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete ${deleting.name}?`}
+          // The opposite warning to Delist's. There the fear was losing orders;
+          // here the point is that this really does erase, and the one thing it
+          // will not erase is a restaurant somebody has ordered from.
+          body="This erases the restaurant and its menu, hours, licence, bank details and team. It cannot be undone. A restaurant that has taken even one order cannot be deleted at all — delist it instead."
+          confirmLabel="Delete"
+          busy={busy}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => void destroy(deleting)}
         />
       )}
     </>
