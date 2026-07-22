@@ -1,3 +1,4 @@
+import 'package:zopiq_rider/core/launcher.dart';
 import 'package:zopiq_rider/features/auth/data/rider_auth_datasource.dart';
 import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
 import 'package:zopiq_rider/features/jobs/data/jobs_datasource.dart';
@@ -107,7 +108,11 @@ class FakeJobsDataSource implements JobsDataSource {
         state: JobState.claimed,
         orderStatus: offer.isReady ? 'ready_for_pickup' : 'preparing',
         restaurantName: offer.restaurantName,
+        restaurantLat: 24.6061,
+        restaurantLng: 72.3283,
         deliverTo: offer.deliverTo,
+        deliverLat: 24.5881,
+        deliverLng: 72.3163,
         customerPhone: '+919876543210',
         total: offer.total,
         isCash: offer.isCash,
@@ -211,7 +216,11 @@ class FakeJobsDataSource implements JobsDataSource {
                   state: state,
                   orderStatus: orderStatus,
                   restaurantName: j.restaurantName,
+                  restaurantLat: j.restaurantLat,
+                  restaurantLng: j.restaurantLng,
                   deliverTo: j.deliverTo,
+                  deliverLat: j.deliverLat,
+                  deliverLng: j.deliverLng,
                   customerPhone: j.customerPhone,
                   total: j.total,
                   isCash: j.isCash,
@@ -257,13 +266,22 @@ Job job({
   double payPerKm = 5,
   int riderPay = 46,
   DateTime? deliveredAt,
+  // Null is the real case for a kitchen with no map location on file (0042),
+  // which is what the navigation fallback exists for.
+  double? restaurantLat = 24.6061,
+  double? restaurantLng = 72.3283,
+  String customerPhone = '+919876543210',
 }) => Job(
   orderId: orderId,
   state: state,
   orderStatus: orderStatus,
   restaurantName: 'Paradise Biryani',
+  restaurantLat: restaurantLat,
+  restaurantLng: restaurantLng,
   deliverTo: 'Banjara Hills, Hyderabad',
-  customerPhone: '+919876543210',
+  deliverLat: 24.5881,
+  deliverLng: 72.3163,
+  customerPhone: customerPhone,
   total: 720,
   isCash: isCash,
   distanceKm: distanceKm,
@@ -299,3 +317,35 @@ Payout payout({
   reference: reference ?? (isPaid ? 'UTR123456789' : null),
   paidAt: isPaid ? DateTime(2026, 7, 20, 9) : null,
 );
+
+/// Records what the app *would* have opened.
+///
+/// The app's responsibility ends at the URI it hands to the platform — whether
+/// a given phone has a maps app installed is not a thing these tests can or
+/// should assert. So this captures the string and reports success.
+class FakeLauncher implements Launcher {
+  final List<String> opened = <String>[];
+
+  /// Set to make every hand-off fail, the way a phone with no maps app does.
+  bool succeeds = true;
+
+  @override
+  Future<bool> navigate({
+    double? lat,
+    double? lng,
+    required String label,
+  }) async {
+    opened.add(
+      lat != null && lng != null
+          ? 'geo:$lat,$lng?q=$lat,$lng(${Uri.encodeComponent(label)})'
+          : 'geo:0,0?q=${Uri.encodeComponent(label)}',
+    );
+    return succeeds;
+  }
+
+  @override
+  Future<bool> dial(String phone) async {
+    opened.add('tel:${Uri.encodeComponent(phone)}');
+    return succeeds;
+  }
+}

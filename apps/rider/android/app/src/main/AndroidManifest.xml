@@ -41,5 +41,21 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+
+        <!-- Android 11 (API 30) hides other apps from this one unless they are
+             declared here. Without these two, `canLaunchUrl` returns false on
+             every modern phone and the buttons silently do nothing — the failure
+             looks like a bug in our code and is not one.
+
+             `geo:` for the map, `tel:` for the dialler. Deliberately not
+             `ACTION_VIEW https` — we are not asking to see the whole browser. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="geo"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+            <data android:scheme="tel"/>
+        </intent>
     </queries>
 </manifest>

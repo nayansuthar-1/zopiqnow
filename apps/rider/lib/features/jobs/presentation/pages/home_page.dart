@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_rider/core/launcher.dart';
 import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
 import 'package:zopiq_rider/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_rider/features/jobs/domain/entities/job.dart';
@@ -341,6 +342,35 @@ class _RunJobCardState extends ConsumerState<_RunJobCard> {
     }
   }
 
+  /// Both of these hand off to another app, so neither sets `_busy` — there is
+  /// nothing of ours still running to wait for, and a spinner on a button that
+  /// has already backgrounded the app is a spinner nobody comes back to.
+  Future<void> _navigate() async {
+    final Job job = widget.job;
+    final bool ok = await ref
+        .read(launcherProvider)
+        .navigate(
+          lat: job.targetLat,
+          lng: job.targetLng,
+          label: job.targetLabel,
+        );
+    if (!ok) _say('No maps app could open that address.');
+  }
+
+  Future<void> _call() async {
+    final bool ok = await ref
+        .read(launcherProvider)
+        .dial(widget.job.customerPhone);
+    if (!ok) _say('This phone can\'t make calls.');
+  }
+
+  void _say(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _pickup() async {
     final String? otp = await showModalBottomSheet<String>(
       context: context,
@@ -479,6 +509,34 @@ class _RunJobCardState extends ConsumerState<_RunJobCard> {
               emphasis: job.isCash,
             ),
             const SizedBox(height: ZopiqSpacing.md),
+
+            // The two things a rider does with a phone that are not this app:
+            // find the place, and ring the person. Side by side and above the
+            // job's own action, because they happen *while* the job is open,
+            // not at the end of it.
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: ZopiqButton(
+                    label: 'Navigate',
+                    variant: ZopiqButtonVariant.outline,
+                    onPressed: _navigate,
+                  ),
+                ),
+                const SizedBox(width: ZopiqSpacing.sm),
+                Expanded(
+                  child: ZopiqButton(
+                    label: 'Call',
+                    variant: ZopiqButtonVariant.outline,
+                    // A job still cooking has no customer to ring yet — the
+                    // number arrives with the claim, but an empty string is a
+                    // dialler full of nothing.
+                    onPressed: job.customerPhone.isEmpty ? null : _call,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: ZopiqSpacing.sm),
 
             if (job.isCarrying)
               ZopiqButton(

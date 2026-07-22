@@ -506,3 +506,58 @@ Rider 30/30 (five new), analyze clean, release APK builds.
   matrix, which needs the routing service `0043` also wanted for honest per-km
   pay. One dependency, two features — worth doing once, deliberately, not twice
   by halves.
+
+## Phase 8g — the rider stops retyping addresses
+
+Navigate and Call, on every job in the run. Until now the app displayed an
+address and a phone number and left the rider to copy both into other apps, at a
+kerb, holding a helmet.
+
+**`url_launcher` was already in the lockfile.** It has shipped in every build of
+all three apps as a transitive dependency of `supabase_flutter`, which uses it
+for OAuth redirects — so this promotes it to a direct dependency rather than
+adding anything. The APK grows by nothing.
+
+That produced the one genuinely useful mistake of the slice: pinning it at
+`6.3.1` — a plausible-looking recent version — resolved cleanly and quietly
+**downgraded the whole workspace** from the `6.3.2` already frozen. Caught by
+diffing `pubspec.lock`, not by anything failing. Pinned at `6.3.2`, and the
+lockfile is now byte-identical to before the change. *Always diff the lockfile
+after touching a pin, even an approved one.*
+
+- **`geo:` URIs, not a Google or Ola Maps https link.** `geo:` opens whichever
+  maps app the rider has already chosen and already has their traffic settings
+  in. Hard-coding a vendor's link overrides that choice for no benefit to them.
+- **The pin is on the end the job is heading for** — the kitchen while
+  collecting, the customer once carrying. Derived from `deliveries.state`, so a
+  rider cannot navigate to the wrong end of their own job.
+- **Falls back to an address search** when the kitchen has no coordinates
+  (0042 requires them to publish; the eight demo restaurants got theirs in seed
+  0007). A text search is worse than a pin and much better than a dead button.
+- **`tel:` dials but does not call.** Placing the call outright needs
+  `CALL_PHONE`, and a permission prompt to save one tap is a bad trade on a
+  button somebody may brush with a glove.
+- **Android `<queries>` for both schemes.** Without them API 30+ hides every
+  other app, `canLaunchUrl` returns false, and the buttons silently do nothing —
+  a failure that looks like our bug and is not.
+- **`Launcher` is an interface behind a provider**, because `url_launcher` talks
+  over a platform channel and a widget test has no platform on the other end.
+  Tests assert the URI produced and stop there; whether a phone has a maps app
+  is Android's business, not ours.
+
+`my_deliveries` has returned all four coordinates since 0025 and the app had
+been discarding them since 8b-2. Rider 36/36 (six new), analyze clean, release
+APK builds.
+
+### Owed next
+
+- **Routable distance** (Ola Maps Distance Matrix) to replace the haversine in
+  0043 — waiting on credentials. Plan: distance is a property of the *order*,
+  computed once into `orders.route_km` and read by `claim_delivery`, never
+  called from inside that function. `pg_net` and `pg_cron` are both already
+  installed, so this needs no Edge Function and no deploy.
+- **Job-offer push**, which would let 8e's polling be deleted. Needs a Firebase
+  Android app for the rider package plus the Phase 7 send-side deploy.
+- **Navigate/Call in the customer app**, now unblocked — 8b-3 showed the rider's
+  phone as plain text specifically because `url_launcher` was not a dependency
+  there. It is available in the workspace today.

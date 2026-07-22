@@ -41,6 +41,20 @@ dependencies:
 
   supabase_flutter: 2.8.0
 
+  # For the one thing a rider does that nobody else does: they go somewhere.
+  # Until now the app showed an address and a phone number and left the rider to
+  # retype both into other apps, at a kerb, holding a helmet.
+  #
+  # Approved by the user 2026-07-22. **Not actually a new package** — it has been
+  # in the root lockfile all along as a transitive dependency of
+  # `supabase_flutter`, which uses it for OAuth redirects. This only promotes it
+  # to a direct dependency so the app may import it.
+  #
+  # Pinned at 6.3.2, the version the lockfile already froze. Writing 6.3.1 here
+  # resolved cleanly and quietly *downgraded* the whole workspace — which is the
+  # exact drift the freeze exists to catch.
+  url_launcher: 6.3.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

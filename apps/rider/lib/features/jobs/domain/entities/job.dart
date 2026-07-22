@@ -157,7 +157,11 @@ class Job {
     required this.state,
     required this.orderStatus,
     required this.restaurantName,
+    required this.restaurantLat,
+    required this.restaurantLng,
     required this.deliverTo,
+    required this.deliverLat,
+    required this.deliverLng,
     required this.customerPhone,
     required this.total,
     required this.isCash,
@@ -174,7 +178,11 @@ class Job {
     state: JobState.fromWire(json['state'] as String),
     orderStatus: json['order_status'] as String? ?? '',
     restaurantName: json['restaurant_name'] as String? ?? 'Restaurant',
+    restaurantLat: (json['restaurant_lat'] as num?)?.toDouble(),
+    restaurantLng: (json['restaurant_lng'] as num?)?.toDouble(),
     deliverTo: json['deliver_to'] as String? ?? '',
+    deliverLat: (json['deliver_lat'] as num?)?.toDouble(),
+    deliverLng: (json['deliver_lng'] as num?)?.toDouble(),
     customerPhone: json['customer_phone'] as String? ?? '',
     total: json['total'] as int? ?? 0,
     isCash: json['payment_method'] == 'cod',
@@ -200,6 +208,23 @@ class Job {
   final String restaurantName;
   final String deliverTo;
   final String customerPhone;
+
+  /// Both ends of the ride. Returned by `my_deliveries` since 0025 and ignored
+  /// by this app until navigation arrived — the restaurant's are null for any
+  /// kitchen without a map location on file (see 0042, and seed 0007 for the
+  /// eight demo ones), and a null pair means the map gets the address text
+  /// instead of a pin.
+  final double? restaurantLat;
+  final double? restaurantLng;
+  final double? deliverLat;
+  final double? deliverLng;
+
+  /// Where this job is going *right now* — the kitchen until it is collected,
+  /// the customer after. The one question a navigation button has to answer,
+  /// and answering it from [state] means the rider never picks the wrong end.
+  double? get targetLat => isCarrying ? deliverLat : restaurantLat;
+  double? get targetLng => isCarrying ? deliverLng : restaurantLng;
+  String get targetLabel => isCarrying ? deliverTo : restaurantName;
   final int total;
   final bool isCash;
 
