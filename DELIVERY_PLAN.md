@@ -289,3 +289,66 @@ allows both without a migration.
   stages when Phase 2 made it six — was fixed here because it sits in the file
   8b-3 touched. **The other 11 are untriaged and owed.** Run the suite early;
   HEAD is not green.
+
+## Phase 8c — a delivery is worth something
+
+Phase 8b closed with a rider who could do the job and no number anywhere saying
+what the job was worth. This is that number, and the screen that shows it.
+
+**The model (user decision, 2026-07-22):** a base fee plus a per-kilometre rate,
+chosen over a flat fee and over a percentage of the order value — that last one
+pays less for a ₹150 order than a ₹1500 one when the ride is identical.
+
+**The precondition nobody had noticed.** All eight restaurants on the platform
+had `latitude = null`. 0027 left the columns nullable (correctly — the seeds had
+none) and the console has always offered them as optional, so a distance-based
+fee would have paid the base and nothing more, forever, while looking in every
+screen exactly like it was working. Migration `0042` makes a map location
+required to publish. The eight already-live rows are untouched; the check runs
+when somebody publishes, which does mean a restaurant delisted and brought back
+needs its coordinates first.
+
+**The distance is haversine and therefore wrong, in a known direction.** It is
+the straight line, never the road, so it is always at or below what was actually
+ridden — it underpays and cannot overpay. Two consequences, both deliberate:
+`distance_km` is stored on the delivery rather than folded into a total, so a
+rider disputing their pay can be shown what was measured; and the rates are
+admin-editable, so the answer to a badly-shaped city is to raise the base. A road
+distance needs a routing API called inside a claim, and that is its own slice.
+
+**Named `rider_pay`, never `delivery_fee`.** `orders.delivery_fee` has existed
+since 0003 and is what the *customer is charged*. The two describe the same ride
+and are not the same money.
+
+- **`0042`** — `admin_publish_restaurant` requires latitude and longitude.
+- **`0043`** — `rider_pay_rates` (one row, platform-wide, enforced by the primary
+  key); `delivery_distance_km()` (haversine, null-in-null-out); four snapshot
+  columns on `deliveries`; `claim_delivery` takes the snapshot; `my_deliveries`
+  rebuilt to carry it; `rider_earnings(from, to)`; and the two admin RPCs.
+- **Rider app** — a three-tab shell (Jobs · Earnings · Profile), an Earnings
+  screen showing today and the last seven days with every job's arithmetic spelled
+  out, and a Profile screen that finally gives sign-out a label instead of an
+  unmarked icon in the corner of the busiest screen.
+- **Admin console** — a Rider pay card on Settings, beside the admin roster.
+
+Verified in rolled-back transactions against the live database: haversine returns
+111.19 km for one degree of latitude and 0.00 for a point against itself without
+an `asin` domain error; a claim snapshots all four columns and the total equals
+its parts; a missing coordinate pays base only and records null rather than zero;
+a rate change does not reprice a claimed job while abandon-then-reclaim correctly
+takes the new one; earnings count `delivered` only, never `claimed`, `picked_up`
+or a dropped job; the rate bounds refuse 50000 and -1; and the publish gate fires
+on a null pair and on half a pair. Rider 17/17, analyze clean, release APK builds.
+
+**Still owed, and it is a blocker for the per-km half:** the eight seeded
+restaurants need real coordinates typed into the console. Until then every job
+from them pays the base fee and says so on the rider's screen, in those words.
+
+### Open, on purpose
+
+- **Nothing pays the rider.** This records what is owed; there is no rider payout
+  batch the way `run_settlement_batch` (0017) exists for restaurants. Deliberate —
+  a payout run needs a bank account per rider, which the roster does not collect.
+- **No cap on concurrent claims** (carried over from 8b-4), and pay now gives that
+  a sharper edge: claiming five jobs snapshots five fees.
+- **The board still cannot refresh itself.** Unchanged since 8b-2.

@@ -70,6 +70,35 @@ class JobOffer {
   final DateTime placedAt;
 }
 
+/// One day's work, as `rider_earnings` counts it (migration 0043).
+///
+/// Only delivered jobs are in here. A job in hand has not been earned yet, and
+/// a rider watching their total rise at pickup would have been told they were
+/// paid for a delivery they might still fail to make. The day is the day it was
+/// *delivered*, in IST — the day the rider actually worked.
+@immutable
+class EarningsDay {
+  const EarningsDay({
+    required this.day,
+    required this.jobs,
+    required this.earnings,
+  });
+
+  factory EarningsDay.fromJson(Map<String, dynamic> json) => EarningsDay(
+    day: DateTime.parse(json['day'] as String),
+    jobs: json['jobs'] as int? ?? 0,
+    earnings: json['earnings'] as int? ?? 0,
+  );
+
+  /// A calendar date, not an instant. Deliberately not converted to local time:
+  /// Postgres already resolved it to the rider's own day in IST, and calling
+  /// `toLocal()` on a midnight date is how a day slides into the one before it.
+  final DateTime day;
+
+  final int jobs;
+  final int earnings;
+}
+
 /// A job this rider is actually carrying.
 @immutable
 class Job {
@@ -82,7 +111,12 @@ class Job {
     required this.customerPhone,
     required this.total,
     required this.isCash,
+    required this.distanceKm,
+    required this.payBase,
+    required this.payPerKm,
+    required this.riderPay,
     required this.claimedAt,
+    required this.deliveredAt,
   });
 
   factory Job.fromJson(Map<String, dynamic> json) => Job(
@@ -94,7 +128,16 @@ class Job {
     customerPhone: json['customer_phone'] as String? ?? '',
     total: json['total'] as int? ?? 0,
     isCash: json['payment_method'] == 'cod',
+    // `num`, not `int`: these are Postgres `numeric` and arrive as either,
+    // depending on whether the value happens to be whole.
+    distanceKm: (json['distance_km'] as num?)?.toDouble(),
+    payBase: json['pay_base'] as int? ?? 0,
+    payPerKm: (json['pay_per_km'] as num?)?.toDouble() ?? 0,
+    riderPay: json['rider_pay'] as int? ?? 0,
     claimedAt: DateTime.parse(json['claimed_at'] as String).toLocal(),
+    deliveredAt: json['delivered_at'] == null
+        ? null
+        : DateTime.parse(json['delivered_at'] as String).toLocal(),
   );
 
   final String orderId;
@@ -109,11 +152,44 @@ class Job {
   final String customerPhone;
   final int total;
   final bool isCash;
+
+  /// Straight-line kilometres from the kitchen to the door, as measured when
+  /// the job was claimed — **null when it could not be measured at all**,
+  /// which means the restaurant has no coordinates on file. Null is not zero,
+  /// and the difference is visible to the rider: an unmeasured job pays the
+  /// base fee and says so, rather than showing a confident `0.0 km`.
+  final double? distanceKm;
+
+  /// The two halves of the rate that applied *at claim time* (migration 0043).
+  /// Kept apart from [riderPay] rather than folded into it so a rider can check
+  /// the arithmetic — pay you cannot check is pay you will eventually dispute.
+  final int payBase;
+  final double payPerKm;
+
+  /// What this job pays, in whole rupees. Earned on delivery, not on claim.
+  final int riderPay;
+
   final DateTime claimedAt;
+  final DateTime? deliveredAt;
 
   /// Whether the kitchen has finished. Until this is true there is no code to
   /// type, because there is nothing on the counter to hand over.
   bool get isReadyToCollect => orderStatus == 'ready_for_pickup';
 
   bool get isCarrying => state == JobState.pickedUp;
+
+  /// The sum, spelled out: "₹25 + 4.2 km × ₹5".
+  ///
+  /// The unmeasured case says what actually happened rather than hiding it —
+  /// a rider who reads "base fee only" and knows the ride was six kilometres
+  /// has been handed the exact sentence to complain with, which is the point.
+  String get payExplained => distanceKm == null
+      ? '₹$payBase base fee only — this kitchen has no map location'
+      : '₹$payBase + ${_trim(distanceKm!)} km × ₹${_trim(payPerKm)}';
+
+  /// 4.20 → "4.2", 5.00 → "5". Trailing zeros on money a rider is reading at a
+  /// traffic light are noise.
+  static String _trim(double v) => v == v.roundToDouble()
+      ? v.round().toString()
+      : v.toStringAsFixed(2).replaceFirst(RegExp(r'0$'), '');
 }

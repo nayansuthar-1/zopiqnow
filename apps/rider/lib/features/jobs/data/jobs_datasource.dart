@@ -26,6 +26,16 @@ abstract interface class JobsDataSource {
   Future<void> confirmPickup({required String orderId, required String otp});
 
   Future<void> confirmDelivered(String orderId);
+
+  /// What this rider earned, by day, over a closed date range.
+  ///
+  /// A separate call rather than totalling [fetchMine], which returns every job
+  /// the rider has ever held: an earnings screen that downloads a career to
+  /// display a week gets slower every shift.
+  Future<List<EarningsDay>> fetchEarnings({
+    required DateTime from,
+    required DateTime to,
+  });
 }
 
 /// A call the database refused — a rule in 0025 (`P0001`: somebody else claimed
@@ -99,6 +109,34 @@ class JobsSupabaseDataSource implements JobsDataSource {
       params: <String, dynamic>{'p_order_id': orderId},
     ),
   );
+
+  @override
+  Future<List<EarningsDay>> fetchEarnings({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final List<dynamic> rows = await _guard<List<dynamic>>(
+      () => _db.rpc<List<dynamic>>(
+        'rider_earnings',
+        params: <String, dynamic>{
+          // Dates, not timestamps. The function takes `date` and compares
+          // against the IST day a job was delivered on; sending an instant
+          // would make the boundary depend on the phone's clock.
+          'p_from': _asDate(from),
+          'p_to': _asDate(to),
+        },
+      ),
+    );
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map(EarningsDay.fromJson)
+        .toList(growable: false);
+  }
+
+  static String _asDate(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 
   /// 0025 raises every refusal as `P0001` with a sentence already written for a
   /// human — "Another partner just took that one." Passing it straight through

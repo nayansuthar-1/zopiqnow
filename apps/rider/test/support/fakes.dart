@@ -59,6 +59,13 @@ class FakeJobsDataSource implements JobsDataSource {
   /// Codes this fake will accept. Anything else is refused, like the real one.
   String otp = '5896';
 
+  /// The rates a claim snapshots, standing in for `rider_pay_rates` (0043).
+  /// [claimDistanceKm] set to null is the real case where the restaurant has no
+  /// coordinates on file and only the base fee can be paid.
+  int payBase = 25;
+  double payPerKm = 5;
+  double? claimDistanceKm = 4.2;
+
   List<Job> get mine => List<Job>.unmodifiable(_mine);
 
   @override
@@ -85,7 +92,14 @@ class FakeJobsDataSource implements JobsDataSource {
         customerPhone: '+919876543210',
         total: offer.total,
         isCash: offer.isCash,
+        distanceKm: claimDistanceKm,
+        payBase: payBase,
+        payPerKm: payPerKm,
+        // The same sum 0043 does, including the rule that matters: an
+        // unmeasurable distance pays the base and nothing more.
+        riderPay: payBase + ((claimDistanceKm ?? 0) * payPerKm).round(),
         claimedAt: DateTime.now(),
+        deliveredAt: null,
       ),
     ];
   }
@@ -136,6 +150,36 @@ class FakeJobsDataSource implements JobsDataSource {
     _replace(job, state: JobState.delivered, orderStatus: 'delivered');
   }
 
+  /// Earnings, derived from the delivered rows exactly as `rider_earnings`
+  /// derives them — delivered only, grouped by the day it was delivered.
+  @override
+  Future<List<EarningsDay>> fetchEarnings({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final Map<DateTime, List<Job>> byDay = <DateTime, List<Job>>{};
+    for (final Job j in _mine) {
+      if (j.state != JobState.delivered || j.deliveredAt == null) continue;
+      final DateTime d = DateTime(
+        j.deliveredAt!.year,
+        j.deliveredAt!.month,
+        j.deliveredAt!.day,
+      );
+      if (d.isBefore(DateTime(from.year, from.month, from.day))) continue;
+      if (d.isAfter(DateTime(to.year, to.month, to.day))) continue;
+      byDay.putIfAbsent(d, () => <Job>[]).add(j);
+    }
+    return byDay.entries
+        .map(
+          (MapEntry<DateTime, List<Job>> e) => EarningsDay(
+            day: e.key,
+            jobs: e.value.length,
+            earnings: e.value.fold(0, (int sum, Job j) => sum + j.riderPay),
+          ),
+        )
+        .toList(growable: false);
+  }
+
   void _replace(Job job, {required JobState state, required String orderStatus}) {
     _mine = _mine
         .map(
@@ -149,7 +193,14 @@ class FakeJobsDataSource implements JobsDataSource {
                   customerPhone: j.customerPhone,
                   total: j.total,
                   isCash: j.isCash,
+                  distanceKm: j.distanceKm,
+                  payBase: j.payBase,
+                  payPerKm: j.payPerKm,
+                  riderPay: j.riderPay,
                   claimedAt: j.claimedAt,
+                  deliveredAt: state == JobState.delivered
+                      ? DateTime.now()
+                      : j.deliveredAt,
                 )
               : j,
         )
@@ -179,6 +230,11 @@ Job job({
   JobState state = JobState.claimed,
   String orderStatus = 'ready_for_pickup',
   bool isCash = true,
+  double? distanceKm = 4.2,
+  int payBase = 25,
+  double payPerKm = 5,
+  int riderPay = 46,
+  DateTime? deliveredAt,
 }) => Job(
   orderId: orderId,
   state: state,
@@ -188,5 +244,14 @@ Job job({
   customerPhone: '+919876543210',
   total: 720,
   isCash: isCash,
+  distanceKm: distanceKm,
+  payBase: payBase,
+  payPerKm: payPerKm,
+  riderPay: riderPay,
   claimedAt: DateTime.now().subtract(const Duration(minutes: 3)),
+  // A delivered job without a delivery time is not a state the database can be
+  // in, so the helper fills it rather than letting a test construct one.
+  deliveredAt:
+      deliveredAt ??
+      (state == JobState.delivered ? DateTime.now() : null),
 );

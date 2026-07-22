@@ -206,9 +206,25 @@ export const api = {
     rpc<void>('admin_add_admin', { p_email: email, p_name: name }),
 
   removeAdmin: (email: string) => rpc<void>('admin_remove_admin', { p_email: email }),
+
+  getRiderPayRates: () => rpc<RiderPayRates[]>('admin_get_rider_pay_rates'),
+
+  setRiderPayRates: (baseFee: number, perKmFee: number) =>
+    rpc<void>('admin_set_rider_pay_rates', {
+      p_base_fee: baseFee,
+      p_per_km_fee: perKmFee,
+    }),
 }
 
 export type AdminRow = { email: string; name: string; created_at: string }
+
+/// What a delivery pays a rider (migration 0043). One row, platform-wide — the
+/// RPC returns a table, so this arrives as an array of exactly one.
+export type RiderPayRates = {
+  base_fee: number
+  per_km_fee: number
+  updated_at: string
+}
 
 /// The three vehicles `delivery_partners.vehicle` allows.
 export type Vehicle = 'bike' | 'scooter' | 'bicycle'

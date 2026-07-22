@@ -2,9 +2,9 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:zopiq_rider/app/rider_shell.dart';
 import 'package:zopiq_rider/features/auth/presentation/pages/auth_pages.dart';
 import 'package:zopiq_rider/features/auth/presentation/providers/auth_providers.dart';
-import 'package:zopiq_rider/features/jobs/presentation/pages/home_page.dart';
 
 abstract final class Routes {
   static const String home = 'home';
@@ -65,7 +65,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: _homePath,
         name: Routes.home,
-        builder: (_, _) => const HomePage(),
+        builder: (_, _) => const RiderShell(),
       ),
       GoRoute(
         path: _splashPath,

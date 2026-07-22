@@ -24,17 +24,9 @@ class HomePage extends ConsumerWidget {
     final Job? active = ref.watch(activeJobProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(active == null ? 'Available jobs' : 'Your job'),
-        actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Sign out',
-            onPressed: () =>
-                ref.read(riderAuthControllerProvider.notifier).signOut(),
-          ),
-        ],
-      ),
+      // Sign-out moved to Profile when the shell arrived: an unlabelled icon in
+      // the corner of the busiest screen is one mis-tap from ending a shift.
+      appBar: AppBar(title: Text(active == null ? 'Available jobs' : 'Your job')),
       body: SafeArea(
         child: RefreshIndicator(
           color: context.zc.primary,

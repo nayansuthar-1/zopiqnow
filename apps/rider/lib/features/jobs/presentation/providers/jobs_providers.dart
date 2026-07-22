@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
@@ -49,12 +50,102 @@ final Provider<Job?> activeJobProvider = Provider<Job?>((Ref ref) {
       );
 });
 
+/// The last 30 days of earnings, by day.
+///
+/// A fixed window rather than a range the rider picks. Thirty days answers both
+/// questions somebody actually opens this screen with — "what did I make today"
+/// and "what did I make this week" — and a date picker for the third question
+/// is a control nobody asked for.
+final FutureProvider<List<EarningsDay>> earningsProvider =
+    FutureProvider<List<EarningsDay>>((Ref ref) {
+      final Rider? rider = ref.watch(riderProvider);
+      if (rider == null) {
+        return Future<List<EarningsDay>>.value(const <EarningsDay>[]);
+      }
+      final DateTime today = DateTime.now();
+      return ref
+          .watch(jobsDataSourceProvider)
+          .fetchEarnings(
+            from: today.subtract(const Duration(days: 29)),
+            to: today,
+          );
+    });
+
+/// Today and the last seven days, totalled off [earningsProvider].
+///
+/// Derived rather than fetched: the daily rows are already here, and a second
+/// round trip to re-sum numbers the app is holding would be a slower way to get
+/// the same answer.
+@immutable
+class EarningsSummary {
+  const EarningsSummary({
+    required this.todayJobs,
+    required this.todayPay,
+    required this.weekJobs,
+    required this.weekPay,
+  });
+
+  final int todayJobs;
+  final int todayPay;
+  final int weekJobs;
+  final int weekPay;
+}
+
+final Provider<EarningsSummary> earningsSummaryProvider =
+    Provider<EarningsSummary>((Ref ref) {
+      final List<EarningsDay> days = ref
+          .watch(earningsProvider)
+          .maybeWhen(
+            data: (List<EarningsDay> d) => d,
+            orElse: () => const <EarningsDay>[],
+          );
+
+      final DateTime now = DateTime.now();
+      final DateTime today = DateTime(now.year, now.month, now.day);
+      // Seven days *including* today, which is what "this week" means to
+      // somebody counting shifts — not Monday-to-now, which reads as a bad week
+      // every Monday morning.
+      final DateTime weekStart = today.subtract(const Duration(days: 6));
+
+      int todayJobs = 0, todayPay = 0, weekJobs = 0, weekPay = 0;
+      for (final EarningsDay d in days) {
+        final DateTime day = DateTime(d.day.year, d.day.month, d.day.day);
+        if (!day.isBefore(weekStart)) {
+          weekJobs += d.jobs;
+          weekPay += d.earnings;
+        }
+        if (day == today) {
+          todayJobs = d.jobs;
+          todayPay = d.earnings;
+        }
+      }
+      return EarningsSummary(
+        todayJobs: todayJobs,
+        todayPay: todayPay,
+        weekJobs: weekJobs,
+        weekPay: weekPay,
+      );
+    });
+
+/// Finished jobs, newest first — the "what have I done" list under the totals.
+final Provider<List<Job>> deliveredJobsProvider = Provider<List<Job>>((Ref ref) {
+  return ref
+      .watch(myJobsProvider)
+      .maybeWhen(
+        data: (List<Job> jobs) => jobs
+            .where((Job j) => j.state == JobState.delivered)
+            .toList(growable: false),
+        orElse: () => const <Job>[],
+      );
+});
+
 /// Every write the rider makes. Each returns null on success or a sentence to
 /// show — the shape both other apps use.
 ///
-/// All five refresh *both* lists, because every one of them moves a job across
-/// the boundary between them: claiming takes it off the board and onto the
-/// rider, abandoning puts it back, delivering ends it.
+/// All of them refresh both lists, because every one moves a job across the
+/// boundary between them: claiming takes it off the board and onto the rider,
+/// abandoning puts it back, delivering ends it — and delivering also moves the
+/// earnings total, so that goes too.
 class JobsController extends Notifier<void> {
   @override
   void build() {}
@@ -85,7 +176,12 @@ class JobsController extends Notifier<void> {
       await call();
       ref
         ..invalidate(boardProvider)
-        ..invalidate(myJobsProvider);
+        ..invalidate(myJobsProvider)
+        // Only `confirmDelivered` can actually move this, but invalidating on
+        // every write costs one request the rider never waits on and removes
+        // the failure mode where a total is stale because the list that feeds
+        // it was refreshed and it was not.
+        ..invalidate(earningsProvider);
       return null;
     } on JobFailure catch (e) {
       return e.message;
