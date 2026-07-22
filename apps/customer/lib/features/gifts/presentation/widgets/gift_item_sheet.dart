@@ -32,73 +32,164 @@ class _GiftItemSheet extends StatelessWidget {
 
     return SafeArea(
       top: false,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          // Grab handle.
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(
-                top: ZopiqSpacing.md,
-                bottom: ZopiqSpacing.sm,
-              ),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: zc.divider,
-                borderRadius: ZopiqRadii.rPill,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            // Grab handle.
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(
+                  top: ZopiqSpacing.md,
+                  bottom: ZopiqSpacing.sm,
+                ),
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: zc.divider,
+                  borderRadius: ZopiqRadii.rPill,
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(ZopiqSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                ClipRRect(
-                  borderRadius: ZopiqRadii.rLg,
-                  child: AspectRatio(
-                    aspectRatio: 4 / 3,
-                    child: _Gallery(item: item),
-                  ),
-                ),
-                const SizedBox(height: ZopiqSpacing.lg),
-                Text(
-                  item.category.toUpperCase(),
-                  style: t.labelSmall?.copyWith(
-                    color: zc.primaryDeep,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-                const SizedBox(height: ZopiqSpacing.xs),
-                Text(
-                  item.name,
-                  style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: ZopiqSpacing.sm),
-                Text(
-                  '₹${item.price}',
-                  style: t.titleMedium?.copyWith(
-                    color: zc.textStrong,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                if (item.description.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: ZopiqSpacing.lg),
-                  Text(
-                    item.description,
-                    style: t.bodyMedium?.copyWith(
-                      color: zc.textMuted,
-                      height: 1.45,
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(ZopiqSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    ClipRRect(
+                      borderRadius: ZopiqRadii.rLg,
+                      child: AspectRatio(
+                        aspectRatio: 4 / 3,
+                        child: _Gallery(item: item),
+                      ),
                     ),
-                  ),
-                ],
-              ],
+                    const SizedBox(height: ZopiqSpacing.lg),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: <Widget>[
+                        Text(
+                          item.category.toUpperCase(),
+                          style: t.labelSmall?.copyWith(
+                            color: zc.primaryDeep,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: ZopiqSpacing.sm,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: zc.primaryDeep.withValues(alpha: 0.1),
+                            borderRadius: ZopiqRadii.rPill,
+                          ),
+                          child: Text(
+                            'Curated Gift',
+                            style: t.labelSmall?.copyWith(
+                              color: zc.primaryDeep,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: ZopiqSpacing.xs),
+                    Text(
+                      item.name,
+                      style: t.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 22,
+                      ),
+                    ),
+                    const SizedBox(height: ZopiqSpacing.sm),
+                    Text(
+                      '₹${item.price}',
+                      style: t.headlineSmall?.copyWith(
+                        color: zc.textStrong,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: ZopiqSpacing.md),
+                    // Gift highlights bar
+                    Container(
+                      padding: const EdgeInsets.all(ZopiqSpacing.md),
+                      decoration: BoxDecoration(
+                        color: zc.primaryDeep.withValues(alpha: 0.05),
+                        borderRadius: ZopiqRadii.rMd,
+                        border: Border.all(
+                          color: zc.primaryDeep.withValues(alpha: 0.15),
+                        ),
+                      ),
+                      child: Row(
+                        children: <Widget>[
+                          Icon(
+                            Icons.card_giftcard_rounded,
+                            color: zc.primaryDeep,
+                            size: 24,
+                          ),
+                          const SizedBox(width: ZopiqSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  'Complimentary Gift Box',
+                                  style: t.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  'Includes ribbons, personalized card & safe packaging.',
+                                  style: t.bodySmall?.copyWith(
+                                    color: zc.textMuted,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (item.description.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: ZopiqSpacing.lg),
+                      Text(
+                        'ABOUT THIS GIFT',
+                        style: t.labelMedium?.copyWith(
+                          color: zc.textMuted,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      const SizedBox(height: ZopiqSpacing.xs),
+                      Text(
+                        item.description,
+                        style: t.bodyMedium?.copyWith(
+                          color: zc.textMuted,
+                          height: 1.5,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: ZopiqSpacing.xl),
+                    ZopiqButton(
+                      label: 'Close',
+                      expand: true,
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

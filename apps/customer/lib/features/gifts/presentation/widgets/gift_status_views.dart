@@ -15,9 +15,25 @@ class GiftErrorView extends StatelessWidget {
 
     return _CenteredState(
       children: <Widget>[
-        Icon(Icons.wifi_off_rounded, size: 56, color: zc.textMuted),
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: zc.primaryDeep.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.wifi_off_rounded,
+            size: 38,
+            color: zc.primaryDeep,
+          ),
+        ),
         const SizedBox(height: ZopiqSpacing.lg),
-        Text('Something went wrong', style: t.titleMedium, textAlign: TextAlign.center),
+        Text(
+          'Something went wrong',
+          style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: ZopiqSpacing.xs),
         Text(
           message,
@@ -47,12 +63,28 @@ class GiftEmptyView extends StatelessWidget {
 
     return _CenteredState(
       children: <Widget>[
-        Icon(Icons.card_giftcard_rounded, size: 56, color: zc.textMuted),
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: zc.primaryDeep.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.card_giftcard_rounded,
+            size: 38,
+            color: zc.primaryDeep,
+          ),
+        ),
         const SizedBox(height: ZopiqSpacing.lg),
-        Text('No gifts yet', style: t.titleMedium, textAlign: TextAlign.center),
+        Text(
+          'No gifts found',
+          style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: ZopiqSpacing.xs),
         Text(
-          'Our makers are stocking the shelves — check back soon.',
+          'Our makers are stocking the shelves — check back soon or try another category.',
           style: t.bodyMedium?.copyWith(color: zc.textMuted),
           textAlign: TextAlign.center,
         ),
@@ -61,7 +93,7 @@ class GiftEmptyView extends StatelessWidget {
   }
 }
 
-/// A simple shimmer grid stand-in while the gifts load.
+/// A responsive shimmer grid stand-in while gifts load.
 class GiftGridSkeleton extends StatelessWidget {
   const GiftGridSkeleton({this.itemCount = 6, super.key});
 
@@ -69,24 +101,32 @@ class GiftGridSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(ZopiqSpacing.lg),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: ZopiqSpacing.lg,
-        crossAxisSpacing: ZopiqSpacing.lg,
-        childAspectRatio: 0.68,
-      ),
-      itemCount: itemCount,
-      itemBuilder: (_, _) => const ZopiqShimmer(
-        child: ZopiqSkeletonBox(
-          width: double.infinity,
-          height: double.infinity,
-          borderRadius: ZopiqRadii.rLg,
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final double width = constraints.maxWidth;
+        final int crossAxisCount = width > 900 ? 4 : (width > 550 ? 3 : 2);
+        final double childAspectRatio = width < 400 ? 0.62 : 0.65;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(ZopiqSpacing.lg),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: ZopiqSpacing.lg,
+            crossAxisSpacing: ZopiqSpacing.lg,
+            childAspectRatio: childAspectRatio,
+          ),
+          itemCount: itemCount,
+          itemBuilder: (_, _) => const ZopiqShimmer(
+            child: ZopiqSkeletonBox(
+              width: double.infinity,
+              height: double.infinity,
+              borderRadius: ZopiqRadii.rLg,
+            ),
+          ),
+        );
+      },
     );
   }
 }

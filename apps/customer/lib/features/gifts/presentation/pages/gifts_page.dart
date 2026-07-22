@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
@@ -11,22 +12,43 @@ import 'package:zopiqnow/features/gifts/presentation/widgets/gift_item_sheet.dar
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_shop_card.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_status_views.dart';
 
-/// The Gifts tab — a second storefront beside food. Not restaurants, not dishes:
-/// handcrafted and curated things one person buys to give another. Sellers are
-/// dedicated gift shops, browsed here as a rail up top with a grid of every
-/// product below.
-///
-/// Browse-only for now — tapping a product opens a detail sheet, not a cart. A
-/// gift cart and checkout are a later task.
-class GiftsPage extends ConsumerWidget {
+/// The Gifts tab — a curated storefront for handcrafted gifts, artisanal decor,
+/// personalized tokens, and luxury gift boxes.
+class GiftsPage extends ConsumerStatefulWidget {
   const GiftsPage({required this.onOpenShop, super.key});
 
-  /// Navigates to a shop's storefront page. Injected so the page stays free of
-  /// go_router — the router owns the wiring.
   final void Function(GiftShop shop) onOpenShop;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GiftsPage> createState() => _GiftsPageState();
+}
+
+class _GiftsPageState extends ConsumerState<GiftsPage> {
+  String _selectedCategory = 'All';
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<GiftItem> _filterItems(List<GiftItem> items) {
+    return items.where((GiftItem item) {
+      final bool matchesCategory =
+          _selectedCategory == 'All' ||
+          item.category.toLowerCase() == _selectedCategory.toLowerCase();
+      final bool matchesSearch =
+          _searchQuery.isEmpty ||
+          item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          item.category.toLowerCase().contains(_searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final AsyncValue<List<GiftItem>> items = ref.watch(giftItemsProvider);
 
     return Scaffold(
@@ -44,7 +66,15 @@ class GiftsPage extends ConsumerWidget {
           ),
           slivers: <Widget>[
             const _GiftsAppBar(),
-            _GiftShopsRail(onOpenShop: onOpenShop),
+            _HeroGiftBanner(
+              searchController: _searchController,
+              onSearchChanged: (String query) {
+                setState(() {
+                  _searchQuery = query;
+                });
+              },
+            ),
+            _GiftShopsRail(onOpenShop: widget.onOpenShop),
             items.when(
               loading: () => const SliverToBoxAdapter(child: GiftGridSkeleton()),
               error: (Object error, _) => SliverFillRemaining(
@@ -57,13 +87,34 @@ class GiftsPage extends ConsumerWidget {
                 ),
               ),
               data: (List<GiftItem> list) {
-                if (list.isEmpty) {
-                  return const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: GiftEmptyView(),
-                  );
-                }
-                return _GiftGrid(items: list);
+                final List<String> categories = <String>[
+                  'All',
+                  ...list.map((GiftItem item) => item.category).toSet(),
+                ];
+                final List<GiftItem> filtered = _filterItems(list);
+
+                return SliverMainAxisGroup(
+                  slivers: <Widget>[
+                    SliverToBoxAdapter(
+                      child: _CategoryFilterRail(
+                        categories: categories,
+                        selectedCategory: _selectedCategory,
+                        onSelectCategory: (String cat) {
+                          setState(() {
+                            _selectedCategory = cat;
+                          });
+                        },
+                      ),
+                    ),
+                    if (filtered.isEmpty)
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: GiftEmptyView(),
+                      )
+                    else
+                      _GiftGrid(items: filtered),
+                  ],
+                );
               },
             ),
             const SliverToBoxAdapter(child: SizedBox(height: ZopiqSpacing.xxl)),
@@ -94,19 +145,22 @@ class _GiftsAppBar extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(Icons.card_giftcard_rounded, color: zc.primaryDeep, size: 24),
+              Icon(Icons.card_giftcard_rounded, color: zc.primaryDeep, size: 26),
               const SizedBox(width: ZopiqSpacing.sm),
               Text(
                 'Gifts',
-                style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                style: t.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
+                ),
               ),
             ],
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 2, left: 32),
+            padding: const EdgeInsets.only(top: 2, left: 34),
             child: Text(
-              'Handcrafted things to gift someone',
-              style: t.bodySmall?.copyWith(color: zc.textMuted),
+              'Handcrafted & curated things to gift someone',
+              style: t.bodySmall?.copyWith(color: zc.textMuted, fontSize: 11.5),
             ),
           ),
         ],
@@ -116,9 +170,213 @@ class _GiftsAppBar extends StatelessWidget {
   }
 }
 
-/// The gift-shops rail. Silent while it loads or fails — the item grid below
-/// already owns the shimmer and the retry, and a second of either on one screen
-/// reads as broken.
+class _HeroGiftBanner extends StatelessWidget {
+  const _HeroGiftBanner({
+    required this.searchController,
+    required this.onSearchChanged,
+  });
+
+  final TextEditingController searchController;
+  final ValueChanged<String> onSearchChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: ZopiqSpacing.pageGutter,
+          vertical: ZopiqSpacing.sm,
+        ),
+        child: Column(
+          children: <Widget>[
+            // Ambient Hero Card
+            Container(
+              padding: const EdgeInsets.all(ZopiqSpacing.lg),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: <Color>[
+                    zc.primaryDeep.withValues(alpha: isDark ? 0.25 : 0.12),
+                    zc.primaryDeep.withValues(alpha: isDark ? 0.1 : 0.03),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: ZopiqRadii.rXl,
+                border: Border.all(
+                  color: zc.primaryDeep.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: ZopiqSpacing.sm,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: zc.primaryDeep,
+                            borderRadius: ZopiqRadii.rPill,
+                          ),
+                          child: Text(
+                            'STUDIO CURATED',
+                            style: t.labelSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.8,
+                              fontSize: 9.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: ZopiqSpacing.xs),
+                        Text(
+                          'Make Every Moment Special',
+                          style: t.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 17,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Handmade gifts, artisan boxes & custom notes',
+                          style: t.bodySmall?.copyWith(
+                            color: zc.textMuted,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: ZopiqSpacing.md),
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: zc.primaryDeep.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.card_giftcard_rounded,
+                      color: zc.primaryDeep,
+                      size: 28,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: ZopiqSpacing.md),
+            // Search Input Field
+            TextField(
+              controller: searchController,
+              onChanged: onSearchChanged,
+              decoration: InputDecoration(
+                hintText: 'Search handcrafted gifts, candles, frames...',
+                hintStyle: t.bodyMedium?.copyWith(
+                  color: zc.textMuted,
+                  fontSize: 13,
+                ),
+                prefixIcon: Icon(Icons.search_rounded, color: zc.textMuted, size: 20),
+                suffixIcon: searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 18),
+                        onPressed: () {
+                          searchController.clear();
+                          onSearchChanged('');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.03),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: ZopiqSpacing.md,
+                  vertical: ZopiqSpacing.sm,
+                ),
+                border: const OutlineInputBorder(
+                  borderRadius: ZopiqRadii.rPill,
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryFilterRail extends StatelessWidget {
+  const _CategoryFilterRail({
+    required this.categories,
+    required this.selectedCategory,
+    required this.onSelectCategory,
+  });
+
+  final List<String> categories;
+  final String selectedCategory;
+  final ValueChanged<String> onSelectCategory;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const _SectionHeader(title: 'Browse By Category'),
+        SizedBox(
+          height: 38,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(
+              horizontal: ZopiqSpacing.pageGutter,
+            ),
+            itemCount: categories.length,
+            separatorBuilder: (_, _) => const SizedBox(width: ZopiqSpacing.sm),
+            itemBuilder: (BuildContext context, int index) {
+              final String cat = categories[index];
+              final bool isSelected = cat == selectedCategory;
+              return ChoiceChip(
+                label: Text(cat),
+                selected: isSelected,
+                onSelected: (_) => onSelectCategory(cat),
+                selectedColor: zc.primaryDeep,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                labelStyle: t.labelSmall?.copyWith(
+                  color: isSelected ? Colors.white : zc.textStrong,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: ZopiqRadii.rPill,
+                  side: BorderSide(
+                    color: isSelected
+                        ? zc.primaryDeep
+                        : zc.divider,
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: ZopiqSpacing.xs,
+                  vertical: 2,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _GiftShopsRail extends ConsumerWidget {
   const _GiftShopsRail({required this.onOpenShop});
 
@@ -136,9 +394,9 @@ class _GiftShopsRail extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const _SectionHeader(title: 'Gift shops'),
+          const _SectionHeader(title: 'Gift Shops'),
           SizedBox(
-            height: 190,
+            height: 195,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(
@@ -166,39 +424,49 @@ class _GiftGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SliverMainAxisGroup(
-      slivers: <Widget>[
-        const SliverToBoxAdapter(child: _SectionHeader(title: 'All gifts')),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
-            ZopiqSpacing.lg,
-            0,
-            ZopiqSpacing.lg,
-            ZopiqSpacing.lg,
-          ),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: ZopiqSpacing.lg,
-              crossAxisSpacing: ZopiqSpacing.lg,
-              childAspectRatio: 0.68,
-            ),
-            delegate: SliverChildBuilderDelegate((BuildContext context, int i) {
-              return RepaintBoundary(
-                child: GiftItemCard(
-                  item: items[i],
-                  onTap: () => showGiftItemSheet(context, items[i]),
+    return SliverLayoutBuilder(
+      builder: (BuildContext context, SliverConstraints constraints) {
+        final double width = constraints.crossAxisExtent;
+        final int crossAxisCount = width > 900 ? 4 : (width > 550 ? 3 : 2);
+        final double childAspectRatio = width < 400 ? 0.62 : 0.66;
+
+        return SliverMainAxisGroup(
+          slivers: <Widget>[
+            const SliverToBoxAdapter(child: _SectionHeader(title: 'All Gifts')),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                ZopiqSpacing.lg,
+                0,
+                ZopiqSpacing.lg,
+                ZopiqSpacing.lg,
+              ),
+              sliver: SliverGrid(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  mainAxisSpacing: ZopiqSpacing.lg,
+                  crossAxisSpacing: ZopiqSpacing.lg,
+                  childAspectRatio: childAspectRatio,
                 ),
-              );
-            }, childCount: items.length),
-          ),
-        ),
-      ],
+                delegate: SliverChildBuilderDelegate(
+                  (BuildContext context, int i) {
+                    return RepaintBoundary(
+                      child: GiftItemCard(
+                        item: items[i],
+                        onTap: () => showGiftItemSheet(context, items[i]),
+                      ),
+                    );
+                  },
+                  childCount: items.length,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
-/// Uppercase section title, matching Home's rail headings.
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title});
 
@@ -211,14 +479,15 @@ class _SectionHeader extends StatelessWidget {
         ZopiqSpacing.pageGutter,
         ZopiqSpacing.lg,
         ZopiqSpacing.pageGutter,
-        ZopiqSpacing.md,
+        ZopiqSpacing.sm,
       ),
       child: Text(
         title.toUpperCase(),
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.1,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.2,
+          fontSize: 11,
         ),
       ),
     );

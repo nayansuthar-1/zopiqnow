@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
@@ -206,40 +207,48 @@ class _ShopItems extends StatelessWidget {
       bucket.add(item);
     }
 
-    return SliverMainAxisGroup(
-      slivers: <Widget>[
-        for (final String shelf in shelves) ...<Widget>[
-          SliverToBoxAdapter(child: _ShelfHeader(title: shelf)),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              ZopiqSpacing.lg,
-              0,
-              ZopiqSpacing.lg,
-              ZopiqSpacing.lg,
-            ),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: ZopiqSpacing.lg,
-                crossAxisSpacing: ZopiqSpacing.lg,
-                childAspectRatio: 0.68,
+    return SliverLayoutBuilder(
+      builder: (BuildContext context, SliverConstraints constraints) {
+        final double width = constraints.crossAxisExtent;
+        final int crossAxisCount = width > 900 ? 4 : (width > 550 ? 3 : 2);
+        final double childAspectRatio = width < 400 ? 0.62 : 0.66;
+
+        return SliverMainAxisGroup(
+          slivers: <Widget>[
+            for (final String shelf in shelves) ...<Widget>[
+              SliverToBoxAdapter(child: _ShelfHeader(title: shelf)),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  ZopiqSpacing.lg,
+                  0,
+                  ZopiqSpacing.lg,
+                  ZopiqSpacing.lg,
+                ),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    mainAxisSpacing: ZopiqSpacing.lg,
+                    crossAxisSpacing: ZopiqSpacing.lg,
+                    childAspectRatio: childAspectRatio,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (BuildContext context, int i) {
+                      final GiftItem item = byShelf[shelf]![i];
+                      return RepaintBoundary(
+                        child: GiftItemCard(
+                          item: item,
+                          onTap: () => showGiftItemSheet(context, item),
+                        ),
+                      );
+                    },
+                    childCount: byShelf[shelf]!.length,
+                  ),
+                ),
               ),
-              delegate: SliverChildBuilderDelegate(
-                (BuildContext context, int i) {
-                  final GiftItem item = byShelf[shelf]![i];
-                  return RepaintBoundary(
-                    child: GiftItemCard(
-                      item: item,
-                      onTap: () => showGiftItemSheet(context, item),
-                    ),
-                  );
-                },
-                childCount: byShelf[shelf]!.length,
-              ),
-            ),
-          ),
-        ],
-      ],
+            ],
+          ],
+        );
+      },
     );
   }
 }
