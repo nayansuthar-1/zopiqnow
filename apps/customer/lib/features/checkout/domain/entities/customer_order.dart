@@ -74,6 +74,7 @@ class OrderLine {
     required this.unitPrice,
     required this.quantity,
     required this.lineTotal,
+    this.options = const <String>[],
   });
 
   final String menuItemId;
@@ -81,6 +82,13 @@ class OrderLine {
   final int unitPrice;
   final int quantity;
   final int lineTotal;
+
+  /// The variant/add-ons chosen for this line, by name — "Full", "Extra cheese"
+  /// (migration 0048). Empty for a plain line.
+  final List<String> options;
+
+  /// The chosen options as one line, or empty.
+  String get optionsLabel => options.join(', ');
 }
 
 /// An order the customer has already placed, as order history renders it.

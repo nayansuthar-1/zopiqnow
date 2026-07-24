@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
+import 'package:zopiqnow/features/menu/domain/entities/menu_option.dart';
 
 /// Outcome of an add attempt, so the UI knows whether to prompt.
 enum AddToCartResult {
@@ -24,25 +25,27 @@ class CartNotifier extends Notifier<Cart> {
     required String restaurantId,
     required String restaurantName,
     required MenuItem item,
+    List<MenuOption> options = const <MenuOption>[],
   }) {
     if (state.isNotEmpty && state.restaurantId != restaurantId) {
       return AddToCartResult.differentRestaurant;
     }
-    state = _withRestaurant(restaurantId, restaurantName)._upsert(item, 1);
+    state = _withRestaurant(restaurantId, restaurantName)._upsert(item, 1, options);
     return AddToCartResult.added;
   }
 
-  /// Clears the cart and adds [item] from the new restaurant (after the user
-  /// confirms the "start a new cart" prompt).
+  /// Clears the cart and adds [item] (with its chosen [options]) from the new
+  /// restaurant, after the user confirms the "start a new cart" prompt.
   void startNewCartWith({
     required String restaurantId,
     required String restaurantName,
     required MenuItem item,
+    List<MenuOption> options = const <MenuOption>[],
   }) {
     state = Cart(
       restaurantId: restaurantId,
       restaurantName: restaurantName,
-    )._upsert(item, 1);
+    )._upsert(item, 1, options);
   }
 
   /// Replaces the cart wholesale — the reorder path.
@@ -65,12 +68,12 @@ class CartNotifier extends Notifier<Cart> {
           );
   }
 
-  void increment(String menuItemId) {
-    state = state._delta(menuItemId, 1);
+  void increment(String lineId) {
+    state = state._delta(lineId, 1);
   }
 
-  void decrement(String menuItemId) {
-    state = state._delta(menuItemId, -1);
+  void decrement(String lineId) {
+    state = state._delta(lineId, -1);
   }
 
   /// Puts a removed line back, at the quantity it had — what "Undo" means after
@@ -93,9 +96,9 @@ class CartNotifier extends Notifier<Cart> {
     state = base.copyWith(lines: <CartLine>[...base.lines, line]);
   }
 
-  void removeLine(String menuItemId) {
+  void removeLine(String lineId) {
     final List<CartLine> lines = state.lines
-        .where((CartLine l) => l.item.id != menuItemId)
+        .where((CartLine l) => l.lineId != lineId)
         .toList(growable: false);
     state = lines.isEmpty ? const Cart.empty() : state.copyWith(lines: lines);
   }
@@ -107,14 +110,18 @@ class CartNotifier extends Notifier<Cart> {
 }
 
 extension _CartOps on Cart {
-  /// Adds [delta] to an item's quantity, inserting the line if needed and
-  /// dropping it (and emptying the cart) when quantity hits zero.
-  Cart _upsert(MenuItem item, int delta) {
+  /// Adds [delta] to the line for [item] with exactly [options], inserting the
+  /// line if it is new and dropping it (and emptying the cart) at zero. Keyed by
+  /// the composite line id, so the same dish with different options is its own
+  /// line rather than merging.
+  Cart _upsert(MenuItem item, int delta, List<MenuOption> options) {
+    final String key =
+        CartLine(item: item, quantity: 0, options: options).lineId;
     final List<CartLine> next = <CartLine>[...lines];
-    final int i = next.indexWhere((CartLine l) => l.item.id == item.id);
+    final int i = next.indexWhere((CartLine l) => l.lineId == key);
     if (i == -1) {
       if (delta <= 0) return this;
-      next.add(CartLine(item: item, quantity: delta));
+      next.add(CartLine(item: item, quantity: delta, options: options));
     } else {
       final int q = next[i].quantity + delta;
       if (q <= 0) {
@@ -127,11 +134,11 @@ extension _CartOps on Cart {
     return copyWith(lines: next);
   }
 
-  /// Applies a quantity delta to an existing item id (no-op if absent).
-  Cart _delta(String menuItemId, int delta) {
-    final int i = lines.indexWhere((CartLine l) => l.item.id == menuItemId);
+  /// Applies a quantity delta to an existing line id (no-op if absent).
+  Cart _delta(String lineId, int delta) {
+    final int i = lines.indexWhere((CartLine l) => l.lineId == lineId);
     if (i == -1) return this;
-    return _upsert(lines[i].item, delta);
+    return _upsert(lines[i].item, delta, lines[i].options);
   }
 }
 

@@ -100,7 +100,7 @@ class _CartBody extends StatelessWidget {
                   if (i > 0)
                     Divider(height: ZopiqSpacing.lg, color: context.zc.divider),
                   _CartLineTile(
-                    key: ValueKey<String>(cart.lines[i].item.id),
+                    key: ValueKey<String>(cart.lines[i].lineId),
                     line: cart.lines[i],
                   ),
                 ],
@@ -176,7 +176,7 @@ class _CartLineTile extends ConsumerWidget {
     final TextTheme t = Theme.of(context).textTheme;
 
     return Dismissible(
-      key: ValueKey<String>('dismiss-${line.item.id}'),
+      key: ValueKey<String>('dismiss-${line.lineId}'),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
@@ -194,7 +194,7 @@ class _CartLineTile extends ConsumerWidget {
         // cart, and an empty cart has no restaurant. Undo would otherwise put
         // the dish back into a cart that belongs to nobody.
         final Cart before = ref.read(cartProvider);
-        cart.removeLine(removed.item.id);
+        cart.removeLine(removed.lineId);
         // Undo, not "are you sure?". A swipe is a confident gesture and a
         // dialog after one is an insult; but a swipe is also easy to do by
         // accident, so the way back has to be one tap and it has to be here.
@@ -249,9 +249,18 @@ class _CartLineTile extends ConsumerWidget {
                     ),
                   ],
                 ),
+                // The chosen variant/add-ons, if any — "Full, Extra cheese".
+                if (line.options.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: ZopiqSpacing.xxs),
+                  Text(
+                    line.optionsLabel,
+                    style: t.bodySmall?.copyWith(color: zc.primary),
+                  ),
+                ],
                 const SizedBox(height: ZopiqSpacing.xxs),
                 Text(
-                  '₹${line.item.price}',
+                  // The as-configured unit price, base plus options.
+                  '₹${line.unitPrice}',
                   style: t.bodySmall?.copyWith(color: zc.textMuted),
                 ),
               ],
@@ -264,9 +273,9 @@ class _CartLineTile extends ConsumerWidget {
               AddToCartControl(
                 quantity: line.quantity,
                 // A line only exists at quantity >= 1, so ADD is unreachable.
-                onAdd: () => cart.increment(line.item.id),
-                onIncrement: () => cart.increment(line.item.id),
-                onDecrement: () => cart.decrement(line.item.id),
+                onAdd: () => cart.increment(line.lineId),
+                onIncrement: () => cart.increment(line.lineId),
+                onDecrement: () => cart.decrement(line.lineId),
                 width: 96,
               ),
               const SizedBox(height: ZopiqSpacing.xs),

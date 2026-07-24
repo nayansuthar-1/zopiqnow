@@ -7,6 +7,8 @@ import 'package:zopiqnow/features/cart/presentation/widgets/add_to_cart_control.
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_image.dart'
     show GradientImagePlaceholder;
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
+import 'package:zopiqnow/features/menu/domain/entities/menu_option.dart';
+import 'package:zopiqnow/features/menu/presentation/widgets/dish_options_sheet.dart';
 
 /// One dish row: details on the left, art + the ADD control on the right.
 ///
@@ -29,12 +31,26 @@ class MenuItemTile extends ConsumerWidget {
   /// ADD control is inert, though the real refusal lives in `place_order`.
   final bool enabled;
 
+  /// The plain-dish add, or — for a customisable dish — the add after the
+  /// choice sheet returns a selection.
   Future<void> _add(BuildContext context, WidgetRef ref) async {
+    List<MenuOption> options = const <MenuOption>[];
+    if (item.isCustomizable) {
+      final List<MenuOption>? chosen = await showDishOptionsSheet(
+        context,
+        item: item,
+      );
+      if (chosen == null) return; // dismissed
+      options = chosen;
+    }
+    if (!context.mounted) return;
+
     final CartNotifier cart = ref.read(cartProvider.notifier);
     final AddToCartResult result = cart.add(
       restaurantId: restaurantId,
       restaurantName: restaurantName,
       item: item,
+      options: options,
     );
     if (result == AddToCartResult.added) return;
 
@@ -64,6 +80,7 @@ class MenuItemTile extends ConsumerWidget {
         restaurantId: restaurantId,
         restaurantName: restaurantName,
         item: item,
+        options: options,
       );
     }
   }
@@ -94,7 +111,11 @@ class MenuItemTile extends ConsumerWidget {
                 const SizedBox(height: ZopiqSpacing.xs),
                 Text(item.name, style: t.titleMedium),
                 const SizedBox(height: ZopiqSpacing.xxs),
-                Text('₹${item.price}', style: t.titleSmall),
+                Text(
+                  // A customisable dish's price is a floor — options add to it.
+                  item.isCustomizable ? '₹${item.price} onwards' : '₹${item.price}',
+                  style: t.titleSmall,
+                ),
                 if (item.rating != null) ...<Widget>[
                   const SizedBox(height: ZopiqSpacing.xs),
                   _ItemRating(rating: item.rating!, color: zc.rating),
@@ -112,7 +133,10 @@ class MenuItemTile extends ConsumerWidget {
           const SizedBox(width: ZopiqSpacing.lg),
           _ItemArtAndControl(
             item: item,
-            quantity: quantity,
+            // A customisable dish always shows ADD (each tap re-opens the choice
+            // sheet, since taps may build different configurations); the tile's
+            // stepper is for plain dishes, whose single line is keyed by the id.
+            quantity: item.isCustomizable ? 0 : quantity,
             enabled: enabled,
             onAdd: () => _add(context, ref),
             onIncrement: () =>

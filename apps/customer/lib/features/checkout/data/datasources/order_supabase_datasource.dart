@@ -9,6 +9,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/menu/domain/entities/menu_option.dart';
 
 /// Orders and coupons, over the `validate_coupon` and `place_order` functions.
 ///
@@ -64,12 +65,16 @@ class OrderSupabaseDataSource implements OrderDataSource {
             params: <String, dynamic>{
               'p_user_phone': userPhone,
               'p_restaurant_id': cart.restaurantId,
-              // Ids and quantities only. No prices leave this device.
+              // Ids, quantities and the chosen option ids only. No prices leave
+              // this device — place_order re-prices every line and its options.
               'p_items': cart.lines
                   .map(
                     (CartLine l) => <String, dynamic>{
                       'menu_item_id': l.item.id,
                       'quantity': l.quantity,
+                      'option_ids': l.options
+                          .map((MenuOption o) => o.id)
+                          .toList(),
                     },
                   )
                   .toList(),
@@ -116,7 +121,8 @@ class OrderSupabaseDataSource implements OrderDataSource {
       // The catalog join is for the photo alone — the name is on the order,
       // so a delisted restaurant costs us an image and not an identity.
       'restaurants(image_url), '
-      'order_items(menu_item_id, name, unit_price, quantity, line_total)';
+      'order_items(menu_item_id, name, unit_price, quantity, line_total, '
+      'order_item_options(name, price_delta))';
 
   @override
   Future<List<CustomerOrder>> fetchOrders() async {
@@ -207,6 +213,12 @@ class OrderSupabaseDataSource implements OrderDataSource {
                 unitPrice: (i['unit_price'] as num).toInt(),
                 quantity: (i['quantity'] as num).toInt(),
                 lineTotal: (i['line_total'] as num).toInt(),
+                options:
+                    (i['order_item_options'] as List<dynamic>? ??
+                            const <dynamic>[])
+                        .cast<Map<String, dynamic>>()
+                        .map((Map<String, dynamic> o) => o['name'] as String)
+                        .toList(growable: false),
               ),
             )
             .toList()

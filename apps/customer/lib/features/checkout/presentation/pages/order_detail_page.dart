@@ -114,11 +114,25 @@ class _OrderBody extends StatelessWidget {
                 const SizedBox(height: ZopiqSpacing.md),
                 for (final OrderLine line in order.lines) ...<Widget>[
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Expanded(
-                        child: Text(
-                          '${line.quantity} × ${line.name}',
-                          style: t.bodyMedium,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              '${line.quantity} × ${line.name}',
+                              style: t.bodyMedium,
+                            ),
+                            // The variant/add-ons chosen, if any.
+                            if (line.options.isNotEmpty)
+                              Text(
+                                line.optionsLabel,
+                                style: t.bodySmall?.copyWith(
+                                  color: context.zc.textMuted,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: ZopiqSpacing.sm),
