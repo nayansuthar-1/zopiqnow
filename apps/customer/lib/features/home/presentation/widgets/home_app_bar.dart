@@ -7,6 +7,7 @@ import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_filters.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_hero_carousel.dart';
+import 'package:zopiqnow/features/notifications/presentation/widgets/notification_bell.dart';
 
 /// Home header as a Zomato-style collapsing sliver, built *around* the hero
 /// carousel.
@@ -156,6 +157,8 @@ class HomeSliverAppBar extends StatelessWidget {
                                 onTap: onTapLocation,
                               ),
                             ),
+                            const SizedBox(width: ZopiqSpacing.sm),
+                            const NotificationBell(),
                             const SizedBox(width: ZopiqSpacing.sm),
                             _ProfileButton(onTap: onTapProfile),
                           ],

@@ -26,6 +26,7 @@ import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/presentation/pages/address_book_page.dart';
 import 'package:zopiqnow/features/location/presentation/pages/address_form_page.dart';
 import 'package:zopiqnow/features/menu/presentation/pages/menu_page.dart';
+import 'package:zopiqnow/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:zopiqnow/features/search/presentation/pages/search_page.dart';
 import 'package:zopiqnow/app/coming_soon_page.dart';
 
@@ -49,6 +50,7 @@ abstract final class Routes {
   static const String licenses = 'licenses';
   static const String account = 'account';
   static const String profile = 'profile';
+  static const String notifications = 'notifications';
   static const String splash = 'splash';
   static const String login = 'login';
   static const String otp = 'otp';
@@ -362,6 +364,16 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: '/licenses',
         name: Routes.licenses,
         builder: (_, _) => const LicensesPage(),
+      ),
+      // The inbox. Deliberately not protected: a signed-out user simply has an
+      // empty one (they have no user id to address a row to), and bouncing them
+      // to a login screen to see "nothing yet" would be a worse welcome than the
+      // empty list itself. The one tap that needs identity — opening an order —
+      // is the order route, which is guarded on its own.
+      GoRoute(
+        path: '/notifications',
+        name: Routes.notifications,
+        builder: (_, _) => const NotificationsPage(),
       ),
       GoRoute(
         path: '/account',
