@@ -86,6 +86,7 @@ class _NotificationCard extends ConsumerWidget {
     final bool unread = item.isUnread;
     final Color accent = switch (item.kind) {
       NotificationKind.newOrder => zc.primary,
+      NotificationKind.settlement => zc.veg,
       NotificationKind.system => zc.textMuted,
     };
 
@@ -158,6 +159,7 @@ class _NotificationCard extends ConsumerWidget {
 
   static IconData _iconFor(NotificationKind kind) => switch (kind) {
     NotificationKind.newOrder => Icons.receipt_long_rounded,
+    NotificationKind.settlement => Icons.account_balance_wallet_rounded,
     NotificationKind.system => Icons.info_outline_rounded,
   };
 

@@ -1,13 +1,16 @@
 import 'package:flutter/foundation.dart';
 
-/// What kind of alert a row is. Only [newOrder] is written today; [system] is
-/// the home the next source will land in.
+/// What kind of alert a row is. [newOrder] and [settlement] are written by
+/// triggers (0021, 0047); [system] is the home any other source lands in — an
+/// unknown wire value degrades to it rather than crashing an older build.
 enum NotificationKind {
   newOrder,
+  settlement,
   system;
 
   static NotificationKind fromWire(String wire) => switch (wire) {
     'new_order' => newOrder,
+    'settlement' => settlement,
     _ => system,
   };
 }
