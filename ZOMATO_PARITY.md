@@ -56,23 +56,28 @@ Also owed: commit the rider in-app notification inbox (built, analyze-clean, unc
 
 ---
 
-### B1 — Close the delivery lifecycle *(one migration, all three apps)*
-The single biggest hole: between "claimed" and "delivered" the system is blind, and a
-delivery can be marked complete by a rider who never met the customer.
+### B1 — Close the delivery lifecycle ✅ **DONE 2026-07-24** (migration 0049)
+The single biggest hole: between "claimed" and "delivered" the system was blind, and a
+delivery could be marked complete by a rider who never met the customer.
 
-- [ ] `deliveries.state` gains `arrived_at_restaurant` and `arrived_at_customer`
-- [ ] Rider: **"I've arrived at restaurant"** button → vendor ticket shows *Rider waiting*
-- [ ] Rider: **"I've arrived at customer"** button → customer screen shows *Rider at your door*
-- [ ] **Delivery OTP**: 4 digits on the customer's tracking screen, rider types it into
-      `confirm_delivered`. Mirror of the pickup OTP, opposite direction. This is what makes
-      "delivered" mean something
-- [ ] Vendor: rider-arrival status on the ticket
-- [ ] Rider: **online / offline self-toggle** (today `is_active` is admin-only; a rider
-      cannot go off shift). Offline must refuse new claims but never strand a live job
-- [ ] Customer: delivery-OTP screen + "rider is here" state in the timeline
+- [x] `deliveries.state` gains `arrived_at_restaurant` and `arrived_at_customer`
+- [x] Rider: **"I've arrived at restaurant"** → vendor ticket shows *At the counter · waiting Xm*
+- [x] Rider: **"I've arrived at customer"** → customer card shows *Waiting outside*
+- [x] **Delivery OTP** — 4 digits on the customer's tracking card, typed into
+      `confirm_delivered`. This is what makes "delivered" mean something
+- [x] Vendor: rider-arrival status on the ticket
+- [x] Rider: **online / offline self-toggle**, refused while carrying
+- [x] Customer: delivery code + "rider is here" state
 
-**Rules that must hold:** no state may be skipped; an OTP must be verifiable exactly once;
-going offline while carrying is refused, not silently allowed.
+**A hole found and closed on the way:** the *pickup* code had been readable by the rider
+it was meant to test — 0025 stored it on `deliveries.pickup_otp` and gave riders `select`
+on their own row, so a rider could confirm a pickup from the road. Both codes now live in
+`delivery_codes`, a table with **no policies at all**, read through one function per
+identity. Five wrong guesses locks a code; whoever reads it aloud reissues it.
+
+**Rules now enforced in Postgres:** no state may be skipped (`confirm_pickup` refuses from
+`claimed`, `confirm_delivered` from `picked_up`); a wrong code is *returned*, not raised,
+so the attempt counter survives; going offline while carrying is refused.
 
 ---
 
