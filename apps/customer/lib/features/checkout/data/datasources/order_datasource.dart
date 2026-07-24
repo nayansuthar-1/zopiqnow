@@ -62,4 +62,8 @@ abstract interface class OrderDataSource {
   /// the delivery is over. All three look the same from here — and they should,
   /// because in all three there is no one to name.
   Future<OrderRider?> fetchRider(String orderId);
+
+  /// The four digits the rider must be told at the door, or null while there is
+  /// nothing to confirm. Same shape as [fetchRider] and for the same reason.
+  Future<String?> fetchDeliveryCode(String orderId);
 }

@@ -44,6 +44,19 @@ final FutureProvider<List<JobOffer>> boardProvider =
 final Provider<Duration?> boardPollIntervalProvider =
     Provider<Duration?>((Ref ref) => const Duration(seconds: 20));
 
+/// Whether this rider is on shift.
+///
+/// `is_active` is ops saying you work here; this is the rider saying they are
+/// working *now* (0049). Kept out of [Rider] deliberately: that object is
+/// resolved once at sign-in and never changes, and a shift changes several times
+/// a day — folding a mutable fact into an immutable one is how a screen ends up
+/// showing a state the database left behind an hour ago.
+final FutureProvider<bool> riderOnlineProvider = FutureProvider<bool>((Ref ref) {
+  final Rider? rider = ref.watch(riderProvider);
+  if (rider == null) return Future<bool>.value(false);
+  return ref.watch(jobsDataSourceProvider).fetchOnline();
+});
+
 /// This rider's jobs.
 final FutureProvider<List<Job>> myJobsProvider = FutureProvider<List<Job>>((
   Ref ref,
@@ -206,6 +219,11 @@ class JobsController extends Notifier<void> {
   Future<String?> abandon(String orderId) =>
       _write(() => _ds.abandon(orderId), 'We couldn\'t drop that job.');
 
+  Future<String?> arriveAtRestaurant(String orderId) => _write(
+    () => _ds.arriveAtRestaurant(orderId),
+    'We couldn\'t tell the restaurant you\'re here.',
+  );
+
   Future<String?> confirmPickup({
     required String orderId,
     required String otp,
@@ -214,9 +232,28 @@ class JobsController extends Notifier<void> {
     'We couldn\'t confirm the pickup.',
   );
 
-  Future<String?> confirmDelivered(String orderId) => _write(
-    () => _ds.confirmDelivered(orderId),
+  Future<String?> arriveAtCustomer(String orderId) => _write(
+    () => _ds.arriveAtCustomer(orderId),
+    'We couldn\'t tell the customer you\'re here.',
+  );
+
+  Future<String?> confirmDelivered({
+    required String orderId,
+    required String otp,
+  }) => _write(
+    () => _ds.confirmDelivered(orderId: orderId, otp: otp),
     'We couldn\'t mark that delivered.',
+  );
+
+  /// Going off shift. Not optimistic, unlike most toggles in these apps: the
+  /// database refuses this while the rider is carrying anything, and a switch
+  /// that flips to "Offline" and then snaps back has already told the rider they
+  /// were done for the day.
+  Future<String?> setOnline(bool online) => _write(
+    () => _ds.setOnline(online),
+    online
+        ? 'We couldn\'t start your shift.'
+        : 'We couldn\'t end your shift.',
   );
 
   Future<String?> _write(Future<void> Function() call, String fallback) async {
@@ -225,6 +262,10 @@ class JobsController extends Notifier<void> {
       ref
         ..invalidate(boardProvider)
         ..invalidate(myJobsProvider)
+        // The board is empty while offline and full while on, so a shift change
+        // is a board change — and every job write can be the one that frees a
+        // rider to end their shift.
+        ..invalidate(riderOnlineProvider)
         // Only `confirmDelivered` can actually move this, but invalidating on
         // every write costs one request the rider never waits on and removes
         // the failure mode where a total is stale because the list that feeds

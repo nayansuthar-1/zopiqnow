@@ -48,7 +48,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Nothing waiting'), findsOneWidget);
+    expect(find.text('Scanning for New Orders'), findsOneWidget);
 
     // A kitchen finishes cooking. Nothing tells the app.
     jobs.arrive(offer());
@@ -108,9 +108,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Take this job'));
+    await tester.tap(find.text('Claim & Accept Job'));
     await tester.pumpAndSettle();
-    expect(find.text('Your run'), findsOneWidget);
+    expect(find.textContaining('Your Run'), findsOneWidget);
 
     // The board is gone, so its timer is gone with it. If it were not, this
     // pump would leave a pending timer and fail the test — which is the

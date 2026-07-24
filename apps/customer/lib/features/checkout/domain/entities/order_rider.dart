@@ -12,7 +12,12 @@ class OrderRider {
     required this.name,
     required this.phone,
     required this.vehicle,
+    this.isAtDoor = false,
   });
+
+  /// The rider has said they are outside (0049). The one fact on this screen
+  /// worth interrupting somebody for, and the moment the delivery code matters.
+  final bool isAtDoor;
 
   final String name;
   final String phone;

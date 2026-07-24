@@ -35,8 +35,8 @@ void main() {
     await tester.pumpWidget(_app(auth: FakeRiderAuthDataSource()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Zopiqnow for partners'), findsOneWidget);
-    expect(find.text('Available jobs'), findsNothing);
+    expect(find.text('Partner Sign In'), findsOneWidget);
+    expect(find.text('Jobs'), findsNothing);
   });
 
   testWidgets('a good code for a partner reaches the board', (
@@ -48,15 +48,15 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'nayan@siteonlab.com');
-    await tester.tap(find.text('Send code'));
+    await tester.tap(find.text('Send Verification Code'));
     await tester.pumpAndSettle();
     expect(auth.lastCodeSentTo, 'nayan@siteonlab.com');
 
     await tester.enterText(find.byType(TextField), '123456');
-    await tester.tap(find.text('Verify'));
+    await tester.tap(find.text('Verify & Access Shift'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Available jobs'), findsOneWidget);
+    expect(find.text('Jobs'), findsWidgets);
   });
 
   testWidgets(
@@ -69,15 +69,15 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'someone@else.com');
-      await tester.tap(find.text('Send code'));
+      await tester.tap(find.text('Send Verification Code'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), '123456');
-      await tester.tap(find.text('Verify'));
+      await tester.tap(find.text('Verify & Access Shift'));
       await tester.pumpAndSettle();
 
       // Not bounced back to sign in, which would let them log in forever.
-      expect(find.text('Not a delivery partner'), findsOneWidget);
-      expect(find.text('Available jobs'), findsNothing);
+      expect(find.text('Account Not Onboarded'), findsOneWidget);
+      expect(find.text('Jobs'), findsNothing);
     },
   );
 
@@ -87,14 +87,14 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'nayan@siteonlab.com');
-    await tester.tap(find.text('Send code'));
+    await tester.tap(find.text('Send Verification Code'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '000000');
-    await tester.tap(find.text('Verify'));
+    await tester.tap(find.text('Verify & Access Shift'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('didn\'t work'), findsOneWidget);
-    expect(find.text('Available jobs'), findsNothing);
+    expect(find.text('Jobs'), findsNothing);
   });
 
   testWidgets('the auth service\'s own reason reaches the rider', (
@@ -111,7 +111,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'nayan@siteonlab.com');
-    await tester.tap(find.text('Send code'));
+    await tester.tap(find.text('Send Verification Code'));
     await tester.pumpAndSettle();
 
     // Passed through, not replaced. A rider can wait 54 seconds; they
@@ -134,7 +134,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'nayan@siteonlab.com');
-    await tester.tap(find.text('Send code'));
+    await tester.tap(find.text('Send Verification Code'));
     await tester.pumpAndSettle();
 
     // The shape of the bug that cost a release build: no INTERNET

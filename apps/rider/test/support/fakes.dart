@@ -68,6 +68,11 @@ class FakeJobsDataSource implements JobsDataSource {
   /// state this fake evolves.
   final List<Payout> payouts;
 
+  /// The two codes the fake will accept, and the shift it starts in. Riders
+  /// default to on shift, exactly as `is_online` defaults in 0049.
+  String deliveryOtp = '4321';
+  bool online = true;
+
   List<JobOffer> _board;
   List<Job> _mine;
 
@@ -135,6 +140,8 @@ class FakeJobsDataSource implements JobsDataSource {
         // unmeasurable distance pays the base and nothing more.
         riderPay: payBase + ((claimDistanceKm ?? 0) * payPerKm).round(),
         claimedAt: DateTime.now(),
+        arrivedAtRestaurantAt: null,
+        arrivedAtCustomerAt: null,
         deliveredAt: null,
       ),
     ];
@@ -143,7 +150,7 @@ class FakeJobsDataSource implements JobsDataSource {
   @override
   Future<void> abandon(String orderId) async {
     final Job job = _mine.firstWhere((Job j) => j.orderId == orderId);
-    if (job.state != JobState.claimed) {
+    if (!job.state.isCollecting) {
       throw const JobFailure(
         'You can only drop a job you haven\'t picked up yet.',
       );
@@ -164,11 +171,30 @@ class FakeJobsDataSource implements JobsDataSource {
   }
 
   @override
+  Future<void> arriveAtRestaurant(String orderId) async {
+    final Job job = _mine.firstWhere((Job j) => j.orderId == orderId);
+    if (job.state != JobState.claimed) {
+      throw const JobFailure(
+        'You have no job waiting to be collected on that order.',
+      );
+    }
+    _replace(job, state: JobState.arrivedAtRestaurant);
+  }
+
+  /// The arrival gate is 0049's, not the app's — so the fake refuses a pickup
+  /// from `claimed` the same way Postgres does. A fake that let it through would
+  /// let a screen that skips the step pass its own tests.
+  @override
   Future<void> confirmPickup({
     required String orderId,
     required String otp,
   }) async {
     final Job job = _mine.firstWhere((Job j) => j.orderId == orderId);
+    if (job.state != JobState.arrivedAtRestaurant) {
+      throw const JobFailure(
+        'Tap "I\'ve arrived" at the restaurant before collecting the order.',
+      );
+    }
     if (!job.isReadyToCollect) {
       throw const JobFailure('That order isn\'t packed yet.');
     }
@@ -181,9 +207,44 @@ class FakeJobsDataSource implements JobsDataSource {
   }
 
   @override
-  Future<void> confirmDelivered(String orderId) async {
+  Future<void> arriveAtCustomer(String orderId) async {
     final Job job = _mine.firstWhere((Job j) => j.orderId == orderId);
+    if (job.state != JobState.pickedUp) {
+      throw const JobFailure('You aren\'t carrying that order.');
+    }
+    _replace(job, state: JobState.arrivedAtCustomer);
+  }
+
+  @override
+  Future<void> confirmDelivered({
+    required String orderId,
+    required String otp,
+  }) async {
+    final Job job = _mine.firstWhere((Job j) => j.orderId == orderId);
+    if (job.state != JobState.arrivedAtCustomer) {
+      throw const JobFailure(
+        'Tap "I\'ve arrived" at the customer before completing the delivery.',
+      );
+    }
+    if (otp != deliveryOtp) {
+      throw const JobFailure(
+        'That code doesn\'t match. Ask the customer to read it again.',
+      );
+    }
     _replace(job, state: JobState.delivered, orderStatus: 'delivered');
+  }
+
+  @override
+  Future<bool> fetchOnline() async => online;
+
+  @override
+  Future<void> setOnline(bool value) async {
+    if (!value && _mine.any((Job j) => j.state.isLive)) {
+      throw const JobFailure(
+        'Finish or drop your live job(s) before going offline.',
+      );
+    }
+    online = value;
   }
 
   /// Earnings, derived from the delivered rows exactly as `rider_earnings`
@@ -219,14 +280,14 @@ class FakeJobsDataSource implements JobsDataSource {
   @override
   Future<List<Payout>> fetchPayouts() async => List<Payout>.unmodifiable(payouts);
 
-  void _replace(Job job, {required JobState state, required String orderStatus}) {
+  void _replace(Job job, {required JobState state, String? orderStatus}) {
     _mine = _mine
         .map(
           (Job j) => j.orderId == job.orderId
               ? Job(
                   orderId: j.orderId,
                   state: state,
-                  orderStatus: orderStatus,
+                  orderStatus: orderStatus ?? j.orderStatus,
                   restaurantName: j.restaurantName,
                   restaurantLat: j.restaurantLat,
                   restaurantLng: j.restaurantLng,
@@ -241,6 +302,12 @@ class FakeJobsDataSource implements JobsDataSource {
                   payPerKm: j.payPerKm,
                   riderPay: j.riderPay,
                   claimedAt: j.claimedAt,
+                  arrivedAtRestaurantAt: state == JobState.arrivedAtRestaurant
+                      ? DateTime.now()
+                      : j.arrivedAtRestaurantAt,
+                  arrivedAtCustomerAt: state == JobState.arrivedAtCustomer
+                      ? DateTime.now()
+                      : j.arrivedAtCustomerAt,
                   deliveredAt: state == JobState.delivered
                       ? DateTime.now()
                       : j.deliveredAt,
@@ -301,6 +368,15 @@ Job job({
   payPerKm: payPerKm,
   riderPay: riderPay,
   claimedAt: DateTime.now().subtract(const Duration(minutes: 3)),
+  // Filled in from the state for the same reason `deliveredAt` is: a job that
+  // says it is at the door with no arrival time is not a row 0049 can produce.
+  arrivedAtRestaurantAt: state == JobState.claimed
+      ? null
+      : DateTime.now().subtract(const Duration(minutes: 2)),
+  arrivedAtCustomerAt:
+      state == JobState.arrivedAtCustomer || state == JobState.delivered
+      ? DateTime.now().subtract(const Duration(minutes: 1))
+      : null,
   // A delivered job without a delivery time is not a state the database can be
   // in, so the helper fills it rather than letting a test construct one.
   deliveredAt:

@@ -480,12 +480,32 @@ VendorNotification notification({
 /// Who is carrying what, in memory. Defaults to nobody — the ordinary case for
 /// a restaurant that hands bags to its own cousin with a scooter.
 class FakeDeliveryDataSource implements DeliveryDataSource {
-  FakeDeliveryDataSource({this.active = const <String, OrderDelivery>{}});
+  FakeDeliveryDataSource({
+    this.active = const <String, OrderDelivery>{},
+    this.code = '5896',
+  });
 
   final Map<String, OrderDelivery> active;
 
+  /// Since 0049 the code is an answer, not a column — so the fake answers too.
+  String code;
+
   @override
   Future<Map<String, OrderDelivery>> fetchActive() async => active;
+
+  @override
+  Future<String> pickupCode(String orderId) async {
+    if (!active.containsKey(orderId)) {
+      throw const DeliveryFailure('No rider is waiting on that order.');
+    }
+    return code;
+  }
+
+  @override
+  Future<String> reissuePickupCode(String orderId) async {
+    code = '1111';
+    return code;
+  }
 }
 
 OrderDelivery delivery({
@@ -493,13 +513,14 @@ OrderDelivery delivery({
   String riderName = 'Asha',
   String riderPhone = '+919000000001',
   DeliveryState state = DeliveryState.claimed,
-  String pickupOtp = '5896',
 }) => OrderDelivery(
   orderId: orderId,
   riderName: riderName,
   riderPhone: riderPhone,
   state: state,
-  pickupOtp: pickupOtp,
+  arrivedAt: state == DeliveryState.arrivedAtRestaurant
+      ? DateTime.now().subtract(const Duration(minutes: 4))
+      : null,
 );
 
 /// The roster, in memory. Mirrors 0024's refusals that the screen actually

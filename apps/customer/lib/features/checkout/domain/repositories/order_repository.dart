@@ -74,6 +74,10 @@ abstract interface class OrderRepository {
   /// one has picked the order up, and the card renders both the same way: by
   /// showing nothing.
   Future<OrderRider?> getRider(String orderId);
+
+  /// The delivery code to read out at the door, or null when there is nothing
+  /// to confirm yet. Never throws, for the same reason [getRider] does not.
+  Future<String?> getDeliveryCode(String orderId);
 }
 
 /// Domain-level failure for reading order history.

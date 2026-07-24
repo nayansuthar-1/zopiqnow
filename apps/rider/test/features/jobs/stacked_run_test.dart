@@ -52,10 +52,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Your run'), findsOneWidget);
-    expect(find.text('ZPQ-A'), findsOneWidget);
-    expect(find.text('ZPQ-B'), findsOneWidget);
-    expect(find.text('Your run · 2'), findsOneWidget);
+    expect(find.textContaining('Your Run'), findsOneWidget);
+    expect(find.textContaining('ZPQ-A'), findsOneWidget);
+    expect(find.textContaining('ZPQ-B'), findsOneWidget);
+    expect(find.text('Your Run (2 Active)'), findsOneWidget);
   });
 
   testWidgets('the run is ordered by what can be acted on now', (
@@ -76,7 +76,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    double y(String id) => tester.getTopLeft(find.text(id)).dy;
+    double y(String id) => tester.getTopLeft(find.textContaining(id)).dy;
 
     // Packed and waiting on a counter, then what is already on the bike, then
     // what the kitchen has not finished. Not a route — the app knows two dots
@@ -84,8 +84,8 @@ void main() {
     expect(y('ZPQ-PACKED'), lessThan(y('ZPQ-CARRYING')));
     expect(y('ZPQ-CARRYING'), lessThan(y('ZPQ-COOKING')));
 
-    expect(find.text('Packed'), findsOneWidget);
-    expect(find.text('On the bike'), findsOneWidget);
+    expect(find.text('Ready'), findsOneWidget);
+    expect(find.text('On Bike'), findsOneWidget);
     expect(find.text('Cooking'), findsOneWidget);
   });
 
@@ -101,17 +101,17 @@ void main() {
     await tester.pumpAndSettle();
 
     // Opens on the run, not the board — the old instinct survives.
-    expect(find.text('Take this job'), findsNothing);
+    expect(find.text('Claim & Accept Job'), findsNothing);
 
-    await tester.tap(find.text('Board'));
+    await tester.tap(find.text('Available Board'));
     await tester.pumpAndSettle();
-    expect(find.text('Take this job'), findsOneWidget);
+    expect(find.text('Claim & Accept Job'), findsOneWidget);
 
-    await tester.tap(find.text('Take this job'));
+    await tester.tap(find.text('Claim & Accept Job'));
     await tester.pumpAndSettle();
 
     expect(jobs.mine.length, 2);
-    expect(find.text('Your run · 2'), findsOneWidget);
+    expect(find.text('Your Run (2 Active)'), findsOneWidget);
   });
 
   testWidgets('finishing the last job returns to the board on its own', (
@@ -124,14 +124,17 @@ void main() {
     await tester.pumpWidget(_app(jobs: jobs));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Mark delivered'));
+    await tester.tap(find.text('I\'ve Arrived at the Customer'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Delivered'));
+    await tester.tap(find.text('Enter Delivery Code'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, '4321');
     await tester.pumpAndSettle();
 
-    // The switch disappears with the run that justified it.
-    expect(find.text('Available jobs'), findsOneWidget);
-    expect(find.text('Board'), findsNothing);
+    // The switch disappears with the run that justified it, leaving the plain
+    // board a free rider sees.
+    expect(find.text('Scanning for New Orders'), findsOneWidget);
+    expect(find.text('Available Board'), findsNothing);
   });
 
   testWidgets('dropping one job leaves the rest of the run alone', (
@@ -147,11 +150,11 @@ void main() {
     // Two identical cards, so the first "Drop this job" belongs to ZPQ-A.
     await tester.tap(find.text('Drop this job').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Drop it'));
+    await tester.tap(find.text('Drop Job'));
     await tester.pumpAndSettle();
 
-    expect(find.text('ZPQ-A'), findsNothing);
-    expect(find.text('ZPQ-B'), findsOneWidget);
-    expect(find.text('Your run · 1'), findsOneWidget);
+    expect(find.textContaining('ZPQ-A'), findsNothing);
+    expect(find.textContaining('ZPQ-B'), findsOneWidget);
+    expect(find.text('Your Run (1 Active)'), findsOneWidget);
   });
 }

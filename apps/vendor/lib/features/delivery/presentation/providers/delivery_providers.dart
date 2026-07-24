@@ -34,6 +34,39 @@ final FutureProvider<Map<String, OrderDelivery>> deliveriesProvider =
       }
     });
 
+/// The four digits for one order, fetched only when a ticket actually shows
+/// them — which is why this is a family and not part of [deliveriesProvider].
+///
+/// Since 0049 the code is not a column on any row this app can select; it is an
+/// answer `order_pickup_code` gives to a staff member of that order's
+/// restaurant, and only while a rider is waiting. Asking for every order in the
+/// queue would be one round trip per ticket for a number most of them will never
+/// display.
+final FutureProviderFamily<String, String> pickupCodeProvider =
+    FutureProvider.family<String, String>((Ref ref, String orderId) {
+      return ref.watch(deliveryDataSourceProvider).pickupCode(orderId);
+    });
+
+/// Ask for a fresh one, after five wrong guesses locked the old.
+final ProviderFamily<Future<String?> Function(), String>
+reissuePickupCodeProvider =
+    Provider.family<Future<String?> Function(), String>((
+      Ref ref,
+      String orderId,
+    ) {
+      return () async {
+        try {
+          await ref.read(deliveryDataSourceProvider).reissuePickupCode(orderId);
+          ref.invalidate(pickupCodeProvider(orderId));
+          return null;
+        } on DeliveryFailure catch (e) {
+          return e.message;
+        } on Object {
+          return 'We couldn\'t issue a new code.';
+        }
+      };
+    });
+
 /// The rider on one order, or null when nobody has claimed it.
 final ProviderFamily<OrderDelivery?, String> orderDeliveryProvider =
     Provider.family<OrderDelivery?, String>((Ref ref, String orderId) {

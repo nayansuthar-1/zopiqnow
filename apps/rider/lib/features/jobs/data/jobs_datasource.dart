@@ -22,10 +22,24 @@ abstract interface class JobsDataSource {
   /// Put an unstarted job back on the board.
   Future<void> abandon(String orderId);
 
+  /// I'm at the restaurant. Required before [confirmPickup] — Postgres refuses
+  /// a pickup straight from `claimed` (0049), so this is a step, not a courtesy.
+  Future<void> arriveAtRestaurant(String orderId);
+
   /// Collect the bag, proving it with the code the restaurant reads out.
   Future<void> confirmPickup({required String orderId, required String otp});
 
-  Future<void> confirmDelivered(String orderId);
+  /// I'm at the door. Required before [confirmDelivered], same as above.
+  Future<void> arriveAtCustomer(String orderId);
+
+  /// Hand it over, proving it with the code the *customer* reads out.
+  Future<void> confirmDelivered({required String orderId, required String otp});
+
+  /// Whether this rider is on shift right now.
+  Future<bool> fetchOnline();
+
+  /// Start or end a shift. Refused while carrying anything (0049).
+  Future<void> setOnline(bool online);
 
   /// What this rider earned, by day, over a closed date range.
   ///
@@ -95,23 +109,86 @@ class JobsSupabaseDataSource implements JobsDataSource {
   );
 
   @override
-  Future<void> confirmPickup({
-    required String orderId,
-    required String otp,
-  }) => _guard<void>(
+  Future<void> arriveAtRestaurant(String orderId) => _guard<void>(
     () => _db.rpc<void>(
-      'confirm_pickup',
-      params: <String, dynamic>{'p_order_id': orderId, 'p_otp': otp},
+      'arrive_at_restaurant',
+      params: <String, dynamic>{'p_order_id': orderId},
     ),
   );
 
   @override
-  Future<void> confirmDelivered(String orderId) => _guard<void>(
+  Future<void> confirmPickup({
+    required String orderId,
+    required String otp,
+  }) async => _readCodeVerdict(
+    await _guard<String?>(
+      () => _db.rpc<String?>(
+        'confirm_pickup',
+        params: <String, dynamic>{'p_order_id': orderId, 'p_otp': otp},
+      ),
+    ),
+    reissuedBy: 'the restaurant',
+  );
+
+  @override
+  Future<void> arriveAtCustomer(String orderId) => _guard<void>(
     () => _db.rpc<void>(
-      'confirm_delivered',
+      'arrive_at_customer',
       params: <String, dynamic>{'p_order_id': orderId},
     ),
   );
+
+  @override
+  Future<void> confirmDelivered({
+    required String orderId,
+    required String otp,
+  }) async => _readCodeVerdict(
+    await _guard<String?>(
+      () => _db.rpc<String?>(
+        'confirm_delivered',
+        params: <String, dynamic>{'p_order_id': orderId, 'p_otp': otp},
+      ),
+    ),
+    reissuedBy: 'the customer',
+  );
+
+  /// The second table read in this file, and allowed for the same reason as the
+  /// first: 0025 gives a rider a select policy on *their own* partner row. A
+  /// function around it would enforce nothing the policy does not.
+  @override
+  Future<bool> fetchOnline() async {
+    final Map<String, dynamic>? row = await _guard<Map<String, dynamic>?>(
+      () => _db.from('delivery_partners').select('is_online').maybeSingle(),
+    );
+    // A rider whose row we cannot see is not on shift. Defaulting the other way
+    // would show an "Online" badge to somebody the board is refusing.
+    return row?['is_online'] as bool? ?? false;
+  }
+
+  @override
+  Future<void> setOnline(bool online) => _guard<void>(
+    () => _db.rpc<void>(
+      'set_rider_online',
+      params: <String, dynamic>{'p_online': online},
+    ),
+  );
+
+  /// The two code checks are the only calls in this app that report a failure by
+  /// **returning** rather than raising, and the reason is in 0049: raising would
+  /// roll back the attempt counter that makes the five-guess cap a cap. So the
+  /// verdict is turned back into an exception here — in one place, so no screen
+  /// can forget to look at it and treat a refusal as a handover.
+  void _readCodeVerdict(String? verdict, {required String reissuedBy}) =>
+      switch (verdict) {
+        'ok' => null,
+        'wrong_code' => throw JobFailure(
+          "That code doesn't match. Ask $reissuedBy to read it again.",
+        ),
+        'locked' => throw JobFailure(
+          'Too many wrong codes. Ask $reissuedBy for a new one.',
+        ),
+        _ => throw const JobFailure(),
+      };
 
   @override
   Future<List<EarningsDay>> fetchEarnings({

@@ -122,7 +122,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Call'));
+    await tester.tap(find.text('Call Customer'));
     await tester.pumpAndSettle();
 
     // The '+' is percent-encoded: in a URI it would otherwise read as a space
@@ -143,7 +143,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Call'));
+    await tester.tap(find.text('Call Customer'));
     await tester.pumpAndSettle();
 
     expect(launcher.opened, isEmpty);

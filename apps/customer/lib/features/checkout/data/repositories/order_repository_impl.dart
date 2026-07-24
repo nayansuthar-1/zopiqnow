@@ -91,6 +91,15 @@ class OrderRepositoryImpl implements OrderRepository {
       _dataSource.watchOrderStatus(orderId);
 
   @override
+  Future<String?> getDeliveryCode(String orderId) async {
+    try {
+      return await _dataSource.fetchDeliveryCode(orderId);
+    } on Object catch (_) {
+      return null;
+    }
+  }
+
+  @override
   Future<OrderRider?> getRider(String orderId) async {
     try {
       return await _dataSource.fetchRider(orderId);

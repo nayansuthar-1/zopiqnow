@@ -77,6 +77,20 @@ final AutoDisposeFutureProviderFamily<OrderRider?, String> orderRiderProvider =
       return ref.watch(orderRepositoryProvider).getRider(orderId);
     });
 
+/// The four digits to read out at the door (0049).
+///
+/// Same shape as [orderRiderProvider], and asked at the same moment — the
+/// screen only wants it once the food is on its way. Null while there is
+/// nothing to confirm, which is also what a failed read looks like: the code
+/// simply is not on screen, and the rider's own app will say why.
+final AutoDisposeFutureProviderFamily<String?, String> deliveryCodeProvider =
+    FutureProvider.autoDispose.family<String?, String>((
+      Ref ref,
+      String orderId,
+    ) {
+      return ref.watch(orderRepositoryProvider).getDeliveryCode(orderId);
+    });
+
 /// What a reorder actually managed to put in the cart.
 ///
 /// [unavailable] is not an error: a dish sells out, a vendor delists it, and the

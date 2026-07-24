@@ -5,15 +5,23 @@ import 'package:flutter/foundation.dart';
 /// Deliberately a different axis from the order's own status: the customer app
 /// throws on an order status it does not recognise, so the rider's lifecycle was
 /// kept out of `orders.status` entirely.
+/// The order is the order (0049): claimed → arrivedAtRestaurant → pickedUp →
+/// arrivedAtCustomer → delivered. Each arrival is a step Postgres requires, not
+/// one this app is trusted to lead the rider through — `confirm_pickup` refuses
+/// from [claimed] and `confirm_delivered` refuses from [pickedUp].
 enum JobState {
   claimed,
+  arrivedAtRestaurant,
   pickedUp,
+  arrivedAtCustomer,
   delivered,
   cancelled;
 
   static JobState fromWire(String value) => switch (value) {
     'claimed' => claimed,
+    'arrived_at_restaurant' => arrivedAtRestaurant,
     'picked_up' => pickedUp,
+    'arrived_at_customer' => arrivedAtCustomer,
     'delivered' => delivered,
     'cancelled' => cancelled,
     // Tolerant on purpose. A rider standing in a stairwell holding somebody's
@@ -22,8 +30,23 @@ enum JobState {
     _ => claimed,
   };
 
-  bool get isLive => this == claimed || this == pickedUp;
+  bool get isLive =>
+      this == claimed ||
+      this == arrivedAtRestaurant ||
+      this == pickedUp ||
+      this == arrivedAtCustomer;
+
+  /// Collecting, as opposed to carrying. Which end of the ride the rider is at
+  /// decides the map pin, the phone number and the next button.
+  bool get isCollecting => this == claimed || this == arrivedAtRestaurant;
 }
+
+/// The single next move on a live job.
+///
+/// Derived from [JobState] rather than stored, so the card can never offer a
+/// button the database would refuse — and there is only ever one, because a
+/// screen read at a traffic light gets one decision.
+enum JobStep { rideToRestaurant, collect, rideToCustomer, handOver, done }
 
 /// A job on the board: an order that is cooked, or nearly, and unclaimed.
 ///
@@ -170,6 +193,8 @@ class Job {
     required this.payPerKm,
     required this.riderPay,
     required this.claimedAt,
+    required this.arrivedAtRestaurantAt,
+    required this.arrivedAtCustomerAt,
     required this.deliveredAt,
   });
 
@@ -193,10 +218,13 @@ class Job {
     payPerKm: (json['pay_per_km'] as num?)?.toDouble() ?? 0,
     riderPay: json['rider_pay'] as int? ?? 0,
     claimedAt: DateTime.parse(json['claimed_at'] as String).toLocal(),
-    deliveredAt: json['delivered_at'] == null
-        ? null
-        : DateTime.parse(json['delivered_at'] as String).toLocal(),
+    arrivedAtRestaurantAt: _at(json['arrived_at_restaurant_at']),
+    arrivedAtCustomerAt: _at(json['arrived_at_customer_at']),
+    deliveredAt: _at(json['delivered_at']),
   );
+
+  static DateTime? _at(Object? value) =>
+      value == null ? null : DateTime.parse(value as String).toLocal();
 
   final String orderId;
   final JobState state;
@@ -245,13 +273,31 @@ class Job {
   final int riderPay;
 
   final DateTime claimedAt;
+
+  /// When the rider said they were there. The kitchen's screen counts up from
+  /// [arrivedAtRestaurantAt] — "waiting 9 min" is only honest because this is a
+  /// recorded fact rather than an inference from the claim time.
+  final DateTime? arrivedAtRestaurantAt;
+  final DateTime? arrivedAtCustomerAt;
   final DateTime? deliveredAt;
 
   /// Whether the kitchen has finished. Until this is true there is no code to
   /// type, because there is nothing on the counter to hand over.
   bool get isReadyToCollect => orderStatus == 'ready_for_pickup';
 
-  bool get isCarrying => state == JobState.pickedUp;
+  /// Carrying, in the map sense: heading for the customer rather than the
+  /// kitchen. True from pickup onward, including while standing at the door.
+  bool get isCarrying =>
+      state == JobState.pickedUp || state == JobState.arrivedAtCustomer;
+
+  /// What this rider is expected to do next, which is exactly one thing.
+  JobStep get step => switch (state) {
+    JobState.claimed => JobStep.rideToRestaurant,
+    JobState.arrivedAtRestaurant => JobStep.collect,
+    JobState.pickedUp => JobStep.rideToCustomer,
+    JobState.arrivedAtCustomer => JobStep.handOver,
+    JobState.delivered || JobState.cancelled => JobStep.done,
+  };
 
   /// The sum, spelled out: "₹25 + 4.2 km × ₹5".
   ///

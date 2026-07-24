@@ -44,10 +44,10 @@ void main() {
     await tester.pumpWidget(_app(jobs: FakeJobsDataSource()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Available jobs'), findsOneWidget);
+    expect(find.text('Scanning for New Orders'), findsOneWidget);
 
     await _openEarnings(tester);
-    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('TODAY\'S EARNINGS'), findsOneWidget);
 
     await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
@@ -110,14 +110,14 @@ void main() {
     await tester.pumpWidget(_app(jobs: jobs));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Take this job'));
+    await tester.tap(find.text('Claim & Accept Job'));
     await tester.pumpAndSettle();
     await _openEarnings(tester);
 
     // Claimed, priced, and worth nothing yet — a rider who saw their total rise
     // at claim would have been paid for a delivery they might still fail.
     expect(find.text('₹0'), findsWidgets);
-    expect(find.textContaining('Nothing delivered yet'), findsOneWidget);
+    expect(find.textContaining('No completed deliveries yet'), findsOneWidget);
   });
 
   testWidgets('with no payouts yet, the section is absent rather than empty', (
@@ -132,7 +132,7 @@ void main() {
 
     // A first-week rider should not see a "Payouts" heading over nothing —
     // that reads as broken, not as not-yet.
-    expect(find.text('Payouts'), findsNothing);
+    expect(find.text('Weekly Payouts'), findsNothing);
   });
 
   testWidgets('a pending payout says what is owed and that it is on the way', (
@@ -145,9 +145,9 @@ void main() {
     await tester.pumpAndSettle();
     await _openEarnings(tester);
 
-    expect(find.text('Payouts'), findsOneWidget);
-    expect(find.text('₹132 on the way'), findsOneWidget);
-    expect(find.text('Being processed'), findsOneWidget);
+    expect(find.text('Weekly Payouts'), findsOneWidget);
+    expect(find.text('₹132 Processing'), findsOneWidget);
+    expect(find.text('Processing Payment'), findsOneWidget);
     // The week, collapsed to one month name.
     expect(find.text('13–19 Jul'), findsOneWidget);
     expect(find.text('3 deliveries'), findsOneWidget);
@@ -163,10 +163,10 @@ void main() {
     await tester.pumpAndSettle();
     await _openEarnings(tester);
 
-    expect(find.text('Paid'), findsOneWidget);
+    expect(find.text('Transfer Completed'), findsOneWidget);
     // The rider needs this to ask their bank about a payment that never landed.
-    expect(find.text('Ref UTR123456789'), findsOneWidget);
-    expect(find.textContaining('on the way'), findsNothing);
+    expect(find.textContaining('UTR123456789'), findsOneWidget);
+    expect(find.textContaining('Processing'), findsNothing);
   });
 
   testWidgets('a period spanning two months names both', (
@@ -201,17 +201,21 @@ void main() {
     await tester.pumpWidget(_app(jobs: jobs));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Take this job'));
+    // The whole run, end to end, through the five taps 0049 requires: claim,
+    // arrive, code, arrive, code. Money only moves on the last one.
+    await tester.tap(find.text('Claim & Accept Job'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Enter pickup code'));
+    await tester.tap(find.text('I\'ve Arrived at the Restaurant'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Enter Pickup Code'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, '5896');
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Confirm pickup'));
+    await tester.tap(find.text('I\'ve Arrived at the Customer'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Mark delivered'));
+    await tester.tap(find.text('Enter Delivery Code'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Delivered'));
+    await tester.enterText(find.byType(TextField).first, '4321');
     await tester.pumpAndSettle();
 
     await _openEarnings(tester);

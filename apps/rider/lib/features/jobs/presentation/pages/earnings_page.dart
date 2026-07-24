@@ -2,16 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_rider/core/widgets/rider_animations.dart';
+import 'package:zopiq_rider/core/widgets/rider_svg_icons.dart';
 import 'package:zopiq_rider/features/jobs/domain/entities/job.dart';
 import 'package:zopiq_rider/features/jobs/presentation/providers/jobs_providers.dart';
 
 /// What the work was worth.
-///
-/// Two numbers at the top because those are the two questions — today, and the
-/// week — and under them the jobs themselves, each showing the sum that
-/// produced its pay rather than only the result. A rider who can see "₹25 + 4.2
-/// km × ₹5" can tell you it is wrong. A rider who can only see "₹46" can only
-/// tell you it feels low, which is an argument nobody can win.
 class EarningsPage extends ConsumerWidget {
   const EarningsPage({super.key});
 
@@ -22,7 +18,10 @@ class EarningsPage extends ConsumerWidget {
     final AsyncValue<List<EarningsDay>> days = ref.watch(earningsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Earnings')),
+      appBar: AppBar(
+        title: const Text('Partner Earnings'),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: RefreshIndicator(
           color: context.zc.primary,
@@ -43,31 +42,57 @@ class EarningsPage extends ConsumerWidget {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),
                   children: <Widget>[
-                    _TotalsCard(summary: summary),
+                    RiderFadeSlide(child: _TotalsCard(summary: summary)),
                     const SizedBox(height: ZopiqSpacing.lg),
                     const _Payouts(),
                     Text(
-                      'Completed jobs',
+                      'Completed Orders History',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     const SizedBox(height: ZopiqSpacing.sm),
                     if (done.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: ZopiqSpacing.xl,
-                        ),
-                        child: Text(
-                          'Nothing delivered yet. Finished jobs show up here '
-                          'with what each one paid.',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: context.zc.textMuted),
-                          textAlign: TextAlign.center,
+                      RiderFadeSlide(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: ZopiqSpacing.xl,
+                          ),
+                          child: Column(
+                            children: <Widget>[
+                              RiderSvgIcon(
+                                type: RiderSvgType.receipt,
+                                size: 48,
+                                color: context.zc.textMuted,
+                              ),
+                              const SizedBox(height: ZopiqSpacing.sm),
+                              Text(
+                                'No completed deliveries yet.',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Delivered jobs will appear here along with itemized pay breakdowns.',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(color: context.zc.textMuted),
+                              ),
+                            ],
+                          ),
                         ),
                       )
                     else
-                      ...done.map((Job j) => _DoneJobCard(job: j)),
+                      ...done.asMap().entries.map(
+                            (MapEntry<int, Job> entry) => RiderFadeSlide(
+                              delay: Duration(milliseconds: entry.key * 50),
+                              child: _DoneJobCard(job: entry.value),
+                            ),
+                          ),
                   ],
                 ),
         ),
@@ -76,12 +101,6 @@ class EarningsPage extends ConsumerWidget {
   }
 }
 
-/// Where the money is, as opposed to how much of it there is.
-///
-/// Renders nothing at all until the first batch exists. A rider in their first
-/// week would otherwise get an empty "Payouts" heading, which reads as something
-/// broken rather than something that has not happened yet — the totals above
-/// already told them they have earned.
 class _Payouts extends ConsumerWidget {
   const _Payouts();
 
@@ -108,23 +127,30 @@ class _Payouts extends ConsumerWidget {
           children: <Widget>[
             Expanded(
               child: Text(
-                'Payouts',
-                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                'Weekly Payouts',
+                style: t.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
             if (owed > 0)
-              Text(
-                '₹$owed on the way',
-                style: t.bodySmall?.copyWith(
-                  color: zc.primary,
-                  fontWeight: FontWeight.w700,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: zc.primary.withValues(alpha: 0.12),
+                  borderRadius: ZopiqRadii.rPill,
+                ),
+                child: Text(
+                  '₹$owed Processing',
+                  style: t.labelSmall?.copyWith(
+                    color: zc.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
           ],
         ),
         const SizedBox(height: ZopiqSpacing.xs),
         Text(
-          'Paid every Monday for the week before.',
+          'Payouts are processed automatically every Monday.',
           style: t.bodySmall?.copyWith(color: zc.textMuted),
         ),
         const SizedBox(height: ZopiqSpacing.sm),
@@ -145,7 +171,6 @@ class _PayoutCard extends StatelessWidget {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
-  /// "13–19 Jul", collapsing the month when both ends share one.
   String get _period {
     final DateTime a = payout.periodStart;
     final DateTime b = payout.periodEnd;
@@ -158,6 +183,7 @@ class _PayoutCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
+    final Color surfaceColor = Theme.of(context).colorScheme.surface;
     final TextTheme t = Theme.of(context).textTheme;
 
     return Padding(
@@ -171,11 +197,11 @@ class _PayoutCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     _period,
-                    style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    style: t.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
-                Text(
-                  '₹${payout.amount}',
+                ZopiqAnimatedAmount(
+                  amount: payout.amount,
                   style: t.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: payout.isPaid ? zc.textStrong : zc.primary,
@@ -186,38 +212,45 @@ class _PayoutCard extends StatelessWidget {
             const SizedBox(height: ZopiqSpacing.xs),
             Row(
               children: <Widget>[
-                Icon(
-                  payout.isPaid
-                      ? Icons.check_circle_rounded
-                      : Icons.schedule_rounded,
+                RiderSvgIcon(
+                  type: RiderSvgType.verifiedShield,
                   size: 16,
-                  color: payout.isPaid ? zc.veg : zc.textMuted,
+                  color: payout.isPaid ? zc.veg : zc.primary,
                 ),
                 const SizedBox(width: ZopiqSpacing.xs),
                 Expanded(
                   child: Text(
-                    payout.isPaid ? 'Paid' : 'Being processed',
+                    payout.isPaid ? 'Transfer Completed' : 'Processing Payment',
                     style: t.bodySmall?.copyWith(
-                      color: payout.isPaid ? zc.veg : zc.textMuted,
+                      color: payout.isPaid ? zc.veg : zc.primary,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
                 Text(
                   payout.deliveryCount == 1
-                      ? '1 delivery'
-                      : '${payout.deliveryCount} deliveries',
+                      ? '1 run'
+                      : '${payout.deliveryCount} runs',
                   style: t.bodySmall?.copyWith(color: zc.textMuted),
                 ),
               ],
             ),
-            // The bank reference, once there is one. Shown rather than kept for
-            // ops: a rider whose bank says nothing arrived needs the number to
-            // ask about, and having to request it costs them a day.
             if (payout.reference != null) ...<Widget>[
               const SizedBox(height: ZopiqSpacing.xs),
-              Text(
-                'Ref ${payout.reference}',
-                style: t.bodySmall?.copyWith(color: zc.textMuted),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: surfaceColor,
+                  borderRadius: ZopiqRadii.rSm,
+                  border: Border.all(color: zc.divider),
+                ),
+                child: Text(
+                  'Bank Ref (UTR): ${payout.reference}',
+                  style: t.labelSmall?.copyWith(
+                    color: zc.textMuted,
+                    letterSpacing: 0.5,
+                  ),
+                ),
               ),
             ],
           ],
@@ -234,29 +267,50 @@ class _TotalsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ZopiqCard(
+    final ZopiqColors zc = context.zc;
+
+    return Container(
+      padding: const EdgeInsets.all(ZopiqSpacing.lg),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: <Color>[
+            zc.primary,
+            zc.primary.withValues(alpha: 0.8),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: ZopiqRadii.rLg,
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: zc.primary.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
       child: Row(
         children: <Widget>[
           Expanded(
-            child: _Total(
-              label: 'Today',
+            child: _TotalBlock(
+              label: 'TODAY\'S EARNINGS',
               amount: summary.todayPay,
               jobs: summary.todayJobs,
-              emphasis: true,
+              isLight: true,
             ),
           ),
           Container(
             width: 1,
-            height: 52,
-            color: context.zc.divider,
+            height: 54,
+            color: Colors.white.withValues(alpha: 0.25),
             margin: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.md),
           ),
           Expanded(
-            child: _Total(
-              label: 'Last 7 days',
+            child: _TotalBlock(
+              label: 'LAST 7 DAYS',
               amount: summary.weekPay,
               jobs: summary.weekJobs,
-              emphasis: false,
+              isLight: true,
             ),
           ),
         ],
@@ -265,38 +319,48 @@ class _TotalsCard extends StatelessWidget {
   }
 }
 
-class _Total extends StatelessWidget {
-  const _Total({
+class _TotalBlock extends StatelessWidget {
+  const _TotalBlock({
     required this.label,
     required this.amount,
     required this.jobs,
-    required this.emphasis,
+    required this.isLight,
   });
 
   final String label;
   final int amount;
   final int jobs;
-  final bool emphasis;
+  final bool isLight;
 
   @override
   Widget build(BuildContext context) {
-    final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
+    final Color textColor = isLight ? Colors.white : Colors.black;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(label, style: t.labelMedium?.copyWith(color: zc.textMuted)),
-        const SizedBox(height: ZopiqSpacing.xs),
         Text(
-          '₹$amount',
+          label,
+          style: t.labelSmall?.copyWith(
+            color: textColor.withValues(alpha: 0.8),
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: ZopiqSpacing.xs),
+        ZopiqAnimatedAmount(
+          amount: amount,
           style: t.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: emphasis ? zc.primary : zc.textStrong,
+            fontWeight: FontWeight.w900,
+            color: textColor,
           ),
         ),
         Text(
           jobs == 1 ? '1 delivery' : '$jobs deliveries',
-          style: t.bodySmall?.copyWith(color: zc.textMuted),
+          style: t.bodySmall?.copyWith(
+            color: textColor.withValues(alpha: 0.85),
+          ),
         ),
       ],
     );
@@ -311,6 +375,7 @@ class _DoneJobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
+    final Color surfaceColor = Theme.of(context).colorScheme.surface;
     final TextTheme t = Theme.of(context).textTheme;
 
     return Padding(
@@ -325,11 +390,11 @@ class _DoneJobCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     job.restaurantName,
-                    style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    style: t.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
-                Text(
-                  '₹${job.riderPay}',
+                ZopiqAnimatedAmount(
+                  amount: job.riderPay,
                   style: t.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: zc.primary,
@@ -345,10 +410,20 @@ class _DoneJobCard extends StatelessWidget {
               style: t.bodySmall?.copyWith(color: zc.textMuted),
             ),
             const SizedBox(height: ZopiqSpacing.xs),
-            // The arithmetic, in full. This is the line the screen exists for.
-            Text(
-              job.payExplained,
-              style: t.bodySmall?.copyWith(color: zc.textMuted),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: surfaceColor,
+                borderRadius: ZopiqRadii.rSm,
+                border: Border.all(color: zc.divider.withValues(alpha: 0.5)),
+              ),
+              child: Text(
+                job.payExplained,
+                style: t.labelSmall?.copyWith(
+                  color: zc.textMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ],
         ),

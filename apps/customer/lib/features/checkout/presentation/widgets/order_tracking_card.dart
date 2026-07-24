@@ -165,7 +165,11 @@ class _Rider extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.only(top: ZopiqSpacing.lg),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _DeliveryCode(orderId: orderId, isAtDoor: rider.isAtDoor),
+          Row(
         children: <Widget>[
           Container(
             width: 36,
@@ -192,8 +196,13 @@ class _Rider extends ConsumerWidget {
                   style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 Text(
-                  _vehicleLabel(rider.vehicle),
-                  style: t.bodySmall?.copyWith(color: zc.textMuted),
+                  rider.isAtDoor
+                      ? 'Waiting outside'
+                      : _vehicleLabel(rider.vehicle),
+                  style: t.bodySmall?.copyWith(
+                    color: rider.isAtDoor ? zc.primary : zc.textMuted,
+                    fontWeight: rider.isAtDoor ? FontWeight.w700 : null,
+                  ),
                 ),
               ],
             ),
@@ -208,6 +217,74 @@ class _Rider extends ConsumerWidget {
               fontWeight: FontWeight.w600,
               fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
             ),
+          ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The four digits the rider needs before the order can be marked delivered.
+///
+/// Two sizes, one fact. While the rider is still riding it is a quiet line —
+/// present so nobody is hunting for it when the doorbell goes. Once they say
+/// they are outside it becomes the loudest thing on the screen, because that is
+/// the ten seconds it exists for.
+///
+/// Absent, not empty, when there is no code: a panel reading "—" over a missing
+/// number looks broken, and there is nothing the customer could do about it.
+class _DeliveryCode extends ConsumerWidget {
+  const _DeliveryCode({required this.orderId, required this.isAtDoor});
+
+  final String orderId;
+  final bool isAtDoor;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final String? code = ref.watch(deliveryCodeProvider(orderId)).valueOrNull;
+    if (code == null) return const SizedBox.shrink();
+
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: ZopiqSpacing.md),
+      padding: const EdgeInsets.all(ZopiqSpacing.md),
+      decoration: BoxDecoration(
+        color: zc.primary.withValues(alpha: isAtDoor ? 0.12 : 0.06),
+        borderRadius: ZopiqRadii.rMd,
+        border: Border.all(
+          color: zc.primary.withValues(alpha: isAtDoor ? 0.4 : 0.15),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            isAtDoor
+                ? 'Your rider is here — share this code'
+                : 'Delivery code',
+            style: t.labelMedium?.copyWith(
+              color: zc.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: ZopiqSpacing.xs),
+          Text(
+            code,
+            style: (isAtDoor ? t.headlineMedium : t.titleLarge)?.copyWith(
+              fontWeight: FontWeight.w900,
+              letterSpacing: 8,
+              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Only share it once the food is in your hands.',
+            style: t.bodySmall?.copyWith(color: zc.textMuted),
           ),
         ],
       ),

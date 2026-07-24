@@ -184,7 +184,7 @@ class OrderSupabaseDataSource implements OrderDataSource {
     // would have to be told not to trust.
     final Map<String, dynamic>? row = await _db
         .from('deliveries')
-        .select('delivery_partners(name, phone, vehicle)')
+        .select('state, delivery_partners(name, phone, vehicle)')
         .eq('order_id', orderId)
         .maybeSingle();
 
@@ -196,7 +196,29 @@ class OrderSupabaseDataSource implements OrderDataSource {
       name: partner['name'] as String,
       phone: partner['phone'] as String,
       vehicle: partner['vehicle'] as String,
+      isAtDoor: row!['state'] == 'arrived_at_customer',
     );
+  }
+
+  /// The four digits the customer reads out at the door (0049).
+  ///
+  /// An RPC, unlike everything else on this screen, because the code is the one
+  /// thing here that must not be a column: the rider holds a select policy on
+  /// their own delivery row, so a code stored there would be a code they could
+  /// look up instead of being told. `order_delivery_code` answers the order's
+  /// own customer and nobody else, and only while it is out for delivery.
+  @override
+  Future<String?> fetchDeliveryCode(String orderId) async {
+    try {
+      return await _db.rpc<String>(
+        'order_delivery_code',
+        params: <String, dynamic>{'p_order_id': orderId},
+      );
+    } on PostgrestException {
+      // Not out for delivery yet, or no longer. Not an error the customer needs
+      // to see — the code simply is not on screen.
+      return null;
+    }
   }
 
   CustomerOrder _orderFrom(Map<String, dynamic> row) {

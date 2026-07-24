@@ -84,6 +84,9 @@ class OrderMockDataSource implements OrderDataSource {
   Future<OrderRider?> fetchRider(String orderId) async => null;
 
   @override
+  Future<String?> fetchDeliveryCode(String orderId) async => null;
+
+  @override
   Future<AppliedCoupon> applyCoupon({
     required String code,
     required int subtotal,
