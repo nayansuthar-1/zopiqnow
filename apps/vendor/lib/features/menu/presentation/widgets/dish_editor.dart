@@ -5,6 +5,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_vendor/core/images/photo_field.dart';
 import 'package:zopiq_vendor/features/menu/domain/entities/vendor_dish.dart';
+import 'package:zopiq_vendor/features/menu/presentation/pages/dish_customization_page.dart';
 import 'package:zopiq_vendor/features/menu/presentation/providers/menu_providers.dart';
 
 /// Opens the add / edit sheet. Pass a [dish] to edit it, or nothing to add one.
@@ -297,6 +298,25 @@ class _DishEditorState extends ConsumerState<_DishEditor> {
                 ),
               ),
             ),
+
+            // Variants & add-ons live behind their own screen — a dish must be
+            // saved (have an id) before options can attach to it, so this shows
+            // only when editing, never while adding.
+            if (_isEditing) ...<Widget>[
+              const SizedBox(height: ZopiqSpacing.xs),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.tune_rounded),
+                title: const Text('Customisation'),
+                subtitle: const Text('Variants (Half/Full) and add-ons'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => DishCustomizationPage(dish: _original!),
+                  ),
+                ),
+              ),
+            ],
 
             if (_error != null) ...<Widget>[
               const SizedBox(height: ZopiqSpacing.md),
