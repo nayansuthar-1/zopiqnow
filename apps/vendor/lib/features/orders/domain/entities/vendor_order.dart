@@ -61,28 +61,42 @@ enum OrderStatus {
   /// The one status the kitchen can move this order to by pressing the big
   /// button, or null when there is nothing left to press.
   ///
-  /// This mirrors `set_order_status` in migration 0014, and mirroring it is the
+  /// This mirrors `set_order_status` in migration 0050, and mirroring it is the
   /// point: the button offers what the database will accept. If they ever
   /// disagree the database wins — it raises, and the ticket says so — but a
   /// button that is *usually* refused is a button nobody trusts.
+  ///
+  /// The ladder **stops at [readyForPickup]**. Once the food is packed the
+  /// order is the rider's to carry: `out_for_delivery` and `delivered` are
+  /// reached only through `confirm_pickup` and `confirm_delivered`, each of
+  /// which demands the rider be present with the right four digits. A "Hand to
+  /// rider" or "Mark delivered" button here would be a way to complete a
+  /// delivery that never happened — the exact hole 0050 closed — so there is no
+  /// button, and the vendor watches the rider's progress instead of faking it.
   OrderStatus? get next => switch (this) {
     placed => accepted,
     accepted => preparing,
     preparing => readyForPickup,
-    readyForPickup => outForDelivery,
-    outForDelivery => delivered,
-    delivered || cancelled || rejected => null,
+    readyForPickup ||
+    outForDelivery ||
+    delivered ||
+    cancelled ||
+    rejected => null,
   };
 
   /// What the button *says*. "Accept" and "Start preparing" are imperatives; the
-  /// status they produce is not the word a cook would use.
+  /// status they produce is not the word a cook would use. Null past
+  /// [preparing]: see [next] — the handover and the completion belong to the
+  /// rider, not to a tap on this screen.
   String? get nextAction => switch (this) {
     placed => 'Accept order',
     accepted => 'Start preparing',
     preparing => 'Mark ready',
-    readyForPickup => 'Hand to rider',
-    outForDelivery => 'Mark delivered',
-    delivered || cancelled || rejected => null,
+    readyForPickup ||
+    outForDelivery ||
+    delivered ||
+    cancelled ||
+    rejected => null,
   };
 
   /// Cancellable once accepted and up to the moment the food leaves. A *new*

@@ -137,6 +137,13 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
                 case final OrderDelivery delivery) ...<Widget>[
               const SizedBox(height: ZopiqSpacing.md),
               _RiderStrip(delivery: delivery, orderStatus: order.status),
+            ] else if (order.status == OrderStatus.readyForPickup) ...<Widget>[
+              // Packed, but no rider has claimed it yet. The kitchen owns nothing
+              // here but the wait — the handover is a code it reads to a rider who
+              // is not here yet — so the ticket says so rather than showing a dead
+              // button. (Since 0050 there is no "Hand to rider" tap to fake it.)
+              const SizedBox(height: ZopiqSpacing.md),
+              const _WaitingForRider(),
             ],
 
             if (_refusal != null) ...<Widget>[
@@ -182,6 +189,48 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A packed order still on the counter, waiting for a rider to claim it. The
+/// kitchen's part is done and its next move — reading the pickup code aloud —
+/// only exists once a rider is standing there, so the ticket shows the wait
+/// rather than an action.
+class _WaitingForRider extends StatelessWidget {
+  const _WaitingForRider();
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(ZopiqSpacing.md),
+      decoration: BoxDecoration(
+        color: zc.textMuted.withValues(alpha: 0.06),
+        borderRadius: ZopiqRadii.rMd,
+        border: Border.all(color: zc.divider.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: <Widget>[
+          VendorSvgIcon(
+            type: VendorSvgType.riderPickup,
+            size: 24,
+            color: zc.textMuted,
+          ),
+          const SizedBox(width: ZopiqSpacing.md),
+          Expanded(
+            child: Text(
+              'Packed — waiting for a rider to accept',
+              style: t.bodyMedium?.copyWith(
+                color: zc.textMuted,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
