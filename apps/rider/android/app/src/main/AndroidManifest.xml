@@ -10,6 +10,10 @@
          nobody had run its release build on a real phone until now. -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Android 13+ makes notifications an opt-in the user must grant. Without
+         this the rider is never asked, and a new-job push is silent. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     <application
         android:label="zopiq_rider"
         android:name="${applicationName}"
@@ -36,6 +40,13 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- The channel a background FCM notification lands on when the payload
+             names none. Must match the channel PushService creates in Dart
+             (`jobs`), or Android 8+ drops the notification silently. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="jobs" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -11,6 +11,7 @@ import 'package:zopiqnow/core/storage/key_value_store.dart';
 import 'package:zopiqnow/core/storage/secure_store.dart';
 import 'package:zopiqnow/core/storage/storage_providers.dart';
 import 'package:zopiqnow/core/storage/supabase_secure_local_storage.dart';
+import 'package:zopiqnow/features/notifications/push_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,6 +47,10 @@ Future<void> main() async {
       localStorage: SupabaseSecureLocalStorage(secureStore),
     ),
   );
+
+  // Wire push after Supabase is up so a token can register against the restored
+  // session. Guarded internally: no Firebase config means a no-op, app runs on.
+  await PushService.start();
 
   runApp(
     ProviderScope(

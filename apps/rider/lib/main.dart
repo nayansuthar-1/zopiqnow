@@ -8,6 +8,7 @@ import 'package:zopiq_rider/app/env.dart';
 import 'package:zopiq_rider/app/rider_app.dart';
 import 'package:zopiq_rider/core/storage/secure_store.dart';
 import 'package:zopiq_rider/core/storage/supabase_secure_local_storage.dart';
+import 'package:zopiq_rider/features/notifications/push_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +29,10 @@ Future<void> main() async {
       localStorage: SupabaseSecureLocalStorage(secureStore),
     ),
   );
+
+  // Wire push after Supabase is up so a token can register against the restored
+  // session. Guarded internally: no Firebase config means a no-op, app runs on.
+  await PushService.start();
 
   runApp(const ProviderScope(child: RiderApp()));
 }

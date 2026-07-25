@@ -82,6 +82,16 @@ dependencies:
   # 24, so Rule 1 is unaffected.
   google_sign_in: 7.2.0
 
+  # --- Push notifications (B0, 2026-07-25) ------------------------------------
+  # The same three packages the vendor app already pins, at the versions the root
+  # lockfile already froze — **not one new version** (Rule 3). FCM carries the
+  # wake; `flutter_local_notifications` draws a foreground message Android would
+  # otherwise swallow. Push is guarded end-to-end in `PushService.start`, so a
+  # build with no `google-services.json` still runs — push is simply inert.
+  firebase_core: 3.8.1
+  firebase_messaging: 15.1.6
+  flutter_local_notifications: 18.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

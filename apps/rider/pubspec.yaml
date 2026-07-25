@@ -55,6 +55,16 @@ dependencies:
   # exact drift the freeze exists to catch.
   url_launcher: 6.3.2
 
+  # --- Push notifications (B0, 2026-07-25) ------------------------------------
+  # The one thing the rider pubspec's original note said was "absent... belongs
+  # to a later slice" — this is that slice. The same three packages the vendor
+  # already pins, at the versions the root lockfile already froze: **not one new
+  # version** (Rule 3). Push is guarded end-to-end in `PushService.start`, so a
+  # build with no `google-services.json` still runs — push is simply inert.
+  firebase_core: 3.8.1
+  firebase_messaging: 15.1.6
+  flutter_local_notifications: 18.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
