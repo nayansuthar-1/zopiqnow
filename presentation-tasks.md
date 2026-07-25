@@ -34,7 +34,7 @@ Worth stating up front so nothing below gets rebuilt.
 Pinned versions this work has to live inside: Flutter **3.44.5**, Dart SDK `^3.12.2`,
 `compileSdk 36`, `targetSdk 35`, `minSdk 24`, iOS deployment target **13.0**,
 `firebase_messaging 15.1.6`, `flutter_local_notifications 18.0.1`. Next free migration
-is **0052**.
+is **0053** (0052 is the live order card).
 
 ---
 
@@ -71,26 +71,43 @@ discovering on a device.
 
 ### The three-tier plan
 
-- [ ] **Tier 1 — the card itself. Android 10 → latest, no new dependency, ship this first**
-  - One persistent notification per live order, updated in place by reusing the same
-    notification id
-  - `showProgress: true` with `maxProgress: 100`, driven by the status ladder:
-    `accepted` 15 → `preparing` 35 → `ready_for_pickup` 55 →
-    `out_for_delivery` 75 → `arrived_at_customer` 95 → `delivered` cancel
-  - `largeIcon` — the art on the right of the screenshot. A per-state illustration
-    (cooking / rider / at-the-door), bundled as an asset so it needs no network fetch
-    at notification time
-  - Headline per state: "Restaurant is preparing your order", "Delivery partner is at
-    the restaurant", "Your rider is outside"
-  - `subText` carries "Arriving in N mins" from `orders.eta_minutes` — the orange line
-    at the top of the reference
-  - `ongoing: true`, `onlyAlertOnce: true` (silent after the first), dedicated
-    `order_live` channel at `IMPORTANCE_DEFAULT` so six status changes are not six buzzes
-  - `colorized: true` with the Swiggy-orange brand token, per [[zopiqnow-swiggy-design]]
-  - `setContentIntent` → deep link to `/orders/:id`
-  - Cancel on `delivered` / `cancelled` / `rejected`
-  - **Verified available in the pinned `flutter_local_notifications 18.0.1`** — every
-    field above exists on `AndroidNotificationDetails` today
+- [x] **Tier 1 — the card itself. Android 10 → latest, no new dependency** — *built
+      2026-07-25. Migration 0052, `send-notification`, `order_live_card.dart`. Not yet
+      run on a device: see the manual steps below.*
+  - [x] One persistent notification per live order, updated in place by reusing the same
+    notification id — FNV-1a over the order id, because the card is drawn in the FCM
+    background isolate as often as the app's own and `String.hashCode` promises nothing
+    across that boundary
+  - [x] `showProgress: true` with `maxProgress: 100`. **The ladder is computed from
+    `orders.status` and `deliveries.state` together, not from whichever moved last** —
+    a rider reaches the counter (65) before the kitchen packs the bag (55), so a bar
+    driven by one table alone walks backwards on screen. `order_live_payload` takes the
+    furthest point either has reached. Verified against a real order:
+    20 → 35 → 65 → 75 → 95 → 100, with the out-of-order `ready_for_pickup` correctly
+    *not* moving it back
+  - [~] `largeIcon` — **the launcher mark, not per-state art.** There is no cooking /
+    rider / at-the-door illustration in the repo and inventing brand art is not this
+    task's job. It also cannot be a Flutter asset: `largeIcon` needs an Android
+    *drawable*, so the art must land in `android/app/src/main/res/drawable/`. Dropping
+    three files there and switching on `stage` is the whole remaining change
+  - [x] Headline per state, from `order_live_payload`: "Preparing your order",
+    "Delivery partner is at the restaurant", "Your delivery partner is outside"
+  - [x] `subText` carries "Arriving in N min" — but counted down against a fixed
+    `eta_at` the server sends, **not** a minutes-remaining number computed when the push
+    was built. A deadline that never moves is what makes Rule 3 structural rather than
+    hoped for
+  - [x] `ongoing: true`, `onlyAlertOnce: true`, dedicated `order_live` channel at
+    `IMPORTANCE_DEFAULT` with sound and vibration off **on the channel itself**, so it
+    reads as the silent tracker it is in system settings
+  - [x] `colorized: true` with the Swiggy-orange brand token, per [[zopiqnow-swiggy-design]]
+  - [x] Tap → `/orders/:id`. `PushService` parks the order id and `ZopiqApp` drains it,
+    which is what makes a tap that woke the app *from dead* still land on the tracking
+    screen. Ordinary alerting pushes got the same treatment — they had no tap
+    destination before today
+  - [x] Cancel on `delivered` / `cancelled` / `rejected` — the terminal stages post a
+    tick of their own so there is always an event that takes the card down
+  - [x] **Verified available in the pinned `flutter_local_notifications 18.0.1`** — no
+    new dependency, no `targetSdk` bump, no version-freeze collision
 
 - [ ] **Tier 2 — Android 16 Live Updates (`Notification.ProgressStyle`)** ⚠️ *refinement, not the feature*
   - Adds three things over Tier 1: the **status-bar chip** while the phone is in use,
@@ -125,19 +142,52 @@ discovering on a device.
 
 ### Server-side work, common to all three tiers
 
-- [ ] **Migration 0052 — narrate the states the customer currently isn't told about.**
-      `notify_customer_order_update` (0047) deliberately **skips** `preparing` and
-      `ready_for_pickup` as "kitchen mechanics". A live tracker needs exactly those. Add
-      a `kind = 'order_live'` row for every step so the device has an event to redraw on,
-      and keep the existing `order_update` rows as the ones that actually buzz — one
-      noisy channel and one silent one, or the customer gets six alerts per order
-- [ ] Rider arrival events (`arrived_at_restaurant`, `arrived_at_customer`) fire nothing
-      to the customer today. 0049 records them; nothing tells the phone. "Delivery
-      partner is at the restaurant" — the second screenshot — is exactly this row
-- [ ] Payload carries `order_id`, `status`, `eta_minutes`, `progress` so the device
-      redraws without a round trip
-- [ ] `send-notification` routes `order_live` to a data-only push (`content-available`),
-      not an alerting one
+- [x] **Migration 0052 — narrate the states the customer currently isn't told about.**
+      Done. `order_live` is a second, silent stream over the same table: a row per step
+      including the two 0047 skips, stamped `read_at` at insert so it can never reach
+      the unread badge, and filtered out of the inbox list as well. The five
+      `order_update` rows still buzz, exactly as before — one noisy channel, one silent
+- [x] Rider arrival events (`arrived_at_restaurant`, `arrived_at_customer`) now fire.
+      A trigger on `deliveries.state`, so it does not care which RPC moved the row
+- [x] Payload carries `order_id`, `stage`, `progress`, `eta_at`, `title`, `body` so the
+      device redraws without a round trip. **Not `orders.status`** — it reads
+      "preparing" while the rider is at the counter, and a second field that disagrees
+      with the first is one somebody eventually believes
+- [x] `send-notification` routes `order_live` to a data-only push — no `notification`
+      block, which is what stops Android drawing a tray entry beside the card.
+      Verified: FCM accepted and delivered one (`{"devices":1,"sent":1}`)
+- [x] **The writer refuses to repeat itself.** Because progress is the furthest point
+      either ladder reached, an event can leave the card byte-identical — the kitchen
+      packing a bag after the rider already arrived is the ordinary case. Sending it
+      would wake every device to redraw nothing, so the previous tick is compared and a
+      duplicate dropped. This cut the walk-through from 7 pushes to 6
+
+### Verifying Tier 1 on a device ([[zopiqnow-no-test-files]] — manual, by hand)
+
+What is already proven, server-side, without a phone: the ladder is monotonic across an
+out-of-order arrival, the duplicate tick is dropped, a cancellation posts a terminal
+tick, `order_live` rows never reach the unread badge, and FCM accepts and delivers the
+data-only push. What is **not** proven is anything that happens on Android.
+
+1. `flutter run` the customer app on a real device, signed in, and confirm a token
+   registers (`select * from device_tokens where audience='customer'`).
+2. Place an order. Walk it through the vendor and rider apps: accept → start cooking →
+   rider claims → **rider taps "I've arrived" before the kitchen marks it packed** (this
+   is the case the ladder exists for) → packed → pickup → arrived → delivered.
+3. Watch for, at each step: **one** card, not a stack; the bar moving forward and never
+   back; no sound or vibration after the first `order_update` buzz; "Arriving in N min"
+   counting down.
+4. **Lock the phone and repeat from step 2.** The card is drawn in the FCM background
+   isolate — this is the path that actually matters and the only one the emulator lies
+   about.
+5. Tap the card. It must open `/orders/<id>` and **not** dismiss itself.
+6. On `delivered`, the card must vanish. Repeat for a customer cancellation.
+7. Repeat the whole thing on the **Android 10 floor** ([[zopiqnow-android-compat]]).
+
+Known ceiling, worth confirming rather than discovering later: a data-only push reaches a
+dozing phone at high priority but Android may still hold it, and a **force-stopped** app
+receives nothing at all until it is next opened. That is the same for every sender and
+nothing in this slice can raise it — it is the honest floor below Android 16.
 
 ### Rules for this slice
 
@@ -162,7 +212,7 @@ supplied"* — so this was always the plan.
 There is **no banner, promo, hero, or campaign table** anywhere in `supabase/migrations/`.
 This is greenfield.
 
-- [ ] **Migration 0052/0053 — `hero_slides`**
+- [ ] **Migration 0053 — `hero_slides`**
   - `id`, `title`, `subtitle`, `cta_label`, `cta_target` (deep link or restaurant id),
     `image_url`, `sort_order`, `is_active`, `starts_at`, `ends_at`, `created_at`
   - **RLS:** public `select` for `anon` + `authenticated` where
@@ -307,7 +357,7 @@ the decisions.
 | # | Task | Effort | Blocked on |
 |---|---|---|---|
 | 1 | **P3** Android high refresh rate | hours | nothing |
-| 2 | **P1 Tier 1** the live order card | days | nothing |
+| ~~2~~ | ~~**P1 Tier 1** the live order card~~ | **✅ built 2026-07-25** | needs a device pass |
 | 3 | **P2** admin hero CRUD | days | nothing |
 | 4 | **P4** hero motion loop | days | P2 + the WebP/video decision |
 | 5 | **P1 Tier 2** Android 16 chip + segments | days | ⚠️ targetSdk 36 |

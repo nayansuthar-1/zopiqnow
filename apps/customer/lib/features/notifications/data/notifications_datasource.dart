@@ -35,6 +35,13 @@ class CustomerNotificationsSupabaseDataSource
         .order('created_at', ascending: false)
         .map(
           (List<Map<String, dynamic>> rows) => rows
+              // `order_live` rows (0052) are transport, not correspondence:
+              // they exist to move the progress bar on the lock-screen card and
+              // there are up to eight per order. Filtered here rather than in
+              // the query because a Realtime stream takes one filter and it is
+              // already spent on the user id. They arrive already-read, so they
+              // never reach the unread badge either way.
+              .where((Map<String, dynamic> r) => r['kind'] != 'order_live')
               .map(CustomerNotification.fromJson)
               .toList(growable: false),
         );

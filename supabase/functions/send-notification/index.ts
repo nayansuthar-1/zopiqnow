@@ -34,7 +34,17 @@ interface NotificationRecord {
   title: string;
   body: string | null;
   order_id: string | null;
+  // The live card's numbers (migration 0052). Null on every other kind.
+  data: Record<string, unknown> | null;
 }
+
+// The silent kind. An `order_live` row is not correspondence — it is a tick that
+// moves a progress bar on a notification the device is already drawing, so it
+// goes out as a *data-only* message: no `notification` block, which is what
+// stops Android from posting a tray entry of its own beside the card. The app's
+// background handler receives it and redraws. Everything else keeps the
+// alerting shape 0047 shipped.
+const SILENT_KINDS = new Set(["order_live"]);
 
 interface WebhookPayload {
   type: "INSERT" | "UPDATE" | "DELETE";
@@ -192,8 +202,35 @@ Deno.serve(async (req) => {
     `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
 
   // The data payload the app reads on tap. Only order_id when there is one.
+  // FCM data values must be strings, so the row's jsonb is flattened one level —
+  // numbers become their decimal text and the device parses them back.
   const data: Record<string, string> = { kind: n.kind };
   if (n.order_id) data.order_id = n.order_id;
+  if (n.data) {
+    for (const [key, value] of Object.entries(n.data)) {
+      if (value !== null && value !== undefined) data[key] = String(value);
+    }
+  }
+
+  const silent = SILENT_KINDS.has(n.kind);
+
+  // A data-only message is delivered to a sleeping app only at high priority,
+  // and even then Android may hold it if the app is dozing. That is the honest
+  // ceiling of the live card below Android 16 and it is the same for every
+  // sender — nothing here can raise it.
+  const message: Record<string, unknown> = silent
+    ? {
+      android: { priority: "high" },
+      data,
+    }
+    : {
+      notification: { title: n.title, body: n.body ?? "" },
+      android: {
+        priority: "high",
+        notification: { channel_id: CHANNEL[n.audience] },
+      },
+      data,
+    };
 
   let sent = 0;
   for (const { token } of tokens) {
@@ -203,17 +240,7 @@ Deno.serve(async (req) => {
         "Authorization": `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        message: {
-          token,
-          notification: { title: n.title, body: n.body ?? "" },
-          android: {
-            priority: "high",
-            notification: { channel_id: CHANNEL[n.audience] },
-          },
-          data,
-        },
-      }),
+      body: JSON.stringify({ message: { token, ...message } }),
     });
 
     if (res.ok) {
