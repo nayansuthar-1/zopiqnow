@@ -37,6 +37,13 @@ dependencies:
   zopiq_ui:
     path: ../../packages/zopiq_ui
 
+  # The live order card, drawn natively (P1 Tier 2). In-repo and Android-only;
+  # adds no pub dependency and nothing to the lockfile. A package rather than
+  # Kotlin in `android/app` because the card is drawn from the FCM background
+  # isolate, and only real plugins reach that engine — see its pubspec.
+  zopiq_live_card:
+    path: ../../packages/zopiq_live_card
+
   # State management + DI (SAD 7.2 / 7.3).
   flutter_riverpod: 2.6.1
 

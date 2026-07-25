@@ -1,0 +1,36 @@
+name: zopiq_live_card
+description: "The live order card, drawn natively on Android: a segmented delivery tracker on every version, and Android 16's promoted Live Update where the OS offers it."
+version: 0.1.0
+publish_to: "none"
+
+# Part of the workspace: shares the root lockfile.
+resolution: workspace
+
+environment:
+  sdk: ^3.12.2
+  flutter: ">=3.44.5"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: 6.0.0
+
+# A federated-in-name-only plugin: Android is the only platform that has a
+# notification worth drawing this way. There is no iOS implementation and there
+# is deliberately no stub for one — iOS is Tier 3 (ActivityKit), a different
+# feature wearing the same screenshot.
+#
+# **Why this is a package and not Kotlin in `apps/customer/android/app`.** The
+# card is drawn from the FCM background isolate, which runs in a `FlutterEngine`
+# the messaging plugin creates itself and populates from
+# `GeneratedPluginRegistrant`. Only real plugin packages land in that file, so
+# only a real plugin package can answer a method channel with the app killed —
+# which is the entire situation the live card exists for.
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.siteonlab.zopiq_live_card
+        pluginClass: ZopiqLiveCardPlugin

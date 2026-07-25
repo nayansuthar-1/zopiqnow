@@ -1,0 +1,13 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Android 16's promoted-ongoing ("Live Update") treatment: the status-bar
+         chip and the guaranteed slot at the top of the lock screen. A normal
+         manifest permission, not a runtime prompt — the OS reads it as a
+         declaration of intent and still applies its own eligibility rules.
+
+         Declared here rather than in the app manifest because it is this
+         module's requirement; the manifest merger folds it in. It is inert on
+         every Android below 16. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
+
+</manifest>

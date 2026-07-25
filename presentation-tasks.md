@@ -54,15 +54,18 @@ Verified in the pinned package — `flutter_local_notifications 18.0.1` exposes
 
 | Tier | What it adds over the one below | Availability | Reachable today? |
 |---|---|---|---|
-| **Android, any version** | The screenshot: headline, progress bar, large icon, persistent, on the lock screen | API 24+ | ✅ **today, no dependency** |
-| **Android 16 Live Updates** | The status-bar **chip** while the phone is in use · guaranteed *promoted* placement at the top of the lock screen and AOD · `ProgressStyle` **segments and milestone points** (the tracker with a moving marker, not a plain bar) | API 36 · **requires `targetSdk 36`** | ❌ targetSdk is **35** |
+| **Android, any version** | The screenshot: headline, progress bar, large icon, persistent, on the lock screen | API 24+ | ✅ **built (Tier 1)** |
+| **Segmented tracker, any version** | **Segments and milestone points** — the tracker with a moving marker, not a plain bar — painted onto a `Canvas` and used as the notification body | API 24+ | ✅ **built (Tier 2)**, no dependency |
+| **Android 16 Live Updates** | What is left once the tracker is reproduced: the status-bar **chip** while the phone is in use, and the **guarantee** of promoted placement at the top of the lock screen and AOD | API 36 | ✅ **built (Tier 2)**, runtime-gated · chip on a `targetSdk 35` app is unverified |
 | **iOS Live Activities** | Dynamic Island · the iOS presentation in the screenshots | iOS 16.1+ · 17.2+ for remote *start* | ❌ deployment target is **13.0** |
 
-**The honest summary:** the *look* is reachable on Android now. What is not reachable
-below Android 16 is the **placement** — the chip in the status bar, and the guarantee of
-sitting at the top of the lock screen rather than wherever the shade puts it — plus the
-segmented progress style. Those are refinements on a card you can ship this week, not
-prerequisites for it.
+**The honest summary:** the *look* is now identical on every Android from the version 10
+floor up — Tier 2 paints the segmented tracker itself rather than waiting for API 36 to
+draw one. What remains genuinely exclusive to Android 16 is the **placement**: the chip
+in the status bar, and the guarantee of the top slot on the lock screen rather than
+wherever the shade puts it. Those two are drawn by system UI. There is no backport, no
+support library, and no trick — they are the one part of this feature that a phone's
+Android version decides and code does not.
 
 Below Android 16 an ongoing notification competes for lock-screen position like any
 other. In practice it sits high, because it is ongoing and recently updated, but nothing
@@ -109,20 +112,76 @@ discovering on a device.
   - [x] **Verified available in the pinned `flutter_local_notifications 18.0.1`** — no
     new dependency, no `targetSdk` bump, no version-freeze collision
 
-- [ ] **Tier 2 — Android 16 Live Updates (`Notification.ProgressStyle`)** ⚠️ *refinement, not the feature*
-  - Adds three things over Tier 1: the **status-bar chip** while the phone is in use,
-    **promoted placement** (guaranteed top of the lock screen and AOD, expanded), and
-    **segments/milestone points** — a tracker with a moving marker instead of a plain bar
-  - **Blocked on `targetSdk 35 → 36`**, a Play-console-affecting change and a
-    version-freeze item in its own right. Its own task, not folded into a feature commit
-  - `flutter_local_notifications 18.0.1` does **not** expose `ProgressStyle` — the API
-    postdates it. Either a package bump ⚠️ or a small Kotlin platform channel
-    (no new dependency). **Prefer the platform channel** — it keeps the freeze intact and
-    the surface is one notification builder
-  - Degrades to Tier 1 below API 36. Same notification id, same channel, so a device that
-    updates from 15 to 16 upgrades its own live card mid-order
+- [x] **Tier 2 — the segmented tracker, on every Android** — *built 2026-07-25.
+      `packages/zopiq_live_card/`. Not yet run on a device: see the manual steps below.*
 
-- [ ] **Tier 3 — iOS Live Activities** ⚠️ **largest single item in this file**
+  Asked for as "Android 16 Live Updates", built as "the segmented tracker on all Android
+  versions, and the Android 16 treatment where the OS offers it". The split below is not a
+  preference — the platform forces it, and the reason is worth reading once.
+
+  **What Android 16 alone can do, and no amount of code changes it:** the status-bar
+  **chip** while the phone is in use, and the **guarantee** of the top slot on the lock
+  screen and AOD. Both are drawn by system UI. There is no support-library backport and
+  no trick; below API 36 an ongoing notification competes for position like any other.
+
+  **What was reachable everywhere, and now is:** the **segmented tracker with milestone
+  points**. Tier 1 shipped a plain unbroken bar because that is the only shape
+  `flutter_local_notifications` exposes. It is now painted onto a `Canvas` and handed to
+  the notification as a custom body, so an Android 10 phone shows the same tracker an
+  Android 16 phone does.
+
+  - [x] **`packages/zopiq_live_card/`** — an in-repo, Android-only Flutter plugin, written
+    in Java against the framework `Notification.Builder`. **Zero new dependencies**: no
+    package bump, no androidx artifact, no Kotlin stdlib, no AGP pin — `pubspec.lock` is
+    byte-identical after the change. Verified with `git diff pubspec.lock` (empty)
+  - [x] **A package rather than Kotlin in `apps/customer/android/app`, and this is the
+    load-bearing decision.** The card is drawn from the FCM background isolate, which runs
+    in a `FlutterEngine` that `firebase_messaging` constructs itself and populates from
+    `GeneratedPluginRegistrant`. Only real plugin packages land in that file. Kotlin in the
+    app module would have answered the channel with the app foregrounded and gone silent
+    with it killed — which is the entire situation the live card exists for. Confirmed
+    after the build: `GeneratedPluginRegistrant.java:89` now registers it
+  - [x] **API 36+ → `Notification.ProgressStyle`** with three segments and two milestone
+    points (`PromotedStyle.java`), plus the `android.requestPromotedOngoing` extra and
+    `POST_PROMOTED_NOTIFICATIONS` in the plugin's manifest — confirmed merged into the
+    app's packaged manifest. That is the chip and the promoted placement
+  - [x] **API 24–35 → `DecoratedCustomViewStyle`** over a hand-painted bar
+    (`TrackerBar.java`). The decorated style keeps the system's own header — icon, app
+    name, "Arriving in 18 min", the expander — and replaces only the body, which is what
+    lets a custom layout inherit the shade's light or dark theme instead of guessing at it
+  - [x] **The two branches are mutually exclusive by Google's rules, not by taste.** A
+    promoted notification may not carry custom `RemoteViews`, and may not be colorized.
+    So the Android 16 path cannot use the painted bar, the older path cannot be promoted,
+    and `setColorized` is gone from both — it was doing nothing anyway, since the platform
+    honours it only for foreground-service and media notifications. `setColor` still tints
+  - [x] **One ladder, one place.** `Ladder.java` holds the milestones (35 / 75 / 100) and
+    both branches read them, so the painted bar and the platform's own tracker cannot
+    drift into showing different steps. Three milestones, not eight: `accepted`,
+    `claimed`, `packed`, `rider_at_restaurant` and `at_door` all move the bar without
+    earning a dot, which is what stops it reading as a progress bar with a rash
+  - [x] **Taps survive the move.** The card is no longer drawn by
+    `flutter_local_notifications`, so its taps no longer arrive through `_onLocalTap`. The
+    plugin builds its own `PendingIntent` and hands the order id back two ways — a live
+    callback for an app that is running, and a parked value for a tap that started the
+    process from dead, because a cold start has no Dart alive to call back
+  - [x] **The bitmap is clamped to 720px wide.** It crosses to `system_server` through a
+    Binder transaction with about a megabyte to spend, and it is sent twice — collapsed
+    and expanded. Unclamped it would be 960px on a density-3 phone
+  - [x] Degrades silently downward, per Rule 5. Same notification id, same `order_live`
+    channel as Tier 1, so a phone that updates from 15 to 16 upgrades its own live card
+    mid-order without the server knowing
+  - [x] Migration 0052 and `send-notification` are **untouched**. This is a device-side
+    change end to end; the payload it reads is the one Tier 1 already defined
+  - [ ] **The one open question — `targetSdk`.** Google documents the promotion
+    requirements as properties of the notification plus the permission, and says nothing
+    about `targetSdk 36`. The code is compiled against `compileSdk 36` (already the app's
+    value) and gated at runtime on `SDK_INT >= 36`, so **nothing here needed the freeze
+    broken**. But whether the OS actually honours promotion for a `targetSdk 35` app is
+    unverified and only an Android 16 device can answer it. If the chip does not appear,
+    that — and only that — is what the `35 → 36` bump ⚠️ would buy, and it stays its own
+    approved task rather than being folded in here
+
+- [ ] (skip for now)  **Tier 3 — iOS Live Activities** ⚠️ **largest single item in this file**
   - **Bump iOS deployment target 13.0 → 16.1** (or gate: Live Activity on 16.1+, plain
     push below). Dropping iOS 13/14/15 is a product decision, not a technical one
   - A **Widget Extension target in Swift** — ActivityKit UI cannot be written in Dart.
@@ -162,12 +221,21 @@ discovering on a device.
       would wake every device to redraw nothing, so the previous tick is compared and a
       duplicate dropped. This cut the walk-through from 7 pushes to 6
 
-### Verifying Tier 1 on a device ([[zopiqnow-no-test-files]] — manual, by hand)
+### Verifying Tiers 1 and 2 on a device ([[zopiqnow-no-test-files]] — manual, by hand)
 
 What is already proven, server-side, without a phone: the ladder is monotonic across an
 out-of-order arrival, the duplicate tick is dropped, a cancellation posts a terminal
 tick, `order_live` rows never reach the unread badge, and FCM accepts and delivers the
-data-only push. What is **not** proven is anything that happens on Android.
+data-only push.
+
+What Tier 2 additionally proved without a phone, at build time: the module compiles
+against `compileSdk 36` (so `ProgressStyle`, its segments and its points are the real
+API and not a guess), `pubspec.lock` is unchanged, and — the one that mattered —
+`GeneratedPluginRegistrant.java` registers the plugin, which is what lets the FCM
+background isolate reach it with the app killed. The permission merged into the packaged
+manifest.
+
+What is **not** proven is anything that happens on a screen.
 
 1. `flutter run` the customer app on a real device, signed in, and confirm a token
    registers (`select * from device_tokens where audience='customer'`).
@@ -177,12 +245,27 @@ data-only push. What is **not** proven is anything that happens on Android.
 3. Watch for, at each step: **one** card, not a stack; the bar moving forward and never
    back; no sound or vibration after the first `order_update` buzz; "Arriving in N min"
    counting down.
-4. **Lock the phone and repeat from step 2.** The card is drawn in the FCM background
-   isolate — this is the path that actually matters and the only one the emulator lies
-   about.
-5. Tap the card. It must open `/orders/<id>` and **not** dismiss itself.
-6. On `delivered`, the card must vanish. Repeat for a customer cancellation.
-7. Repeat the whole thing on the **Android 10 floor** ([[zopiqnow-android-compat]]).
+4. **Tier 2, collapsed and expanded.** The tracker must show **two gaps** and **three
+   dots**, the dots filling as the order passes 35 / 75 / 100. Expand the card: the same
+   tracker plus the line of prose. Then check the two things a hand-painted bitmap can
+   get wrong and nothing else can — **switch the phone between light and dark theme**
+   (the gaps must show the shade's background through them, not a grey stripe), and check
+   the bar is not **clipped or stretched** at either end.
+5. **Lock the phone and repeat from step 2.** The card is drawn in the FCM background
+   isolate — this is the path that actually matters, the only one the emulator lies
+   about, and since Tier 2 it is also the path that proves the plugin is reachable from
+   an engine the app did not create. If the card appears foregrounded but not from the
+   lock screen, that is the failure this whole package was shaped to avoid.
+6. Tap the card. It must open `/orders/<id>` and **not** dismiss itself. Then **force-stop
+   the app, place a new order and tap that card** — the cold-start path hands the order id
+   back a different way than the warm one, so it is a separate thing to get wrong.
+7. On `delivered`, the card must vanish. Repeat for a customer cancellation.
+8. Repeat the whole thing on the **Android 10 floor** ([[zopiqnow-android-compat]]).
+   Android 10 is where the painted tracker either holds up or does not.
+9. **On an Android 16 device, if one is to hand:** the card should look different, because
+   system UI is drawing the tracker rather than the app. Look for the **chip in the status
+   bar** while using the phone. If it is absent, that is the `targetSdk 35 → 36` question
+   above answering itself — everything else on the card should still be correct.
 
 Known ceiling, worth confirming rather than discovering later: a data-only push reaches a
 dozing phone at high priority but Android may still hold it, and a **force-stopped** app
@@ -360,21 +443,28 @@ the decisions.
 | ~~2~~ | ~~**P1 Tier 1** the live order card~~ | **✅ built 2026-07-25** | needs a device pass |
 | 3 | **P2** admin hero CRUD | days | nothing |
 | 4 | **P4** hero motion loop | days | P2 + the WebP/video decision |
-| 5 | **P1 Tier 2** Android 16 chip + segments | days | ⚠️ targetSdk 36 |
+| ~~5~~ | ~~**P1 Tier 2** Android 16 chip + segments~~ | **✅ built 2026-07-25** | needs a device pass |
 | 6 | **P1 Tier 3** iOS Live Activities | **weeks** | ⚠️ iOS target 16.1, a Swift extension, and proof iOS builds at all |
 
 P3 first because it is hours and touches nothing else. P1 Tier 1 second because it
 reproduces the screenshots on the devices that actually run this app, with nothing
 blocking it. P2 before P4 because P4 is a column on P2's table.
 
+Tier 2 jumped the queue because it turned out not to need the `targetSdk` bump it was
+filed under: the segmented tracker is reachable on every Android without one, and the
+Android 16 half compiles against the `compileSdk 36` the app already had.
+
 ---
 
 ## Decisions needed from you before any of this starts
 
 1. **P4:** animated WebP (no new dependency) or `video_player` ⚠️? *Recommend WebP.*
-2. **P1 Tier 2:** approve `targetSdk 35 → 36` ⚠️, or park the Android 16 chip? *Not
-   urgent — Tier 1 already gives you the card; this only adds the status-bar chip,
-   guaranteed top placement, and segmented progress.*
+2. **P1 Tier 2:** ~~approve `targetSdk 35 → 36` ⚠️, or park the Android 16 chip?~~
+   **Mostly answered by building it.** The segmented tracker needed no bump and now runs
+   on every Android; the Android 16 branch compiles against the existing `compileSdk 36`
+   and is gated at runtime. The only question left is narrow: *if a device pass on Android
+   16 shows no status-bar chip*, do you want `targetSdk 35 → 36` ⚠️ as its own upgrade
+   task to get it? Nothing else depends on the answer.
 3. **P1 Tier 3:** is iOS a real target? If yes — has the iOS app ever been built and run
    on a device, and is dropping iOS 13/14/15 acceptable? If iOS is not shipping this
    year, Tier 3 should be deleted from this file rather than carried.

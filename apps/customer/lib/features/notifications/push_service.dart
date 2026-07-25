@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:zopiq_live_card/zopiq_live_card.dart';
 
 import 'package:zopiqnow/features/notifications/order_live_card.dart';
 
@@ -40,6 +41,12 @@ class PushService {
   /// services, a missing config, a denied permission — none of these is a reason
   /// for the app to fail to start. Push just stays inert.
   static Future<void> start() async {
+    // First, and deliberately ahead of Firebase: a tap on the live card has to
+    // land on the tracking screen even on a device where push never came up at
+    // all. The card is drawn by `zopiq_live_card` since Tier 2, so its taps
+    // arrive on that plugin's channel rather than through `_onLocalTap`.
+    await _adoptLiveCardTaps();
+
     try {
       await Firebase.initializeApp();
     } on Object catch (e) {
@@ -87,6 +94,19 @@ class PushService {
     });
   }
 
+  /// Two entry points, because a tap has two shapes: one for an app that was
+  /// already running, and one for a tap that started the process from dead. The
+  /// second cannot be a callback — there is no Dart alive to call — so the
+  /// platform parks the order id and this drains it.
+  static Future<void> _adoptLiveCardTaps() async {
+    ZopiqLiveCard.listenForTaps((String orderId) {
+      pendingOrderId.value = orderId;
+    });
+
+    final String? launched = await ZopiqLiveCard.consumeLaunchOrderId();
+    if (launched != null && launched.isNotEmpty) pendingOrderId.value = launched;
+  }
+
   static Future<void> _initLocalNotifications() async {
     const AndroidInitializationSettings android =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -95,8 +115,9 @@ class PushService {
       onDidReceiveNotificationResponse: _onLocalTap,
     );
 
-    // A tap on the live card while the app was dead: the OS starts us and hands
-    // the response over here rather than through the callback above.
+    // A tap on an alerting notification this app drew while it was dead: the OS
+    // starts us and hands the response over here rather than through the
+    // callback above. (The live card's own taps go through `_adoptLiveCardTaps`.)
     final NotificationAppLaunchDetails? launch = await _local
         .getNotificationAppLaunchDetails();
     final NotificationResponse? response = launch?.notificationResponse;

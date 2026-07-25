@@ -1,15 +1,11 @@
-import 'dart:ui' show Color;
-
 import 'package:flutter/foundation.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:zopiq_live_card/zopiq_live_card.dart';
 
 /// The live order card: one notification per running order, redrawn in place.
 ///
 /// The thing on the lock screen while food is on its way — a headline, a
-/// progress bar, the brand mark, and "Arriving in 18 min" along the top. It is a
-/// plain Android notification, which is the whole point: every field it uses
-/// exists on API 24, so the card works on the Android 10 floor with no new
-/// dependency and no `targetSdk` bump.
+/// **segmented delivery tracker** with a milestone at each step, the brand mark,
+/// and "Arriving in 18 min" along the top.
 ///
 /// **One notification per order, updated in place.** The id is derived from the
 /// order id, so the eight events an order emits redraw a single card rather than
@@ -19,23 +15,17 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 ///
 /// Drawn from a data-only push (`kind = order_live`, migration 0052), which
 /// means this runs in the FCM background isolate as often as in the app's own.
-/// That is why it owns its plugin instance and initialises it lazily: statics do
-/// not cross isolates, so [PushService]'s copy is not available here.
+///
+/// **What changed in Tier 2.** Tier 1 drew this with `flutter_local_notifications`
+/// and got a plain unbroken progress bar, because that is the only shape the
+/// package exposes. The drawing now lives in [ZopiqLiveCard] — an in-repo,
+/// Android-only plugin — which paints a segmented tracker on every Android from
+/// the version 10 floor up, and on Android 16 hands the job to the platform's own
+/// `Notification.ProgressStyle` to earn the status-bar chip. This file is
+/// unchanged in every other respect: same ids, same channel, same ladder, same
+/// rules. See `packages/zopiq_live_card/`.
 class OrderLiveCard {
   OrderLiveCard._();
-
-  static const String channelId = 'order_live';
-  static const String _channelName = 'Live order tracking';
-
-  static final FlutterLocalNotificationsPlugin _local =
-      FlutterLocalNotificationsPlugin();
-
-  static bool _ready = false;
-
-  /// Swiggy orange, as `ZopiqPalette.primary` — repeated as a literal rather
-  /// than imported because this code runs in the background isolate, where the
-  /// design system's theme machinery has no business being woken up.
-  static const Color _brand = Color(0xFFFC8019);
 
   /// The stages that end an order. Their card is cancelled, not redrawn.
   static const Set<String> _terminal = <String>{'delivered', 'ended'};
@@ -57,7 +47,14 @@ class OrderLiveCard {
         await cancel(orderId);
         return true;
       }
-      await _show(orderId: orderId, stage: stage, data: data);
+      await ZopiqLiveCard.show(
+        id: idFor(orderId),
+        orderId: orderId,
+        title: (data['title'] as String?) ?? 'Your order',
+        body: data['body'] as String?,
+        subText: _subText(stage, data['eta_at'] as String?),
+        progress: int.tryParse('${data['progress']}') ?? 0,
+      );
     } on Object catch (e) {
       debugPrint('Live order card not drawn: $e.');
     }
@@ -66,62 +63,10 @@ class OrderLiveCard {
 
   /// Take the card down. Used on a terminal stage, and safe on an order that
   /// never had one.
-  static Future<void> cancel(String orderId) async {
-    await _ensureReady();
-    await _local.cancel(idFor(orderId));
-  }
+  static Future<void> cancel(String orderId) =>
+      ZopiqLiveCard.cancel(idFor(orderId));
 
-  static Future<void> _show({
-    required String orderId,
-    required String stage,
-    required Map<String, dynamic> data,
-  }) async {
-    await _ensureReady();
-
-    final int progress = int.tryParse('${data['progress']}') ?? 0;
-    final String title = (data['title'] as String?) ?? 'Your order';
-    final String? body = data['body'] as String?;
-
-    await _local.show(
-      idFor(orderId),
-      title,
-      body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          channelId,
-          _channelName,
-          channelDescription: 'The live card while an order is on its way.',
-          // DEFAULT, not HIGH: the card must never peek over what the customer
-          // is doing. The alerting half of an order's news is `order_updates`,
-          // and it still buzzes exactly five times per order (0047).
-          importance: Importance.defaultImportance,
-          priority: Priority.defaultPriority,
-          // Sits in the shade for the life of the order and does not disappear
-          // when tapped — tapping opens the tracking screen, it does not mean
-          // "I'm done with this".
-          ongoing: true,
-          autoCancel: false,
-          // Six redraws, one alert. Without this every status change would make
-          // its own noise on a channel that is supposed to be silent.
-          onlyAlertOnce: true,
-          playSound: false,
-          enableVibration: false,
-          showProgress: true,
-          maxProgress: 100,
-          progress: progress.clamp(0, 100),
-          subText: _subText(stage, data['eta_at'] as String?),
-          largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
-          color: _brand,
-          colorized: true,
-          category: AndroidNotificationCategory.progress,
-          visibility: NotificationVisibility.public,
-        ),
-      ),
-      payload: orderId,
-    );
-  }
-
-  /// The orange line along the top of the card.
+  /// The line along the top of the card.
   ///
   /// Counted down against a fixed deadline the server sent (`eta_at`), not
   /// against a minutes-remaining number computed when the push was built. That
@@ -155,34 +100,5 @@ class OrderLiveCard {
       hash = ((hash ^ unit) * 0x01000193) & 0x7fffffff;
     }
     return 100000 + (hash % 900000);
-  }
-
-  /// The channel, and the plugin behind it. Cheap to call repeatedly; the first
-  /// call in each isolate does the work.
-  static Future<void> _ensureReady() async {
-    if (_ready) return;
-
-    const AndroidInitializationSettings android =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    await _local.initialize(const InitializationSettings(android: android));
-
-    // Sound and vibration are off on the channel itself, not only on each
-    // notification: the channel is what the customer sees in system settings,
-    // and it should read as the silent tracker it is.
-    const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      channelId,
-      _channelName,
-      description: 'The live card while an order is on its way.',
-      importance: Importance.defaultImportance,
-      playSound: false,
-      enableVibration: false,
-    );
-    await _local
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(channel);
-
-    _ready = true;
   }
 }
