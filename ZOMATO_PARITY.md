@@ -41,18 +41,23 @@ These were on the gap list but are shipped and verified. Kept here so nobody reb
 
 ## Part B — the real remaining work
 
-### B0 — Unblock push (owed by the user, not buildable here)
-- [ ] Firebase project(s) + `google-services.json` for customer and rider apps
-- [ ] `supabase secrets set FCM_SERVICE_ACCOUNT`
-- [ ] `supabase functions deploy send-notification --no-verify-jwt` (**not** the old `send-order-push`)
-- [ ] Notifications-INSERT database webhook
-- [ ] Verify a real push on a release build on a device
+### B0 — Unblock push ✅ **DONE 2026-07-25** (by the user)
+- [x] Firebase project(s) + `google-services.json` for customer and rider apps
+- [x] `supabase secrets set FCM_SERVICE_ACCOUNT`
+- [x] `supabase functions deploy send-notification --no-verify-jwt`
+- [x] Notifications-INSERT database webhook — trigger `push_on_notification_insert`
+- [x] Verify a real push on a release build on a device
 
-Everything in `PUSH_NOTIFICATIONS.md`. **B3's dispatch and B1's alerts are half-blind
-until this is live** — the rider board still polls every 20s because of it.
+Everything in `PUSH_NOTIFICATIONS.md`. **B3's dispatch is now unblocked** — an offer
+push with Accept/Decline is buildable, and the 20s board poll can go.
 
-Also owed: commit the rider in-app notification inbox (built, analyze-clean, uncommitted
-— entangled with the current rider UI WIP).
+Still owed, small:
+- [ ] `supabase functions delete send-order-push` — the superseded function is still
+      ACTIVE beside `send-notification`, and a dead endpoint nobody calls is one
+      somebody wires back up
+- [ ] Commit the rider in-app notification inbox (built, analyze-clean, uncommitted —
+      entangled with the current rider UI WIP, which also carries a stray
+      `apps/rider/lib/lib/app/rider_shell.dart` that does not compile)
 
 ---
 
@@ -130,7 +135,7 @@ run must assert the overload count.
 
 ### B3 — Dispatch, live tracking, dynamic ETA
 - [ ] **Rider assignment algorithm** — auto-offer the nearest free rider instead of
-      self-claim. Needs push (B0) to be an *offer* with Accept/Decline and a countdown
+      self-claim. An *offer* with Accept/Decline and a countdown (push is live as of B0)
 - [ ] **Auto-reassignment** on decline, timeout, or abandon
 - [ ] **Rider location stream** — `rider_locations`, written on an interval while carrying,
       readable only by that order's customer while `state='picked_up'`
