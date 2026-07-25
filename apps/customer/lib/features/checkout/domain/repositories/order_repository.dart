@@ -78,6 +78,28 @@ abstract interface class OrderRepository {
   /// The delivery code to read out at the door, or null when there is nothing
   /// to confirm yet. Never throws, for the same reason [getRider] does not.
   Future<String?> getDeliveryCode(String orderId);
+
+  /// Calls the order off, while the order service still allows it.
+  ///
+  /// Throws [OrderCancelFailure] — always, on any failure, and with the
+  /// service's own sentence when it has one. This is the opposite of [getRider]
+  /// on purpose: a rider's name is a nicety, and a cancellation that quietly
+  /// did nothing is a customer who believes their order has stopped.
+  Future<void> cancelOrder({required String orderId, String? reason});
+}
+
+/// A cancellation the order service refused, or one that never reached it.
+/// [message] is written for the customer — "The kitchen has already started
+/// cooking this order." — and the screen shows it verbatim.
+class OrderCancelFailure implements Exception {
+  const OrderCancelFailure([
+    this.message = 'We couldn\'t cancel that order. Please try again.',
+  ]);
+
+  final String message;
+
+  @override
+  String toString() => 'OrderCancelFailure: $message';
 }
 
 /// Domain-level failure for reading order history.

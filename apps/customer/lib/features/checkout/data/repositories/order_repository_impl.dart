@@ -112,6 +112,20 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
+  Future<void> cancelOrder({required String orderId, String? reason}) async {
+    try {
+      await _dataSource.cancelOrder(orderId: orderId, reason: reason);
+    } on OrderCancelFailure {
+      // Already carries the service's own sentence — "your order is packed and
+      // waiting for a rider" — which is the whole answer. Relabelling it would
+      // throw away the only part the customer can act on.
+      rethrow;
+    } on Object catch (_) {
+      throw const OrderCancelFailure();
+    }
+  }
+
+  @override
   Future<List<String>> getCouponHints() async {
     try {
       return await _dataSource.fetchCouponHints();

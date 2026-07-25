@@ -86,6 +86,50 @@ class OrderMockDataSource implements OrderDataSource {
   @override
   Future<String?> fetchDeliveryCode(String orderId) async => null;
 
+  /// Calls a mock order off, refusing on exactly the statuses `cancel_my_order`
+  /// refuses on — and with the same sentence. A fake that let a customer cancel
+  /// an order the real service would not is a fake that teaches the screen the
+  /// wrong lesson.
+  @override
+  Future<void> cancelOrder({required String orderId, String? reason}) async {
+    await Future<void>.delayed(latency);
+
+    final int index = _history.indexWhere(
+      (CustomerOrder o) => o.id == orderId,
+    );
+    if (index < 0) {
+      throw const OrderCancelFailure('We couldn\'t find that order.');
+    }
+
+    final CustomerOrder order = _history[index];
+    if (order.status.cannotCancelBecause case final String refusal) {
+      throw OrderCancelFailure(refusal);
+    }
+
+    _history[index] = CustomerOrder(
+      id: order.id,
+      restaurantId: order.restaurantId,
+      restaurantName: order.restaurantName,
+      restaurantImageUrl: order.restaurantImageUrl,
+      status: OrderStatus.cancelled,
+      statusReason: reason?.trim().isEmpty ?? true
+          ? 'Cancelled by the customer'
+          : reason!.trim(),
+      placedAt: order.placedAt,
+      deliveryTo: order.deliveryTo,
+      etaMinutes: order.etaMinutes,
+      paymentMethod: order.paymentMethod,
+      paymentId: order.paymentId,
+      subtotal: order.subtotal,
+      deliveryFee: order.deliveryFee,
+      taxes: order.taxes,
+      discount: order.discount,
+      total: order.total,
+      couponCode: order.couponCode,
+      lines: order.lines,
+    );
+  }
+
   @override
   Future<AppliedCoupon> applyCoupon({
     required String code,

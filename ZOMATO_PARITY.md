@@ -84,17 +84,47 @@ so the attempt counter survives; going offline while carrying is refused.
 ### B2 — Cancellation, refunds, and the accept timeout
 Today only a vendor can end an order early, and no money ever comes back.
 
-- [ ] Customer cancellation flow — allowed until `preparing`, refused after, with the
-      reason shown in plain words (never a silent disabled button)
-- [ ] Vendor **auto-timeout**: an order not accepted within N minutes auto-rejects and
-      tells the customer. Runs in Postgres (pg_cron), not in an app that might be closed
+**B2a — cancellation and the timeout ✅ DONE 2026-07-25** (migration 0051)
+
+- [x] Customer cancellation flow — allowed until `preparing`, refused after, with the
+      reason shown in plain words (never a silent disabled button). `cancel_my_order`
+      refuses with a *sentence about this order* — "the kitchen has already started",
+      "packed and waiting for a rider", "already on its way" — and the screen shows it
+      verbatim, whether it arrives before the tap or after it
+- [x] Vendor **auto-timeout**: 5 minutes, `expire_unaccepted_orders()` on pg_cron every
+      minute, `skip locked` so an accept in flight always wins the race. The deadline
+      lives on `orders.accept_deadline`, which is also what the vendor ticket counts
+      down to — one column, so the tablet and the sweeper can never disagree
+- [x] A cancelled order releases its rider — `release_order_delivery` cancels the
+      delivery, deletes both codes, and tells the rider why their job vanished
+
+**B2b — refunds, deferred to after B4.** A `refunds` state machine built now would be a
+ledger with nothing behind it: checkout still runs on `MockPaymentGateway` and no money
+has ever moved. Building it against a real gateway once beats building it twice.
+
 - [ ] `refunds` table + state machine (requested → approved → paid), FK to the order
 - [ ] Refund on cancel-after-payment and on vendor rejection
 - [ ] Customer: order issue / report screen, feeding a support queue
 - [ ] Admin: refund management console
 
+**A hole found and closed on the way:** 0050 did not do what it says. 0015 had widened
+`set_order_status` to four arguments (`p_prep_minutes`); 0050 wrote a *three*-argument
+function to close the vendor's back door into the rider's half of the story — and
+Postgres overloads rather than replaces across a different argument list. Both existed,
+and the vendor app, which passes `p_prep_minutes` on every call, bound to the
+four-argument one: the 0015 body, with `ready_for_pickup → out_for_delivery` and
+`out_for_delivery → delivered` still on its ladder. The wall was built beside the door.
+Nothing exploited it — the app stopped offering the buttons in the same commit — but "the
+app does not ask" is exactly the guarantee 0050 was written to stop relying on. 0051
+collapses the two into one function and drops the overload.
+
 **Rule:** a cancelled order must release its rider (`abandon_delivery`) and never leave a
 `deliveries` row pointing at a dead order.
+
+**Lesson for every migration from here:** `create or replace function` with a changed
+argument list is a **new function**, not a replacement. Any migration that redefines an
+existing function must `drop function` the old signature explicitly, and the edge-case
+run must assert the overload count.
 
 ---
 

@@ -31,7 +31,11 @@ class OrderTrackingCard extends ConsumerWidget {
 
     return ZopiqCard(
       child: ended
-          ? _Ended(status: status, placedAt: order.placedAt)
+          ? _Ended(
+              status: status,
+              placedAt: order.placedAt,
+              reason: order.statusReason,
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -414,10 +418,16 @@ class _Step extends StatelessWidget {
 /// is not a timeline with a gap in it. It left the journey, and the only thing
 /// that changes between the two is the sentence.
 class _Ended extends StatelessWidget {
-  const _Ended({required this.status, required this.placedAt});
+  const _Ended({required this.status, required this.placedAt, this.reason});
 
   final OrderStatus status;
   final DateTime placedAt;
+
+  /// Why, in the words that were recorded when it happened — the kitchen's note,
+  /// the customer's own reason, or the auto-decline's sentence. Null when the
+  /// order ended without one, which the card handles by saying only what it
+  /// knows.
+  final String? reason;
 
   @override
   Widget build(BuildContext context) {
@@ -437,8 +447,11 @@ class _Ended extends StatelessWidget {
             children: <Widget>[
               Text(title, style: t.titleSmall),
               const SizedBox(height: ZopiqSpacing.xxs),
+              // The reason displaces the timestamp rather than joining it. Why
+              // an order ended is the thing being looked for; when it was placed
+              // is on the receipt three lines down.
               Text(
-                'Placed ${formatClockTime(placedAt)}',
+                reason ?? 'Placed ${formatClockTime(placedAt)}',
                 style: t.bodySmall?.copyWith(color: zc.textMuted),
               ),
             ],

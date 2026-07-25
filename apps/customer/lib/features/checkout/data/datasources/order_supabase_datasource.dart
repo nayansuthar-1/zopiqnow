@@ -115,9 +115,9 @@ class OrderSupabaseDataSource implements OrderDataSource {
   /// detail screen show the same order and a column the detail screen forgot to
   /// ask for is a field that is null on exactly one of them.
   static const String _orderColumns =
-      'id, restaurant_id, restaurant_name, status, created_at, delivery_to, '
-      'eta_minutes, payment_method, payment_id, subtotal, delivery_fee, '
-      'taxes, discount, total, coupon_code, '
+      'id, restaurant_id, restaurant_name, status, status_reason, created_at, '
+      'delivery_to, eta_minutes, payment_method, payment_id, subtotal, '
+      'delivery_fee, taxes, discount, total, coupon_code, '
       // The catalog join is for the photo alone — the name is on the order,
       // so a delisted restaurant costs us an image and not an identity.
       'restaurants(image_url), '
@@ -221,6 +221,22 @@ class OrderSupabaseDataSource implements OrderDataSource {
     }
   }
 
+  @override
+  Future<void> cancelOrder({required String orderId, String? reason}) async {
+    try {
+      await _db.rpc<String>(
+        'cancel_my_order',
+        params: <String, dynamic>{'p_order_id': orderId, 'p_reason': reason},
+      );
+    } on PostgrestException catch (e) {
+      // "The kitchen has already started cooking this order." — a rule we wrote,
+      // phrased for the customer, and the most useful sentence on the screen at
+      // that moment. Anything else is an outage, and gets the generic apology.
+      if (e.code == _businessRuleErrorCode) throw OrderCancelFailure(e.message);
+      throw const OrderCancelFailure();
+    }
+  }
+
   CustomerOrder _orderFrom(Map<String, dynamic> row) {
     final Map<String, dynamic>? restaurant =
         row['restaurants'] as Map<String, dynamic>?;
@@ -255,6 +271,7 @@ class OrderSupabaseDataSource implements OrderDataSource {
       restaurantName: row['restaurant_name'] as String,
       restaurantImageUrl: restaurant?['image_url'] as String? ?? '',
       status: OrderStatus.fromWire(row['status'] as String),
+      statusReason: row['status_reason'] as String?,
       placedAt: DateTime.parse(row['created_at'] as String).toLocal(),
       deliveryTo: row['delivery_to'] as String,
       etaMinutes: (row['eta_minutes'] as num).toInt(),

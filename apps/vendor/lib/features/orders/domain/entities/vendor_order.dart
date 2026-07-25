@@ -162,6 +162,7 @@ class VendorOrder {
     required this.paymentMethod,
     required this.etaMinutes,
     this.readyBy,
+    this.acceptDeadline,
   });
 
   final String id;
@@ -203,9 +204,28 @@ class VendorOrder {
   /// for an order that was rejected. What the prep countdown counts down to.
   final DateTime? readyBy;
 
+  /// When an unaccepted order declines itself (migration 0051). Read off the
+  /// row rather than computed from [placedAt] plus a constant here: the sweeper
+  /// in Postgres reads this same column, and a countdown that hits zero a minute
+  /// out of step with the thing it is counting down to is worse than none.
+  ///
+  /// Nullable only so a build that predates the column keeps parsing; every
+  /// order written since 0051 has one.
+  final DateTime? acceptDeadline;
+
   /// How long this ticket has been sitting there. The number a kitchen is
   /// actually judged on, and the reason the queue sorts oldest-first.
   Duration get age => DateTime.now().difference(placedAt);
+
+  /// How long is left to accept, or null when that question does not apply —
+  /// the order has already been accepted, declined, or has no deadline on it.
+  ///
+  /// Can go negative for the few seconds between the deadline passing and the
+  /// sweeper's next tick, which is why the pill below renders it as "declining
+  /// now" rather than a negative number.
+  Duration? get timeToAutoDecline => status == OrderStatus.placed
+      ? acceptDeadline?.difference(DateTime.now())
+      : null;
 
   /// Time until (positive) or since (negative) the food was due to be ready, or
   /// null when no prep time was set. Only meaningful while the order is being

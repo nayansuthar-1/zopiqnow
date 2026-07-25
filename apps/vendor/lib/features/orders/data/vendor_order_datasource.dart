@@ -73,7 +73,7 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
   static const String _orderColumns =
       'id, status, created_at, user_phone, delivery_to, '
       'subtotal, delivery_fee, taxes, discount, total, payment_method, '
-      'eta_minutes, ready_by';
+      'eta_minutes, ready_by, accept_deadline';
 
   @override
   Stream<List<VendorOrder>> watchOrders(String restaurantId) {
@@ -184,5 +184,8 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
     readyBy: row['ready_by'] == null
         ? null
         : DateTime.parse(row['ready_by'] as String).toLocal(),
+    acceptDeadline: row['accept_deadline'] == null
+        ? null
+        : DateTime.parse(row['accept_deadline'] as String).toLocal(),
   );
 }

@@ -42,6 +42,32 @@ enum OrderStatus {
   /// subscribes to live status or renders a receipt.
   bool get isOpen => this != delivered && this != cancelled && this != rejected;
 
+  /// Whether the customer may still call this order off.
+  ///
+  /// Mirrors `cancel_my_order` in migration 0051, and mirroring it is the point:
+  /// the button is offered exactly when the database will honour it. The line is
+  /// drawn where cooking starts — before that, calling off an order costs
+  /// nobody anything; after it, food has been made and it is a refund
+  /// conversation instead. If the two ever disagree the database wins, and
+  /// [cannotCancelBecause] is what the screen shows.
+  bool get isCancellable => this == placed || this == accepted;
+
+  /// Why the order can no longer be called off, in the words the customer
+  /// reads, or null while it still can be.
+  ///
+  /// A sentence and not a disabled button: "you cannot do this" with no reason
+  /// attached is the thing that makes someone phone the restaurant. These match
+  /// `cancel_my_order`'s refusals — the same news, whether it arrives before the
+  /// tap or after it.
+  String? get cannotCancelBecause => switch (this) {
+    placed || accepted => null,
+    preparing => 'The kitchen has already started cooking this order.',
+    readyForPickup => 'Your order is packed and waiting for a rider.',
+    outForDelivery => 'Your order is already on its way.',
+    delivered => 'This order has already been delivered.',
+    rejected || cancelled => 'This order has already ended.',
+  };
+
   /// The stages an order that goes well passes through, in order.
   ///
   /// Neither [cancelled] nor [rejected] is among them, and that is not an
@@ -117,6 +143,7 @@ class CustomerOrder {
     this.restaurantImageUrl = '',
     this.couponCode,
     this.paymentId,
+    this.statusReason,
   });
 
   /// Human-readable reference, e.g. `ZPQ-1042`.
@@ -133,6 +160,12 @@ class CustomerOrder {
   final String restaurantImageUrl;
 
   final OrderStatus status;
+
+  /// Why the order ended, when it ended early — the kitchen's note on a
+  /// rejection or a cancellation, the customer's own words when they called it
+  /// off, or the sweeper's sentence when nobody accepted it in time (0051).
+  /// Null for every order that is still running or that ran to completion.
+  final String? statusReason;
 
   /// Local time. The database stores `timestamptz`.
   final DateTime placedAt;

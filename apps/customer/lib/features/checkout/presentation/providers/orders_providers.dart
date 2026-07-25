@@ -6,6 +6,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
+import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_category.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
@@ -90,6 +91,47 @@ final AutoDisposeFutureProviderFamily<String?, String> deliveryCodeProvider =
     ) {
       return ref.watch(orderRepositoryProvider).getDeliveryCode(orderId);
     });
+
+/// Calls an order off, and reports what the order service said if it refused.
+///
+/// State is whether a cancellation is in flight, which is what the button
+/// renders — the same shape as [ReorderController], and for the same reason.
+///
+/// Returns the refusal rather than throwing it. The sentence is the answer the
+/// screen shows ("The kitchen has already started cooking this order."), not an
+/// exception to be caught somewhere and turned into "something went wrong".
+/// Null means the order is cancelled.
+class OrderCancelController extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  Future<String?> cancel(String orderId, {String? reason}) async {
+    state = true;
+    try {
+      await ref
+          .read(orderRepositoryProvider)
+          .cancelOrder(orderId: orderId, reason: reason);
+      // The order row changed under both of these. The status stream will bring
+      // the tracking card along on its own, but the *receipt* — and the reason
+      // printed on it — was fetched once and is now stale.
+      ref.invalidate(orderByIdProvider(orderId));
+      ref.invalidate(ordersProvider);
+      return null;
+    } on OrderCancelFailure catch (failure) {
+      // The order moved while the sheet was open — someone in the kitchen tapped
+      // Start a half-second before this did. Refetch, so the screen agrees with
+      // the sentence it is about to show.
+      ref.invalidate(orderByIdProvider(orderId));
+      return failure.message;
+    } finally {
+      state = false;
+    }
+  }
+}
+
+final NotifierProvider<OrderCancelController, bool>
+orderCancelControllerProvider =
+    NotifierProvider<OrderCancelController, bool>(OrderCancelController.new);
 
 /// What a reorder actually managed to put in the cart.
 ///

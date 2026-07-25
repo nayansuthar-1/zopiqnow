@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
@@ -92,7 +94,13 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
                     style: t.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
-                if (order.readyBy != null &&
+                // A new order's own clock comes first. It is the only countdown
+                // on this screen with a consequence attached — everything else
+                // here reports, this one expires.
+                if (order.acceptDeadline case final DateTime deadline
+                    when isNew)
+                  _AcceptCountdown(deadline: deadline)
+                else if (order.readyBy != null &&
                     (order.status == OrderStatus.accepted ||
                         order.status == OrderStatus.preparing))
                   _PrepCountdown(remaining: order.timeToReady!)
@@ -376,6 +384,96 @@ class _PickupCode extends ConsumerWidget {
                 ),
               ),
             ),
+      ),
+    );
+  }
+}
+
+/// How long is left to accept, ticking, on a brand-new ticket.
+///
+/// Counts down to `orders.accept_deadline` — the same column the sweeper in
+/// Postgres reads (migration 0051), not `placedAt` plus a number kept in Dart.
+/// If the two ever disagreed, this pill would be the one lying: the order would
+/// already be declined and the tablet would still be offering an Accept button.
+///
+/// **It runs its own one-second timer** rather than leaning on `clockProvider`,
+/// which ticks every thirty. A thirty-second tick on a five-minute deadline
+/// reads as a frozen clock, and raising the shared tick to one second would
+/// rebuild every ticket in the queue once a second on the oldest device we
+/// support. This rebuilds one pill, and only while a ticket is unaccepted.
+class _AcceptCountdown extends StatefulWidget {
+  const _AcceptCountdown({required this.deadline});
+
+  final DateTime deadline;
+
+  @override
+  State<_AcceptCountdown> createState() => _AcceptCountdownState();
+}
+
+class _AcceptCountdownState extends State<_AcceptCountdown> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => setState(() {}),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    final Duration left = widget.deadline.difference(DateTime.now());
+    // Past the deadline, the sweeper has up to a minute to come around. Saying
+    // "declining now" is the honest reading of that gap — the decision is made,
+    // the row has not caught up — and it is better than a negative clock or a
+    // countdown that sits on 0:00 looking broken.
+    final bool expired = left.isNegative;
+    final String label = expired
+        ? 'Declining now'
+        : '${left.inMinutes}:${(left.inSeconds % 60).toString().padLeft(2, '0')} '
+              'to accept';
+
+    // Amber for the last minute: a nudge, not an alarm. Red is what this screen
+    // uses for an order that is already late, and a new order is not late yet.
+    final Color color = expired || left.inSeconds <= 60
+        ? zc.nonVeg
+        : zc.primary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: ZopiqSpacing.sm,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: ZopiqRadii.rSm,
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          VendorSvgIcon(type: VendorSvgType.prepTimer, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: t.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -66,4 +66,15 @@ abstract interface class OrderDataSource {
   /// The four digits the rider must be told at the door, or null while there is
   /// nothing to confirm. Same shape as [fetchRider] and for the same reason.
   Future<String?> fetchDeliveryCode(String orderId);
+
+  /// Calls the order off. No user id, for the reason [placeOrder] gives.
+  ///
+  /// [reason] is the customer's own words, stored on the order and read by the
+  /// kitchen too — so it is written third-person or not at all.
+  ///
+  /// Throws [OrderCancelFailure] with the service's own sentence when the order
+  /// has moved past the point of calling off. That sentence is the *answer*, not
+  /// an error to bury: it says whether the food is being cooked, packed, or
+  /// already on a bike.
+  Future<void> cancelOrder({required String orderId, String? reason});
 }
