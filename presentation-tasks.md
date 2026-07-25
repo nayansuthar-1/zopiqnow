@@ -40,47 +40,70 @@ is **0052**.
 
 ## P1 — Live order notifications (the Swiggy lock-screen card)
 
-The reference screenshots are **iOS Live Activities**. That is a specific Apple
-feature (ActivityKit, iOS 16.1+), not a push notification with a picture on it, and it
-has no single cross-platform equivalent. This is the largest of the four asks by a wide
-margin and the only one with no cheap path.
+The reference screenshots are **iOS Live Activities** (ActivityKit). But look at what is
+actually on screen: a headline, a progress bar, an icon on the right, and it stays put.
+**Every one of those is a standard Android notification**, available on the Android 10
+floor, with no new dependency and no `targetSdk` bump.
 
-### What is actually being asked for, per platform
+Verified in the pinned package — `flutter_local_notifications 18.0.1` exposes
+`showProgress`, `maxProgress`, `progress`, `largeIcon`, `ongoing`, `onlyAlertOnce`,
+`subText` and `colorized`
+(`notification_details.dart:117–398`). That is the whole screenshot.
 
-| Platform | The real feature | Availability | Reachable today? |
+### What each platform tier actually buys
+
+| Tier | What it adds over the one below | Availability | Reachable today? |
 |---|---|---|---|
-| iOS | Live Activities / Dynamic Island (ActivityKit) | iOS 16.1+ · 17.2+ for remote *start* | ❌ deployment target is **13.0** |
-| Android 16+ | Live Updates — `Notification.ProgressStyle`, status-bar chip, expanded lock screen | API 36, and **requires `targetSdk 36`** | ❌ targetSdk is **35** |
-| Android 10–15 | Ongoing notification + `setProgress()` — sits in the shade and on the lock screen, but as a normal notification, no chip, no rich card | API 24+ | ✅ today |
+| **Android, any version** | The screenshot: headline, progress bar, large icon, persistent, on the lock screen | API 24+ | ✅ **today, no dependency** |
+| **Android 16 Live Updates** | The status-bar **chip** while the phone is in use · guaranteed *promoted* placement at the top of the lock screen and AOD · `ProgressStyle` **segments and milestone points** (the tracker with a moving marker, not a plain bar) | API 36 · **requires `targetSdk 36`** | ❌ targetSdk is **35** |
+| **iOS Live Activities** | Dynamic Island · the iOS presentation in the screenshots | iOS 16.1+ · 17.2+ for remote *start* | ❌ deployment target is **13.0** |
 
-**The honest summary:** the screenshots cannot be reproduced on the devices this app
-actually targets. [[zopiqnow-android-compat]] puts the floor at Android 10, and the
-rich card only exists on Android 16. Most of the user base gets the third row.
+**The honest summary:** the *look* is reachable on Android now. What is not reachable
+below Android 16 is the **placement** — the chip in the status bar, and the guarantee of
+sitting at the top of the lock screen rather than wherever the shade puts it — plus the
+segmented progress style. Those are refinements on a card you can ship this week, not
+prerequisites for it.
+
+Below Android 16 an ongoing notification competes for lock-screen position like any
+other. In practice it sits high, because it is ongoing and recently updated, but nothing
+guarantees it. That is the real gap, and it is worth naming honestly rather than
+discovering on a device.
 
 ### The three-tier plan
 
-- [ ] **Tier 1 — Android ongoing progress notification (works on the Android 10 floor)**
-  - One persistent, non-dismissable notification per live order, updated in place by
-    reusing the same notification id
-  - Progress bar driven by the status ladder, matching the reference:
-    `accepted` 15% → `preparing` 35% → `ready_for_pickup` 55% →
-    `out_for_delivery` 75% → `arrived_at_customer` 95% → `delivered` dismiss
-  - Headline per state — "Restaurant is preparing your order", "Delivery partner is at
-    the restaurant", "Your rider is outside" — plus "Arriving in N mins" from
-    `orders.eta_minutes`
-  - `setOngoing(true)`, `setOnlyAlertOnce(true)` (silent updates after the first),
-    dedicated `order_live` channel at `IMPORTANCE_DEFAULT` so it does not buzz six times
+- [ ] **Tier 1 — the card itself. Android 10 → latest, no new dependency, ship this first**
+  - One persistent notification per live order, updated in place by reusing the same
+    notification id
+  - `showProgress: true` with `maxProgress: 100`, driven by the status ladder:
+    `accepted` 15 → `preparing` 35 → `ready_for_pickup` 55 →
+    `out_for_delivery` 75 → `arrived_at_customer` 95 → `delivered` cancel
+  - `largeIcon` — the art on the right of the screenshot. A per-state illustration
+    (cooking / rider / at-the-door), bundled as an asset so it needs no network fetch
+    at notification time
+  - Headline per state: "Restaurant is preparing your order", "Delivery partner is at
+    the restaurant", "Your rider is outside"
+  - `subText` carries "Arriving in N mins" from `orders.eta_minutes` — the orange line
+    at the top of the reference
+  - `ongoing: true`, `onlyAlertOnce: true` (silent after the first), dedicated
+    `order_live` channel at `IMPORTANCE_DEFAULT` so six status changes are not six buzzes
+  - `colorized: true` with the Swiggy-orange brand token, per [[zopiqnow-swiggy-design]]
+  - `setContentIntent` → deep link to `/orders/:id`
   - Cancel on `delivered` / `cancelled` / `rejected`
-  - `flutter_local_notifications 18.0.1` covers all of this — **no new dependency**
+  - **Verified available in the pinned `flutter_local_notifications 18.0.1`** — every
+    field above exists on `AndroidNotificationDetails` today
 
-- [ ] **Tier 2 — Android 16 Live Updates (`Notification.ProgressStyle`)** ⚠️
-  - The status-bar chip and the expanded lock-screen card from the screenshots
-  - **Blocked on `targetSdk 35 → 36`**, which is a Play-console-affecting change and a
-    version-freeze item in its own right. Worth doing on its own schedule, not folded in
-  - `flutter_local_notifications 18.0.1` almost certainly does not expose `ProgressStyle`
-    (the API postdates it). **Verify before planning** — if absent, it is either a
-    package bump ⚠️ or a small Kotlin platform channel (no new dependency)
-  - Must degrade to Tier 1 on anything below API 36. Same notification id, same channel
+- [ ] **Tier 2 — Android 16 Live Updates (`Notification.ProgressStyle`)** ⚠️ *refinement, not the feature*
+  - Adds three things over Tier 1: the **status-bar chip** while the phone is in use,
+    **promoted placement** (guaranteed top of the lock screen and AOD, expanded), and
+    **segments/milestone points** — a tracker with a moving marker instead of a plain bar
+  - **Blocked on `targetSdk 35 → 36`**, a Play-console-affecting change and a
+    version-freeze item in its own right. Its own task, not folded into a feature commit
+  - `flutter_local_notifications 18.0.1` does **not** expose `ProgressStyle` — the API
+    postdates it. Either a package bump ⚠️ or a small Kotlin platform channel
+    (no new dependency). **Prefer the platform channel** — it keeps the freeze intact and
+    the surface is one notification builder
+  - Degrades to Tier 1 below API 36. Same notification id, same channel, so a device that
+    updates from 15 to 16 upgrades its own live card mid-order
 
 - [ ] **Tier 3 — iOS Live Activities** ⚠️ **largest single item in this file**
   - **Bump iOS deployment target 13.0 → 16.1** (or gate: Live Activity on 16.1+, plain
@@ -284,22 +307,24 @@ the decisions.
 | # | Task | Effort | Blocked on |
 |---|---|---|---|
 | 1 | **P3** Android high refresh rate | hours | nothing |
-| 2 | **P2** admin hero CRUD | days | nothing |
-| 3 | **P1 Tier 1** Android ongoing progress notification | days | nothing |
+| 2 | **P1 Tier 1** the live order card | days | nothing |
+| 3 | **P2** admin hero CRUD | days | nothing |
 | 4 | **P4** hero motion loop | days | P2 + the WebP/video decision |
-| 5 | **P1 Tier 2** Android 16 Live Updates | days | ⚠️ targetSdk 36 |
+| 5 | **P1 Tier 2** Android 16 chip + segments | days | ⚠️ targetSdk 36 |
 | 6 | **P1 Tier 3** iOS Live Activities | **weeks** | ⚠️ iOS target 16.1, a Swift extension, and proof iOS builds at all |
 
-P3 first because it is hours and touches nothing else. P2 before P4 because P4 is a
-column on P2's table. P1 Tier 1 delivers most of the felt value of the screenshots on the
-devices that actually run this app.
+P3 first because it is hours and touches nothing else. P1 Tier 1 second because it
+reproduces the screenshots on the devices that actually run this app, with nothing
+blocking it. P2 before P4 because P4 is a column on P2's table.
 
 ---
 
 ## Decisions needed from you before any of this starts
 
 1. **P4:** animated WebP (no new dependency) or `video_player` ⚠️? *Recommend WebP.*
-2. **P1 Tier 2:** approve `targetSdk 35 → 36` ⚠️, or park the Android 16 chip?
+2. **P1 Tier 2:** approve `targetSdk 35 → 36` ⚠️, or park the Android 16 chip? *Not
+   urgent — Tier 1 already gives you the card; this only adds the status-bar chip,
+   guaranteed top placement, and segmented progress.*
 3. **P1 Tier 3:** is iOS a real target? If yes — has the iOS app ever been built and run
    on a device, and is dropping iOS 13/14/15 acceptable? If iOS is not shipping this
    year, Tier 3 should be deleted from this file rather than carried.
