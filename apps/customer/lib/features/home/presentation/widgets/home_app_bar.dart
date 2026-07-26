@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
+import 'package:zopiqnow/features/home/domain/entities/hero_slide.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_filters.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_hero_carousel.dart';
@@ -29,10 +30,12 @@ import 'package:zopiqnow/features/notifications/presentation/widgets/notificatio
 class HomeSliverAppBar extends StatelessWidget {
   const HomeSliverAppBar({
     required this.address,
+    this.heroSlides = const <HeroSlide>[],
     this.onTapLocation,
     this.onTapSearch,
     this.onTapProfile,
     this.onTapCta,
+    this.onOpenHeroTarget,
     super.key,
   });
 
@@ -41,8 +44,15 @@ class HomeSliverAppBar extends StatelessWidget {
   final VoidCallback? onTapSearch;
   final VoidCallback? onTapProfile;
 
+  /// The published campaign slides. Empty means the carousel draws the art it
+  /// ships with — see [HomeHeroCarousel].
+  final List<HeroSlide> heroSlides;
+
   /// Forwarded to the carousel's "Order now" CTA.
   final VoidCallback? onTapCta;
+
+  /// Forwarded to the carousel: opens a slide's own destination.
+  final ValueChanged<String>? onOpenHeroTarget;
 
   // Header metrics (below the status-bar inset).
   static const double _topPad = ZopiqSpacing.pageGutter; // 16
@@ -121,7 +131,9 @@ class HomeSliverAppBar extends StatelessWidget {
                     child: HomeHeroCarousel(
                       headerInset: headerInset,
                       promoHeight: promoHeight,
+                      slides: heroSlides,
                       onTapCta: onTapCta,
+                      onOpenTarget: onOpenHeroTarget,
                     ),
                   ),
                 ),

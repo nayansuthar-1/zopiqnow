@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/features/home/domain/entities/hero_slide.dart';
+
 /// The Home hero — a swipeable carousel of campaign slides under the header.
 ///
 /// It continues the header's brand colour into a full-bleed panel (Zomato's
@@ -11,9 +13,13 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 /// dots and a gentle auto-advance. Each slide's text animates: it lifts and
 /// fades in on first build (entrance) and drifts with a parallax as you swipe.
 ///
-/// The slide artwork is a **temporary in-app composition** (gradient + rotating
-/// ray bursts + a light sheen) until brand art is supplied. Swap a slide's body
-/// for an `Image` when the real asset lands — nothing outside this file changes.
+/// **Two kinds of slide, and which one you see.** [slides] is what an admin
+/// published in the console (migration 0053): artwork, copy and a destination,
+/// editable without a build. When it is empty — no campaign running, or the
+/// fetch failed, or the phone is offline — the carousel renders the in-app
+/// composition below instead (gradient + rotating ray bursts + a sheen), which
+/// is what shipped before any of this was content. That fallback is the empty
+/// state on purpose: zero rows must look like the app, not like a blank band.
 ///
 /// Motion budget (DEVELOPMENT_PLAN — Motion & performance standard): every loop
 /// is a transform or a one-shot opacity behind a [RepaintBoundary]; nothing
@@ -22,9 +28,19 @@ class HomeHeroCarousel extends StatefulWidget {
   const HomeHeroCarousel({
     required this.headerInset,
     required this.promoHeight,
+    this.slides = const <HeroSlide>[],
     this.onTapCta,
+    this.onOpenTarget,
     super.key,
   });
+
+  /// The published campaign slides. Empty renders the in-app fallback art.
+  final List<HeroSlide> slides;
+
+  /// Opens a slide's `cta_target`. Only called for a slide that names one; a
+  /// slide with no target falls back to [onTapCta], which is what the hero's
+  /// button has always done.
+  final ValueChanged<String>? onOpenTarget;
 
   /// Blank space reserved at the top of every slide so the location + search
   /// header (which the app bar floats over the carousel) never sits on the
@@ -49,14 +65,38 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
   DateTime _lastInteract = DateTime.fromMillisecondsSinceEpoch(0);
   bool _reduceMotion = false;
 
+  /// How many distinct slides the carousel is paging through — published ones
+  /// if there are any, otherwise the in-app fallback set.
+  int get _count =>
+      widget.slides.isEmpty ? _slides.length : widget.slides.length;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _reduceMotion = MediaQuery.disableAnimationsOf(context);
+    _syncAuto();
+  }
+
+  @override
+  void didUpdateWidget(HomeHeroCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only on a change of *count*, never on an ordinary rebuild. The app bar
+    // rebuilds this widget on every pixel of its collapse, and restarting the
+    // timer each time would reset the five seconds forever — the carousel would
+    // never advance on its own.
+    if (oldWidget.slides.length != widget.slides.length) _syncAuto();
+  }
+
+  void _syncAuto() {
     // Auto-advance is a nicety, not the way to see slides — off when the OS
     // asks for reduced motion. Swiping still works.
-    if (_reduceMotion) {
+    //
+    // Also off for a single slide, which an admin publishing one campaign will
+    // produce: there is nowhere to advance *to*, so the timer would slide the
+    // same artwork out and back in every five seconds.
+    if (_reduceMotion || _count < 2) {
       _auto?.cancel();
+      _auto = null;
     } else {
       _startAuto();
     }
@@ -102,23 +142,40 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
             },
             child: Stack(
               children: <Widget>[
+                // One PageView for both kinds of slide, so the published ones
+                // arriving mid-session only swap the *children*. Rebuilding the
+                // view itself would mean a second widget briefly attached to the
+                // same PageController, which Flutter refuses outright. The
+                // incoming slide's own entrance fade covers the swap.
                 PageView.builder(
                   controller: _page,
-                  itemBuilder: (BuildContext context, int i) => _HeroSlideView(
-                    slide: _slides[i % _slides.length],
-                    index: i,
-                    page: _page,
-                    headlineSize: headlineSize,
-                    topInset: widget.headerInset,
-                    reduceMotion: _reduceMotion,
-                    onTapCta: widget.onTapCta,
-                  ),
+                  itemBuilder: (BuildContext context, int i) =>
+                      widget.slides.isEmpty
+                      ? _HeroSlideView(
+                          slide: _slides[i % _slides.length],
+                          index: i,
+                          page: _page,
+                          headlineSize: headlineSize,
+                          topInset: widget.headerInset,
+                          reduceMotion: _reduceMotion,
+                          onTapCta: widget.onTapCta,
+                        )
+                      : _PublishedSlideView(
+                          slide: widget.slides[i % widget.slides.length],
+                          index: i,
+                          page: _page,
+                          headlineSize: headlineSize,
+                          topInset: widget.headerInset,
+                          reduceMotion: _reduceMotion,
+                          onTapCta: widget.onTapCta,
+                          onOpenTarget: widget.onOpenTarget,
+                        ),
                 ),
                 Positioned(
                   left: 0,
                   right: 0,
                   bottom: ZopiqSpacing.md,
-                  child: _Dots(count: _slides.length, pageController: _page),
+                  child: _Dots(count: _count, pageController: _page),
                 ),
               ],
             ),
@@ -131,6 +188,12 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
 
 /// The page-position indicator. Only 5 dots visible at a time.
 /// As the user swipes, the dots infinitely slide left/right.
+///
+/// Two shapes, because [count] stopped being a constant the day slides became
+/// content. Up to five, the row shows exactly that many dots and lights the
+/// current one — anything else would claim the carousel holds slides it does
+/// not. Above five it is the sliding window this was written as, since a row of
+/// twelve dots is not a page indicator any more.
 class _Dots extends StatelessWidget {
   const _Dots({required this.count, required this.pageController});
 
@@ -139,13 +202,37 @@ class _Dots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // One slide has no position to indicate.
+    if (count < 2) return const SizedBox.shrink();
+
     return AnimatedBuilder(
       animation: pageController,
       builder: (BuildContext context, Widget? child) {
         final double page = pageController.hasClients && pageController.position.haveDimensions
             ? (pageController.page ?? 12000.0)
             : 12000.0;
-        
+
+        if (count <= 5) {
+          final int active = page.round() % count;
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              for (int i = 0; i < count; i++)
+                Container(
+                  width: 7,
+                  height: 7,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    color: ZopiqPalette.white.withValues(
+                      alpha: i == active ? 1.0 : 0.5,
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+            ],
+          );
+        }
+
         final int basePage = page.floor();
         final double f = page - basePage;
 
@@ -393,6 +480,210 @@ class _HeroSlideViewState extends State<_HeroSlideView>
   }
 }
 
+/// One admin-published slide: the uploaded artwork, a scrim, and the copy.
+///
+/// Deliberately *not* the composition above. The gradient, the rotating ray
+/// bursts and the sheen exist because there was no artwork; put them over a real
+/// photograph and they fight it. What is kept is the copy's motion — the same
+/// entrance lift and swipe parallax — so the two kinds of slide move alike even
+/// though they look nothing alike.
+///
+/// The scrim is the one thing here that is not decoration. Artwork is uploaded
+/// by a person who cannot know what the headline will sit on, so white text over
+/// an unknown photograph needs a floor under it or a pale sky makes the headline
+/// vanish. A bottom-weighted gradient, no blur, no glow.
+class _PublishedSlideView extends StatefulWidget {
+  const _PublishedSlideView({
+    required this.slide,
+    required this.index,
+    required this.page,
+    required this.headlineSize,
+    required this.topInset,
+    required this.reduceMotion,
+    this.onTapCta,
+    this.onOpenTarget,
+  });
+
+  final HeroSlide slide;
+  final int index;
+  final PageController page;
+  final double headlineSize;
+  final double topInset;
+  final bool reduceMotion;
+  final VoidCallback? onTapCta;
+  final ValueChanged<String>? onOpenTarget;
+
+  @override
+  State<_PublishedSlideView> createState() => _PublishedSlideViewState();
+}
+
+class _PublishedSlideViewState extends State<_PublishedSlideView>
+    with TickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: ZopiqDurations.breath,
+  );
+  late final AnimationController _entrance = AnimationController(
+    vsync: this,
+    duration: ZopiqDurations.slow,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.reduceMotion) {
+      _entrance.value = 1;
+    } else {
+      _pulse.repeat(reverse: true);
+      _entrance.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    _entrance.dispose();
+    super.dispose();
+  }
+
+  void _onTap() {
+    final String? target = widget.slide.ctaTarget;
+    if (target == null) {
+      widget.onTapCta?.call();
+    } else {
+      widget.onOpenTarget?.call(target);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme t = Theme.of(context).textTheme;
+    final HeroSlide s = widget.slide;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: <Widget>[
+        // The brand gradient is the fallback, not a backdrop: a slide whose
+        // artwork fails to load still reads as the app, with its copy intact.
+        ZopiqNetworkImage(
+          url: s.imageUrl,
+          fallback: const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: <Color>[
+                  ZopiqPalette.primary,
+                  ZopiqPalette.primaryDeep,
+                ],
+              ),
+            ),
+          ),
+        ),
+        const Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: <Color>[Color(0x33000000), Color(0x99000000)],
+                  stops: <double>[0.35, 1],
+                ),
+              ),
+            ),
+          ),
+        ),
+        FadeTransition(
+          opacity: CurvedAnimation(parent: _entrance, curve: ZopiqCurves.enter),
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.14),
+              end: Offset.zero,
+            ).animate(
+              CurvedAnimation(parent: _entrance, curve: ZopiqCurves.emphasized),
+            ),
+            child: AnimatedBuilder(
+              animation: widget.page,
+              builder: (BuildContext context, Widget? child) {
+                final double page =
+                    widget.page.hasClients &&
+                        widget.page.position.haveDimensions
+                    ? (widget.page.page ?? widget.index.toDouble())
+                    : widget.index.toDouble();
+                final double delta = page - widget.index;
+                return Transform.translate(
+                  offset: Offset(delta * -30, 0),
+                  child: child,
+                );
+              },
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  ZopiqSpacing.pageGutter,
+                  widget.topInset,
+                  ZopiqSpacing.pageGutter,
+                  ZopiqSpacing.lg,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: <Widget>[
+                    Text(
+                      s.title,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: t.displayLarge?.copyWith(
+                        color: ZopiqPalette.white,
+                        fontSize: widget.headlineSize,
+                        height: 1.05,
+                        fontWeight: FontWeight.w800,
+                        fontVariations: const <FontVariation>[
+                          FontVariation('wght', 800),
+                        ],
+                        shadows: const <Shadow>[
+                          Shadow(color: Color(0x66000000), offset: Offset(0, 2)),
+                        ],
+                      ),
+                    ),
+                    // An empty subtitle is allowed by the table, so it costs no
+                    // vertical space here rather than an empty line.
+                    if (s.subtitle.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: ZopiqSpacing.xs),
+                      Text(
+                        s.subtitle,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.bodyMedium?.copyWith(
+                          color: ZopiqPalette.white.withValues(alpha: 0.92),
+                          shadows: const <Shadow>[
+                            Shadow(color: Color(0x66000000), blurRadius: 4),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: ZopiqSpacing.md),
+                    _PulsingCta(
+                      pulse: _pulse,
+                      label: s.ctaLabel,
+                      // The arrow says where the tap goes. Down for the slide
+                      // that scrolls the feed, forward for one that leaves it.
+                      icon: s.ctaTarget == null
+                          ? Icons.arrow_downward_rounded
+                          : Icons.arrow_forward_rounded,
+                      onTap: _onTap,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// A translucent badge for the slide's kicker line.
 class _EyebrowPill extends StatelessWidget {
   const _EyebrowPill({required this.icon, required this.label});
@@ -503,9 +794,19 @@ class _Sheen extends StatelessWidget {
 
 /// White CTA pill with a slow scale breath.
 class _PulsingCta extends StatelessWidget {
-  const _PulsingCta({required this.pulse, this.onTap});
+  const _PulsingCta({
+    required this.pulse,
+    this.label = 'Order now',
+    this.icon = Icons.arrow_downward_rounded,
+    this.onTap,
+  });
 
   final Animation<double> pulse;
+
+  /// The published slide's `cta_label`. Defaults to what the in-app slides say.
+  final String label;
+
+  final IconData icon;
   final VoidCallback? onTap;
 
   @override
@@ -534,17 +835,13 @@ class _PulsingCta extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Text(
-                  'Order now',
+                  label,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: ZopiqPalette.primaryDeep,
                   ),
                 ),
                 const SizedBox(width: ZopiqSpacing.xs),
-                const Icon(
-                  Icons.arrow_downward_rounded,
-                  size: 16,
-                  color: ZopiqPalette.primaryDeep,
-                ),
+                Icon(icon, size: 16, color: ZopiqPalette.primaryDeep),
               ],
             ),
           ),
@@ -1041,10 +1338,13 @@ class _DealCardData {
 /// Which illustration art to paint on a deal card.
 enum _DealArt { priceDrop, dealFeast, topBrands, freeDelivery }
 
-/// Placeholder campaign slides. The first stays on the brand orange; the rest
-/// use temporary promo gradients (swap for real banner art later, per the
-/// class doc). These carry the offers that used to live in the removed cards,
+/// The empty state — what the hero shows when no campaign is published, and not
+/// a placeholder waiting to be deleted. The first slide stays on the brand
+/// orange; the rest carry the offers that used to live in the removed cards,
 /// plus a teaser for the upcoming Dining feature.
+///
+/// Real artwork arrives as rows now (migration 0053), which is why this list is
+/// no longer the thing to edit when copy changes.
 const List<_HeroSlide> _slides = <_HeroSlide>[
   _HeroSlide(
     eyebrow: 'BIG BRANDS · BIGGEST LOOT',

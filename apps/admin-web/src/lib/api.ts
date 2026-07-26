@@ -231,6 +231,58 @@ export const api = {
       p_base_fee: baseFee,
       p_per_km_fee: perKmFee,
     }),
+
+  /// Every slide, including the ones no customer can see. The table's own read
+  /// policy shows only what is live right now, which is exactly the wrong thing
+  /// for an editor — the row you go looking for is usually the expired one.
+  listHeroSlides: () => rpc<HeroSlideRow[]>('admin_list_hero_slides'),
+
+  /// Create (no `id`) or edit (with one). Every field, every time: a hero slide
+  /// is one short form with no steps, so there is nothing to save a quarter of.
+  /// `is_active` is deliberately not among them — publishing is its own action
+  /// below, so fixing a typo cannot put a slide on screen by accident.
+  upsertHeroSlide: (slide: Record<string, unknown>) =>
+    rpc<string>('admin_upsert_hero_slide', { p_slide: slide }),
+
+  /// Re-checks the slide's destination on the way up: a restaurant it points at
+  /// may have been delisted since it was written, and this is the last look
+  /// anybody takes before it reaches a home screen.
+  setHeroSlideActive: (id: string, active: boolean) =>
+    rpc<void>('admin_set_hero_slide_active', { p_id: id, p_active: active }),
+
+  /// A real delete, unlike a restaurant or a rider — nothing hangs off a slide.
+  deleteHeroSlide: (id: string) =>
+    rpc<void>('admin_delete_hero_slide', { p_id: id }),
+}
+
+/// One campaign slide on the customer home hero (migration 0053).
+///
+/// `cta_target` null is the ordinary case rather than a gap: it means the
+/// button scrolls the customer's home feed down to the restaurant list, which is
+/// what the hero's button has always done.
+export type HeroSlideRow = {
+  id: string
+  title: string
+  subtitle: string
+  cta_label: string
+  cta_target: string | null
+  image_url: string
+  sort_order: number
+  is_active: boolean
+  starts_at: string
+  ends_at: string | null
+  created_at: string
+}
+
+/// What a slide is doing right now. Derived from the same three fields the read
+/// policy uses, so the pill and the customer's phone can never disagree.
+export type SlideState = 'live' | 'off' | 'scheduled' | 'expired'
+
+export function slideStateOf(s: HeroSlideRow, now = Date.now()): SlideState {
+  if (s.ends_at && Date.parse(s.ends_at) <= now) return 'expired'
+  if (!s.is_active) return 'off'
+  if (Date.parse(s.starts_at) > now) return 'scheduled'
+  return 'live'
 }
 
 export type AdminRow = { email: string; name: string; created_at: string }

@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:zopiqnow/features/home/data/datasources/hero_slide_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/home_catalog_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_supabase_datasource.dart';
 import 'package:zopiqnow/features/home/data/repositories/restaurant_repository_impl.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
+import 'package:zopiqnow/features/home/domain/entities/hero_slide.dart';
 import 'package:zopiqnow/features/home/domain/entities/offer.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/domain/repositories/restaurant_repository.dart';
@@ -39,6 +41,21 @@ restaurantByIdProvider = FutureProvider.autoDispose.family<Restaurant, String>(
   (Ref ref, String id) =>
       ref.watch(restaurantRepositoryProvider).getRestaurantById(id),
 );
+
+/// The Home hero's campaign slides (migration 0053).
+///
+/// Not `autoDispose`, and that is the cache. Slides change when an admin
+/// publishes one — perhaps weekly — so a fetch per Home build would be a
+/// request per app resume for content that has not moved. Kept for the life of
+/// the process and invalidated by Home's pull-to-refresh, which is the gesture
+/// a person already makes when they expect the screen to be newer than it is.
+final Provider<HeroSlideDataSource> heroSlideDataSourceProvider =
+    Provider<HeroSlideDataSource>((Ref ref) => const HeroSlideDataSource());
+
+final FutureProvider<List<HeroSlide>> heroSlidesProvider =
+    FutureProvider<List<HeroSlide>>(
+      (Ref ref) => ref.watch(heroSlideDataSourceProvider).fetchLive(),
+    );
 
 /// Merchandising content for the category rail and the offers carousel.
 final Provider<HomeCatalogDataSource> homeCatalogDataSourceProvider =

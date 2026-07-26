@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
+import 'package:zopiqnow/features/home/domain/entities/hero_slide.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/domain/repositories/restaurant_repository.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
@@ -100,6 +101,21 @@ class _HomePageState extends ConsumerState<HomePage>
     super.dispose();
   }
 
+  /// A published slide's own destination. The database has already checked that
+  /// it is one of a closed set and that it exists (migration 0053), so this only
+  /// has to decide *how* to go there — and the two answers are different.
+  ///
+  /// A restaurant is pushed, like every other route to a menu, so Back returns
+  /// to Home. A tab is `go`, because pushing one on top of Home would leave the
+  /// bottom bar highlighting a tab the user is not on.
+  void _openHeroTarget(String target) {
+    if (target.startsWith('/restaurant/')) {
+      context.push(target);
+    } else {
+      context.go(target);
+    }
+  }
+
   /// The hero's "Order now": advance the feed by roughly one viewport, which
   /// lands at the restaurant list without hardcoding any section heights.
   void _scrollTowardsRestaurants() {
@@ -117,6 +133,13 @@ class _HomePageState extends ConsumerState<HomePage>
     final List<FoodCategory> categories = ref.watch(foodCategoriesProvider);
     final Address? address = ref.watch(selectedAddressProvider);
 
+    // `valueOrNull`, so loading and failure are both "no campaign running" and
+    // the carousel draws the art it ships with. A hero is the first thing on the
+    // first screen: it has no business showing a spinner, and it certainly has
+    // no business showing an error about a marketing banner.
+    final List<HeroSlide> heroSlides =
+        ref.watch(heroSlidesProvider).valueOrNull ?? const <HeroSlide>[];
+
     // Full-bleed: no top SafeArea, so the hero carousel bleeds behind the
     // status bar. The app bar insets its own content by the real top padding,
     // and — because it owns the status-bar area — the pinned filter chips still
@@ -132,7 +155,13 @@ class _HomePageState extends ConsumerState<HomePage>
         // Sit the spinner just below the status bar, clear of the search pill.
         edgeOffset: topInset + ZopiqSpacing.sm,
         displacement: 40,
-        onRefresh: () => ref.refresh(nearbyRestaurantsProvider.future),
+        onRefresh: () {
+          // The hero's cache invalidation (see `heroSlidesProvider`). Not
+          // awaited: the spinner belongs to the feed, and a slow banner fetch
+          // must not hold it spinning over a list that has already arrived.
+          ref.invalidate(heroSlidesProvider);
+          return ref.refresh(nearbyRestaurantsProvider.future);
+        },
         child: CustomScrollView(
           controller: _scroll,
           // Clamping (not bouncing): a pull-to-refresh drags only the
@@ -145,10 +174,12 @@ class _HomePageState extends ConsumerState<HomePage>
               // Null on a first run. Inventing a default city would be
               // a lie about where we deliver — ask instead.
               address: address?.shortDisplay ?? 'Set delivery location',
+              heroSlides: heroSlides,
               onTapLocation: () => showAddressPicker(context),
               onTapSearch: () => context.goNamed(Routes.search),
               onTapProfile: () => context.pushNamed(Routes.account),
               onTapCta: _scrollTowardsRestaurants,
+              onOpenHeroTarget: _openHeroTarget,
             ),
             SliverPersistentHeader(
               pinned: true,

@@ -29,12 +29,13 @@ Worth stating up front so nothing below gets rebuilt.
 | Impeller on Android | Flutter 3.44.5 default | ✅ |
 | Cloudinary upload from the console | `apps/admin-web/src/lib/uploads.ts` | ✅ images only |
 | Admin console CRUD pattern | `apps/admin-web/src/restaurants/`, `riders/`, `menu/` | ✅ copy this |
-| Hero carousel | `apps/customer/lib/features/home/presentation/widgets/home_hero_carousel.dart` | 1111 lines, slides **hardcoded**, art composed in Dart |
+| Hero carousel | `apps/customer/lib/features/home/presentation/widgets/home_hero_carousel.dart` | ✅ **slides are rows** (0053); the in-Dart art is now the empty state |
+| Hero slides table + console | migration 0053, `apps/admin-web/src/content/HeroSlidesPage.tsx` | ✅ built 2026-07-26 |
 
 Pinned versions this work has to live inside: Flutter **3.44.5**, Dart SDK `^3.12.2`,
 `compileSdk 36`, `targetSdk 35`, `minSdk 24`, iOS deployment target **13.0**,
 `firebase_messaging 15.1.6`, `flutter_local_notifications 18.0.1`. Next free migration
-is **0053** (0052 is the live order card).
+is **0054** (0052 is the live order card, 0053 the hero slides).
 
 ---
 
@@ -295,34 +296,99 @@ supplied"* — so this was always the plan.
 There is **no banner, promo, hero, or campaign table** anywhere in `supabase/migrations/`.
 This is greenfield.
 
-- [ ] **Migration 0053 — `hero_slides`**
-  - `id`, `title`, `subtitle`, `cta_label`, `cta_target` (deep link or restaurant id),
+**Built 2026-07-26.** Migration 0053 applied and verified against the live database;
+console module and customer wiring land with it. The one thing not proven is the same
+thing P1 has outstanding — nothing that happens on a phone screen. Manual steps below.
+
+- [x] **Migration 0053 — `hero_slides`** — *applied.*
+  - [x] `id`, `title`, `subtitle`, `cta_label`, `cta_target` (deep link or restaurant id),
     `image_url`, `sort_order`, `is_active`, `starts_at`, `ends_at`, `created_at`
-  - **RLS:** public `select` for `anon` + `authenticated` where
+  - [x] **RLS:** public `select` for `anon` + `authenticated` where
     `is_active and now() between starts_at and coalesce(ends_at, 'infinity')` —
-    a scheduled-but-unpublished slide must not be readable, not merely unrendered
-  - Writes via `admin_*` RPCs behind `assert_admin()`, matching the pattern every other
-    admin surface uses (0026–0038). **No table-level write grant**
-  - `revoke all on function ... from public, anon, authenticated` on every new RPC —
-    the 0045 lesson
-- [ ] **Console module `apps/admin-web/src/content/HeroSlidesPage.tsx`**
-  - Copy the shape of `restaurants/RestaurantsPage.tsx`; reuse `lib/uploads.ts`
-    `uploadPhoto()` unchanged for stills
-  - List, create, edit, reorder (drag or an integer field — a field is fine and cheaper),
-    activate/deactivate, schedule
-  - **Live preview at the phone's real aspect ratio.** An admin who cannot see the crop
-    will ship a slide with the headline over a face
-  - Add the route to `App.tsx` and a nav entry
-- [ ] **Customer app**
-  - `features/home/data/hero_datasource.dart` + a `heroSlidesProvider`
-  - `HomeHeroCarousel` takes `List<HeroSlide>` instead of composing its own slides
-  - **Keep the existing in-Dart art as the empty state.** Zero active slides must render
-    the carousel that ships today, not a blank band. This is what makes the change safe
-    to land before any content exists
-  - Keep the motion budget the file already documents: transform/opacity only, behind
-    `RepaintBoundary`, all loops off under OS reduce-motion
-- [ ] Cache: slides change rarely. A short TTL or a pull-to-refresh invalidation, not a
-      fetch per home build
+    a scheduled-but-unpublished slide must not be readable, not merely unrendered.
+    Verified: four rows (live / off / scheduled next week / expired yesterday), and
+    `set role anon` reads exactly one
+  - [x] Writes via `admin_*` RPCs behind `assert_admin()`, matching the pattern every other
+    admin surface uses (0026–0038). **No table-level write grant** — and this turned out
+    to need saying out loud in SQL. Supabase's default privileges grant ALL on every new
+    table in `public` to `anon` and `authenticated`, so a fresh table arrives *writable*
+    and the only thing refusing an insert is the absence of an insert policy. The insert,
+    update and delete are now revoked explicitly, so the refusal does not depend on a
+    policy nobody has added yet
+  - [x] `revoke all on function ... from public, anon, authenticated` on every new RPC —
+    the 0045 lesson. `assert_hero_cta` is revoked from all three: it is called only by
+    the RPCs, in their own definer context
+  - [x] Verified as a real admin (`request.jwt.claims`): create → the slide is invisible
+    to a customer → publish → visible → edit → **still published, and editing does not
+    publish** → delete. A non-admin gets "You are not a Zopiqnow admin."
+- [x] **Console module `apps/admin-web/src/content/HeroSlidesPage.tsx`**
+  - [x] Copies the shape of `riders/RidersPage.tsx` (one form for add and edit, actions on
+    the row); reuses `lib/uploads.ts` `uploadPhoto()` **unchanged**
+  - [x] List, create, edit, reorder (an integer `Position` field — a field, as the cheaper
+    of the two), publish/switch off, schedule, delete
+  - [x] **Live preview at the phone's real aspect ratio** — 393pt wide to scale, with the
+    real numbers read off `home_app_bar.dart` (`headerInset` 158, `promoHeight` 238,
+    42.4pt headline). It draws the **floating location row and search pill over the art**,
+    because those are what cover the top third of every upload — a preview that omitted
+    them would be the crop nobody ships against
+  - [x] Route in `App.tsx`, "Home hero" in the sidebar
+  - [x] `datetime-local` is converted through the admin's own timezone in both directions.
+    A bare local string handed to Postgres reads as UTC, which is how an IST admin
+    schedules 9am and publishes at 2:30pm
+- [x] **Customer app**
+  - [x] `features/home/data/datasources/hero_slide_datasource.dart` + `heroSlidesProvider`
+    (in `home_providers.dart`, beside the rest). Filed under `data/datasources/` rather
+    than the `data/hero_datasource.dart` written above, to sit where the other four do
+  - [x] `HomeHeroCarousel` takes `List<HeroSlide>`; `_PublishedSlideView` draws the
+    uploaded art with a scrim under the copy — **not** the ray bursts and sheen, which
+    exist because there was no artwork and fight a real photograph
+  - [x] **The existing in-Dart art is the empty state.** No campaign, a failed fetch and
+    an offline phone are one case: `valueOrNull ?? const []`, and the carousel draws what
+    ships today. The hero never shows a spinner or an error about a marketing banner
+  - [x] Motion budget kept: the published slide reuses the same entrance lift and swipe
+    parallax and adds no loop of its own beyond the CTA breath, all off under
+    reduce-motion. One `PageView` for both kinds, because rebuilding it would attach two
+    views to one `PageController`
+  - [x] Two things the variable slide count exposed, both now handled: the auto-advance is
+    **off for a single slide** (nowhere to advance to), and the page dots showed a fixed
+    five-dot sliding window regardless of `count` — they now show exactly `count` dots up
+    to five, and nothing at all for one slide
+  - [x] `cta_target` navigation: `/restaurant/<id>` is **pushed** so Back returns Home; a
+    tab path is `go`, because pushing a bottom-nav tab over Home leaves the nav bar
+    highlighting a tab the user is not on
+- [x] Cache: `heroSlidesProvider` is not `autoDispose`, so it is fetched once per process
+      and not once per Home build, and Home's pull-to-refresh invalidates it — the gesture
+      a person already makes when they expect the screen to be newer than it is. The
+      invalidation is deliberately not awaited: the spinner belongs to the feed
+
+### Verifying P2 on a device ([[zopiqnow-no-test-files]] — manual, by hand)
+
+Proven without a phone: the read policy hides off / scheduled / expired slides from
+`anon`; the admin loop creates, publishes, edits without republishing, and deletes; a
+non-admin is refused; a non-Cloudinary image, an empty headline, an end before its start,
+an unlisted restaurant and an arbitrary URL are each refused with a sentence; and the
+customer app's **exact PostgREST query** returns the live slides in position order with
+the switched-off one absent (checked with the anon key over HTTPS, then cleaned up).
+
+1. Console → **Home hero** → Add slide. Upload art and watch the preview: the headline
+   must not collide with the floating search pill.
+2. Save. It appears **Off**. Open the customer app — the hero is still the shipped
+   artwork, six slides, unchanged. That is rule 1, and it is the whole safety property.
+3. **Publish** it. Pull to refresh Home. One slide, your art, your copy, one dot's worth
+   of carousel — no dots at all, and no auto-advance, because there is one slide.
+4. Add a second and publish it. Now: two dots, auto-advance every five seconds, swipe
+   both ways, and the copy drifts as you swipe.
+5. Tap the CTA on a slide with **no** target — Home scrolls to the restaurant list, arrow
+   pointing down. Then one pointing at `/restaurant/<id>` — the menu opens, arrow pointing
+   forward, and **Back returns to Home**.
+6. Switch both off. Refresh. The shipped artwork is back, with no blank frame in between.
+7. Schedule one for five minutes out. It must be **absent** until then, not present and
+   hidden — check by refreshing at four minutes and at six.
+8. Turn on **reduce motion** in the OS: no auto-advance, no CTA breath, swiping still
+   works.
+9. Kill the network and cold-start: the shipped artwork, no error, no spinner in the hero.
+10. Repeat on the **Android 10 floor** ([[zopiqnow-android-compat]]) — a full-bleed
+    Cloudinary JPEG decoded at hero size is the new cost on the first screen.
 
 ### Rules
 
@@ -374,7 +440,8 @@ home feed cannot hold 120 fps, cap it deliberately rather than shipping judder.
 
 ## P4 — Admin-uploaded looping video in the hero
 
-Depends on **P2** — same table, same console module, same carousel. Do not start before it.
+Depends on **P2**, which is now built — same table, same console module, same carousel, so
+this is a `motion_url` column beside `image_url` rather than a feature from scratch.
 
 ### The dependency question, which has a good answer
 
@@ -441,8 +508,8 @@ the decisions.
 |---|---|---|---|
 | 1 | **P3** Android high refresh rate | hours | nothing |
 | ~~2~~ | ~~**P1 Tier 1** the live order card~~ | **✅ built 2026-07-25** | needs a device pass |
-| 3 | **P2** admin hero CRUD | days | nothing |
-| 4 | **P4** hero motion loop | days | P2 + the WebP/video decision |
+| ~~3~~ | ~~**P2** admin hero CRUD~~ | **✅ built 2026-07-26** | needs a device pass |
+| 4 | **P4** hero motion loop | days | ~~P2~~ + the WebP/video decision |
 | ~~5~~ | ~~**P1 Tier 2** Android 16 chip + segments~~ | **✅ built 2026-07-25** | needs a device pass |
 | 6 | **P1 Tier 3** iOS Live Activities | **weeks** | ⚠️ iOS target 16.1, a Swift extension, and proof iOS builds at all |
 
