@@ -31,6 +31,7 @@ Worth stating up front so nothing below gets rebuilt.
 | Admin console CRUD pattern | `apps/admin-web/src/restaurants/`, `riders/`, `menu/` | ✅ copy this |
 | Hero carousel | `apps/customer/lib/features/home/presentation/widgets/home_hero_carousel.dart` | ✅ **slides are rows** (0053); the in-Dart art is now the empty state |
 | Hero slides table + console | migration 0053, `apps/admin-web/src/content/HeroSlidesPage.tsx` | ✅ built 2026-07-26 |
+| High refresh rate, Android | `apps/customer/android/.../MainActivity.kt` | ✅ built 2026-07-26, customer only |
 
 Pinned versions this work has to live inside: Flutter **3.44.5**, Dart SDK `^3.12.2`,
 `compileSdk 36`, `targetSdk 35`, `minSdk 24`, iOS deployment target **13.0**,
@@ -402,34 +403,73 @@ the switched-off one absent (checked with the anon key over HTTPS, then cleaned 
 
 ## P3 — Run at the device's maximum refresh rate
 
-The smallest item here, and half of it is already done.
+The smallest item here, and half of it was already done.
+
+**Built 2026-07-26.** 34 lines of Kotlin in one file, no new dependency, and it compiles —
+`flutter build apk --debug` succeeded against the pinned SDK. The one thing not proven is
+the one thing only a 90/120 Hz phone can prove: the frame rate on screen. Manual steps below.
 
 - [x] **iOS** — `CADisableMinimumFrameDurationOnPhone` is already `true`
       (`apps/customer/ios/Runner/Info.plist:5`). ProMotion 120 Hz is enabled. **Nothing to do.**
 - [x] **Impeller** — default on Android in Flutter 3.44.5.
-- [ ] **Android** — `MainActivity.kt` is a bare `class MainActivity : FlutterActivity()`.
-      Nothing requests a high-refresh display mode, so on a 90/120 Hz phone whose system
-      default mode is 60 Hz, the app renders at 60.
+- [x] **Android** — was a bare `class MainActivity : FlutterActivity()`. Nothing requested a
+      high-refresh display mode, so on a 90/120 Hz phone whose system default mode is 60 Hz,
+      the app rendered at 60. It now asks.
 
 Two ways to fix it:
 
 | Approach | Cost | Verdict |
 |---|---|---|
-| **Kotlin in `MainActivity`** — enumerate `display.supportedModes`, pick the highest `refreshRate` at the current resolution, set `window.attributes.preferredDisplayModeId`. API 23+, ~20 lines | **no new dependency** | ✅ **recommended** |
-| `flutter_displaymode` package — `FlutterDisplayMode.setHighRefreshRate()` | a new pub dependency | ⚠️ needs approval; buys little over the above |
+| **Kotlin in `MainActivity`** — enumerate `display.supportedModes`, pick the highest `refreshRate` at the current resolution, set `window.attributes.preferredDisplayModeId`. API 23+, ~20 lines | **no new dependency** | ✅ **built** |
+| `flutter_displaymode` package — `FlutterDisplayMode.setHighRefreshRate()` | a new pub dependency | ⚠️ not taken — it does exactly the above and would collide with the freeze for no gain |
 
-- [ ] Implement the Kotlin route in `apps/customer/android/.../MainActivity.kt`
-- [ ] **Match the resolution.** Naively picking the highest-refresh mode can also switch
-      resolution and blur the display. Filter to modes matching the current
-      `physicalWidth`/`physicalHeight` first, then take the max refresh rate
-- [ ] Consider `Surface.setFrameRate()` (API 30+) as the modern signal alongside it
-- [ ] Do the same in the **vendor and rider** apps, or write down why not — a kitchen
-      tablet gains nothing from 120 Hz and loses battery, so "customer only" is a
-      defensible answer, but it should be a decision rather than an oversight
+- [x] Implement the Kotlin route in `apps/customer/android/.../MainActivity.kt` —
+      `preferredDisplayModeId` is API **23+**, so this reaches the Android 10 floor and
+      everything below it down to `minSdk 24`. No `targetSdk` bump, no lockfile diff
+- [x] **Match the resolution.** Naively picking the highest-refresh mode can also switch
+      resolution and blur the display — a 120 Hz mode is frequently offered only at 1080p on
+      a 1440p panel. The modes are filtered to the *current* `physicalWidth`/`physicalHeight`
+      first, and the max refresh rate taken from what is left, so sharpness is never traded
+      for smoothness
+- [x] **Don't re-request the mode you are already in.** A 60 Hz panel reports 59.94, so the
+      comparison carries a 1 Hz margin. Without it, a 60 Hz-only phone would hand the
+      compositor a mode change that changes nothing on every cold start
+- [x] `Display` is read two ways: `Activity.getDisplay()` on API 30+, and the deprecated
+      `WindowManager.getDefaultDisplay()` below it, which is the correct route there
+- [x] **`Surface.setFrameRate()` (API 30+) — considered, deliberately not used.** It needs the
+      surface Flutter renders into, and `FlutterActivity` does not expose it; reaching into
+      `FlutterView`'s internals to find it would be a fragile way to say the same thing the
+      mode request already says, on a subset of the devices
+- [x] **Customer only — decided 2026-07-26, not overlooked.** The vendor app is a kitchen
+      tablet where nobody is watching an animation, and the rider app runs a whole shift on
+      GPS, where battery is the scarce thing and 120 Hz spends it. Their `MainActivity`s stay
+      bare on purpose. If the rider app later grows a map that pans, revisit it there and only
+      there
 - [ ] **Verify with numbers, not vibes.** `flutter run --profile` plus the performance
       overlay on a 90/120 Hz device. A high-refresh app that drops to 45 fps is *worse*
       than a steady 60 — raising the ceiling raises the cost of every dropped frame
 - [ ] Re-check the Android 10 floor after the change ([[zopiqnow-android-compat]])
+
+### Verifying P3 on a device ([[zopiqnow-no-test-files]] — manual, by hand)
+
+Proven without a phone: it compiles against the pinned Flutter 3.44.5 / `compileSdk 36`, and
+`pubspec.lock` is untouched. Nothing else about this task can be proven off-device — the
+whole feature is a number the compositor chooses.
+
+1. On a **90 or 120 Hz** phone, set the system display setting to its *standard* / 60 Hz
+   mode if it has one — that is the case this change exists for. `flutter run --profile`.
+2. Turn on the performance overlay. The raster and UI graphs should now show a **~8.3 ms
+   (120 Hz) or ~11.1 ms (90 Hz)** frame budget rather than 16.7 ms. If the budget line has
+   not moved, the mode request was refused and nothing else below matters.
+3. Scroll the home feed hard. **Both graphs must stay under the new line.** A 120 Hz app that
+   drops to 45 fps is worse than a steady 60 — if the feed cannot hold it, cap it deliberately
+   (see the rule below) rather than shipping judder.
+4. Check the **display resolution did not change**: text must be exactly as sharp as before.
+   That is the filter in step one of the Kotlin doing its job, and a blurry screen is the
+   failure mode it exists to prevent.
+5. On a **60 Hz-only phone**, confirm nothing regressed — no flicker on launch, no mode
+   renegotiation. The 1 Hz margin should mean the request is never made at all.
+6. Repeat on the **Android 10 floor** ([[zopiqnow-android-compat]]).
 
 ### Rule
 
@@ -506,7 +546,7 @@ the decisions.
 
 | # | Task | Effort | Blocked on |
 |---|---|---|---|
-| 1 | **P3** Android high refresh rate | hours | nothing |
+| ~~1~~ | ~~**P3** Android high refresh rate~~ | **✅ built 2026-07-26** | needs a device pass |
 | ~~2~~ | ~~**P1 Tier 1** the live order card~~ | **✅ built 2026-07-25** | needs a device pass |
 | ~~3~~ | ~~**P2** admin hero CRUD~~ | **✅ built 2026-07-26** | needs a device pass |
 | 4 | **P4** hero motion loop | days | ~~P2~~ + the WebP/video decision |
@@ -535,7 +575,10 @@ Android 16 half compiles against the `compileSdk 36` the app already had.
 3. **P1 Tier 3:** is iOS a real target? If yes — has the iOS app ever been built and run
    on a device, and is dropping iOS 13/14/15 acceptable? If iOS is not shipping this
    year, Tier 3 should be deleted from this file rather than carried.
-4. **P3:** high refresh rate on customer only, or all three apps?
+4. ~~**P3:** high refresh rate on customer only, or all three apps?~~ **Answered
+   2026-07-26: customer only.** The reasoning is written into P3 above rather than left
+   implicit — the kitchen tablet gains nothing, and the rider trades battery for smoothness
+   it is not looking at.
 
 ---
 
