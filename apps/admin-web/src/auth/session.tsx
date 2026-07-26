@@ -4,9 +4,9 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 
 /// Being signed in and being an admin are two different facts, and the console
-/// needs both. Supabase issues a session to anyone who can receive an OTP —
-/// that is identity, not authority. Authority is `platform_admins`, which the
-/// server answers through `is_admin()` (migration 0026).
+/// needs both. Supabase issues a session to anyone whose email and password
+/// match — that is identity, not authority. Authority is `platform_admins`,
+/// which the server answers through `is_admin()` (migration 0026).
 ///
 /// The check here is a *courtesy*: it decides what to render. It is not what
 /// keeps a non-admin out — every admin RPC re-asks the same question server-side,

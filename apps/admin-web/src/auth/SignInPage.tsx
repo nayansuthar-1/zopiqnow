@@ -2,45 +2,43 @@ import { useState } from 'react'
 import { supabase, messageFor } from '../lib/supabase'
 import { Button, Card, Field } from '../ui/primitives'
 
-/// Email OTP, the same door the vendor and rider apps use — a six-digit code to
-/// an address, delivered by the SMTP sender already configured on the project.
+/// Email and password. Not the email OTP the vendor and rider apps use, and the
+/// difference is deliberate in one way worth naming.
 ///
-/// An auth account is created on first sign-in for whoever asks, exactly as it is
-/// for a vendor. It grants nothing: the console is gated on `platform_admins`,
-/// and a session without a row there can read nothing and call nothing.
+/// The OTP door called `signInWithOtp({ shouldCreateUser: true })`, which minted
+/// an auth account for **any** address that asked for a code. That was safe —
+/// authority is `platform_admins` (0026), and a session without a row there can
+/// read nothing and call nothing — but it meant the console's front door created
+/// users as a side effect of someone typing into it. This screen cannot create
+/// anything: an admin exists because somebody made them one, or they do not.
+///
+/// There is no sign-up and no password reset here on purpose. Both would be a
+/// way into an ops console that does not begin with an existing admin, which is
+/// the same reason `platform_admins` has no self-service path.
 export function SignInPage() {
   const [email, setEmail] = useState('')
-  const [code, setCode] = useState('')
-  const [sent, setSent] = useState(false)
+  const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function sendCode() {
+  async function signIn() {
     setBusy(true)
     setError(null)
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
-      options: { shouldCreateUser: true },
+      password,
     })
     setBusy(false)
     if (error) {
-      setError(messageFor(error))
-      return
-    }
-    setSent(true)
-  }
-
-  async function verifyCode() {
-    setBusy(true)
-    setError(null)
-    const { error } = await supabase.auth.verifyOtp({
-      email: email.trim().toLowerCase(),
-      token: code.trim(),
-      type: 'email',
-    })
-    setBusy(false)
-    if (error) {
-      setError("That code didn't work. Please try again.")
+      // Supabase answers a wrong password and an unknown address with the same
+      // "Invalid login credentials", and that is the right behaviour — telling
+      // a stranger which addresses exist is telling them who to go after. One
+      // sentence for both, so nothing here narrows it down either.
+      setError(
+        error.message === 'Invalid login credentials'
+          ? "That email and password don't match."
+          : messageFor(error),
+      )
       return
     }
     // On success there is nothing to do here: SessionProvider is listening to
@@ -59,54 +57,37 @@ export function SignInPage() {
           className="mt-6 space-y-4"
           onSubmit={(e) => {
             e.preventDefault()
-            void (sent ? verifyCode() : sendCode())
+            void signIn()
           }}
         >
           <Field
             label="Email"
             type="email"
             required
-            autoFocus={!sent}
-            disabled={sent}
+            autoFocus
+            autoComplete="username"
             placeholder="you@siteonlab.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
 
-          {sent && (
-            <Field
-              label="Six-digit code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              required
-              autoFocus
-              placeholder="123456"
-              hint={`Sent to ${email.trim().toLowerCase()}.`}
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-            />
-          )}
+          <Field
+            label="Password"
+            type="password"
+            required
+            // Named so the browser's password manager offers to save and fill
+            // it. Without this an ops password gets retyped, and a retyped
+            // password gets written on something.
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
 
           {error && <p className="text-sm text-non-veg">{error}</p>}
 
           <Button type="submit" loading={busy} className="w-full">
-            {sent ? 'Verify and sign in' : 'Send code'}
+            Sign in
           </Button>
-
-          {sent && (
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full"
-              onClick={() => {
-                setSent(false)
-                setCode('')
-                setError(null)
-              }}
-            >
-              Use a different email
-            </Button>
-          )}
         </form>
       </Card>
     </div>
