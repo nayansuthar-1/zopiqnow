@@ -2,13 +2,19 @@
 <!--
     The collapsed card: what is on the lock screen at a glance.
 
-    Only the body. The icon, app name, time and "Arriving in N min" sub-text along
-    the top are the system's, supplied by DecoratedCustomViewStyle — which is why
-    this file is two views rather than a whole notification, and why it inherits
-    the shade's own light/dark theme instead of guessing at colours.
+    Only the body. The icon, app name, time, the artwork on the right and the
+    "Ready in 12 min" sub-text along the top are the system's, supplied by
+    DecoratedCustomViewStyle — which is why this file is a few views rather than a
+    whole notification, and why it inherits the shade's own light/dark theme
+    instead of guessing at colours.
 
     Text appearances are the framework's notification styles, so the title reads
     at the weight and colour every other notification on the phone uses.
+
+    The countdown is two views sharing one slot: a Chronometer while there is time
+    left, a plain line of text once there is not. See LiveCardNotification.dress —
+    a Chronometer past its deadline starts counting the overrun upward, and a card
+    that tells you how late your food is was not the brief.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -25,13 +31,32 @@
         android:ellipsize="end"
         android:textAppearance="@android:style/TextAppearance.Material.Notification.Title"/>
 
+    <!-- fitXY, not fitCenter: the bar is drawn to a fixed 320dp:6dp ratio and is
+         meant to span the card's whole width at a constant thickness. fitCenter
+         would letterbox it on a narrow shade and thin it on a wide one. -->
     <ImageView
         android:id="@+id/zopiq_live_tracker"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:adjustViewBounds="true"
-        android:scaleType="fitCenter"
+        android:layout_height="6dp"
+        android:layout_marginTop="8dp"
+        android:scaleType="fitXY"
         android:importantForAccessibility="no"/>
+
+    <Chronometer
+        android:id="@+id/zopiq_live_countdown"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:textAppearance="@android:style/TextAppearance.Material.Notification"/>
+
+    <TextView
+        android:id="@+id/zopiq_live_countdown_done"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:visibility="gone"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textAppearance="@android:style/TextAppearance.Material.Notification"/>
 
 </LinearLayout>

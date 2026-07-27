@@ -10,4 +10,35 @@
          every Android below 16. -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
 
+    <!-- The ticker behind the bar. A notification does not move on its own, and a
+         bar driven by pushes alone is the stepping bar this redesign replaced;
+         something on the device has to redraw it while the phone is locked. See
+         LiveCardService for why that has to be a foreground service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+
+    <application>
+
+        <!-- `specialUse` because none of the specific types describe this. It is
+             not `location` (this service reads no position), not `dataSync` (it
+             makes no network call at all — a LiveCardSpec is self-contained
+             precisely so it need not), and not `shortService`, whose three-minute
+             ceiling is shorter than any order. `specialUse` is the type Android
+             defines for exactly this: a legitimate long-running job the taxonomy
+             does not otherwise cover.
+
+             The property below is what Play review reads. Keep it truthful and
+             keep it specific — a vague justification is the usual reason one of
+             these is rejected. -->
+        <service
+            android:name="com.siteonlab.zopiq_live_card.LiveCardService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Advances the progress bar and countdown on the customer's live food-order notification while their order is being prepared and delivered. Runs only while an order is in flight and stops itself when the order ends."/>
+        </service>
+
+    </application>
+
 </manifest>

@@ -4,21 +4,26 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
 
 /**
- * The segmented tracker, drawn by hand, for every Android below 16.
+ * The progress bar, drawn by hand, for every Android below 16.
  *
- * <p>Android 16 draws this itself from {@code Notification.ProgressStyle}. Below it the platform
- * offers exactly one shape — {@code setProgress}, a plain unbroken bar — so the segments and
- * milestone dots have to be painted into a bitmap and handed to an {@code ImageView} inside a
- * {@code RemoteViews} body. That is the whole reason this file exists, and it is why the card looks
- * the same on an Android 10 phone as on an Android 16 one.
+ * <p>Android 16 draws this itself from {@code Notification.ProgressStyle}. Below it the platform's
+ * own {@code setProgress} bar cannot be themed, sized or rounded, so the bar is painted into a
+ * bitmap and handed to an {@code ImageView} inside a {@code RemoteViews} body. That is the whole
+ * reason this file exists, and it is why the card looks the same on an Android 10 phone as on an
+ * Android 16 one.
  *
- * <p>Drawn once per notification update, which is at most eight times over an order's life, so the
- * allocation is not worth pooling.
+ * <p><b>One unbroken fill.</b> It used to be three segments with a milestone dot at each boundary
+ * and a larger marker disc riding the head. All of that described a bar that moved in jumps, and
+ * once 0055 made the fill a continuous function of the clock the punctuation stopped describing
+ * anything — a dot at 35% is meaningless when the bar sweeps past it a pixel at a time. A plain
+ * rounded track with a plain rounded fill is also what the reference design is.
+ *
+ * <p>Drawn on every tick of {@link LiveCardService} — roughly three times a minute for the life of
+ * an order — which is why the bitmap is deliberately small and the paint objects are the only
+ * allocations.
  */
 final class TrackerBar {
 
@@ -33,20 +38,14 @@ final class TrackerBar {
      * <p>A bitmap in a {@code RemoteViews} crosses to system_server through a Binder transaction
      * with about a megabyte to spend, and this one is sent twice — once for the collapsed body, once
      * for the expanded. At density 3 an unclamped bar would be 960px wide; clamped it is 720px, and
-     * the ImageView scales the difference back up. A 5dp bar upscaled by a third is not something an
-     * eye finds, and it keeps the card well clear of a {@code TransactionTooLargeException}.
+     * the ImageView scales the difference back up. A 6dp bar upscaled by a third is not something an
+     * eye finds, and it keeps the card well clear of a {@code TransactionTooLargeException}. It
+     * matters more now than it did: this crosses that Binder every twenty seconds, not eight times
+     * an order.
      */
     private static final float MAX_SCALE = 720f / WIDTH_DP;
 
-    private static final float BAR_DP = 5f;
-    private static final float DOT_RADIUS_DP = 4.5f;
-    private static final float MARKER_RADIUS_DP = 6f;
-
-    /**
-     * The break between two segments. Cut out of the bar rather than painted over it, because the
-     * notification background behind it is unknown — see {@link Ladder#TRACK}.
-     */
-    private static final float GAP_DP = 3.5f;
+    private static final float BAR_DP = 6f;
 
     static Bitmap render(Context context, int progress) {
         final float scale =
@@ -54,62 +53,27 @@ final class TrackerBar {
         final int clamped = Ladder.clampProgress(progress);
 
         final float width = WIDTH_DP * scale;
-        final float bar = BAR_DP * scale;
-        final float dot = DOT_RADIUS_DP * scale;
-        final float marker = MARKER_RADIUS_DP * scale;
-        final float gap = GAP_DP * scale;
-
-        // The marker is the tallest thing on the bar, so it sets the height and the horizontal
-        // inset: without the inset the dot at 100 would be sliced in half by the right edge.
-        final float height = marker * 2f;
-        final float inset = marker;
-        final float midY = height / 2f;
-        final float span = width - inset * 2f;
+        final float height = BAR_DP * scale;
+        final float radius = height / 2f;
 
         final Bitmap bitmap =
-                Bitmap.createBitmap(Math.round(width), Math.round(height), Bitmap.Config.ARGB_8888);
+                Bitmap.createBitmap(
+                        Math.round(width), Math.round(height), Bitmap.Config.ARGB_8888);
         final Canvas canvas = new Canvas(bitmap);
         final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-        final float top = midY - bar / 2f;
-        final float bottom = midY + bar / 2f;
-        final float radius = bar / 2f;
-
         // 1. The track, end to end.
         paint.setColor(Ladder.TRACK);
-        canvas.drawRoundRect(new RectF(inset, top, width - inset, bottom), radius, radius, paint);
+        canvas.drawRoundRect(new RectF(0f, 0f, width, height), radius, radius, paint);
 
-        // 2. The distance covered.
-        final float head = inset + span * (clamped / 100f);
-        if (clamped > 0) {
+        // 2. The distance covered. Below one bar-width the rounded rect would be drawn as a lens
+        //    thinner than the track it sits in, which reads as a rendering fault rather than as
+        //    "barely started" — so the fill either has a full round cap or is not drawn at all.
+        final float head = width * (clamped / 100f);
+        if (head >= height) {
             paint.setColor(Ladder.BRAND);
-            canvas.drawRoundRect(new RectF(inset, top, head, bottom), radius, radius, paint);
+            canvas.drawRoundRect(new RectF(0f, 0f, head, height), radius, radius, paint);
         }
-
-        // 3. The segment breaks, cut clean through both. CLEAR against a transparent bitmap is what
-        //    lets the shade's own background show through the gap, on a light theme and a dark one
-        //    alike — painting a "background-coloured" bar there would guess wrong on one of them.
-        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
-        int boundary = 0;
-        for (int i = 0; i < Ladder.SEGMENTS.length - 1; i++) {
-            boundary += Ladder.SEGMENTS[i];
-            final float x = inset + span * (boundary / 100f);
-            canvas.drawRect(x - gap / 2f, top, x + gap / 2f, bottom, paint);
-        }
-        paint.setXfermode(null);
-
-        // 4. The milestones. Filled once passed, hollow-grey until then — the same two-state dot the
-        //    Android 16 ProgressStyle points draw for themselves.
-        for (final int point : Ladder.POINTS) {
-            paint.setColor(clamped >= point ? Ladder.BRAND : Ladder.TRACK);
-            canvas.drawCircle(inset + span * (point / 100f), midY, dot, paint);
-        }
-
-        // 5. Where the order is right now. A solid disc, larger than a milestone and nothing more:
-        //    no halo, no glow (zopiqnow-clean-ui). At 100 it lands on the last milestone and simply
-        //    reads as a filled end.
-        paint.setColor(Ladder.BRAND);
-        canvas.drawCircle(head, midY, marker, paint);
 
         return bitmap;
     }

@@ -3,7 +3,7 @@ package com.siteonlab.zopiq_live_card;
 import android.app.Notification;
 import android.os.Bundle;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -21,8 +21,9 @@ import java.util.List;
  *       below 16, and the one part of the live card that genuinely cannot be reproduced;
  *   <li>a guaranteed slot at the <b>top of the lock screen</b> and the always-on display, rather
  *       than wherever the shade decides to sort an ongoing notification;
- *   <li>segments and milestone points drawn by system UI, so they animate and match the device
- *       theme instead of being a picture we painted.
+ *   <li>a bar drawn by system UI, which <b>animates between two values</b> — so on this branch the
+ *       twenty-second tick from {@link LiveCardService} is not a step but the start of a smooth
+ *       glide to the next position.
  * </ul>
  */
 final class PromotedStyle {
@@ -39,36 +40,45 @@ final class PromotedStyle {
     private static final String EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing";
 
     /**
-     * Attach the segmented tracker and ask to be promoted.
+     * Attach the bar and the countdown, and ask to be promoted.
+     *
+     * <p><b>One segment, no points.</b> The style is built for a journey with named stops, and that
+     * is what this used to be: three segments and a milestone dot at each boundary. 0055 made the
+     * fill a continuous function of the clock, and punctuation on a bar that sweeps rather than
+     * steps marks nothing — so it is now a single full-length segment, which is the style's way of
+     * spelling "an ordinary progress bar, drawn by you, in our colour".
      *
      * <p>Deliberately does <b>not</b> call {@code Builder.setProgress}: the platform documents that
      * this style overrides those extras, so setting both is a way to be surprised later.
+     *
+     * <p>The countdown rides the notification header here rather than sitting under the bar, because
+     * this branch may not carry custom {@code RemoteViews} — that is the price of promotion, and
+     * {@code setUsesChronometer} is the standard template's own equivalent. Past the deadline it is
+     * dropped entirely rather than left to count the overrun upward.
      *
      * <p>Asking is all an app can do. The OS applies its own eligibility rules on top — ongoing, a
      * content title, an eligible style, no custom {@code RemoteViews}, not colorized, not a group
      * summary, and a channel above {@code IMPORTANCE_MIN} — and {@link LiveCardNotification} is
      * built to satisfy every one of them on this branch.
      */
-    static void apply(Notification.Builder builder, int progress) {
-        final List<Notification.ProgressStyle.Segment> segments = new ArrayList<>();
-        for (final int length : Ladder.SEGMENTS) {
-            segments.add(new Notification.ProgressStyle.Segment(length).setColor(Ladder.BRAND));
-        }
-
-        final List<Notification.ProgressStyle.Point> points = new ArrayList<>();
-        for (final int position : Ladder.POINTS) {
-            // The last milestone is the end of the bar. A point sitting on the terminus reads as a
-            // smudge rather than a step, so the ladder's 100 is left to the bar itself.
-            if (position >= 100) continue;
-            points.add(new Notification.ProgressStyle.Point(position).setColor(Ladder.BRAND));
-        }
+    static void apply(Notification.Builder builder, LiveCardSpec spec) {
+        final List<Notification.ProgressStyle.Segment> segments =
+                Collections.singletonList(
+                        new Notification.ProgressStyle.Segment(100).setColor(Ladder.BRAND));
 
         builder.setStyle(
                 new Notification.ProgressStyle()
-                        // Segment lengths sum to 100, which is the scale migration 0052 sends.
-                        .setProgress(Ladder.clampProgress(progress))
-                        .setProgressSegments(segments)
-                        .setProgressPoints(points));
+                        .setProgress(spec.progressNow())
+                        .setProgressSegments(segments));
+
+        final long remaining = spec.remainingMs();
+        if (remaining > 0L) {
+            builder.setWhen(System.currentTimeMillis() + remaining)
+                    .setUsesChronometer(true)
+                    .setChronometerCountDown(true);
+        } else {
+            builder.setUsesChronometer(false);
+        }
 
         final Bundle extras = new Bundle();
         extras.putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true);

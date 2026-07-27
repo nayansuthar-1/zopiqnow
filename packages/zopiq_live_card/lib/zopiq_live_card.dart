@@ -7,7 +7,8 @@ import 'package:flutter/services.dart';
 ///
 /// A thin wrapper over one method channel. Everything interesting is on the
 /// other side of it — see `LiveCardNotification.java` for why the card is built
-/// two different ways, and `Ladder.java` for the shape of the tracker.
+/// two different ways, `LiveCardSpec.java` for how two instants become a bar
+/// position, and `LiveCardService.java` for what moves it between pushes.
 ///
 /// Safe to call from the FCM background isolate: the plugin is registered on
 /// every engine in the process, including the one `firebase_messaging` creates
@@ -26,14 +27,28 @@ class ZopiqLiveCard {
   /// P1 Tier 3, a different feature wearing the same screenshot.
   static bool get isSupported => !kIsWeb && Platform.isAndroid;
 
-  /// Post or redraw the card. Reusing an [id] redraws in place.
+  /// Post or redraw the card, and keep it ticking. Reusing an [id] redraws in
+  /// place.
+  ///
+  /// [windowStart] and [windowEnd] are the two instants the bar sweeps between
+  /// — the whole reason it can fill continuously. The platform side interpolates
+  /// against them on its own clock and redraws every twenty seconds, so this
+  /// need only be called when the *order* changes, not when the bar should move.
+  /// Both must be UTC.
+  ///
+  /// [phase] is `prep` or `delivery`, and decides the artwork and the wording.
+  ///
+  /// [progress] overrides the clock when non-null, and is the seam for real
+  /// distance-driven progress later (B3). Leave it null and the window governs.
   static Future<void> show({
     required int id,
     required String orderId,
     required String title,
-    required int progress,
+    required String phase,
+    required DateTime windowStart,
+    required DateTime windowEnd,
     String? body,
-    String? subText,
+    int? progress,
   }) {
     if (!isSupported) return Future<void>.value();
     return _channel.invokeMethod<void>('show', <String, dynamic>{
@@ -41,8 +56,12 @@ class ZopiqLiveCard {
       'orderId': orderId,
       'title': title,
       'body': body,
-      'subText': subText,
-      'progress': progress,
+      'phase': phase,
+      'windowStart': windowStart.toUtc().millisecondsSinceEpoch,
+      'windowEnd': windowEnd.toUtc().millisecondsSinceEpoch,
+      // -1 is "no override" on the other side; null over the channel would have
+      // to be unboxed there anyway.
+      'progress': progress ?? -1,
     });
   }
 

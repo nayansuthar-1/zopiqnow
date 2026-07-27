@@ -58,7 +58,8 @@ Verified in the pinned package — `flutter_local_notifications 18.0.1` exposes
 | Tier | What it adds over the one below | Availability | Reachable today? |
 |---|---|---|---|
 | **Android, any version** | The screenshot: headline, progress bar, large icon, persistent, on the lock screen | API 24+ | ✅ **built (Tier 1)** |
-| **Segmented tracker, any version** | **Segments and milestone points** — the tracker with a moving marker, not a plain bar — painted onto a `Canvas` and used as the notification body | API 24+ | ✅ **built (Tier 2)**, no dependency |
+| **Segmented tracker, any version** | ~~**Segments and milestone points** — the tracker with a moving marker~~ — **superseded by Tier 2.1**, which replaced the segments with one continuously filling bar | API 24+ | ⬆️ **replaced (Tier 2.1)** |
+| **Continuously filling bar + countdown** | The bar creeps against a **time window** instead of stepping between milestones, a live countdown sits under it, the artwork changes with the phase, and prep and delivery are **two separate cards** | API 24+ | ✅ **built (Tier 2.1)**, no dependency |
 | **Android 16 Live Updates** | What is left once the tracker is reproduced: the status-bar **chip** while the phone is in use, and the **guarantee** of promoted placement at the top of the lock screen and AOD | API 36 | ✅ **built (Tier 2)**, runtime-gated · chip on a `targetSdk 35` app is unverified |
 | **iOS Live Activities** | Dynamic Island · the iOS presentation in the screenshots | iOS 16.1+ · 17.2+ for remote *start* | ❌ deployment target is **13.0** |
 
@@ -184,6 +185,42 @@ discovering on a device.
     that — and only that — is what the `35 → 36` bump ⚠️ would buy, and it stays its own
     approved task rather than being folded in here
 
+- [x] **Tier 2.1 — the bar fills continuously, and there are two of them** — *built
+      2026-07-27. Migration 0055, `packages/zopiq_live_card/`, `order_live_card.dart`.
+      Not yet run on a device: see the manual steps below.*
+
+  Tier 2 drew an honest picture of *where* an order was and said nothing about *how long*
+  anything would take, so the bar sat still for twenty minutes and then jumped forty
+  points. This replaces the ladder with a window.
+
+  - [x] **The server sends two instants, not a position.** `order_live_payload` now emits
+    `phase`, `window_start` and `window_end`; the device computes
+    `(now − start) / (end − start)` on its own clock. Both ends are **constant for the
+    life of a phase**, so the bar can only advance and the countdown can only fall —
+    Rule 3 enforced structurally rather than by care
+  - [x] **Two cards per order.** A `prep` card filling against `orders.ready_by` (the
+    kitchen's own promise, 0015) and a separate `delivery` card starting empty at
+    `deliveries.picked_up_at` and filling against the ride. Different id bands a million
+    apart, so one order's delivery card cannot land on another's prep card
+  - [x] **The ride is measured per address**, from `route_km` (0046, road distance) at
+    20 km/h, falling back to the haversine and then to 3 km. `eta_minutes` could not do
+    this — it is one blanket number a restaurant sets for every customer it has
+  - [x] **`LiveCardService`, a foreground service**, redraws every 20s so the bar creeps
+    with the app killed. `specialUse`, justified in the manifest. It is started *after*
+    the card is already drawn, so an Android 12+ refusal costs the creep, never the card
+  - [x] **The countdown is a `Chronometer`**, ticked by system UI at no cost to us, so the
+    seconds stay right between service ticks. Swapped for static text past the deadline
+    rather than left counting the overrun upward
+  - [x] **Artwork by phase** — food while the kitchen cooks, a rider once it is on a bike
+    — resolved by name from the *host app's* resources, falling back to the launcher icon
+    so a build without the images still draws a correct card
+  - [x] **No new dependency, no version bump.** Migration 0055 needed no edge-function
+    deploy: `send-notification` flattens whatever jsonb it is handed
+  - [ ] **`progress` is now an override, and it is the B3 seam.** Null means "use the
+    clock"; today only `at_door` sets it (to 100). When `rider_locations` lands, real
+    distance-covered goes in that field and the delivery bar becomes distance-driven
+    **with no device change at all**
+
 - [ ] (skip for now)  **Tier 3 — iOS Live Activities** ⚠️ **largest single item in this file**
   - **Bump iOS deployment target 13.0 → 16.1** (or gate: Live Activity on 16.1+, plain
     push below). Dropping iOS 13/14/15 is a product decision, not a technical one
@@ -248,12 +285,18 @@ What is **not** proven is anything that happens on a screen.
 3. Watch for, at each step: **one** card, not a stack; the bar moving forward and never
    back; no sound or vibration after the first `order_update` buzz; "Arriving in N min"
    counting down.
-4. **Tier 2, collapsed and expanded.** The tracker must show **two gaps** and **three
-   dots**, the dots filling as the order passes 35 / 75 / 100. Expand the card: the same
-   tracker plus the line of prose. Then check the two things a hand-painted bitmap can
-   get wrong and nothing else can — **switch the phone between light and dark theme**
-   (the gaps must show the shade's background through them, not a grey stripe), and check
-   the bar is not **clipped or stretched** at either end.
+4. **Tier 2.1, collapsed and expanded.** The bar must be **one unbroken fill** — no gaps,
+   no dots — with a **countdown ticking beneath it** and **food artwork on the right**.
+   Expand the card: the same bar plus the line of prose. Then check what a hand-painted
+   bitmap can get wrong and nothing else can — **switch the phone between light and dark
+   theme**, and check the bar is not **clipped or stretched** at either end.
+4b. **Watch it for two minutes without touching anything.** This is the point of the whole
+   tier and the one step no amount of building substitutes for: the bar must **visibly
+   advance on its own**, and the countdown must fall every second. Seconds ticking while
+   the bar stays put means `LiveCardService` never started — logcat, tag `ZopiqLiveCard`.
+4c. **The handover.** When the rider picks up, the prep card must **disappear** and be
+   replaced by a *new* card: rider artwork, bar back near **empty**, fresh countdown.
+   Two cards for one order must never be on screen at once.
 5. **Lock the phone and repeat from step 2.** The card is drawn in the FCM background
    isolate — this is the path that actually matters, the only one the emulator lies
    about, and since Tier 2 it is also the path that proves the plugin is reachable from

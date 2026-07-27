@@ -1,19 +1,16 @@
 package com.siteonlab.zopiq_live_card;
 
 /**
- * The shape of the tracker, in one place.
+ * The look of the tracker, and the two phases it is drawn for.
  *
- * <p>Migration 0052 hands the device a single {@code progress} number, taken as the furthest point
- * either the kitchen ladder ({@code orders.status}) or the road ladder ({@code deliveries.state})
- * has reached. This class is where that number becomes a picture, and both drawing paths — the
- * Android 16 {@code ProgressStyle} and the bitmap every older Android gets — read the milestones
- * from here, so the two can never drift into showing different trackers.
+ * <p><b>What used to be here.</b> Milestones. Migration 0052 handed the device one number on a
+ * ladder of eight server-side steps, and this class turned it into three segments with a dot at each
+ * boundary. The bar therefore moved only when the kitchen or the rider pressed something: it sat
+ * still for twenty minutes and then jumped forty points. Migration 0055 replaced the ladder with a
+ * window — two instants the device interpolates between — so there is no longer any such thing as a
+ * milestone position, and the segments and points that expressed them are gone with it.
  *
- * <p>The three milestones are the ones a customer actually holds in their head. They are
- * deliberately fewer than the eight steps the server emits: {@code accepted} (15), {@code claimed}
- * (20), {@code packed} (55), {@code rider_at_restaurant} (65) and {@code at_door} (95) all move the
- * bar without earning a dot of their own, which is what stops the tracker reading as a progress bar
- * with a rash.
+ * <p>What is left is colour, and the names of the two cards an order now gets.
  */
 final class Ladder {
 
@@ -23,7 +20,7 @@ final class Ladder {
     static final int BRAND = 0xFFFC8019;
 
     /**
-     * The unfilled track, and the milestones not yet reached.
+     * The unfilled track.
      *
      * <p>Half-transparent grey rather than a fixed colour: a notification is drawn on a background
      * this module cannot read — white on a light theme, near-black on a dark one — and only an
@@ -31,17 +28,25 @@ final class Ladder {
      */
     static final int TRACK = 0x40808080;
 
-    /**
-     * Milestone positions on the 0–100 scale: the kitchen starts cooking, the food leaves with a
-     * rider, the food arrives.
-     */
-    static final int[] POINTS = {35, 75, 100};
+    /** The kitchen is cooking. The bar fills against the prep window. */
+    static final String PHASE_PREP = "prep";
+
+    /** The food is on a bike. The bar fills against the ride window. */
+    static final String PHASE_DELIVERY = "delivery";
 
     /**
-     * The same three milestones expressed as segment lengths, which is the form
-     * {@code Notification.ProgressStyle} wants. Sums to 100.
+     * The artwork on the right of the card, resolved by name out of the <b>host app's</b> resources
+     * rather than this module's.
+     *
+     * <p>Looked up at runtime, and deliberately so. These are the one part of the card that is a
+     * brand asset rather than a mechanism — the host app owns them, ships them at whatever density
+     * it likes, and can change them without this package being rebuilt. A name that resolves to
+     * nothing simply falls back to the launcher icon, which means the card draws correctly on a
+     * build where the images have not been added yet.
      */
-    static final int[] SEGMENTS = {35, 40, 25};
+    static final String ART_PREP = "zopiq_live_prep";
+
+    static final String ART_DELIVERY = "zopiq_live_delivery";
 
     static int clampProgress(int progress) {
         if (progress < 0) return 0;

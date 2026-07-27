@@ -70,19 +70,22 @@ public final class ZopiqLiveCardPlugin
 
         switch (call.method) {
             case "show":
-                LiveCardNotification.show(
+                LiveCardService.show(
                         context,
-                        intArg(call, "id"),
-                        stringArg(call, "orderId"),
-                        stringArg(call, "title"),
-                        stringArg(call, "body"),
-                        stringArg(call, "subText"),
-                        intArg(call, "progress"));
+                        new LiveCardSpec(
+                                intArg(call, "id"),
+                                stringArg(call, "orderId"),
+                                stringArg(call, "title"),
+                                stringArg(call, "body"),
+                                stringArg(call, "phase"),
+                                longArg(call, "windowStart"),
+                                longArg(call, "windowEnd"),
+                                intArg(call, "progress", LiveCardSpec.NO_OVERRIDE)));
                 result.success(null);
                 break;
 
             case "cancel":
-                LiveCardNotification.cancel(context, intArg(call, "id"));
+                LiveCardService.cancel(context, intArg(call, "id"));
                 result.success(null);
                 break;
 
@@ -161,7 +164,22 @@ public final class ZopiqLiveCardPlugin
     }
 
     private static int intArg(MethodCall call, String name) {
-        final Integer value = call.argument(name);
-        return value == null ? 0 : value;
+        return intArg(call, name, 0);
+    }
+
+    private static int intArg(MethodCall call, String name, int fallback) {
+        final Number value = call.argument(name);
+        return value == null ? fallback : value.intValue();
+    }
+
+    /**
+     * Read as {@code Number}, not {@code Long}. The standard message codec sizes a Dart int to
+     * whatever fits — an epoch in milliseconds arrives as a {@code Long}, but anything small enough
+     * arrives as an {@code Integer}, and a cast to {@code Long} would be a {@code
+     * ClassCastException} waiting for the first zero somebody sends.
+     */
+    private static long longArg(MethodCall call, String name) {
+        final Number value = call.argument(name);
+        return value == null ? 0L : value.longValue();
     }
 }

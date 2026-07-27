@@ -33,10 +33,26 @@
     <ImageView
         android:id="@+id/zopiq_live_tracker"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:adjustViewBounds="true"
-        android:scaleType="fitCenter"
+        android:layout_height="6dp"
+        android:layout_marginTop="12dp"
+        android:scaleType="fitXY"
         android:importantForAccessibility="no"/>
+
+    <Chronometer
+        android:id="@+id/zopiq_live_countdown"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textAppearance="@android:style/TextAppearance.Material.Notification"/>
+
+    <TextView
+        android:id="@+id/zopiq_live_countdown_done"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:visibility="gone"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textAppearance="@android:style/TextAppearance.Material.Notification"/>
 
 </LinearLayout>

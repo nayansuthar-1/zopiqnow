@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.Icon;
 import android.os.Build;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.RemoteViews;
@@ -17,18 +18,26 @@ import android.widget.RemoteViews;
  *
  * <p>The split is not a preference. Android 16's promoted-ongoing rules disqualify any notification
  * carrying custom {@code RemoteViews}, and every Android below 16 has no {@code ProgressStyle} to
- * draw. So the two are mutually exclusive by construction, and the tracker is reproduced with a
- * hand-painted bar wherever the OS will not draw one:
+ * draw. So the two are mutually exclusive by construction, and the bar is reproduced by hand
+ * wherever the OS will not draw one:
  *
  * <ul>
- *   <li><b>API 36+</b> — {@link PromotedStyle}: real segments, real milestone points, the status-bar
- *       chip and a guaranteed slot at the top of the lock screen.
- *   <li><b>API 24–35</b> — {@code DecoratedCustomViewStyle} over {@link TrackerBar}: the same
- *       segmented tracker, painted into a bitmap, on the Android 10 floor.
+ *   <li><b>API 36+</b> — {@link PromotedStyle}: a real progress bar, the status-bar chip and a
+ *       guaranteed slot at the top of the lock screen, with the countdown in the system header.
+ *   <li><b>API 24–35</b> — {@code DecoratedCustomViewStyle} over {@link TrackerBar}: the same bar,
+ *       painted into a bitmap, with the countdown as a {@code Chronometer} beneath it, on the
+ *       Android 10 floor.
  * </ul>
  *
- * <p>Everything else is shared and unchanged from Tier 1 — one notification per order redrawn in
- * place, a silent channel, and a card that vanishes when the order ends.
+ * <p><b>Two cards, not one.</b> An order now produces a prep card that fills while the kitchen cooks
+ * and a separate delivery card that starts empty at pickup — different notification ids, different
+ * artwork, different windows. {@link LiveCardService} owns the clock that moves them; this class
+ * only ever renders a {@link LiveCardSpec} at the instant it is asked to.
+ *
+ * <p><b>Why the countdown is a Chronometer and not text.</b> A {@code Chronometer} in countdown mode
+ * is ticked by the system UI process at no cost to this app, so the seconds under the bar keep
+ * falling between service ticks and stay right even if a tick is delayed by Doze. The bar needs a
+ * redraw to move; the number does not.
  */
 final class LiveCardNotification {
 
@@ -43,49 +52,11 @@ final class LiveCardNotification {
 
     private static final int API_PROGRESS_STYLE = 36;
 
-    static void show(
-            Context context,
-            int notificationId,
-            String orderId,
-            String title,
-            String body,
-            String subText,
-            int progress) {
-
+    static void show(Context context, LiveCardSpec spec) {
         final NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager == null) return;
-
         ensureChannel(manager);
-
-        final Notification.Builder builder = newBuilder(context);
-        builder.setSmallIcon(context.getApplicationInfo().icon)
-                .setLargeIcon(Icon.createWithResource(context, context.getApplicationInfo().icon))
-                .setColor(Ladder.BRAND)
-                .setContentTitle(title)
-                .setContentText(body)
-                .setSubText(subText)
-                // Sits in the shade for the life of the order, and a tap means "show me", not
-                // "I'm done with this".
-                .setOngoing(true)
-                .setAutoCancel(false)
-                // Eight redraws, one alert. The order's noisy half is the `order_updates` channel.
-                .setOnlyAlertOnce(true)
-                .setCategory(Notification.CATEGORY_PROGRESS)
-                .setVisibility(Notification.VISIBILITY_PUBLIC)
-                .setContentIntent(tapIntent(context, notificationId, orderId));
-
-        // `setColorized` is deliberately absent, and this is the one visible change from Tier 1.
-        // A colorized notification is ineligible for Android 16 promotion, and it was never doing
-        // much anyway — the platform honours it only for foreground-service and media
-        // notifications, which this is neither. `setColor` still tints the icon and accents orange.
-
-        if (Build.VERSION.SDK_INT >= API_PROGRESS_STYLE) {
-            PromotedStyle.apply(builder, progress);
-        } else {
-            applyCustomTracker(context, builder, title, body, progress);
-        }
-
-        manager.notify(notificationId, builder.build());
+        manager.notify(spec.id, build(context, spec));
     }
 
     static void cancel(Context context, int notificationId) {
@@ -94,43 +65,135 @@ final class LiveCardNotification {
     }
 
     /**
-     * The tracker for every Android that will not draw one itself.
+     * Render a spec into a notification.
+     *
+     * <p>Separate from {@link #show} because {@link LiveCardService} needs the {@code Notification}
+     * object itself to hand to {@code startForeground}, not a posted one.
+     */
+    static Notification build(Context context, LiveCardSpec spec) {
+        ensureChannel(context.getSystemService(NotificationManager.class));
+
+        final Notification.Builder builder = newBuilder(context);
+        builder.setSmallIcon(context.getApplicationInfo().icon)
+                .setLargeIcon(artwork(context, spec))
+                .setColor(Ladder.BRAND)
+                .setContentTitle(spec.title)
+                .setContentText(spec.body)
+                .setSubText(spec.subText())
+                // Sits in the shade for the life of the order, and a tap means "show me", not
+                // "I'm done with this".
+                .setOngoing(true)
+                .setAutoCancel(false)
+                // Many redraws, one alert. The order's noisy half is the `order_updates` channel.
+                .setOnlyAlertOnce(true)
+                .setCategory(Notification.CATEGORY_PROGRESS)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .setContentIntent(tapIntent(context, spec.id, spec.orderId));
+
+        // `setColorized` is deliberately absent. A colorized notification is ineligible for Android
+        // 16 promotion, and the platform honours it only for foreground-service and media
+        // notifications anyway. `setColor` still tints the icon and accents orange.
+
+        if (Build.VERSION.SDK_INT >= API_PROGRESS_STYLE) {
+            PromotedStyle.apply(builder, spec);
+        } else {
+            applyCustomTracker(context, builder, spec);
+        }
+
+        return builder.build();
+    }
+
+    /**
+     * The image on the right of the card: food while the kitchen cooks, a rider once the food is on
+     * a bike.
+     *
+     * <p>Resolved by name out of the host app's resources, and falling back to the launcher icon
+     * when the name finds nothing — see {@link Ladder#ART_PREP}. The fallback is the reason a build
+     * without the artwork still draws a correct card rather than crashing on a zero resource id, and
+     * it is also what was producing the Flutter logo before these images existed: this module never
+     * had an icon of its own to offer.
+     */
+    private static Icon artwork(Context context, LiveCardSpec spec) {
+        final String packageName = context.getPackageName();
+        final String name = spec.artName();
+
+        int id = context.getResources().getIdentifier(name, "drawable", packageName);
+        if (id == 0) {
+            id = context.getResources().getIdentifier(name, "mipmap", packageName);
+        }
+        if (id == 0) {
+            id = context.getApplicationInfo().icon;
+        }
+        return Icon.createWithResource(context, id);
+    }
+
+    /**
+     * The card for every Android that will not draw a progress bar itself.
      *
      * <p>{@code DecoratedCustomViewStyle} keeps the system's own header — app icon, app name, the
-     * "Arriving in 18 min" sub-text, the expander — and replaces only the body. That is what lets a
-     * hand-built layout inherit the shade's light or dark theme instead of guessing at it, and it is
-     * why the layouts in {@code res/layout} are two views rather than a whole notification.
+     * "Arriving in 18 min" sub-text, the artwork, the expander — and replaces only the body. That is
+     * what lets a hand-built layout inherit the shade's light or dark theme instead of guessing at
+     * it, and it is why the layouts in {@code res/layout} are a few views rather than a whole
+     * notification.
      *
      * <p>{@code setProgress} is set as well even though the decorated body hides it: an OEM shell,
      * Android Auto or a Wear companion that declines to render custom views falls back to the
      * standard template, and there it is the difference between a progress bar and nothing.
      */
     private static void applyCustomTracker(
-            Context context, Notification.Builder builder, String title, String body, int progress) {
+            Context context, Notification.Builder builder, LiveCardSpec spec) {
 
-        final int clamped = Ladder.clampProgress(progress);
-        builder.setProgress(100, clamped, false);
+        final int progress = spec.progressNow();
+        builder.setProgress(100, progress, false);
 
-        final android.graphics.Bitmap bar = TrackerBar.render(context, clamped);
+        final android.graphics.Bitmap bar = TrackerBar.render(context, progress);
         final String packageName = context.getPackageName();
 
         final RemoteViews collapsed = new RemoteViews(packageName, R.layout.zopiq_live_card);
-        collapsed.setTextViewText(R.id.zopiq_live_title, title);
-        collapsed.setImageViewBitmap(R.id.zopiq_live_tracker, bar);
+        dress(collapsed, spec, bar);
 
         final RemoteViews expanded =
                 new RemoteViews(packageName, R.layout.zopiq_live_card_expanded);
-        expanded.setTextViewText(R.id.zopiq_live_title, title);
-        expanded.setImageViewBitmap(R.id.zopiq_live_tracker, bar);
-        if (TextUtils.isEmpty(body)) {
+        dress(expanded, spec, bar);
+        if (TextUtils.isEmpty(spec.body)) {
             expanded.setViewVisibility(R.id.zopiq_live_body, View.GONE);
         } else {
-            expanded.setTextViewText(R.id.zopiq_live_body, body);
+            expanded.setTextViewText(R.id.zopiq_live_body, spec.body);
         }
 
         builder.setStyle(new Notification.DecoratedCustomViewStyle());
         builder.setCustomContentView(collapsed);
         builder.setCustomBigContentView(expanded);
+    }
+
+    /**
+     * Fill the parts both layouts share: the headline, the bar, and the countdown under it.
+     *
+     * <p>The countdown is two views in one slot. A {@code Chronometer} ticks the seconds down for
+     * free while there is time left; past the deadline it would start counting the overrun back up,
+     * which is a card telling the customer how late their food is — so at zero it is swapped for a
+     * plain line of text and the clock stops being mentioned at all.
+     */
+    private static void dress(RemoteViews views, LiveCardSpec spec, android.graphics.Bitmap bar) {
+        views.setTextViewText(R.id.zopiq_live_title, spec.title);
+        views.setImageViewBitmap(R.id.zopiq_live_tracker, bar);
+
+        final long remaining = spec.remainingMs();
+        if (remaining > 0L) {
+            views.setViewVisibility(R.id.zopiq_live_countdown, View.VISIBLE);
+            views.setViewVisibility(R.id.zopiq_live_countdown_done, View.GONE);
+            // The Chronometer timebase is elapsedRealtime, not wall clock.
+            views.setChronometer(
+                    R.id.zopiq_live_countdown,
+                    SystemClock.elapsedRealtime() + remaining,
+                    null,
+                    true);
+            views.setChronometerCountDown(R.id.zopiq_live_countdown, true);
+        } else {
+            views.setViewVisibility(R.id.zopiq_live_countdown, View.GONE);
+            views.setViewVisibility(R.id.zopiq_live_countdown_done, View.VISIBLE);
+            views.setTextViewText(R.id.zopiq_live_countdown_done, spec.subText());
+        }
     }
 
     /**
@@ -152,7 +215,7 @@ final class LiveCardNotification {
 
         return PendingIntent.getActivity(
                 context,
-                // Per notification, so two running orders cannot collapse onto one intent.
+                // Per notification, so an order's two cards cannot collapse onto one intent.
                 notificationId,
                 launch,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -169,6 +232,7 @@ final class LiveCardNotification {
      * fighting any change the customer has made to it.
      */
     private static void ensureChannel(NotificationManager manager) {
+        if (manager == null) return;
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
 
         final NotificationChannel channel =
