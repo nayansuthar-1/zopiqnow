@@ -23,7 +23,9 @@ class HeroSlideDataSource {
   Future<List<HeroSlide>> fetchLive() async {
     final List<Map<String, dynamic>> rows = await _db
         .from('hero_slides')
-        .select('id, title, subtitle, cta_label, cta_target, image_url')
+        .select(
+          'id, title, subtitle, cta_label, cta_target, image_url, motion_url',
+        )
         // Explicitly ascending — postgrest-dart's `order()` defaults to
         // descending, which would run the carousel backwards.
         .order('sort_order', ascending: true)
@@ -41,5 +43,6 @@ HeroSlide _fromRow(Map<String, dynamic> row) => HeroSlide(
   subtitle: (row['subtitle'] as String?) ?? '',
   ctaLabel: (row['cta_label'] as String?) ?? 'Order now',
   imageUrl: row['image_url'] as String,
+  motionUrl: row['motion_url'] as String?,
   ctaTarget: row['cta_target'] as String?,
 );

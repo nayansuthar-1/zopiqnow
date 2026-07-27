@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, slideStateOf } from '../lib/api'
 import type { HeroSlideRow, SlideState } from '../lib/api'
-import { uploadPhoto, UploadFailure } from '../lib/uploads'
+import {
+  formatBytes,
+  MOTION_TARGET_BYTES,
+  uploadMotion,
+  uploadPhoto,
+  UploadFailure,
+} from '../lib/uploads'
 import { PageHeader } from '../ui/AppShell'
 import { Button, ConfirmDialog, Field } from '../ui/primitives'
 
@@ -75,12 +81,14 @@ function StatePill({ state }: { state: SlideState }) {
 /// ship a headline across somebody's nose.
 function SlidePreview({
   imageUrl,
+  motionUrl,
   title,
   subtitle,
   ctaLabel,
   hasTarget,
 }: {
   imageUrl: string
+  motionUrl: string
   title: string
   subtitle: string
   ctaLabel: string
@@ -99,6 +107,19 @@ function SlidePreview({
           // slide with no artwork would look like — which is why the RPC refuses
           // to save one.
           <div className="h-full w-full bg-gradient-to-br from-brand to-brand-deep" />
+        )}
+
+        {/* The loop over the still, in the same order the app stacks them. An
+            animated WebP plays in an <img>, which is the point of the format —
+            what the admin watches here is the same file the phone decodes, so
+            "does it actually move?" is answered before anything is saved rather
+            than on a device afterwards. */}
+        {motionUrl && (
+          <img
+            src={motionUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+          />
         )}
 
         {/* The scrim the app draws under its copy. */}
@@ -213,12 +234,21 @@ function SlideForm({
   const [ctaLabel, setCtaLabel] = useState(editing?.cta_label ?? 'Order now')
   const [ctaTarget, setCtaTarget] = useState(editing?.cta_target ?? '')
   const [imageUrl, setImageUrl] = useState(editing?.image_url ?? '')
+  const [motionUrl, setMotionUrl] = useState(editing?.motion_url ?? '')
   const [sortOrder, setSortOrder] = useState(String(editing?.sort_order ?? 0))
   const [startsAt, setStartsAt] = useState(toLocalInput(editing?.starts_at))
   const [endsAt, setEndsAt] = useState(toLocalInput(editing?.ends_at))
 
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+
+  // Null for a loop that was already on the slide when this form opened. The
+  // size is measured at the moment it is chosen, which is the moment it can
+  // still be changed; re-measuring on every edit would mean downloading the
+  // whole loop to open a form and fix a typo.
+  const [motionBytes, setMotionBytes] = useState<number | null>(null)
+  const [motionBusy, setMotionBusy] = useState(false)
+  const [motionError, setMotionError] = useState<string | null>(null)
 
   async function pickArt(file: File) {
     setUploading(true)
@@ -234,6 +264,22 @@ function SlideForm({
     }
   }
 
+  async function pickMotion(file: File) {
+    setMotionBusy(true)
+    setMotionError(null)
+    try {
+      const motion = await uploadMotion(file)
+      setMotionUrl(motion.url)
+      setMotionBytes(motion.bytes)
+    } catch (e) {
+      setMotionError(
+        e instanceof UploadFailure ? e.message : 'That video could not be uploaded.',
+      )
+    } finally {
+      setMotionBusy(false)
+    }
+  }
+
   return (
     <form
       className="mt-5 rounded-[8px] border border-line p-4"
@@ -246,6 +292,7 @@ function SlideForm({
           cta_label: ctaLabel,
           cta_target: ctaTarget,
           image_url: imageUrl,
+          motion_url: motionUrl,
           sort_order: Number(sortOrder) || 0,
           // Sent as ISO, because the browser's `datetime-local` value carries no
           // zone and Postgres would read a bare timestamp as UTC — an admin in
@@ -343,10 +390,93 @@ function SlideForm({
               <p className="mt-1.5 text-sm text-non-veg">{uploadError}</p>
             )}
           </div>
+
+          {/* The loop is an enhancement to a slide that already works. It is
+              below the artwork and optional in the copy, because the still is
+              what every failure path lands on — a slow network, a decode that
+              fails, a phone asking for reduced motion. */}
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-ink">
+              Motion loop (optional)
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="inline-flex h-10 cursor-pointer items-center rounded-[8px] border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas">
+                {motionBusy
+                  ? 'Transcoding…'
+                  : motionUrl
+                    ? 'Replace loop'
+                    : 'Upload MP4'}
+                <input
+                  type="file"
+                  accept="video/*"
+                  className="hidden"
+                  disabled={motionBusy}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (file) void pickMotion(file)
+                  }}
+                />
+              </label>
+              {motionUrl && !motionBusy && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMotionUrl('')
+                    setMotionBytes(null)
+                    setMotionError(null)
+                  }}
+                  className="text-sm font-medium text-ink-muted hover:text-non-veg"
+                >
+                  Remove loop
+                </button>
+              )}
+            </div>
+
+            <p className="mt-1.5 text-sm text-ink-muted">
+              Silent, and the first 8 seconds is all that is used. Cloudinary
+              turns it into a looping animation at 720px — the phone plays that,
+              not the video.
+            </p>
+
+            {motionBusy && (
+              <p className="mt-1.5 text-sm text-ink-muted">
+                Uploading and measuring the delivered loop — this takes a moment
+                on a long clip.
+              </p>
+            )}
+
+            {/* The number, because an admin who uploads a 40 MB clip should see
+                what a customer downloads before the customer pays for it. Over
+                the target it is amber and still saveable; over the hard cap the
+                upload never got this far. */}
+            {motionBytes !== null && (
+              <p
+                className={`mt-1.5 text-sm ${
+                  motionBytes > MOTION_TARGET_BYTES ? 'text-warn' : 'text-veg'
+                }`}
+              >
+                {motionBytes > MOTION_TARGET_BYTES
+                  ? `${formatBytes(motionBytes)} on mobile data — over the ${formatBytes(MOTION_TARGET_BYTES)} target. A shorter or calmer clip would land under it.`
+                  : `${formatBytes(motionBytes)} delivered — within the ${formatBytes(MOTION_TARGET_BYTES)} target.`}
+              </p>
+            )}
+            {motionUrl && motionBytes === null && !motionBusy && (
+              <p className="mt-1.5 text-sm text-ink-muted">
+                This slide already has a loop — it is playing in the preview.
+                Replace it to see a new size.
+              </p>
+            )}
+
+            {motionError && (
+              <p className="mt-1.5 text-sm text-non-veg">{motionError}</p>
+            )}
+          </div>
         </div>
 
         <SlidePreview
           imageUrl={imageUrl}
+          motionUrl={motionUrl}
           title={title}
           subtitle={subtitle}
           ctaLabel={ctaLabel}
@@ -488,6 +618,11 @@ export function HeroSlidesPage() {
                         </span>
                         <span className="truncate">{s.title}</span>
                         <StatePill state={state} />
+                        {s.motion_url && (
+                          <span className="inline-block whitespace-nowrap rounded-full bg-canvas px-2.5 py-1 text-xs font-semibold text-ink-muted">
+                            Loop
+                          </span>
+                        )}
                       </p>
                       <p className="truncate text-sm text-ink-muted">
                         {s.cta_label} →{' '}

@@ -559,6 +559,9 @@ class _PublishedSlideViewState extends State<_PublishedSlideView>
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
     final HeroSlide s = widget.slide;
+    // Read once into a local so the null check below promotes it — `s.motionUrl`
+    // is a field and would need a `!` at the use site.
+    final String? motion = s.motionUrl;
 
     return Stack(
       fit: StackFit.expand,
@@ -580,6 +583,24 @@ class _PublishedSlideViewState extends State<_PublishedSlideView>
             ),
           ),
         ),
+
+        // The loop, over the still and under the scrim.
+        //
+        // Not mounted at all under reduce-motion, and that is a deliberate
+        // choice over the cheaper one. Flutter *does* pause multi-frame images
+        // when animations are disabled (`image.dart`), but a paused animation
+        // is frozen on its own first frame — an arbitrary video still, not the
+        // artwork an admin chose and composed the headline against. Rule 1 says
+        // every failure path lands on the still, so this one does too.
+        if (motion != null && !widget.reduceMotion)
+          Positioned.fill(
+            child: _SlideMotion(
+              url: motion,
+              page: widget.page,
+              index: widget.index,
+            ),
+          ),
+
         const Positioned.fill(
           child: IgnorePointer(
             child: DecoratedBox(
@@ -680,6 +701,115 @@ class _PublishedSlideViewState extends State<_PublishedSlideView>
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A slide's looping animation, drawn over its still.
+///
+/// **There is no video player here and that is the point.** The admin uploads an
+/// MP4 and Cloudinary delivers it as an animated WebP, which [Image] decodes and
+/// loops natively — so a moving hero costs no new dependency and nothing in
+/// `pubspec.yaml` moves. As far as this widget is concerned it is loading a
+/// picture that happens to have more than one frame.
+///
+/// **Only the slide in front of the customer animates.** An off-screen loop is
+/// battery and CPU spent on something nobody is looking at, and the carousel
+/// keeps several pages alive at once. [TickerMode] is what stops it: Flutter
+/// pauses multi-frame images when the ticker mode is disabled, which parks the
+/// animation *without* tearing the widget down — so swiping back to a slide
+/// resumes it rather than paying to decode it again.
+///
+/// The `< 0.5` test means exactly one loop runs at any moment (rule 3). The
+/// consequence, and it is deliberate: a slide swiping into view stays on its
+/// first frame until it passes the halfway point and takes over.
+class _SlideMotion extends StatefulWidget {
+  const _SlideMotion({
+    required this.url,
+    required this.page,
+    required this.index,
+  });
+
+  final String url;
+  final PageController page;
+  final int index;
+
+  @override
+  State<_SlideMotion> createState() => _SlideMotionState();
+}
+
+class _SlideMotionState extends State<_SlideMotion> {
+  bool _current = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.page.addListener(_sync);
+    // Not read here: the controller has no dimensions until the PageView has
+    // laid out, so on this frame every slide would look like page zero.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
+  }
+
+  @override
+  void dispose() {
+    widget.page.removeListener(_sync);
+    super.dispose();
+  }
+
+  /// Deliberately a listener with its own `setState` rather than an
+  /// [AnimatedBuilder] over the controller. The parallax above rebuilds on
+  /// every pixel of a swipe because it has a new offset on every pixel; this
+  /// has a new answer perhaps twice per swipe, and rebuilding an [Image]
+  /// subtree sixty times a second to arrive at the same boolean is the kind of
+  /// cost that only shows up on the Android 10 floor.
+  void _sync() {
+    if (!mounted) return;
+    final double page =
+        widget.page.hasClients && widget.page.position.haveDimensions
+        ? (widget.page.page ?? widget.index.toDouble())
+        : widget.index.toDouble();
+    final bool current = (page - widget.index).abs() < 0.5;
+    if (current != _current) setState(() => _current = current);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: TickerMode(
+        enabled: _current,
+        child: Image.network(
+          widget.url,
+          fit: BoxFit.cover,
+          // No `cacheWidth`, unlike every still in the app. The loop is already
+          // delivered at 720px by the Cloudinary transformation that built it,
+          // which is the memory bound; asking for the phone's own width on top
+          // of that would be asking to *upscale*, and `ResizeImage` asserts on
+          // exactly that in debug.
+          //
+          // Frames are decoded one at a time as the animation plays, so what
+          // sits in memory is the current frame and the encoded bytes — not the
+          // whole loop.
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          frameBuilder:
+              (
+                BuildContext context,
+                Widget child,
+                int? frame,
+                bool wasSynchronouslyLoaded,
+              ) {
+                // Rule 1, restated as a fade: the still is already painted
+                // underneath, so the loop appears over it rather than replacing
+                // it, and there is never a blank frame between the two.
+                if (wasSynchronouslyLoaded) return child;
+                return AnimatedOpacity(
+                  opacity: frame == null ? 0 : 1,
+                  duration: ZopiqDurations.base,
+                  curve: ZopiqCurves.emphasized,
+                  child: child,
+                );
+              },
+        ),
+      ),
     );
   }
 }

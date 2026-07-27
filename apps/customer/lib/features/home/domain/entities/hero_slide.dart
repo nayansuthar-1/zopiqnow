@@ -15,6 +15,7 @@ class HeroSlide {
     required this.subtitle,
     required this.ctaLabel,
     required this.imageUrl,
+    this.motionUrl,
     this.ctaTarget,
   });
 
@@ -31,6 +32,18 @@ class HeroSlide {
 
   /// Cloudinary-hosted artwork. Never empty: the table requires it.
   final String imageUrl;
+
+  /// An optional looping animation to play over [imageUrl] (migration 0054).
+  ///
+  /// This is a *still image URL* despite what it holds — Cloudinary delivers
+  /// the admin's uploaded MP4 as an animated WebP, which Flutter's own [Image]
+  /// decodes and loops with no video player involved. Nothing on the device
+  /// knows a video was ever uploaded.
+  ///
+  /// Null is the ordinary case. [imageUrl] is what shows when it is null, while
+  /// it downloads, if it fails, and whenever the phone has asked for reduced
+  /// motion — so a slide never depends on this arriving.
+  final String? motionUrl;
 
   /// Where the button goes — an in-app path the database has already validated
   /// against something that exists (`/restaurant/<id>`, `/gifts`, …).
