@@ -5,6 +5,7 @@ import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dar
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
@@ -90,6 +91,46 @@ final AutoDisposeFutureProviderFamily<String?, String> deliveryCodeProvider =
       String orderId,
     ) {
       return ref.watch(orderRepositoryProvider).getDeliveryCode(orderId);
+    });
+
+/// The map's fixed parts: two pins, the road between them, and the live ETA.
+///
+/// Fetched rather than streamed, and refetched whenever the *status* stream
+/// moves — which is exactly when the arrival time can have been recomputed
+/// (0057 re-estimates on every status and delivery-state change). One round trip
+/// per real event beats a socket held open on a row that changes twice an hour.
+///
+/// Null is a real answer and the screen draws no map for it: an order with no
+/// delivery coordinates, or a mock one.
+final AutoDisposeFutureProviderFamily<DeliveryRoute?, String>
+orderRouteProvider =
+    FutureProvider.autoDispose.family<DeliveryRoute?, String>((
+      Ref ref,
+      String orderId,
+    ) {
+      ref.watch(orderStatusProvider(orderId));
+      return ref.watch(orderRepositoryProvider).getRoute(orderId);
+    });
+
+/// Where the rider is, live.
+///
+/// Keyed by the carrier rather than the order because that is what the socket
+/// filters on — see [OrderRider.carrierKey], which is a subscription filter and
+/// not a credential. The screen only asks once it has a rider, which is also the
+/// only window the policy behind it will answer in.
+///
+/// Never in an error state: a map without a dot is a map, and a tracking screen
+/// that goes red because a socket hiccuped is the one thing this must not do.
+final AutoDisposeStreamProviderFamily<RiderPosition?, String>
+riderPositionProvider =
+    StreamProvider.autoDispose.family<RiderPosition?, String>((
+      Ref ref,
+      String carrierKey,
+    ) {
+      return ref
+          .watch(orderRepositoryProvider)
+          .watchRiderPosition(carrierKey)
+          .handleError((Object _) {});
     });
 
 /// Calls an order off, and reports what the order service said if it refused.

@@ -1,23 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_rider/core/widgets/rider_animations.dart';
+import 'package:zopiq_rider/core/widgets/rider_svg_icons.dart';
 import 'package:zopiq_rider/features/auth/presentation/pages/profile_page.dart';
 import 'package:zopiq_rider/features/jobs/domain/entities/job.dart';
 import 'package:zopiq_rider/features/jobs/presentation/pages/earnings_page.dart';
 import 'package:zopiq_rider/features/jobs/presentation/pages/home_page.dart';
 import 'package:zopiq_rider/features/jobs/presentation/providers/jobs_providers.dart';
+import 'package:zopiq_rider/features/jobs/presentation/widgets/offer_sheet.dart';
 
-/// Three tabs, which is two more than this app had.
-///
-/// A plain `IndexedStack` behind a `NavigationBar` rather than go_router's
-/// `StatefulShellRoute`: nothing here is deep-linked, nothing is pushed on top,
-/// and the router's whole job in this app is the signed-in/signed-out redirect
-/// (see `router.dart`). A second routing mechanism to remember which of three
-/// tabs is showing would be machinery bought for a problem nobody has.
-///
-/// `IndexedStack` and not a swapped child, so that the board's scroll position
-/// survives a rider checking what they have made and coming back.
+/// Three main tabs for the Rider partner experience using custom vector SVG icons.
 class RiderShell extends ConsumerStatefulWidget {
   const RiderShell({super.key});
 
@@ -28,49 +24,135 @@ class RiderShell extends ConsumerStatefulWidget {
 class _RiderShellState extends ConsumerState<RiderShell> {
   int _index = 0;
 
+  /// The order whose sheet is currently up, so a rebuild does not open a second
+  /// one over the first. Cleared when the sheet closes for any reason —
+  /// accepted, declined, or run out.
+  String? _showing;
+
+  /// Puts the sheet up and keeps [_showing] honest for as long as it is there.
+  ///
+  /// `isDismissible: false` and `enableDrag: false` on purpose, and it is the
+  /// one modal in this app that refuses a swipe-away: the two answers are
+  /// Accept and Decline, and a third exit that silently means "let it time out"
+  /// costs the customer forty-five seconds the rider had already decided
+  /// against. Declining is one tap and re-offers the job immediately.
+  Future<void> _raise(DeliveryOffer offer) async {
+    _showing = offer.orderId;
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        isDismissible: false,
+        enableDrag: false,
+        backgroundColor: Colors.transparent,
+        builder: (_) => OfferSheet(offer: offer),
+      );
+    } finally {
+      // In a `finally` so a sheet torn down by a route change — a sign-out, a
+      // deep link — does not leave this pinned at an order id that will never
+      // come round again, which would make the *next* offer silently not open.
+      if (mounted) _showing = null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // A rider with work in hand gets a badge on the tab they should be on, and
-    // the count now that a run can hold more than one. It is the one thing
-    // worth interrupting the other two screens about.
     final List<Job> run = ref.watch(activeJobsProvider);
+    final ZopiqColors zc = context.zc;
+    final Color surfaceColor = Theme.of(context).colorScheme.surface;
+
+    // The rider's position, on while they are carrying (0057). Watched here
+    // rather than on the jobs screen because it must keep running while they
+    // are looking at their earnings or their profile — a map that blanks
+    // because the rider switched tabs is a map nobody trusts.
+    ref.watch(locationReportingProvider);
+
+    // An offer is a question with a deadline, so it is raised from the shell
+    // and not from a screen: whichever tab the rider is on, the sheet comes up.
+    ref.listen<DeliveryOffer?>(currentOfferProvider, (
+      DeliveryOffer? _,
+      DeliveryOffer? offer,
+    ) {
+      if (offer == null || offer.orderId == _showing) return;
+      if (offer.isExpired(DateTime.now())) return;
+      unawaited(_raise(offer));
+    });
 
     return Scaffold(
       body: IndexedStack(
         index: _index,
-        children: const <Widget>[HomePage(), EarningsPage(), ProfilePage()],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (int i) => setState(() => _index = i),
-        destinations: <NavigationDestination>[
-          NavigationDestination(
-            icon: run.isEmpty
-                ? const Icon(Icons.two_wheeler_outlined)
-                : Badge(
-                    backgroundColor: context.zc.primary,
-                    // The count only once there is more than one — "1" on a
-                    // badge is noise when the icon already means "you have a
-                    // job".
-                    label: run.length > 1 ? Text('${run.length}') : null,
-                    child: const Icon(Icons.two_wheeler_rounded),
-                  ),
-            selectedIcon: const Icon(Icons.two_wheeler_rounded),
-            // Always "Jobs". The label tracking the state would only repeat the
-            // app bar directly above it, in smaller type.
-            label: 'Jobs',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet_rounded),
-            label: 'Earnings',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profile',
-          ),
+        children: const <Widget>[
+          HomePage(),
+          EarningsPage(),
+          ProfilePage(),
         ],
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: zc.textStrong.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: NavigationBar(
+          selectedIndex: _index,
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          indicatorColor: zc.primary.withValues(alpha: 0.14),
+          onDestinationSelected: (int i) => setState(() => _index = i),
+          destinations: <NavigationDestination>[
+            NavigationDestination(
+              icon: run.isEmpty
+                  ? RiderSvgIcon(
+                      type: RiderSvgType.deliveryBike,
+                      color: zc.textMuted,
+                    )
+                  : RiderPulseBadge(
+                      glowColor: zc.primary,
+                      enabled: true,
+                      child: Badge(
+                        backgroundColor: zc.primary,
+                        label: run.length > 1 ? Text('${run.length}') : null,
+                        child: RiderSvgIcon(
+                          type: RiderSvgType.deliveryBike,
+                          color: zc.primary,
+                        ),
+                      ),
+                    ),
+              selectedIcon: RiderSvgIcon(
+                type: RiderSvgType.deliveryBike,
+                color: zc.primary,
+              ),
+              label: 'Jobs',
+            ),
+            NavigationDestination(
+              icon: RiderSvgIcon(
+                type: RiderSvgType.wallet,
+                color: zc.textMuted,
+              ),
+              selectedIcon: RiderSvgIcon(
+                type: RiderSvgType.wallet,
+                color: zc.primary,
+              ),
+              label: 'Earnings',
+            ),
+            NavigationDestination(
+              icon: RiderSvgIcon(
+                type: RiderSvgType.profile,
+                color: zc.textMuted,
+              ),
+              selectedIcon: RiderSvgIcon(
+                type: RiderSvgType.profile,
+                color: zc.primary,
+              ),
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
     );
   }

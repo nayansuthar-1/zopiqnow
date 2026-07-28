@@ -13,6 +13,32 @@ abstract interface class JobsDataSource {
   /// Cooked-or-nearly orders that nobody has claimed.
   Future<List<JobOffer>> fetchBoard();
 
+  /// Jobs the dispatcher is asking *this* rider to take, right now (0056).
+  Future<List<DeliveryOffer>> fetchOffers();
+
+  /// A ping every time this rider's offers change — one row appearing is the
+  /// event the sheet opens on. Carries no data of its own on purpose: the
+  /// socket says "something moved", [fetchOffers] says what, and there is then
+  /// one shape of an offer in the app rather than two that can disagree.
+  Stream<void> watchOfferChanges(String partnerEmail);
+
+  /// Yes. Creates the delivery, through the same `claim_delivery` race the board
+  /// has always gone through.
+  Future<void> acceptOffer(String orderId);
+
+  /// No. The order moves to the next partner immediately, not when the
+  /// countdown runs out.
+  Future<void> declineOffer(String orderId);
+
+  /// Where this rider is. Ignored by the database unless they are carrying
+  /// something (0057).
+  Future<void> recordLocation({
+    required double lat,
+    required double lng,
+    double? heading,
+    double? speedKmh,
+  });
+
   /// This rider's own jobs, live ones first.
   Future<List<Job>> fetchMine();
 
@@ -80,6 +106,70 @@ class JobsSupabaseDataSource implements JobsDataSource {
         .map(JobOffer.fromJson)
         .toList(growable: false);
   }
+
+  @override
+  Future<List<DeliveryOffer>> fetchOffers() async {
+    final List<dynamic> rows = await _guard<List<dynamic>>(
+      () => _db.rpc<List<dynamic>>('my_offers'),
+    );
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map(DeliveryOffer.fromJson)
+        .toList(growable: false);
+  }
+
+  /// The third table read in this file, and the last.
+  ///
+  /// `delivery_offers` has a select policy scoped to the rider's own email
+  /// (0056) — the same shape as `rider_payouts` below, and allowed for the same
+  /// reason. It is used only as a doorbell: the rows it delivers are thrown
+  /// away and [fetchOffers] is called for the answer, because the RPC joins in
+  /// the restaurant, the distance and the fee that a raw offer row does not
+  /// carry.
+  @override
+  Stream<void> watchOfferChanges(String partnerEmail) {
+    return _db
+        .from('delivery_offers')
+        .stream(primaryKey: const <String>['id'])
+        // Not the security boundary — the policy is. This is so the socket
+        // carries one rider's offers rather than being asked to.
+        .eq('partner_email', partnerEmail)
+        .map((List<Map<String, dynamic>> _) {});
+  }
+
+  @override
+  Future<void> acceptOffer(String orderId) => _guard<void>(
+    () => _db.rpc<void>(
+      'accept_offer',
+      params: <String, dynamic>{'p_order_id': orderId},
+    ),
+  );
+
+  @override
+  Future<void> declineOffer(String orderId) => _guard<void>(
+    () => _db.rpc<void>(
+      'decline_offer',
+      params: <String, dynamic>{'p_order_id': orderId},
+    ),
+  );
+
+  @override
+  Future<void> recordLocation({
+    required double lat,
+    required double lng,
+    double? heading,
+    double? speedKmh,
+  }) => _guard<void>(
+    () => _db.rpc<void>(
+      'record_rider_location',
+      params: <String, dynamic>{
+        'p_lat': lat,
+        'p_lng': lng,
+        'p_heading': heading,
+        'p_speed': speedKmh,
+      },
+    ),
+  );
 
   @override
   Future<List<Job>> fetchMine() async {

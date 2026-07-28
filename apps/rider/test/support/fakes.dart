@@ -73,6 +73,48 @@ class FakeJobsDataSource implements JobsDataSource {
   String deliveryOtp = '4321';
   bool online = true;
 
+  // --- Dispatch (0056) and location (0057) ---------------------------------
+  // Deliberately thin. Nothing in this suite exercises the offer flow, and a
+  // fake that pretended to run a dispatcher would be fixture nobody reads
+  // asserting behaviour nobody tests. These exist so the class satisfies the
+  // interface; the offer flow is covered by the manual steps in ZOMATO_PARITY.
+
+  /// Offers this fake will hand back. Empty unless a test sets it.
+  List<DeliveryOffer> offers = const <DeliveryOffer>[];
+
+  /// Every position [recordLocation] was given, in order — the one thing worth
+  /// recording here, because "did the app stop reporting when the job ended" is
+  /// a question with a wrong answer that costs a rider their privacy.
+  final List<({double lat, double lng})> locations =
+      <({double lat, double lng})>[];
+
+  @override
+  Future<List<DeliveryOffer>> fetchOffers() async => offers;
+
+  @override
+  Stream<void> watchOfferChanges(String partnerEmail) =>
+      const Stream<void>.empty();
+
+  @override
+  Future<void> acceptOffer(String orderId) => claim(orderId);
+
+  @override
+  Future<void> declineOffer(String orderId) async {
+    offers = offers
+        .where((DeliveryOffer o) => o.orderId != orderId)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> recordLocation({
+    required double lat,
+    required double lng,
+    double? heading,
+    double? speedKmh,
+  }) async {
+    locations.add((lat: lat, lng: lng));
+  }
+
   List<JobOffer> _board;
   List<Job> _mine;
 
@@ -165,6 +207,8 @@ class FakeJobsDataSource implements JobsDataSource {
         total: job.total,
         isCash: job.isCash,
         isReady: job.isReadyToCollect,
+        routeKm: job.distanceKm,
+        riderPay: job.riderPay,
         placedAt: job.claimedAt,
       ),
     ];
@@ -325,6 +369,8 @@ JobOffer offer({
   int total = 720,
   bool isCash = true,
   bool isReady = true,
+  double? routeKm = 4.2,
+  int riderPay = 46,
 }) => JobOffer(
   orderId: orderId,
   restaurantName: restaurantName,
@@ -332,6 +378,8 @@ JobOffer offer({
   total: total,
   isCash: isCash,
   isReady: isReady,
+  routeKm: routeKm,
+  riderPay: riderPay,
   placedAt: DateTime.now().subtract(const Duration(minutes: 8)),
 );
 

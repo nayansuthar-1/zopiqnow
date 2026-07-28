@@ -1,23 +1,31 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
 import 'package:zopiq_rider/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_rider/features/jobs/data/jobs_datasource.dart';
+import 'package:zopiq_rider/features/jobs/data/location_reporter.dart';
 import 'package:zopiq_rider/features/jobs/domain/entities/job.dart';
 
 /// Data source binding. Overridden in tests, which have no Supabase instance.
 final Provider<JobsDataSource> jobsDataSourceProvider =
     Provider<JobsDataSource>((Ref ref) => const JobsSupabaseDataSource());
 
-/// The board. A one-shot read refreshed by pull-to-refresh and after every
-/// write — not a stream.
+/// The board — now the *leftovers*, not the front door (0056).
 ///
-/// A live subscription would be the obvious thing and is deliberately not here:
-/// `available_deliveries` is a function, and Realtime rides table policies, not
-/// functions. Since riders have no policy on `orders` at all (0025), there is
-/// nothing for a socket to deliver. Polling on demand is the honest shape of the
-/// thing until a job-offer push lands in a later slice.
+/// An order is offered to one rider at a time and only reaches this list once
+/// the fleet has declined or ignored it. So it is short, it is often empty, and
+/// nothing about it is urgent — which is exactly why the twenty-second timer
+/// that used to sit beside it is gone.
+///
+/// A one-shot read refreshed by pull-to-refresh, after every write, and whenever
+/// this rider's offers change. A live subscription is still not possible:
+/// `available_deliveries` is a function, Realtime rides table policies, and
+/// riders have no policy on `orders` at all (0025). But it no longer needs to
+/// be — [offerSignalProvider] is the socket that says something moved, and the
+/// board is refreshed off the back of it.
 final FutureProvider<List<JobOffer>> boardProvider =
     FutureProvider<List<JobOffer>>((Ref ref) {
       final Rider? rider = ref.watch(riderProvider);
@@ -25,24 +33,67 @@ final FutureProvider<List<JobOffer>> boardProvider =
       return ref.watch(jobsDataSourceProvider).fetchBoard();
     });
 
-/// How often the board re-asks, while it is on screen and the rider is free.
+/// The doorbell. Fires whenever a row in this rider's `delivery_offers` appears,
+/// changes or expires.
 ///
-/// Twenty seconds. Not a number with a theory behind it — it is short enough
-/// that a rider glancing down sees a job that appeared while they were riding,
-/// and long enough that a slow shift is three requests a minute rather than
-/// sixty.
+/// The stream carries nothing — see the data source. Two things watch it: the
+/// offers themselves, and the board, because an order being offered to somebody
+/// leaves the board and an order nobody took rejoins it.
+final StreamProvider<void> offerSignalProvider = StreamProvider<void>((Ref ref) {
+  final Rider? rider = ref.watch(riderProvider);
+  if (rider == null) return const Stream<void>.empty();
+  return ref.watch(jobsDataSourceProvider).watchOfferChanges(rider.email);
+});
+
+/// What this rider is being asked to take, right now.
 ///
-/// Overridden to `null` in widget tests, which is the whole reason this is a
-/// provider and not a constant: a `Timer.periodic` left running when a test ends
-/// fails that test with a pending-timer error, and the alternative — inferring
-/// "am I in a test" from `disableAnimations` — is a guess that reads as one.
+/// Refetched on every ping from [offerSignalProvider], which is what makes the
+/// sheet appear within a socket round trip of the dispatcher choosing this
+/// rider — no polling, and no waiting for FCM to deliver the push that wakes a
+/// *dark* screen.
 ///
-/// This is a stopgap and should be deleted when a job-offer push lands. Polling
-/// is what an app does when nothing can tell it the truth: `available_deliveries`
-/// is a function, Realtime rides table policies, and riders have no policy on
-/// `orders` (0025). A push knows; this only asks.
-final Provider<Duration?> boardPollIntervalProvider =
-    Provider<Duration?>((Ref ref) => const Duration(seconds: 20));
+/// Rows that have already expired are dropped here rather than trusted from the
+/// server, because a sheet is a screen a phone can hold open through a tunnel:
+/// `my_offers` filters on the database's clock at the moment it is asked, and
+/// this filters again on the device's clock at the moment it is drawn.
+final FutureProvider<List<DeliveryOffer>> offersProvider =
+    FutureProvider<List<DeliveryOffer>>((Ref ref) async {
+      final Rider? rider = ref.watch(riderProvider);
+      if (rider == null) return const <DeliveryOffer>[];
+
+      // Watched, not read: this is the whole refresh mechanism.
+      ref.watch(offerSignalProvider);
+
+      // An offer landing means the board changed too — the order it names has
+      // just left it.
+      ref.invalidate(boardProvider);
+
+      final List<DeliveryOffer> offers = await ref
+          .watch(jobsDataSourceProvider)
+          .fetchOffers();
+      final DateTime now = DateTime.now();
+      return offers
+          .where((DeliveryOffer o) => !o.isExpired(now))
+          .toList(growable: false);
+    });
+
+/// The one offer the sheet draws, or null.
+///
+/// The soonest to expire when there is somehow more than one — which the
+/// database prevents per *order* but not per rider, since 0056 refuses to offer
+/// a second job to a rider already deciding about one. Belt and braces: the
+/// rider sees one countdown, always.
+final Provider<DeliveryOffer?> currentOfferProvider = Provider<DeliveryOffer?>((
+  Ref ref,
+) {
+  final List<DeliveryOffer> offers = ref
+      .watch(offersProvider)
+      .maybeWhen(
+        data: (List<DeliveryOffer> o) => o,
+        orElse: () => const <DeliveryOffer>[],
+      );
+  return offers.isEmpty ? null : offers.first;
+});
 
 /// Whether this rider is on shift.
 ///
@@ -100,6 +151,35 @@ final Provider<List<Job>> activeJobsProvider = Provider<List<Job>>((Ref ref) {
     return byRank != 0 ? byRank : a.claimedAt.compareTo(b.claimedAt);
   });
   return List<Job>.unmodifiable(live);
+});
+
+/// The thing that sends the rider's position while they are carrying (0057).
+///
+/// A single long-lived object rather than one per screen: the stream it holds is
+/// a GPS subscription, and two of those is two radios' worth of battery for one
+/// dot on a map. Disposed with the container, which for this app means sign-out.
+final Provider<RiderLocationReporter> locationReporterProvider =
+    Provider<RiderLocationReporter>((Ref ref) {
+      final RiderLocationReporter reporter = RiderLocationReporter(
+        ref.watch(jobsDataSourceProvider),
+      );
+      ref.onDispose(reporter.stop);
+      return reporter;
+    });
+
+/// Turns the reporter on and off from the rider's own jobs.
+///
+/// Watched by the shell, so it is alive for as long as the app is. The condition
+/// is *carrying*, not *has a live job*: a rider riding to a kitchen is not on
+/// anybody's tracking screen, and following them there would be collecting a
+/// position for which there is no reader.
+final Provider<void> locationReportingProvider = Provider<void>((Ref ref) {
+  final bool carrying = ref
+      .watch(activeJobsProvider)
+      .any((Job j) => j.isCarrying);
+  // Deliberately not awaited. This provider's job is to notice the change and
+  // pass it on; the reporter is idempotent and handles its own failures.
+  unawaited(ref.watch(locationReporterProvider).setCarrying(carrying));
 });
 
 /// The last 30 days of earnings, by day.
@@ -216,6 +296,23 @@ class JobsController extends Notifier<void> {
   Future<String?> claim(String orderId) =>
       _write(() => _ds.claim(orderId), 'We couldn\'t take that job.');
 
+  /// Yes to an offer. The database's refusal sentence is passed straight
+  /// through — "That offer has expired." is already written for a human.
+  Future<String?> acceptOffer(String orderId) => _write(
+    () => _ds.acceptOffer(orderId),
+    'We couldn\'t take that job.',
+  );
+
+  /// No. Never reports a failure to the rider, and that is deliberate: the
+  /// answer to "we could not record your decline" is the same as the answer to
+  /// a successful one — the sheet closes and the order goes to somebody else,
+  /// either now or when the countdown runs out. An error toast here would be a
+  /// rider being told off for saying no.
+  Future<String?> declineOffer(String orderId) async {
+    await _write(() => _ds.declineOffer(orderId), '');
+    return null;
+  }
+
   Future<String?> abandon(String orderId) =>
       _write(() => _ds.abandon(orderId), 'We couldn\'t drop that job.');
 
@@ -262,6 +359,9 @@ class JobsController extends Notifier<void> {
       ref
         ..invalidate(boardProvider)
         ..invalidate(myJobsProvider)
+        // Accepting retires an offer, declining retires an offer, and claiming
+        // from the board can retire somebody else's. One line covers all three.
+        ..invalidate(offersProvider)
         // The board is empty while offline and full while on, so a shift change
         // is a board change — and every job write can be the one that frees a
         // rider to end their shift.

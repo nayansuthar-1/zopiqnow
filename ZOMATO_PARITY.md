@@ -27,7 +27,7 @@ These were on the gap list but are shipped and verified. Kept here so nobody reb
 | Backend — role-based permissions | ✅ Owner/staff (0024), rider identity, admin `assert_admin()`, RLS on every table |
 | Backend — proper order state machine | ✅ Transition table lives in Postgres (0014); apps mirror it, DB wins |
 | Backend — real-time status sync | ✅ Realtime on `orders` + `notifications`, RLS applied per subscriber |
-| Backend — ETA calculation | ~ Quoted at placement + prep-time + real road distance (`orders.route_km`, Ola Maps, 0046). **Not dynamic** — see B3 |
+| Backend — ETA calculation | ✅ Dynamic since B3 — recomputed from the rider's live position and this order's own road/straight-line detour factor (`orders.eta_at`, 0057). Moves later only with a reason printed on the card |
 | Important — coupon flow (customer side) | ✅ Apply/remove, server-validated, discount frozen onto the order |
 | Admin — rider management | ✅ Roster, add/edit, activate/deactivate with a live-job guard (0040) |
 | Admin — vendor approval | ✅ Full onboarding console; `admin_publish_restaurant` (0026–0038) |
@@ -133,22 +133,63 @@ run must assert the overload count.
 
 ---
 
-### B3 — Dispatch, live tracking, dynamic ETA
-- [ ] **Rider assignment algorithm** — auto-offer the nearest free rider instead of
-      self-claim. An *offer* with Accept/Decline and a countdown (push is live as of B0)
-- [ ] **Auto-reassignment** on decline, timeout, or abandon
-- [ ] **Rider location stream** — `rider_locations`, written on an interval while carrying,
-      readable only by that order's customer while `state='picked_up'`
-- [ ] **Live map** on the customer tracking screen (Ola Maps; the credential and the
-      Origin-header pattern already work from 0046)
-- [ ] **Dynamic ETA** — recomputed from rider position + road distance, pushed over
-      Realtime, replacing the static quote
-- [ ] Rider board: show distance and pay **before** claiming (`route_km` is already stored)
-- [ ] Delete the 20s board polling in the same commit that lands the offer push
+### B3 — Dispatch, live tracking, dynamic ETA ✅ *(2026-07-28, migrations 0056–0057)*
+- [x] **Rider assignment algorithm** — `dispatch_deliveries()` runs every 20s and offers
+      the job to *one* rider: fewest live jobs first, then nearest, then longest idle.
+      A sheet with a 45-second countdown, Accept / Decline
+- [x] **Auto-reassignment** — decline re-offers **inline** (not at the next sweep);
+      a timeout is retired by the sweeper; an abandon leaves the order with no live
+      delivery, which the sweeper picks up on its next tick. A rider hears about an
+      order at most once — `(order_id, partner_email)` is unique, so a decline is final
+- [x] **Rider location stream** — `rider_locations`, one row per rider (a fix, not a
+      track), written by `record_rider_location` on a 30 m / 20 s stream while carrying
+- [x] **Live map** — custom-painted, on the tracking card. Ola's `overview_polyline` is
+      stored by 0057 and decoded on the device, so the *real road* is drawn with no
+      tile server, no key in the APK, and no new dependency
+- [x] **Dynamic ETA** — `recompute_order_eta` runs off every position fix and every
+      status change; `orders.eta_at` replaces `created_at + eta_minutes`, and the live
+      card (0052) reads the new number over the channel it already had
+- [x] Rider board: distance **and** pay before claiming, on both the board card and the
+      offer sheet (`available_deliveries` now returns `route_km` and `rider_pay`)
+- [x] Deleted the 20s board polling — and its test, whose whole subject was the timer.
+      `delivery_offers` has a rider-scoped policy, so Realtime can carry the signal that
+      `available_deliveries` (a function) never could
 
-**Rules:** location is retained only while the job is live; a customer may never read a
-rider's position outside their own live order; the ETA must never move backwards without
-a reason on screen.
+**Rules, and where each one is actually enforced:**
+- *Location is retained only while the job is live.* Two places, not one:
+  `record_rider_location` **deletes** the row when the caller has nothing live, and
+  `purge_rider_locations` (folded into the dispatcher's tick) sweeps anything a dead
+  phone left behind.
+- *A customer may never read a rider's position outside their own live order.* One RLS
+  policy on `rider_locations`, the same shape as 0039's. The `partner_email` the app
+  subscribes with is a **filter, not a credential** — the policy returns nothing for
+  somebody else's rider.
+- *The ETA must never move backwards without a reason on screen.* Enforced in one place,
+  at the bottom of `recompute_order_eta`: earlier is free; later is written **only**
+  together with `eta_reason`, and where no cause can be named the old time stands. The
+  card renders that sentence under the arrival time. Movement under two minutes either
+  way is not written at all, so the number does not twitch at a traffic light.
+
+**The board did not die, and that is deliberate.** "Auto-assign instead of self-claim"
+read literally means deleting `available_deliveries` — which strands every order the
+fleet declines, and on a thin night that is every order. So an order that exhausts its
+offers goes back on the open board, and *that* is when the broadcast push fires: at the
+moment it is actually true that anybody may take it. The board is the leftovers now, not
+the front door, and the empty-state copy was rewritten to stop telling riders to watch it.
+
+**Two decisions worth keeping.** Riders are *ranked*, not filtered, by live job count —
+8b-4 left concurrent claims uncapped on purpose ("carrying three orders from one street
+is how delivery actually works"), and excluding busy riders would have quietly reversed
+that; a rider already at the kitchen is the nearest busy one, so batching falls out for
+free. And `accept_offer` goes through `claim_delivery` untouched: the partial-unique-index
+race is still the thing that decides a tie, exactly as it did from the board.
+
+**A bug this phase created and closed before shipping.** The first cut of the pre-pickup
+estimate fell back to `created_at + eta_minutes` for the kitchen's ready time when a
+vendor accepted without a prep time — then added the ride on top. That is the *delivery*
+promise, not the kitchen's, so a 32-minute promise on a 12 km route came out as 68
+minutes. It now subtracts the ride back out of the promise, which makes the whole
+expression collapse to the original number: no new information, no new estimate.
 
 ---
 

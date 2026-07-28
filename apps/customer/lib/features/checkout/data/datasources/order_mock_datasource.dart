@@ -5,6 +5,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
@@ -85,6 +86,18 @@ class OrderMockDataSource implements OrderDataSource {
 
   @override
   Future<String?> fetchDeliveryCode(String orderId) async => null;
+
+  /// No map without a backend. The mock has never had coordinates for anything
+  /// — no restaurant location, no delivery pin — and inventing a pair here would
+  /// put a fake bike on a fake road, which is a demo of the wrong thing. The
+  /// tracking card renders the rest of itself and simply has no map.
+  @override
+  Future<DeliveryRoute?> fetchRoute(String orderId) async => null;
+
+  /// Likewise. Nothing is carrying a mock order, so nothing has a position.
+  @override
+  Stream<RiderPosition?> watchRiderPosition(String carrierKey) =>
+      Stream<RiderPosition?>.value(null);
 
   /// Calls a mock order off, refusing on exactly the statuses `cancel_my_order`
   /// refuses on — and with the same sentence. A fake that let a customer cancel

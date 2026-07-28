@@ -13,7 +13,19 @@ class OrderRider {
     required this.phone,
     required this.vehicle,
     this.isAtDoor = false,
+    this.carrierKey,
   });
+
+  /// The delivery's `partner_email`, used as the filter on the live-position
+  /// subscription (0057) and **never rendered**.
+  ///
+  /// It sits on this object rather than costing a second round trip because
+  /// `fetchRider` already reads the delivery row it comes from. That it is
+  /// readable at all is 0039: a customer may see their own live delivery. It is
+  /// not permission to see anything — the policy on `rider_locations` decides
+  /// that, and would return nothing for a key belonging to somebody else's
+  /// rider.
+  final String? carrierKey;
 
   /// The rider has said they are outside (0049). The one fact on this screen
   /// worth interrupting somebody for, and the moment the delivery code matters.

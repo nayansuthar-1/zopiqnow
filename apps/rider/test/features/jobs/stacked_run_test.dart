@@ -21,7 +21,6 @@ Widget _app({required FakeJobsDataSource jobs}) => ProviderScope(
       FakeRiderAuthDataSource(signedInAs: testRider),
     ),
     jobsDataSourceProvider.overrideWithValue(jobs),
-    boardPollIntervalProvider.overrideWithValue(null),
   ],
   child: const RiderApp(),
 );

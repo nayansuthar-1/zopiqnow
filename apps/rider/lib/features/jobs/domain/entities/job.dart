@@ -55,6 +55,10 @@ enum JobStep { rideToRestaurant, collect, rideToCustomer, handOver, done }
 /// everyone who ordered dinner tonight. It arrives with [Job] instead, after the
 /// rider has committed — that is `available_deliveries` vs `my_deliveries` in
 /// 0025, and the split is enforced in Postgres, not here.
+///
+/// Since B3 the board is the **leftovers**, not the front door: an order is
+/// offered to riders one at a time and only reaches this list once the fleet has
+/// declined or ignored it. What is here is genuinely available to anybody.
 @immutable
 class JobOffer {
   const JobOffer({
@@ -64,6 +68,8 @@ class JobOffer {
     required this.total,
     required this.isCash,
     required this.isReady,
+    required this.routeKm,
+    required this.riderPay,
     required this.placedAt,
   });
 
@@ -74,6 +80,10 @@ class JobOffer {
     total: json['total'] as int? ?? 0,
     isCash: json['payment_method'] == 'cod',
     isReady: json['status'] == 'ready_for_pickup',
+    // `num`, not `int`: Postgres `numeric` arrives as either depending on
+    // whether the value happens to be whole. Same reason as [Job.distanceKm].
+    routeKm: (json['route_km'] as num?)?.toDouble(),
+    riderPay: json['rider_pay'] as int? ?? 0,
     placedAt: DateTime.parse(json['placed_at'] as String).toLocal(),
   );
 
@@ -81,6 +91,15 @@ class JobOffer {
   final String restaurantName;
   final String deliverTo;
   final int total;
+
+  /// How far the ride is, kitchen to door — the road distance when Ola has
+  /// answered for this order, the straight line until then (0046). Null only
+  /// when neither could be measured, which means the kitchen has no coordinates.
+  final double? routeKm;
+
+  /// What the job pays, at today's rate and [routeKm]. B3's rule: a rider must
+  /// be able to see the distance and the fee **before** deciding, not after.
+  final int riderPay;
 
   /// Whether the rider will be collecting cash. The one thing on the board worth
   /// knowing before accepting, because it changes what they carry.
@@ -91,6 +110,87 @@ class JobOffer {
   final bool isReady;
 
   final DateTime placedAt;
+}
+
+/// A job the platform has picked this rider for, with a clock on it (0056).
+///
+/// The difference between this and [JobOffer] is the difference between being
+/// *asked* and being *shown a list*. An offer is addressed to one rider, holds
+/// the order off everybody else's board while it stands, and expires — decline
+/// it, or say nothing, and it moves to the next partner within seconds.
+///
+/// [expiresAt] is an absolute instant rather than "seconds remaining", the same
+/// trick 0052 used for the live card's ETA: the device counts down against its
+/// own clock, so a countdown drawn on a phone that was asleep for thirty seconds
+/// is correct the moment it appears rather than starting again from full.
+@immutable
+class DeliveryOffer {
+  const DeliveryOffer({
+    required this.orderId,
+    required this.restaurantName,
+    required this.restaurantLat,
+    required this.restaurantLng,
+    required this.deliverTo,
+    required this.total,
+    required this.isCash,
+    required this.isReady,
+    required this.routeKm,
+    required this.toPickupKm,
+    required this.riderPay,
+    required this.offeredAt,
+    required this.expiresAt,
+  });
+
+  factory DeliveryOffer.fromJson(Map<String, dynamic> json) => DeliveryOffer(
+    orderId: json['order_id'] as String,
+    restaurantName: json['restaurant_name'] as String? ?? 'Restaurant',
+    restaurantLat: (json['restaurant_lat'] as num?)?.toDouble(),
+    restaurantLng: (json['restaurant_lng'] as num?)?.toDouble(),
+    deliverTo: json['deliver_to'] as String? ?? '',
+    total: json['total'] as int? ?? 0,
+    isCash: json['payment_method'] == 'cod',
+    isReady: json['order_status'] == 'ready_for_pickup',
+    routeKm: (json['route_km'] as num?)?.toDouble(),
+    toPickupKm: (json['to_pickup_km'] as num?)?.toDouble(),
+    riderPay: json['rider_pay'] as int? ?? 0,
+    offeredAt: DateTime.parse(json['offered_at'] as String).toLocal(),
+    expiresAt: DateTime.parse(json['expires_at'] as String).toLocal(),
+  );
+
+  final String orderId;
+  final String restaurantName;
+  final double? restaurantLat;
+  final double? restaurantLng;
+  final String deliverTo;
+  final int total;
+  final bool isCash;
+  final bool isReady;
+
+  /// The ride itself, kitchen to door.
+  final double? routeKm;
+
+  /// How far the rider is from the kitchen right now — the reason *they* were
+  /// picked, frozen at the moment of the offer (0056). Null when the platform
+  /// had no position for them, which is honest: the sheet then says nothing
+  /// about distance rather than showing a confident zero.
+  final double? toPickupKm;
+
+  final int riderPay;
+  final DateTime offeredAt;
+  final DateTime expiresAt;
+
+  /// How long the whole countdown was, so a progress ring can draw a fraction
+  /// without hard-coding the forty-five seconds the database chose.
+  Duration get window => expiresAt.difference(offeredAt);
+
+  /// What is left, floored at zero — a negative duration on a sheet that has not
+  /// closed yet would draw a ring past its own start.
+  Duration remaining(DateTime now) {
+    final Duration left = expiresAt.difference(now);
+    return left.isNegative ? Duration.zero : left;
+  }
+
+  bool isExpired(DateTime now) => !expiresAt.isAfter(now);
 }
 
 /// One day's work, as `rider_earnings` counts it (migration 0043).

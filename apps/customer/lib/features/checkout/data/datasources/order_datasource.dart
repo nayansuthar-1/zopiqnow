@@ -1,6 +1,7 @@
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
@@ -66,6 +67,25 @@ abstract interface class OrderDataSource {
   /// The four digits the rider must be told at the door, or null while there is
   /// nothing to confirm. Same shape as [fetchRider] and for the same reason.
   Future<String?> fetchDeliveryCode(String orderId);
+
+  /// Both ends of the ride, the road between them, and the live arrival time
+  /// (migration 0057). Null when the order has no delivery coordinates, which
+  /// is the one case there is nothing to draw.
+  ///
+  /// Fetched rather than streamed: the two pins and the road never change, and
+  /// the ETA changes on events the *status* stream already reports.
+  Future<DeliveryRoute?> fetchRoute(String orderId);
+
+  /// The rider's position, live, for as long as the food is on their bike.
+  ///
+  /// [carrierKey] is the delivery's `partner_email`, which the customer may
+  /// already read off their own live delivery row (0039). It is a subscription
+  /// filter and nothing else — it is never rendered, and the *permission* to see
+  /// the position comes from the policy in 0057, not from holding this string.
+  ///
+  /// Emits null when the platform has no current fix: the rider has not started
+  /// reporting, the app was killed, or the job ended and the row was purged.
+  Stream<RiderPosition?> watchRiderPosition(String carrierKey);
 
   /// Calls the order off. No user id, for the reason [placeOrder] gives.
   ///

@@ -297,20 +297,25 @@ class _BoardBody extends ConsumerStatefulWidget {
   ConsumerState<_BoardBody> createState() => _BoardBodyState();
 }
 
+/// The twenty-second `Timer.periodic` that used to live here is gone, and this
+/// is the commit B3 said would delete it.
+///
+/// It existed because nothing could tell the app the truth: `available_deliveries`
+/// is a function, Realtime rides table policies, and riders have no policy on
+/// `orders` (0025). Something can now — `delivery_offers` does have a policy, and
+/// [offerSignalProvider] is a socket on it. A refresh on resume is kept, because
+/// a socket that was asleep in a pocket has missed things; the polling underneath
+/// it has not.
 class _BoardBodyState extends ConsumerState<_BoardBody>
     with WidgetsBindingObserver {
-  Timer? _timer;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _start();
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -318,27 +323,20 @@ class _BoardBodyState extends ConsumerState<_BoardBody>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      ref.invalidate(boardProvider);
-      _start();
-    } else {
-      _timer?.cancel();
-      _timer = null;
+      ref
+        ..invalidate(boardProvider)
+        ..invalidate(offersProvider);
     }
-  }
-
-  void _start() {
-    _timer?.cancel();
-    final Duration? every = ref.read(boardPollIntervalProvider);
-    if (every == null) return;
-    _timer = Timer.periodic(every, (_) {
-      if (mounted) ref.invalidate(boardProvider);
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     final String riderName = widget.riderName;
     final AsyncValue<List<JobOffer>> board = ref.watch(boardProvider);
+
+    // Watched so the socket stays subscribed for as long as the board is on
+    // screen. The provider it feeds is what actually refreshes this list.
+    ref.watch(offerSignalProvider);
 
     return board.when(
       loading: () => Center(
@@ -420,17 +418,27 @@ class _RadarEmptyState extends StatelessWidget {
         ),
         const SizedBox(height: ZopiqSpacing.xl),
         Text(
-          'Scanning for New Orders',
+          'Waiting for your next job',
           style: t.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: ZopiqSpacing.xs),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.xl),
+          // The copy this replaced told the rider to watch this list, which
+          // stopped being true in B3: jobs are offered to one partner at a time
+          // and arrive as a sheet with a countdown on it. This board is now what
+          // is *left over* — the orders the fleet passed on — so telling
+          // somebody to stare at it would be telling them to watch the one place
+          // their next job probably will not appear.
           child: Text(
             riderName.isEmpty
-                ? 'Stay nearby partner hubs. New order assignments will pop up here in real-time.'
-                : 'No unassigned orders right now, $riderName. Stay tuned — new jobs pop up automatically.',
+                ? 'Jobs are offered to you automatically — you\'ll get a '
+                      'notification when one is yours. Anything nobody took '
+                      'shows up here.'
+                : 'Nothing waiting to be claimed, $riderName. Jobs are offered '
+                      'to you automatically — keep the app on and you\'ll be '
+                      'asked when one comes up.',
             style: t.bodyMedium?.copyWith(color: zc.textMuted),
             textAlign: TextAlign.center,
           ),
@@ -511,6 +519,45 @@ class _OfferCardState extends ConsumerState<_OfferCard> {
             ),
             const SizedBox(height: ZopiqSpacing.md),
 
+            // What the job pays and how far it is — B3's rule, and the two facts
+            // a rider was previously asked to decide without. `route_km` has
+            // been on the order since 0046; the board simply never showed it.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: ZopiqSpacing.md,
+                vertical: ZopiqSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                color: zc.primary.withValues(alpha: 0.07),
+                borderRadius: ZopiqRadii.rSm,
+              ),
+              child: Row(
+                children: <Widget>[
+                  Text(
+                    '₹${o.riderPay}',
+                    style: t.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: zc.primary,
+                    ),
+                  ),
+                  const SizedBox(width: ZopiqSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      // An unmeasured ride says so rather than showing a
+                      // confident `0.0 km` — the same honesty [Job.payExplained]
+                      // applies to a job already in hand.
+                      o.routeKm == null
+                          ? 'base fee — this kitchen has no map location'
+                          : 'for ${_trimKm(o.routeKm!)} km',
+                      style: t.bodySmall?.copyWith(color: zc.textMuted),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: ZopiqSpacing.sm),
+
             // Target Delivery Location
             _SvgInfoRow(
               svgType: RiderSvgType.navigationPin,
@@ -546,6 +593,11 @@ class _OfferCardState extends ConsumerState<_OfferCard> {
     );
   }
 }
+
+/// 4.20 → "4.2", 5.00 → "5". Trailing zeros on a distance read at a kerb are
+/// noise — the same trimming [Job.payExplained] does for the fee.
+String _trimKm(double v) =>
+    v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(1);
 
 class _RunJobCard extends ConsumerStatefulWidget {
   const _RunJobCard({super.key, required this.job});

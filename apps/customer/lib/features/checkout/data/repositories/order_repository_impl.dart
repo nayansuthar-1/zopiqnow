@@ -2,6 +2,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
@@ -98,6 +99,25 @@ class OrderRepositoryImpl implements OrderRepository {
       return null;
     }
   }
+
+  @override
+  Future<DeliveryRoute?> getRoute(String orderId) async {
+    try {
+      return await _dataSource.fetchRoute(orderId);
+    } on Object catch (_) {
+      // Same swallow, same reason as [getRider]: the tracking card is already
+      // rendering the order. Failing it over a map would be trading the screen
+      // for a picture.
+      return null;
+    }
+  }
+
+  @override
+  Stream<RiderPosition?> watchRiderPosition(String carrierKey) =>
+      // Passed through untouched, like [watchOrderStatus]. A dropped
+      // subscription costs the dot its liveness and nothing else — the map
+      // still has its two pins and its road.
+      _dataSource.watchRiderPosition(carrierKey);
 
   @override
   Future<OrderRider?> getRider(String orderId) async {

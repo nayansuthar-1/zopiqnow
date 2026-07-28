@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/live_delivery_map.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_card.dart'
     show formatClockTime;
 
@@ -44,6 +46,7 @@ class OrderTrackingCard extends ConsumerWidget {
                 // also the only window the policy behind it will answer in.
                 if (status == OrderStatus.outForDelivery)
                   _Rider(orderId: order.id),
+                _Map(orderId: order.id, status: status),
                 const SizedBox(height: ZopiqSpacing.lg),
                 _Timeline(status: status),
               ],
@@ -53,7 +56,7 @@ class OrderTrackingCard extends ConsumerWidget {
 }
 
 /// The one sentence the customer actually reads, plus the time they care about.
-class _Headline extends StatelessWidget {
+class _Headline extends ConsumerWidget {
   const _Headline({required this.status, required this.order});
 
   final OrderStatus status;
@@ -83,20 +86,30 @@ class _Headline extends StatelessWidget {
   };
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
     final bool isDelivered = status == OrderStatus.delivered;
     final Color color = isDelivered ? zc.veg : zc.primary;
 
-    // The ETA the customer was quoted, as a clock time — "arriving in about 30
-    // min" is only true at the moment it is said, and this screen is one they
-    // come back to. The promise is not recomputed: `eta_minutes` is what the
-    // order service committed to, and a screen that quietly moves the estimate
-    // is a screen that never has to admit the food is late.
-    final DateTime arrivesBy = order.placedAt.add(
-      Duration(minutes: order.etaMinutes),
-    );
+    // The arrival time, as a clock time — "arriving in about 30 min" is only
+    // true at the moment it is said, and this screen is one they come back to.
+    //
+    // **This used to be a promise nobody revisited**, and the comment here said
+    // so: `placedAt + etaMinutes`, picked before a kitchen accepted, before a
+    // rider existed, and never touched. B3 replaced it with an estimate the
+    // platform recomputes from where the rider actually is (0057) — and with
+    // the rule that makes that honest rather than slippery: it may move
+    // *earlier* freely, and may only move *later* alongside a reason, which is
+    // the line below it. Where the platform cannot name a cause, the old time
+    // stands. The original promise is still the fallback for any order nothing
+    // has recomputed yet, so this reads exactly as it did before on those.
+    final DeliveryRoute? route = ref
+        .watch(orderRouteProvider(order.id))
+        .valueOrNull;
+    final DateTime arrivesBy =
+        route?.etaAt ?? order.placedAt.add(Duration(minutes: order.etaMinutes));
+    final String? slippedBecause = route?.etaReason;
 
     return Row(
       children: <Widget>[
@@ -133,6 +146,33 @@ class _Headline extends StatelessWidget {
                   'Arriving by ${formatClockTime(arrivesBy)}',
                   style: t.bodySmall?.copyWith(color: zc.textMuted),
                 ),
+                // B3's rule, made visible: an arrival time that moved later
+                // never does so silently. Present only when it has — an order
+                // running to time says nothing extra, and an apology on every
+                // screen is an apology nobody reads.
+                if (slippedBecause != null) ...<Widget>[
+                  const SizedBox(height: 2),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Icon(
+                        Icons.schedule_rounded,
+                        size: 13,
+                        color: Colors.amber.shade800,
+                      ),
+                      const SizedBox(width: ZopiqSpacing.xxs),
+                      Expanded(
+                        child: Text(
+                          slippedBecause,
+                          style: t.bodySmall?.copyWith(
+                            color: Colors.amber.shade800,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ],
           ),
@@ -226,6 +266,49 @@ class _Rider extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The ride, drawn (B3).
+///
+/// Shown from the moment the kitchen accepts, not from pickup — the route is
+/// worth seeing while the food is still cooking ("it's coming from across
+/// town"), and waiting for a rider would mean the map appears for the last third
+/// of the wait only. Before pickup it is the road with two pins; after, it has a
+/// bike on it.
+///
+/// Renders nothing at all when there is nothing to draw: an order with no
+/// delivery coordinates, or a route the platform has not resolved yet. Same rule
+/// as [_Rider] — the strip appears when the answer does, and never reserves
+/// space for one that may not come.
+class _Map extends ConsumerWidget {
+  const _Map({required this.orderId, required this.status});
+
+  final String orderId;
+  final OrderStatus status;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Nothing to follow before a kitchen has said yes, and the order may still
+    // be rejected — a map of a journey that never happens.
+    if (status == OrderStatus.placed) return const SizedBox.shrink();
+
+    final DeliveryRoute? route = ref
+        .watch(orderRouteProvider(orderId))
+        .valueOrNull;
+    if (route == null || !route.isMappable) return const SizedBox.shrink();
+
+    // Only asked for once the order is out for delivery, which is the only
+    // window `deliveries` is readable in. Null every other time, and the map
+    // draws the route without a bike on it.
+    final OrderRider? rider = status == OrderStatus.outForDelivery
+        ? ref.watch(orderRiderProvider(orderId)).valueOrNull
+        : null;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: ZopiqSpacing.lg),
+      child: LiveDeliveryMap(route: route, rider: rider),
     );
   }
 }

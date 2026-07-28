@@ -4,6 +4,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
@@ -184,7 +185,7 @@ class OrderSupabaseDataSource implements OrderDataSource {
     // would have to be told not to trust.
     final Map<String, dynamic>? row = await _db
         .from('deliveries')
-        .select('state, delivery_partners(name, phone, vehicle)')
+        .select('state, partner_email, delivery_partners(name, phone, vehicle)')
         .eq('order_id', orderId)
         .maybeSingle();
 
@@ -197,7 +198,44 @@ class OrderSupabaseDataSource implements OrderDataSource {
       phone: partner['phone'] as String,
       vehicle: partner['vehicle'] as String,
       isAtDoor: row!['state'] == 'arrived_at_customer',
+      // Read from the same row for free. See [OrderRider.carrierKey] — a
+      // subscription filter, not a credential.
+      carrierKey: row['partner_email'] as String?,
     );
+  }
+
+  /// The map's fixed parts, in one call (migration 0057).
+  ///
+  /// An RPC rather than a select, for the reason `order_delivery_code` is one:
+  /// it returns the *restaurant's* coordinates, which a customer has no policy
+  /// to read in bulk. The function scopes the answer to one order that belongs
+  /// to the caller and hands back nothing else.
+  @override
+  Future<DeliveryRoute?> fetchRoute(String orderId) async {
+    final List<dynamic> rows = await _db.rpc<List<dynamic>>(
+      'order_route',
+      params: <String, dynamic>{'p_order_id': orderId},
+    );
+    if (rows.isEmpty) return null;
+    return DeliveryRoute.fromJson(rows.first as Map<String, dynamic>);
+  }
+
+  @override
+  Stream<RiderPosition?> watchRiderPosition(String carrierKey) {
+    // The `.eq` is not the security boundary — the 0057 policy is, and returns
+    // nothing at all for a rider who is not carrying this customer's food. It
+    // is here so the socket carries one row rather than being asked to.
+    return _db
+        .from('rider_locations')
+        .stream(primaryKey: const <String>['partner_email'])
+        .eq('partner_email', carrierKey)
+        .map(
+          (List<Map<String, dynamic>> rows) => rows.isEmpty
+              // Not an error: the rider has not reported yet, or the job ended
+              // and 0057's purge took the row. Both mean "no dot on the map".
+              ? null
+              : RiderPosition.fromJson(rows.first),
+        );
   }
 
   /// The four digits the customer reads out at the door (0049).

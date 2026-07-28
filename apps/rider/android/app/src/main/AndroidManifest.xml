@@ -14,6 +14,20 @@
          this the rider is never asked, and a new-job push is silent. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
+    <!-- The customer's live map (B3). Asked for at the moment the rider first
+         picks a bag up, not at launch — a permission dialog makes sense to
+         somebody who has just accepted a delivery and makes none to somebody
+         opening an app for the first time.
+
+         COARSE as well as FINE because Android 12+ lets the user grant only the
+         approximate one, and an approximate dot on a map is still a better
+         answer than a blank one. Deliberately NOT ACCESS_BACKGROUND_LOCATION:
+         the position is recorded while the rider has the app open on a live job,
+         and asking for the background grant would be asking for a permission
+         this feature does not use and Play would rightly question. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
     <application
         android:label="zopiq_rider"
         android:name="${applicationName}"

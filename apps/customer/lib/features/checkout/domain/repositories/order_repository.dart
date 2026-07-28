@@ -1,6 +1,7 @@
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
@@ -78,6 +79,15 @@ abstract interface class OrderRepository {
   /// The delivery code to read out at the door, or null when there is nothing
   /// to confirm yet. Never throws, for the same reason [getRider] does not.
   Future<String?> getDeliveryCode(String orderId);
+
+  /// The two pins, the road between them and the live arrival time (0057), or
+  /// null when there is nothing to draw. Never throws — a map is an addition to
+  /// a tracking card that already says everything essential.
+  Future<DeliveryRoute?> getRoute(String orderId);
+
+  /// Where the rider is, live. See [OrderDataSource.watchRiderPosition] for what
+  /// [carrierKey] is and, more importantly, what it is not.
+  Stream<RiderPosition?> watchRiderPosition(String carrierKey);
 
   /// Calls the order off, while the order service still allows it.
   ///

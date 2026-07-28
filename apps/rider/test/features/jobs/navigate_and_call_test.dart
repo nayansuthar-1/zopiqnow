@@ -25,7 +25,6 @@ Widget _app({
       FakeRiderAuthDataSource(signedInAs: testRider),
     ),
     jobsDataSourceProvider.overrideWithValue(jobs),
-    boardPollIntervalProvider.overrideWithValue(null),
     launcherProvider.overrideWithValue(launcher),
   ],
   child: const RiderApp(),

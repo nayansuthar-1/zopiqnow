@@ -55,6 +55,19 @@ dependencies:
   # exact drift the freeze exists to catch.
   url_launcher: 6.3.2
 
+  # --- The rider's own position (B3, 2026-07-28) ------------------------------
+  # The one thing the customer's live map cannot be drawn without. Written on an
+  # interval while the rider is carrying and deleted the moment they are not
+  # (migration 0057).
+  #
+  # **Not a new package.** The customer app has pinned this since Step 5 and the
+  # root lockfile already froze 14.0.3; this promotes it to a direct dependency
+  # of the rider app at that same version. Not one new version resolves — the
+  # same reasoning, and the same care, as `url_launcher` above.
+  #
+  # Inherits `flutter.minSdkVersion` (24), so the Android 10 floor is unaffected.
+  geolocator: 14.0.3
+
   # --- Push notifications (B0, 2026-07-25) ------------------------------------
   # The one thing the rider pubspec's original note said was "absent... belongs
   # to a later slice" — this is that slice. The same three packages the vendor
