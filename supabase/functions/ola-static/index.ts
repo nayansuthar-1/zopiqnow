@@ -34,11 +34,16 @@ const OLA_HOST = "https://api.olamaps.io/tiles/v1/styles";
 // The Origin the key is restricted to. Not configurable from the request.
 const ORIGIN = "https://zopiqnow.app";
 
-// Two styles, named by what the app is showing rather than by Ola's slug, so a
+// Styles, named by what the app is showing rather than by Ola's slug, so a
 // restyle is a change here and not a release of three apps.
+//
+// `dark` was `eclipse-dark-standard` and is not any more: it renders near-black,
+// so on a phone in dark mode the card read as an orange line on a black screen
+// with no map behind it at all. `default-dark-standard` is a dark navy with
+// visible roads and place labels — dark, and still a map.
 const STYLES: Record<string, string> = {
   light: "default-light-standard",
-  dark: "eclipse-dark-standard",
+  dark: "default-dark-standard",
 };
 
 // Ola renders up to 1024 square comfortably. The ceiling is here so a caller

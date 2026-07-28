@@ -107,23 +107,24 @@ final class LiveCardNotification {
      * The image on the right of the card: food while the kitchen cooks, a rider once the food is on
      * a bike.
      *
-     * <p>Resolved by name out of the host app's resources, and falling back to the launcher icon
-     * when the name finds nothing — see {@link Ladder#ART_PREP}. The fallback is the reason a build
-     * without the artwork still draws a correct card rather than crashing on a zero resource id, and
-     * it is also what was producing the Flutter logo before these images existed: this module never
-     * had an icon of its own to offer.
+     * <p><b>A direct {@code R.drawable} reference, and that is the entire point of this method.</b>
+     * These used to be looked up by name with {@code Resources.getIdentifier} out of the host app's
+     * resources, so that the app could own its own brand assets. It worked in debug and produced the
+     * stock Flutter launcher icon in release, because a resource whose only mention is a string
+     * passed to {@code getIdentifier} — from a different module, at that — is a resource
+     * {@code shrinkResources} cannot see anybody using, and it was stripped from the APK. The
+     * fallback to {@code getApplicationInfo().icon} then hid the failure behind something that
+     * looked deliberate.
+     *
+     * <p>A direct reference is a hard reference: the shrinker keeps it, the compiler checks it, and
+     * there is no fallback path left to hide behind. The host app can still override either image
+     * simply by shipping a drawable of the same name — resource merging gives the application's copy
+     * precedence over this module's — and because the reference below is what is kept, the app's
+     * copy is now reachable rather than shrunk away.
      */
     private static Icon artwork(Context context, LiveCardSpec spec) {
-        final String packageName = context.getPackageName();
-        final String name = spec.artName();
-
-        int id = context.getResources().getIdentifier(name, "drawable", packageName);
-        if (id == 0) {
-            id = context.getResources().getIdentifier(name, "mipmap", packageName);
-        }
-        if (id == 0) {
-            id = context.getApplicationInfo().icon;
-        }
+        final int id =
+                spec.isDelivery() ? R.drawable.zopiq_live_delivery : R.drawable.zopiq_live_prep;
         return Icon.createWithResource(context, id);
     }
 
@@ -136,17 +137,18 @@ final class LiveCardNotification {
      * it, and it is why the layouts in {@code res/layout} are a few views rather than a whole
      * notification.
      *
-     * <p>{@code setProgress} is set as well even though the decorated body hides it: an OEM shell,
-     * Android Auto or a Wear companion that declines to render custom views falls back to the
-     * standard template, and there it is the difference between a progress bar and nothing.
+     * <p><b>No {@code setProgress}.</b> It used to be set as well, on the theory that the decorated
+     * body hid it and that an OEM shell or a Wear companion declining to render custom views would
+     * fall back to the standard template and at least have a bar there. It does not hide it: on
+     * Android 15 the platform draws its own thin bar underneath the custom body, so the card had two
+     * progress bars — ours, and a second one in the system accent colour saying the same thing a
+     * few pixels lower. One bar is the design; a hypothetical Wear fallback is not worth a visible
+     * duplicate on every phone that actually exists.
      */
     private static void applyCustomTracker(
             Context context, Notification.Builder builder, LiveCardSpec spec) {
 
-        final int progress = spec.progressNow();
-        builder.setProgress(100, progress, false);
-
-        final android.graphics.Bitmap bar = TrackerBar.render(context, progress);
+        final android.graphics.Bitmap bar = TrackerBar.render(context, spec.progressNow());
         final String packageName = context.getPackageName();
 
         final RemoteViews collapsed = new RemoteViews(packageName, R.layout.zopiq_live_card);

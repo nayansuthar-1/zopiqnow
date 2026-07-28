@@ -34,20 +34,6 @@ final class Ladder {
     /** The food is on a bike. The bar fills against the ride window. */
     static final String PHASE_DELIVERY = "delivery";
 
-    /**
-     * The artwork on the right of the card, resolved by name out of the <b>host app's</b> resources
-     * rather than this module's.
-     *
-     * <p>Looked up at runtime, and deliberately so. These are the one part of the card that is a
-     * brand asset rather than a mechanism — the host app owns them, ships them at whatever density
-     * it likes, and can change them without this package being rebuilt. A name that resolves to
-     * nothing simply falls back to the launcher icon, which means the card draws correctly on a
-     * build where the images have not been added yet.
-     */
-    static final String ART_PREP = "zopiq_live_prep";
-
-    static final String ART_DELIVERY = "zopiq_live_delivery";
-
     static int clampProgress(int progress) {
         if (progress < 0) return 0;
         return Math.min(progress, 100);

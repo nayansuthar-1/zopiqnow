@@ -61,11 +61,6 @@ final class LiveCardSpec {
         return Ladder.PHASE_DELIVERY.equals(phase);
     }
 
-    /** The name of the artwork for this phase, looked up in the host app's resources. */
-    String artName() {
-        return isDelivery() ? Ladder.ART_DELIVERY : Ladder.ART_PREP;
-    }
-
     /**
      * Where the bar should be, right now, on this device's clock.
      *
