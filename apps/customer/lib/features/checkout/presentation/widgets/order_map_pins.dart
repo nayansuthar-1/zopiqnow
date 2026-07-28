@@ -23,7 +23,7 @@ List<ZopiqMapPin> orderMapPins({
         id: 'restaurant',
         lat: restaurant.lat,
         lng: restaurant.lng,
-        color: ZopiqMapPin.colourPickup,
+        kind: ZopiqPinKind.vendor,
         title: route.restaurantName,
       ),
     if (destination != null)
@@ -31,7 +31,7 @@ List<ZopiqMapPin> orderMapPins({
         id: 'destination',
         lat: destination.lat,
         lng: destination.lng,
-        color: ZopiqMapPin.colourDrop,
+        kind: ZopiqPinKind.customer,
         title: route.deliverTo.isEmpty ? 'Delivery address' : route.deliverTo,
       ),
     if (live != null)
@@ -39,9 +39,8 @@ List<ZopiqMapPin> orderMapPins({
         id: 'rider',
         lat: live.point.lat,
         lng: live.point.lng,
-        color: ZopiqMapPin.colourRider,
-        // A vehicle, not an address — so a disc, and so it keeps its identity
-        // across fixes and is animated between them rather than redrawn.
+        // A vehicle, not an address — so a scooter on a disc, and so it keeps
+        // its identity across fixes and is animated between them.
         kind: ZopiqPinKind.rider,
         title: 'Your delivery partner',
       ),

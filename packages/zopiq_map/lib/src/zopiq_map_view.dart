@@ -9,14 +9,17 @@ import 'package:zopiq_map/src/map_markers.dart';
 import 'package:zopiq_map/src/polyline_codec.dart';
 
 /// A pin on the map, in the app's own terms rather than the SDK's.
+///
+/// There is no colour here on purpose. A caller says *what a thing is* — a
+/// vendor, a customer, a rider — and [ZopiqPinKind] decides how it is drawn, so
+/// the same restaurant cannot be orange on one screen and green on another.
 @immutable
 class ZopiqMapPin {
   const ZopiqMapPin({
     required this.id,
     required this.lat,
     required this.lng,
-    required this.color,
-    this.kind = ZopiqPinKind.place,
+    required this.kind,
     this.title,
   });
 
@@ -28,29 +31,11 @@ class ZopiqMapPin {
 
   final double lat;
   final double lng;
-  final Color color;
   final ZopiqPinKind kind;
   final String? title;
 
-  /// Where the food is picked up. Brand orange, because the restaurant is the
-  /// one place on this map that is a Zopiqnow thing.
-  static const Color colourPickup = ZopiqPalette.primary;
-
-  /// Where it is going. Deliberately not orange and not red: it has to be told
-  /// apart from the pickup at a glance on a small map, and red on a map means
-  /// "problem" everywhere else in this app.
-  static const Color colourDrop = ZopiqPalette.veg;
-
-  /// The rider. A cool colour against two warm ones, so the moving thing is
-  /// never confused with the fixed ones.
-  static const Color colourRider = Color(0xFF1B6FE0);
-
   LatLng get position => LatLng(lat, lng);
 }
-
-/// What a pin is a picture of. See [MapMarkers.rider] for why a vehicle is not
-/// drawn with the same shape as an address.
-enum ZopiqPinKind { place, rider }
 
 /// What the map is showing underneath the route.
 enum ZopiqMapLayer {
@@ -164,7 +149,16 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
   final Map<String, LatLng> _drawnAt = <String, LatLng>{};
   final Map<String, _Move> _moving = <String, _Move>{};
 
-  bool _fitted = false;
+  /// How many times the opening fit has been attempted.
+  ///
+  /// **Why more than once.** `newLatLngBounds` needs the platform view to know
+  /// its own size, and at `onMapCreated` it does not yet — the fit lands, but
+  /// against the wrong viewport, and the result is a route framed slightly too
+  /// tight with a pin clipped off the edge. The first `onCameraIdle` is the
+  /// earliest moment the map is laid out and settled, so the fit is repeated
+  /// there and then never again, which leaves the camera to the reader.
+  int _fitAttempts = 0;
+  static const int _maxFitAttempts = 2;
 
   /// Roughly the interval between two rider fixes, so a pin finishes its glide
   /// about when the next one arrives and the dot never appears to stall.
@@ -204,15 +198,12 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
       if (a[i].id != b[i].id ||
           a[i].lat != b[i].lat ||
           a[i].lng != b[i].lng ||
-          a[i].color != b[i].color) {
+          a[i].kind != b[i].kind) {
         return false;
       }
     }
     return true;
   }
-
-  static String _imageName(ZopiqMapPin pin) =>
-      '${pin.kind.name}-${pin.color.toARGB32()}';
 
   /// Rasterises any marker bitmap this map needs and does not yet have.
   Future<void> _loadIcons() async {
@@ -221,18 +212,12 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
     bool added = false;
 
     for (final ZopiqMapPin pin in widget.pins) {
-      final String name = _imageName(pin);
+      final String name = pin.kind.name;
       if (_icons.containsKey(name)) continue;
-      final Uint8List bytes = switch (pin.kind) {
-        ZopiqPinKind.place => await MapMarkers.pin(
-          color: pin.color,
-          pixelRatio: dpr,
-        ),
-        ZopiqPinKind.rider => await MapMarkers.rider(
-          color: pin.color,
-          pixelRatio: dpr,
-        ),
-      };
+      final Uint8List bytes = await MapMarkers.forKind(
+        pin.kind,
+        pixelRatio: dpr,
+      );
       _icons[name] = BytesMapBitmap(bytes, imagePixelRatio: dpr);
       added = true;
     }
@@ -293,6 +278,13 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
     ...widget.pins.map((ZopiqMapPin p) => p.position),
   ];
 
+  /// The opening fit, at most [_maxFitAttempts] times and never after.
+  void _openingFit() {
+    if (_fitAttempts >= _maxFitAttempts) return;
+    _fitAttempts++;
+    unawaited(_fit());
+  }
+
   Future<void> _fit() async {
     final List<LatLng> points = _framed;
     if (points.isEmpty) return;
@@ -308,12 +300,8 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
     return Marker(
       markerId: MarkerId(pin.id),
       position: at,
-      icon: _icons[_imageName(pin)] ?? BitmapDescriptor.defaultMarker,
-      // A teardrop points at its place, so it is anchored at its tip. A rider's
-      // disc *is* its place, so it is anchored at its middle.
-      anchor: pin.kind == ZopiqPinKind.place
-          ? const Offset(0.5, 1)
-          : const Offset(0.5, 0.5),
+      icon: _icons[pin.kind.name] ?? BitmapDescriptor.defaultMarker,
+      anchor: pin.kind.anchor,
       infoWindow: pin.title == null
           ? InfoWindow.noText
           : InfoWindow(title: pin.title),
@@ -364,11 +352,12 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
           markers: _markers,
           onMapCreated: (GoogleMapController controller) {
             if (!_controller.isCompleted) _controller.complete(controller);
-            if (!_fitted) {
-              _fitted = true;
-              unawaited(_fit());
-            }
+            _openingFit();
           },
+          // The second and last opening fit — see [_fitAttempts]. Guarded, so
+          // once the route has been framed this stops firing and a reader who
+          // pans away keeps the view they chose.
+          onCameraIdle: _openingFit,
         ),
         if (widget.showLayerSwitcher)
           Positioned(
