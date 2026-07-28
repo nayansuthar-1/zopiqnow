@@ -25,4 +25,5 @@ export 'src/components/zopiq_card.dart';
 export 'src/components/zopiq_network_image.dart';
 export 'src/components/zopiq_pressable.dart';
 export 'src/components/zopiq_shimmer.dart';
+export 'src/components/zopiq_static_map.dart';
 export 'src/components/zopiq_veg_indicator.dart';

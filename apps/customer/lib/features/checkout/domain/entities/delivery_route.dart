@@ -1,13 +1,12 @@
-import 'dart:math' as math;
-
 import 'package:flutter/foundation.dart';
 
 /// A point on the earth, and the smallest thing this file needs.
 ///
 /// Deliberately not `LatLng` from a mapping package — there is no mapping
-/// package. The live map is drawn by a `CustomPainter` from these and an encoded
-/// path, which is what lets the tracking screen show a road-shaped route without
-/// a tile server, an API key in the APK, or a new dependency.
+/// package. The map arrives as a finished picture from the `ola-static` Edge
+/// Function, which is what lets the tracking screen show a real map without a
+/// tile renderer, an API key in the APK, or a new dependency. These are the
+/// points we send it.
 @immutable
 class GeoPoint {
   const GeoPoint(this.lat, this.lng);
@@ -36,7 +35,7 @@ class DeliveryRoute {
     required this.restaurant,
     required this.deliverTo,
     required this.destination,
-    required this.path,
+    required this.encodedPath,
     required this.routeKm,
     required this.etaAt,
     required this.etaReason,
@@ -53,7 +52,7 @@ class DeliveryRoute {
       restaurant: rLat == null || rLng == null ? null : GeoPoint(rLat, rLng),
       deliverTo: json['deliver_to'] as String? ?? '',
       destination: dLat == null || dLng == null ? null : GeoPoint(dLat, dLng),
-      path: decodePolyline(json['route_polyline'] as String?),
+      encodedPath: json['route_polyline'] as String?,
       routeKm: (json['route_km'] as num?)?.toDouble(),
       etaAt: DateTime.parse(json['eta_at'] as String).toLocal(),
       etaReason: json['eta_reason'] as String?,
@@ -69,10 +68,15 @@ class DeliveryRoute {
   final String deliverTo;
   final GeoPoint? destination;
 
-  /// The road, as Ola drew it, decoded. Empty when the lookup has not come back
-  /// yet or never will — the map then joins the two pins with a straight line
-  /// and is honest about being a sketch.
-  final List<GeoPoint> path;
+  /// The same road, still encoded, exactly as Ola returned it and 0057 stored
+  /// it. Passed through untouched: the renderer that draws it decodes the same
+  /// format Ola encoded, so decoding it here to send it somewhere else would be
+  /// a round trip that can only lose precision.
+  ///
+  /// Null when the route lookup has not come back yet or never will. The map is
+  /// then framed on the two pins with no road between them, which is honest —
+  /// we do not know the road yet.
+  final String? encodedPath;
 
   final double? routeKm;
 
@@ -128,93 +132,4 @@ class RiderPosition {
   /// there is a lie the customer will believe.
   bool isStale(DateTime now) =>
       now.difference(updatedAt) > const Duration(minutes: 2);
-}
-
-/// Decodes Google's encoded-polyline format, precision 5 — what Ola's Directions
-/// API returns as `overview_polyline` and what 0057 stores verbatim.
-///
-/// Decoded on the device rather than in Postgres for the reason 0057 gives: it
-/// is a few hundred bytes as a string and a few thousand as a coordinate array,
-/// and the phone drawing it has to walk the points anyway.
-///
-/// Tolerant by design. A truncated or malformed string yields the points it
-/// managed to read and stops — a tracking screen that throws because a third
-/// party sent one bad character is a worse outcome than a slightly short line.
-List<GeoPoint> decodePolyline(String? encoded) {
-  if (encoded == null || encoded.isEmpty) return const <GeoPoint>[];
-
-  final List<GeoPoint> points = <GeoPoint>[];
-  int index = 0;
-  int lat = 0;
-  int lng = 0;
-
-  while (index < encoded.length) {
-    final int? dLat = _readValue(encoded, index);
-    if (dLat == null) break;
-    index = _cursor;
-    lat += dLat;
-
-    final int? dLng = _readValue(encoded, index);
-    if (dLng == null) break;
-    index = _cursor;
-    lng += dLng;
-
-    points.add(GeoPoint(lat / 1e5, lng / 1e5));
-  }
-
-  return List<GeoPoint>.unmodifiable(points);
-}
-
-/// Where [_readValue] stopped. A module-level cursor rather than a record
-/// return, so the hot loop above allocates nothing per point.
-int _cursor = 0;
-
-/// One zig-zag-encoded varint, or null if the string ran out mid-value.
-int? _readValue(String encoded, int start) {
-  int index = start;
-  int shift = 0;
-  int result = 0;
-  int byte;
-
-  do {
-    if (index >= encoded.length) return null;
-    byte = encoded.codeUnitAt(index++) - 63;
-    result |= (byte & 0x1f) << shift;
-    shift += 5;
-  } while (byte >= 0x20);
-
-  _cursor = index;
-  return (result & 1) != 0 ? ~(result >> 1) : result >> 1;
-}
-
-/// The rectangle containing every point given, with a little air around it.
-///
-/// Used to fit the map to its content. The padding is a *fraction* rather than
-/// pixels because this runs in degrees, before anything has been projected —
-/// and a zero-size box (one point, or two at the same address) is widened to
-/// something drawable rather than dividing by zero later.
-({double minLat, double maxLat, double minLng, double maxLng}) boundsOf(
-  Iterable<GeoPoint> points,
-) {
-  double minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
-  for (final GeoPoint p in points) {
-    minLat = math.min(minLat, p.lat);
-    maxLat = math.max(maxLat, p.lat);
-    minLng = math.min(minLng, p.lng);
-    maxLng = math.max(maxLng, p.lng);
-  }
-
-  // Nothing was given, or everything was the same point.
-  if (minLat > maxLat) return (minLat: 0, maxLat: 0, minLng: 0, maxLng: 0);
-
-  const double minSpan = 0.002; // ~200 m, so a short hop still has a map
-  final double latPad = math.max((maxLat - minLat) * 0.15, minSpan);
-  final double lngPad = math.max((maxLng - minLng) * 0.15, minSpan);
-
-  return (
-    minLat: minLat - latPad,
-    maxLat: maxLat + latPad,
-    minLng: minLng - lngPad,
-    maxLng: maxLng + lngPad,
-  );
 }

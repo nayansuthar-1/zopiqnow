@@ -11,6 +11,7 @@ import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
 import 'package:zopiq_rider/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_rider/features/jobs/domain/entities/job.dart';
 import 'package:zopiq_rider/features/jobs/presentation/providers/jobs_providers.dart';
+import 'package:zopiq_rider/features/jobs/presentation/pages/job_map_page.dart';
 import 'package:zopiq_rider/features/jobs/presentation/widgets/pickup_sheet.dart';
 import 'package:zopiq_rider/features/notifications/presentation/widgets/notification_bell.dart';
 
@@ -623,8 +624,32 @@ class _RunJobCardState extends ConsumerState<_RunJobCard> {
     }
   }
 
+  /// The map, in this app rather than another one.
+  ///
+  /// A rider handed to Google Maps has left Zopiqnow, and with it the address,
+  /// the pay, the cash to collect and the button they came back to press.
+  /// [JobMapPage] keeps all of that on screen and still offers the handoff for
+  /// riders who want turn-by-turn — which this deliberately is not.
+  ///
+  /// A job with no coordinates at either end has nothing to frame a map on, so
+  /// it falls back to the external launcher, which can at least search for the
+  /// address as text (see [UrlLauncher.navigate]).
   Future<void> _navigate() async {
     final Job job = widget.job;
+
+    final bool mappable =
+        (job.restaurantLat != null && job.restaurantLng != null) ||
+        (job.deliverLat != null && job.deliverLng != null);
+
+    if (mappable) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (BuildContext context) => JobMapPage(job: job),
+        ),
+      );
+      return;
+    }
+
     final bool ok = await ref.read(launcherProvider).navigate(
           lat: job.targetLat,
           lng: job.targetLng,

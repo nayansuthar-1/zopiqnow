@@ -286,6 +286,10 @@ class Job {
     required this.deliverLat,
     required this.deliverLng,
     required this.customerPhone,
+    // Optional, unlike its neighbours: it is genuinely absent on most jobs
+    // until the route lookup lands, and defaulting it keeps every existing
+    // caller compiling.
+    this.routePolyline,
     required this.total,
     required this.isCash,
     required this.distanceKm,
@@ -309,6 +313,7 @@ class Job {
     deliverLat: (json['deliver_lat'] as num?)?.toDouble(),
     deliverLng: (json['deliver_lng'] as num?)?.toDouble(),
     customerPhone: json['customer_phone'] as String? ?? '',
+    routePolyline: json['route_polyline'] as String?,
     total: json['total'] as int? ?? 0,
     isCash: json['payment_method'] == 'cod',
     // `num`, not `int`: these are Postgres `numeric` and arrive as either,
@@ -350,6 +355,12 @@ class Job {
   /// Where this job is going *right now* — the kitchen until it is collected,
   /// the customer after. The one question a navigation button has to answer,
   /// and answering it from [state] means the rider never picks the wrong end.
+  /// The road from the kitchen to the door, encoded, as Ola drew it (0046) and
+  /// `my_deliveries` now returns (0059). Null until the route lookup comes back
+  /// — the in-app map is then framed on the two pins with no line between them,
+  /// which is what we actually know at that moment.
+  final String? routePolyline;
+
   double? get targetLat => isCarrying ? deliverLat : restaurantLat;
   double? get targetLng => isCarrying ? deliverLng : restaurantLng;
   String get targetLabel => isCarrying ? deliverTo : restaurantName;
