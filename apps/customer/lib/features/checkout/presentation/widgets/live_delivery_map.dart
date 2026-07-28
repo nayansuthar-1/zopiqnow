@@ -1,32 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:zopiq_map/zopiq_map.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
-import 'package:zopiqnow/features/checkout/presentation/providers/map_providers.dart';
+import 'package:zopiqnow/features/checkout/presentation/pages/order_map_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/order_map_pins.dart';
 
-/// The rider, on the road, moving — on an actual map.
+/// The rider, on the road, moving — on a real map.
 ///
-/// **What changed, and why.** This used to be a hand-painted picture: the real
-/// road decoded from Ola's polyline, drawn over a faint grid, with no streets
-/// and no landmarks behind it. The reasoning was sound at the time — Ola's key
-/// is referer-restricted and belongs in Vault, not in an APK, and a tile
-/// renderer is a dependency the version freeze does not allow.
+/// **What this has been through.** It began as a hand-painted picture: the road
+/// decoded from Ola's polyline, drawn over a faint grid, with no streets behind
+/// it. Then it became a finished PNG from Ola's static API, which put real
+/// streets behind the road but could not pan, zoom, or offer a layer. It is now
+/// Google's map with Ola's road on it — the two agree on the encoded-polyline
+/// format, which is the only reason a route measured by one can be drawn over
+/// the other.
 ///
-/// Neither of those had to mean *no map*. The key stays on the server and the
-/// `ola-static` Edge Function returns a finished picture with our road and our
-/// pins already on it, which needs no key on the device and no new dependency.
-/// So the grid is gone and there are streets behind the route now.
+/// **This one is still a glance, deliberately.** It sits in a scrolling page,
+/// and a map that claims drags inside a scrollable steals the scroll. So
+/// gestures are off here and a tap opens [OrderMapPage], which is the same map
+/// with everything switched on. That is also why the layer switcher is not on
+/// this one: a control that small, over a map that small, is mostly map you
+/// cannot see.
 ///
-/// **Everything is drawn by one renderer.** The road, both ends and the rider
-/// are all Ola's marks in Ola's projection. There is no overlay, so there is no
-/// second coordinate system that can drift a few pixels out of step and put the
-/// rider in a field beside the road.
-///
-/// **What it still never does.** It does not draw a rider before there is one,
-/// and it does not keep drawing one whose position has gone stale (see
+/// **What it never does.** It does not draw a rider before there is one, and it
+/// does not keep drawing one whose position has gone stale (see
 /// [RiderPosition.isStale]). A dot that keeps gliding after the rider's phone
 /// died is the single most convincing lie a tracking screen can tell.
 class LiveDeliveryMap extends ConsumerWidget {
@@ -39,26 +40,15 @@ class LiveDeliveryMap extends ConsumerWidget {
   final DeliveryRoute route;
 
   /// Who is carrying it, or null while nobody is. Supplies the subscription key
-  /// and the label under the dot — and its absence is what makes this a map of
+  /// and the label under the pin — and its absence is what makes this a map of
   /// the ride ahead rather than of a ride in progress.
   final OrderRider? rider;
 
   static const double _height = 220;
 
-  /// The kitchen end, in near-black: a fixed point, and deliberately not the
-  /// brand colour, which the road and the destination already use.
-  static const Color _pinRestaurant = Color(0xFF282C3F);
-
-  /// The rider, in the one colour on this map that is neither the road nor
-  /// either end of it.
-  static const Color _pinRider = Color(0xFF1D6FE0);
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (!route.isMappable) return const SizedBox.shrink();
-
-    final String? token = ref.watch(mapAuthTokenProvider);
-    if (token == null) return const SizedBox.shrink();
 
     final ZopiqColors zc = context.zc;
     final String? key = rider?.carrierKey;
@@ -71,60 +61,48 @@ class LiveDeliveryMap extends ConsumerWidget {
     final RiderPosition? live =
         position != null && !position.isStale(DateTime.now()) ? position : null;
 
-    final GeoPoint destination = route.destination!;
-
     return ClipRRect(
       borderRadius: ZopiqRadii.rMd,
       child: SizedBox(
         height: _height,
         width: double.infinity,
-        child: ZopiqStaticMap(
-          endpoint: ref.watch(mapEndpointProvider),
-          authToken: token,
-          encodedPolyline: route.encodedPath,
-          markers: <ZopiqMapMarker>[
-            if (route.restaurant != null)
-              ZopiqMapMarker(
-                lat: route.restaurant!.lat,
-                lng: route.restaurant!.lng,
-                color: _pinRestaurant,
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            ZopiqMapView(
+              encodedPolyline: route.encodedPath,
+              pins: orderMapPins(route: route, live: live),
+              // A glance, not a map you drive: gestures off so the page can
+              // still be scrolled, and no layer switcher because a control that
+              // small over a map this small is mostly map you cannot see.
+              interactive: false,
+              showLayerSwitcher: false,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (BuildContext context) =>
+                      OrderMapPage(route: route, rider: rider),
+                ),
               ),
-            ZopiqMapMarker(
-              lat: destination.lat,
-              lng: destination.lng,
-              color: ZopiqPalette.primary,
             ),
-            // Last, so it is the pin drawn on top where the rider is close
-            // enough to the door for the two to overlap.
-            if (live != null)
-              ZopiqMapMarker(
-                lat: live.point.lat,
-                lng: live.point.lng,
-                color: _pinRider,
+            if (live == null)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _Caption(
+                  // Said plainly rather than hidden. The customer can see the
+                  // pin is missing, and not saying why is worse than saying it.
+                  text: position != null
+                      ? 'Live location paused — reconnecting'
+                      : rider == null
+                      ? 'The route your order will take'
+                      : 'Waiting for ${rider!.name}\'s location',
+                  color: zc.textMuted,
+                ),
               ),
           ],
-          caption: _captionFor(position: position, live: live, zc: zc),
         ),
       ),
-    );
-  }
-
-  /// A line along the bottom, for the times there is no rider on the map. Said
-  /// plainly rather than hidden — the customer can see the pin is missing, and
-  /// not saying why is worse than saying this.
-  Widget? _captionFor({
-    required RiderPosition? position,
-    required RiderPosition? live,
-    required ZopiqColors zc,
-  }) {
-    if (live != null) return null;
-    return _Caption(
-      text: position != null
-          ? 'Live location paused — reconnecting'
-          : rider == null
-          ? 'The route your order will take'
-          : 'Waiting for ${rider!.name}\'s location',
-      color: zc.textMuted,
     );
   }
 }

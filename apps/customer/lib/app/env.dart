@@ -37,4 +37,21 @@ abstract final class Env {
     defaultValue:
         '824878750768-thl7npqn43prt1ku2n8ts6ign9ejgdd9.apps.googleusercontent.com',
   );
+
+  /// Ola's tile key, for the delivery map.
+  ///
+  /// **No default, deliberately.** A vector map fetches its own tiles, so this
+  /// key must reach the device and does ship inside the APK — but that is not a
+  /// reason to also commit it. It is billable, and this repo has already had one
+  /// live key reach a commit. So it is passed at build time and lives in
+  /// `dart_defines.json`, which is gitignored:
+  ///
+  ///   flutter run --dart-define-from-file=../../dart_defines.json
+  ///
+  /// Empty here means the map shows its "no key" state rather than a grey void,
+  /// which is the difference between a build mistake you can read and one you
+  /// have to guess at.
+  static const String olaMapsApiKey = String.fromEnvironment(
+    'OLA_MAPS_API_KEY',
+  );
 }

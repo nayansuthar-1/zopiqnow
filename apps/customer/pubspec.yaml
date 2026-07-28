@@ -37,6 +37,11 @@ dependencies:
   zopiq_ui:
     path: ../../packages/zopiq_ui
 
+  # The delivery map: Ola's tiles, Ola's road, the layer switcher. In-repo, and
+  # shared with the rider app so the two screens cannot drift apart.
+  zopiq_map:
+    path: ../../packages/zopiq_map
+
   # The live order card, drawn natively (P1 Tier 2). In-repo and Android-only;
   # adds no pub dependency and nothing to the lockfile. A package rather than
   # Kotlin in `android/app` because the card is drawn from the FCM background

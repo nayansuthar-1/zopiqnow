@@ -15,6 +15,7 @@ workspace:
   - apps/rider
   - packages/zopiq_ui
   - packages/zopiq_live_card
+  - packages/zopiq_map
 
 # Tooling only — Melos runs scripts (analyze/test/format) across all members.
 dev_dependencies:

@@ -1,0 +1,41 @@
+name: zopiq_map
+description: "The map, once. An Ola vector map with the delivery route on it, the layer switcher, and the pins — shared by the customer's tracking screen and the rider's navigation screen."
+version: 0.1.0
+publish_to: "none"
+
+# Part of the workspace: shares the root lockfile.
+resolution: workspace
+
+environment:
+  sdk: ^3.12.2
+  flutter: ">=3.44.5"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # --- The map (approved 2026-07-29, Rule 3 change request) -------------------
+  # The renderer for Ola's own tiles. Ola's mobile stack *is* MapLibre — their
+  # styles declare `"version": 8` against the MapLibre Style Spec and their own
+  # Android SDK embeds MapLibre Native — so this is not a third-party wrapper
+  # around Ola, it is the engine Ola is built on, driven directly.
+  #
+  # It replaces the static-PNG proxy, which was a real map but a photograph of
+  # one: it could not pan, zoom, rotate, or switch layers.
+  #
+  # Declares minSdk 21, under our floor of 24, so Rule 1 is unaffected.
+  maplibre_gl: 0.26.2
+
+  # The design tokens, so a map's controls are the same orange as everything
+  # else. No cycle: zopiq_ui does not depend on this.
+  zopiq_ui:
+    path: ../zopiq_ui
+
+dev_dependencies:
+  flutter_lints: 6.0.0
+
+# --- Why a package of its own, and not `zopiq_ui` ----------------------------
+# `zopiq_ui` is the design system and its only dependency is Flutter itself.
+# Putting a heavy platform plugin in it would make every app that wants a button
+# also ship the Maps SDK — the vendor app has no map and should not carry one.
+# Two apps need this; they are the two that depend on it.

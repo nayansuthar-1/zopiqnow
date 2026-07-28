@@ -61,3 +61,6 @@ dist/
 .env.local
 .env.*.local
 *.tsbuildinfo
+
+# Build-time secrets for `--dart-define-from-file`. Never commit.
+dart_defines.json

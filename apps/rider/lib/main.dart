@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:zopiq_map/zopiq_map.dart';
 
 import 'package:zopiq_rider/app/env.dart';
 import 'package:zopiq_rider/app/rider_app.dart';
@@ -33,6 +34,11 @@ Future<void> main() async {
   // Wire push after Supabase is up so a token can register against the restored
   // session. Guarded internally: no Firebase config means a no-op, app runs on.
   await PushService.start();
+
+  // Installs the headers every Ola tile request carries. A static on MapLibre's
+  // platform channel, so it is set once here rather than per map. A missing key
+  // is a no-op and the job map says so on its own face.
+  await OlaMaps.configure(Env.olaMapsApiKey);
 
   runApp(const ProviderScope(child: RiderApp()));
 }
