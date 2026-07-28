@@ -26,6 +26,14 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
+        <!-- The Maps SDK reads its key from here and nowhere else. The value is
+             substituted by Gradle from `android/local.properties`, which is
+             gitignored — see app/build.gradle.kts. Empty when unset, which
+             renders Google's "authorization failure" tile rather than crashing. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -1,11 +1,12 @@
-import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 /// Decodes the encoded-polyline format, precision 5 — what Ola's Directions API
 /// returns as `overview_polyline` and what migration 0046 stores verbatim.
 ///
-/// Ola measures the road and MapLibre draws it. The format is the interchange
-/// between the two, and it is not Ola's invention: it is the same scheme Google
-/// published, which is why a route stored once can be rendered by anything.
+/// Ola measures the road and Google draws the ground under it. The format is
+/// the interchange between the two, and it is not Ola's invention: it is the
+/// same scheme Google published, which is exactly why a route measured by one
+/// vendor can be laid over the other's map without reprojecting anything.
 ///
 /// Tolerant by design. A truncated or malformed string yields the points it
 /// managed to read and stops — a tracking screen that throws because a third

@@ -1,9 +1,28 @@
+// Imported rather than written as `java.util.Properties`: inside a Kotlin DSL
+// build script `java` resolves to Gradle's own `java` extension, which shadows
+// the package.
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     // Firebase config (google-services.json) for push. B0, 2026-07-25.
     id("com.google.gms.google-services")
+}
+
+// The Google Maps key, read from `android/local.properties` — gitignored, and
+// where it must stay. See the customer app's build file for why the protection
+// is the Cloud console's key restriction rather than secrecy. This app needs its
+// own entry in the restriction list: a key restricted to Android apps is
+// restricted to specific package names, and this is a different package.
+//
+// Empty when unset, so a checkout with no key still builds.
+val mapsApiKey: String = run {
+    val properties = Properties()
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { properties.load(it) }
+    properties.getProperty("MAPS_API_KEY") ?: ""
 }
 
 android {
@@ -24,6 +43,8 @@ android {
 
     defaultConfig {
         applicationId = "com.siteonlab.zopiq_rider"
+        // Read by the meta-data element in AndroidManifest.xml.
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
         // The same floor as the other two apps. A delivery partner's phone is the
         // oldest device in this system by some margin — this is the last app to
         // raise a minimum on.

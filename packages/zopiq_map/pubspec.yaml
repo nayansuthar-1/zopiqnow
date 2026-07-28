@@ -1,5 +1,5 @@
 name: zopiq_map
-description: "The map, once. An Ola vector map with the delivery route on it, the layer switcher, and the pins — shared by the customer's tracking screen and the rider's navigation screen."
+description: "The map, once. A Google map with Ola's route on it, the layer switcher, and the pins — shared by the customer's tracking screen and the rider's navigation screen."
 version: 0.1.0
 publish_to: "none"
 
@@ -14,17 +14,23 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # --- The map (approved 2026-07-29, Rule 3 change request) -------------------
-  # The renderer for Ola's own tiles. Ola's mobile stack *is* MapLibre — their
-  # styles declare `"version": 8` against the MapLibre Style Spec and their own
-  # Android SDK embeds MapLibre Native — so this is not a third-party wrapper
-  # around Ola, it is the engine Ola is built on, driven directly.
+  # --- The basemap (approved 2026-07-29, Rule 3 change request) ---------------
+  # Only the picture underneath comes from Google. The route is still measured by
+  # Ola (migrations 0046/0057/0059) and the rider's position is still Supabase
+  # realtime; neither ever touched a tile server.
   #
-  # It replaces the static-PNG proxy, which was a real map but a photograph of
-  # one: it could not pan, zoom, rotate, or switch layers.
+  # This replaced Ola's own vector tiles for one reason, and it is a hard one:
+  # Ola throttles its tiles product to **20 requests a minute**, account-wide
+  # across styles, tiles and glyphs. A single vector map screen needs 40-80, so
+  # the basemap blanked on first load and stayed blank while panning. Google's
+  # mobile map loads are unmetered and free, so the ceiling disappears entirely.
+  #
+  # It also fixes satellite. Ola's imagery stops at zoom 14 — fields and village
+  # outlines; Google's runs to zoom 20, which is the zoom a rider actually needs
+  # to find a gate.
   #
   # Declares minSdk 21, under our floor of 24, so Rule 1 is unaffected.
-  maplibre_gl: 0.26.2
+  google_maps_flutter: 2.18.0
 
   # The design tokens, so a map's controls are the same orange as everything
   # else. No cycle: zopiq_ui does not depend on this.

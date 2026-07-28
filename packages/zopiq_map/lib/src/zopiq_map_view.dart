@@ -1,18 +1,14 @@
 import 'dart:async';
-// MapLibre takes control margins as a `Point`, and does not re-export the one
-// it means.
-import 'dart:math' show Point;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_map/src/map_markers.dart';
-import 'package:zopiq_map/src/ola_maps.dart';
 import 'package:zopiq_map/src/polyline_codec.dart';
 
-/// A pin on the map, in the app's own terms rather than the renderer's.
+/// A pin on the map, in the app's own terms rather than the SDK's.
 @immutable
 class ZopiqMapPin {
   const ZopiqMapPin({
@@ -56,27 +52,44 @@ class ZopiqMapPin {
 /// drawn with the same shape as an address.
 enum ZopiqPinKind { place, rider }
 
+/// What the map is showing underneath the route.
+enum ZopiqMapLayer {
+  map(MapType.normal, 'Map', Icons.map_outlined),
+  satellite(MapType.hybrid, 'Satellite', Icons.satellite_alt),
+  terrain(MapType.terrain, 'Terrain', Icons.terrain);
+
+  const ZopiqMapLayer(this.type, this.label, this.icon);
+
+  final MapType type;
+  final String label;
+  final IconData icon;
+}
+
 /// The map, once, for both apps.
 ///
-/// **What this replaced.** Until now these screens showed a photograph: a
-/// finished PNG from Ola's static API with the road and pins already drawn on
-/// it. It was a real map, but a picture of one — it could not pan, zoom, rotate
-/// or switch layers, and every change of any kind meant a round trip for a new
-/// image. This is the same data from the same vendor, rendered live on the
-/// device by MapLibre, which is the engine Ola's own SDK is built on.
+/// **Google draws the ground; Ola draws the road.** The basemap, its satellite
+/// imagery and its terrain come from Google. The route on top is measured by
+/// Ola (migrations 0046/0057/0059) and the rider's position arrives over
+/// Supabase realtime. The two vendors agree on the encoded-polyline format,
+/// which is the only reason a route measured by one can be laid over the other.
+///
+/// **Why not Ola's own tiles, which we had working.** Ola throttles its tiles
+/// product to twenty requests a minute, account-wide across styles, tiles and
+/// glyphs. One vector map screen needs forty to eighty, so the basemap went
+/// blank on first load and stayed blank while panning. Google's mobile map
+/// loads are unmetered, so that ceiling does not exist. Ola's satellite also
+/// stops at zoom 14, which is a picture of fields where a rider needs a picture
+/// of a gate.
+///
+/// **Attribution is a licence condition, not decoration.** Google permits a
+/// third party's route on their map and requires the UI to name whose route it
+/// is. That is [_RoutingCredit], and it is why it may not be quietly deleted.
 ///
 /// **The camera is fitted once, then left alone.** A map that re-centres itself
 /// whenever the rider moves is a map you cannot read, because it snatches the
-/// view back the moment you drag it. So the route is framed on first load and
-/// on nothing else. [recenterKey] is the seam for a screen that wants to re-fit
-/// deliberately, and [followPinId] is the opt-in for one that genuinely wants
-/// the camera to chase something.
-///
-/// **Switching layers does not disturb the view.** MapLibre discards every
-/// annotation when a style is swapped, so the route and the pins are rebuilt on
-/// each style load — but the camera is not re-fitted, because someone who has
-/// zoomed into a junction and then tapped Satellite wants that junction from
-/// above, not the whole city again.
+/// view back the moment you drag it. [recenterKey] is the seam for a screen
+/// that wants to re-fit deliberately, and [followPinId] the opt-in for one that
+/// genuinely wants the camera to chase something.
 class ZopiqMapView extends StatefulWidget {
   const ZopiqMapView({
     this.encodedPolyline,
@@ -98,15 +111,13 @@ class ZopiqMapView extends StatefulWidget {
 
   final List<ZopiqMapPin> pins;
 
-  /// The Map / Satellite control. Off for a small map that is a glance rather
-  /// than a screen.
+  /// The Map / Satellite / Terrain control. Off for a small map that is a
+  /// glance rather than a screen.
   final bool showLayerSwitcher;
 
-  /// MapLibre's own location puck, tracked natively.
-  ///
-  /// The rider's map wants it; the customer's does not — the customer's own
-  /// position is not what that screen is about, and asking for it would raise a
-  /// location prompt on a screen with no use for one.
+  /// Google's own blue dot. The rider's map wants it; the customer's does not —
+  /// the customer's own position is not what that screen is about, and asking
+  /// for it would raise a location prompt on a screen with no use for one.
   final bool showMyLocation;
 
   /// Whether the map may be panned, zoomed, rotated and tilted.
@@ -121,8 +132,8 @@ class ZopiqMapView extends StatefulWidget {
   /// Tapping the map itself. The inline-map-opens-full-screen seam.
   final VoidCallback? onTap;
 
-  /// Keeps the attribution and the controls clear of anything drawn over the
-  /// map. Ola's attribution may not be covered.
+  /// Keeps the controls and both attributions clear of anything drawn over the
+  /// map. Google's logo may not be covered.
   final EdgeInsets padding;
 
   /// Change this to re-fit the camera to the route. Null means "fit once".
@@ -138,17 +149,22 @@ class ZopiqMapView extends StatefulWidget {
 
 class _ZopiqMapViewState extends State<ZopiqMapView>
     with SingleTickerProviderStateMixin {
-  MapLibreMapController? _controller;
+  final Completer<GoogleMapController> _controller =
+      Completer<GoogleMapController>();
+
   ZopiqMapLayer _layer = ZopiqMapLayer.map;
 
-  final Map<String, Symbol> _symbols = <String, Symbol>{};
-  Line? _route;
+  /// Marker bitmaps, keyed by [_imageName]. Empty until the first async load
+  /// lands, which is why [_markers] falls back to Google's own pin: a map that
+  /// showed nothing for a frame would flicker on every rebuild.
+  final Map<String, BitmapDescriptor> _icons = <String, BitmapDescriptor>{};
 
-  /// Fitting happens on the first style load only — see the class comment.
-  bool _fitted = false;
-
-  /// Where each pin was and where it is going, for the pins currently moving.
+  /// Where a pin currently is on screen, which is not where it was last
+  /// reported while it is gliding between the two.
+  final Map<String, LatLng> _drawnAt = <String, LatLng>{};
   final Map<String, _Move> _moving = <String, _Move>{};
+
+  bool _fitted = false;
 
   /// Roughly the interval between two rider fixes, so a pin finishes its glide
   /// about when the next one arrives and the dot never appears to stall.
@@ -157,10 +173,11 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
     duration: const Duration(milliseconds: 1200),
   )..addListener(_onMoveTick);
 
-  /// The platform channel is a real cost per call, and a symbol update at the
-  /// display's full rate would put 120 of them a second on it for no visible
-  /// benefit. 30 a second is smooth to the eye and an eighth of the traffic.
-  DateTime _lastTick = DateTime.fromMillisecondsSinceEpoch(0);
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_loadIcons()));
+  }
 
   @override
   void dispose() {
@@ -175,11 +192,9 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
     if (widget.recenterKey != null && widget.recenterKey != old.recenterKey) {
       unawaited(_fit());
     }
-    if (widget.encodedPolyline != old.encodedPolyline) {
-      unawaited(_syncRoute());
-    }
     if (!_samePins(old.pins, widget.pins)) {
-      unawaited(_syncPins(previous: old.pins));
+      _startMoves(old.pins);
+      unawaited(_loadIcons());
     }
   }
 
@@ -196,67 +211,18 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
     return true;
   }
 
-  /// Every point that has to be visible, so a rider who has wandered off the
-  /// quoted route is still in frame rather than off the edge of it.
-  List<LatLng> get _framed => <LatLng>[
-    ...decodePolyline(widget.encodedPolyline),
-    ...widget.pins.map((ZopiqMapPin p) => p.position),
-  ];
+  static String _imageName(ZopiqMapPin pin) =>
+      '${pin.kind.name}-${pin.color.toARGB32()}';
 
-  Future<void> _fit() async {
-    final MapLibreMapController? controller = _controller;
-    final List<LatLng> points = _framed;
-    if (controller == null || points.isEmpty) return;
-
-    // 48pt of air, plus whatever the screen has drawn over the map, so a pin at
-    // the edge of the route is never half under a sheet.
-    await controller.animateCamera(
-      CameraUpdate.newLatLngBounds(
-        boundsOf(points),
-        left: widget.padding.left + 48,
-        top: widget.padding.top + 48,
-        right: widget.padding.right + 48,
-        bottom: widget.padding.bottom + 48,
-      ),
-    );
-  }
-
-  /// A style swap throws away every annotation, so this runs on each style load
-  /// and not only the first.
-  Future<void> _onStyleLoaded() async {
-    final MapLibreMapController? controller = _controller;
-    if (controller == null) return;
-
-    _symbols.clear();
-    _route = null;
-
-    await _registerImages(controller);
-    await _syncRoute();
-    await _syncPins();
-
-    // Overlapping pins stay drawn. The default hides a symbol that collides
-    // with another, which at a shared pickup point would silently delete the
-    // restaurant from the map.
-    await controller.setSymbolIconAllowOverlap(true);
-
-    if (!_fitted) {
-      _fitted = true;
-      await _fit();
-    }
-  }
-
-  /// Every marker bitmap this map could need, registered under a name the
-  /// symbol layer can refer to.
-  Future<void> _registerImages(MapLibreMapController controller) async {
-    // Reached from style- and pin-change callbacks, both of which can land after
-    // the screen has been popped. Reading `context` then would throw.
+  /// Rasterises any marker bitmap this map needs and does not yet have.
+  Future<void> _loadIcons() async {
     if (!mounted) return;
     final double dpr = MediaQuery.devicePixelRatioOf(context);
-    final Set<String> done = <String>{};
+    bool added = false;
 
     for (final ZopiqMapPin pin in widget.pins) {
       final String name = _imageName(pin);
-      if (!done.add(name)) continue;
+      if (_icons.containsKey(name)) continue;
       final Uint8List bytes = switch (pin.kind) {
         ZopiqPinKind.place => await MapMarkers.pin(
           color: pin.color,
@@ -267,83 +233,28 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
           pixelRatio: dpr,
         ),
       };
-      await controller.addImage(name, bytes);
+      _icons[name] = BytesMapBitmap(bytes, imagePixelRatio: dpr);
+      added = true;
     }
+
+    if (added && mounted) setState(() {});
   }
 
-  static String _imageName(ZopiqMapPin pin) =>
-      '${pin.kind.name}-${pin.color.toARGB32()}';
-
-  Future<void> _syncRoute() async {
-    final MapLibreMapController? controller = _controller;
-    if (controller == null) return;
-
-    final List<LatLng> road = decodePolyline(widget.encodedPolyline);
-    final Line? existing = _route;
-
-    if (road.length < 2) {
-      if (existing != null) {
-        await controller.removeLine(existing);
-        _route = null;
-      }
-      return;
-    }
-
-    final LineOptions options = LineOptions(
-      geometry: road,
-      lineColor: _hex(ZopiqPalette.primary),
-      lineWidth: 5,
-      lineOpacity: 1,
-      lineJoin: 'round',
-    );
-
-    if (existing == null) {
-      _route = await controller.addLine(options);
-    } else {
-      await controller.updateLine(existing, options);
-    }
-  }
-
-  /// Adds what is new, removes what is gone, and animates what has moved.
-  Future<void> _syncPins({List<ZopiqMapPin> previous = const <ZopiqMapPin>[]}) async {
-    final MapLibreMapController? controller = _controller;
-    if (controller == null) return;
-
-    final Map<String, ZopiqMapPin> wanted = <String, ZopiqMapPin>{
-      for (final ZopiqMapPin p in widget.pins) p.id: p,
-    };
-
-    for (final String id in _symbols.keys.toList()) {
-      if (wanted.containsKey(id)) continue;
-      final Symbol? gone = _symbols.remove(id);
-      _moving.remove(id);
-      if (gone != null) await controller.removeSymbol(gone);
-    }
-
-    await _registerImages(controller);
-
+  /// Anything that kept its id but changed position is animated to the new one.
+  void _startMoves(List<ZopiqMapPin> previous) {
     final Map<String, LatLng> before = <String, LatLng>{
       for (final ZopiqMapPin p in previous) p.id: p.position,
     };
     bool animate = false;
 
     for (final ZopiqMapPin pin in widget.pins) {
-      final Symbol? existing = _symbols[pin.id];
-
-      if (existing == null) {
-        _symbols[pin.id] = await controller.addSymbol(_optionsFor(pin, pin.position));
-        continue;
-      }
-
-      final LatLng? from = before[pin.id];
-      if (from != null && (from.latitude != pin.lat || from.longitude != pin.lng)) {
-        // It moved. Glide it rather than teleport it — a dot that jumps every
-        // few seconds reads as a glitch, not as a vehicle.
-        _moving[pin.id] = _Move(from: from, to: pin.position, pin: pin);
-        animate = true;
-      } else {
-        await controller.updateSymbol(existing, _optionsFor(pin, pin.position));
-      }
+      final LatLng? from = _drawnAt[pin.id] ?? before[pin.id];
+      if (from == null) continue;
+      if (from.latitude == pin.lat && from.longitude == pin.lng) continue;
+      // It moved. Glide it rather than teleport it — a dot that jumps every few
+      // seconds reads as a glitch, not as a vehicle.
+      _moving[pin.id] = _Move(from: from, to: pin.position, pin: pin);
+      animate = true;
     }
 
     if (animate) {
@@ -352,94 +263,112 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
     }
   }
 
-  SymbolOptions _optionsFor(ZopiqMapPin pin, LatLng at) => SymbolOptions(
-    geometry: at,
-    iconImage: _imageName(pin),
-    iconSize: 1,
-    // A teardrop points at its place, so it is anchored at its tip. A rider's
-    // disc *is* its place, so it is anchored at its middle.
-    iconAnchor: pin.kind == ZopiqPinKind.place ? 'bottom' : 'center',
-  );
-
   void _onMoveTick() {
-    final MapLibreMapController? controller = _controller;
-    if (controller == null || _moving.isEmpty) return;
-
-    final DateTime now = DateTime.now();
-    final bool last = _mover.value == 1;
-    if (!last && now.difference(_lastTick).inMilliseconds < 33) return;
-    _lastTick = now;
+    if (_moving.isEmpty || !mounted) return;
 
     final double t = Curves.easeOut.transform(_mover.value);
-
-    for (final MapEntry<String, _Move> entry in _moving.entries) {
-      final Symbol? symbol = _symbols[entry.key];
-      if (symbol == null) continue;
-      final LatLng at = entry.value.at(t);
-      unawaited(controller.updateSymbol(symbol, _optionsFor(entry.value.pin, at)));
-
-      if (entry.key == widget.followPinId) {
-        unawaited(controller.moveCamera(CameraUpdate.newLatLng(at)));
-      }
+    for (final MapEntry<String, _Move> e in _moving.entries) {
+      _drawnAt[e.key] = e.value.at(t);
     }
 
-    if (last) _moving.clear();
+    final LatLng? follow = widget.followPinId == null
+        ? null
+        : _drawnAt[widget.followPinId];
+    if (follow != null && _controller.isCompleted) {
+      unawaited(
+        _controller.future.then(
+          (GoogleMapController c) => c.moveCamera(CameraUpdate.newLatLng(follow)),
+        ),
+      );
+    }
+
+    setState(() {});
+    if (_mover.value == 1) _moving.clear();
   }
 
-  /// MapLibre's annotation options take a colour as a CSS string, not a [Color].
-  static String _hex(Color color) =>
-      '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
+  /// Every point that has to be visible, so a rider who has wandered off the
+  /// quoted route is still in frame rather than off the edge of it.
+  List<LatLng> get _framed => <LatLng>[
+    ...decodePolyline(widget.encodedPolyline),
+    ...widget.pins.map((ZopiqMapPin p) => p.position),
+  ];
+
+  Future<void> _fit() async {
+    final List<LatLng> points = _framed;
+    if (points.isEmpty) return;
+    final GoogleMapController controller = await _controller.future;
+    // 48pt of air, so a pin at the edge of the route is not half off the screen.
+    await controller.animateCamera(
+      CameraUpdate.newLatLngBounds(boundsOf(points), 48),
+    );
+  }
+
+  Set<Marker> get _markers => widget.pins.map((ZopiqMapPin pin) {
+    final LatLng at = _drawnAt[pin.id] ?? pin.position;
+    return Marker(
+      markerId: MarkerId(pin.id),
+      position: at,
+      icon: _icons[_imageName(pin)] ?? BitmapDescriptor.defaultMarker,
+      // A teardrop points at its place, so it is anchored at its tip. A rider's
+      // disc *is* its place, so it is anchored at its middle.
+      anchor: pin.kind == ZopiqPinKind.place
+          ? const Offset(0.5, 1)
+          : const Offset(0.5, 0.5),
+      infoWindow: pin.title == null
+          ? InfoWindow.noText
+          : InfoWindow(title: pin.title),
+    );
+  }).toSet();
 
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
-    final bool dark = Theme.of(context).brightness == Brightness.dark;
+    final List<LatLng> road = decodePolyline(widget.encodedPolyline);
     final List<LatLng> points = _framed;
-
-    // Without a key MapLibre would draw an empty grey rectangle and log the 401
-    // where nobody is looking. Say it on the screen instead.
-    if (!OlaMaps.isConfigured) return _MissingKey(zc: zc);
 
     return Stack(
       children: <Widget>[
-        MapLibreMap(
-          styleString: OlaMaps.urlFor(_layer, dark: dark),
+        GoogleMap(
           initialCameraPosition: CameraPosition(
             // Somewhere sensible for the moment before the fit lands. India's
             // centre, so a failed fit is never the middle of the ocean.
             target: points.isEmpty ? const LatLng(21.13, 82.79) : points.first,
             zoom: 13,
           ),
+          mapType: _layer.type,
+          padding: widget.padding,
           myLocationEnabled: widget.showMyLocation,
-          myLocationTrackingMode: widget.showMyLocation
-              ? MyLocationTrackingMode.tracking
-              : MyLocationTrackingMode.none,
-          // Must follow `myLocationEnabled`: MapLibre asserts that any mode
-          // other than `normal` has the location layer switched on, so a
-          // hard-coded `compass` crashes every map that does not show a puck —
-          // which is both of the customer's.
-          myLocationRenderMode: widget.showMyLocation
-              ? MyLocationRenderMode.compass
-              : MyLocationRenderMode.normal,
+          myLocationButtonEnabled: widget.showMyLocation && widget.interactive,
+          // The stock zoom buttons are redundant beside pinch-to-zoom and they
+          // crowd a small map; the gestures they duplicate stay on.
+          zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
           compassEnabled: widget.interactive,
           scrollGesturesEnabled: widget.interactive,
           zoomGesturesEnabled: widget.interactive,
           rotateGesturesEnabled: widget.interactive,
           tiltGesturesEnabled: widget.interactive,
-          // Annotation dragging, not map dragging. Nothing here is draggable.
-          dragEnabled: false,
-          // Ola's attribution is a condition of using the tiles. It is kept
-          // clear of whatever the screen has drawn over the map.
-          attributionButtonMargins: Point<num>(
-            8 + widget.padding.right,
-            8 + widget.padding.bottom,
-          ),
-          onMapCreated: (MapLibreMapController controller) =>
-              _controller = controller,
-          onStyleLoadedCallback: () => unawaited(_onStyleLoaded()),
-          onMapClick: widget.onTap == null
-              ? null
-              : (Point<double> _, LatLng _) => widget.onTap!(),
+          onTap: widget.onTap == null ? null : (LatLng _) => widget.onTap!(),
+          polylines: road.length < 2
+              ? const <Polyline>{}
+              : <Polyline>{
+                  Polyline(
+                    polylineId: const PolylineId('route'),
+                    points: road,
+                    color: ZopiqPalette.primary,
+                    width: 6,
+                    startCap: Cap.roundCap,
+                    endCap: Cap.roundCap,
+                  ),
+                },
+          markers: _markers,
+          onMapCreated: (GoogleMapController controller) {
+            if (!_controller.isCompleted) _controller.complete(controller);
+            if (!_fitted) {
+              _fitted = true;
+              unawaited(_fit());
+            }
+          },
         ),
         if (widget.showLayerSwitcher)
           Positioned(
@@ -452,45 +381,14 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
                   setState(() => _layer = layer),
             ),
           ),
-      ],
-    );
-  }
-}
-
-/// What a map looks like when the build forgot its key.
-///
-/// Addressed to whoever is holding the phone, which during development is a
-/// developer and in production should be nobody: a release built without the
-/// define is a release with no maps, and this is how that announces itself
-/// rather than looking like a slow network.
-class _MissingKey extends StatelessWidget {
-  const _MissingKey({required this.zc});
-
-  final ZopiqColors zc;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(ZopiqSpacing.md),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(Icons.map_outlined, color: zc.textMuted),
-              const SizedBox(height: ZopiqSpacing.xs),
-              Text(
-                'Map unavailable',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: zc.textMuted),
-                textAlign: TextAlign.center,
-              ),
-            ],
+        // Only when there is actually a third party's route on the map.
+        if (road.length >= 2)
+          Positioned(
+            right: widget.padding.right + ZopiqSpacing.sm,
+            bottom: widget.padding.bottom + ZopiqSpacing.sm,
+            child: const _RoutingCredit(),
           ),
-        ),
-      ),
+      ],
     );
   }
 }
@@ -513,7 +411,41 @@ class _Move {
   );
 }
 
-/// Map / Satellite, as a menu behind one button.
+/// "Routing by Ola Maps".
+///
+/// **Do not remove this.** Google's Maps Platform terms allow a third party's
+/// route to be drawn on a Google map on the condition that the interface says
+/// whose route it is. Deleting this label does not simplify the map, it breaks
+/// the terms the basemap is served under.
+///
+/// It sits bottom-right because Google's own logo sits bottom-left and the same
+/// terms forbid obscuring it.
+class _RoutingCredit extends StatelessWidget {
+  const _RoutingCredit();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: ZopiqRadii.rSm,
+      ),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Text(
+          'Routing by Ola Maps',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            height: 1.4,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Map / Satellite / Terrain, as a menu behind one button.
 ///
 /// A button rather than chips across the top: this sits over the map, and
 /// anything permanently over a map is map the person cannot see. It is the
@@ -528,11 +460,6 @@ class _LayerSwitcher extends StatelessWidget {
   final ZopiqMapLayer current;
   final ZopiqColors zc;
   final ValueChanged<ZopiqMapLayer> onChanged;
-
-  static const Map<ZopiqMapLayer, IconData> _icons = <ZopiqMapLayer, IconData>{
-    ZopiqMapLayer.map: Icons.map_outlined,
-    ZopiqMapLayer.satellite: Icons.satellite_alt,
-  };
 
   @override
   Widget build(BuildContext context) {
@@ -552,7 +479,7 @@ class _LayerSwitcher extends StatelessWidget {
                 child: Row(
                   children: <Widget>[
                     Icon(
-                      _icons[layer],
+                      layer.icon,
                       size: 18,
                       color: layer == current ? zc.primary : zc.textMuted,
                     ),
@@ -565,7 +492,7 @@ class _LayerSwitcher extends StatelessWidget {
             .toList(),
         child: Padding(
           padding: const EdgeInsets.all(ZopiqSpacing.sm),
-          child: Icon(_icons[current], size: 20, color: zc.primary),
+          child: Icon(current.icon, size: 20, color: zc.primary),
         ),
       ),
     );

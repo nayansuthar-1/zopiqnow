@@ -1,9 +1,34 @@
+// Imported rather than written as `java.util.Properties`: inside a Kotlin DSL
+// build script `java` resolves to Gradle's own `java` extension, which shadows
+// the package and makes the qualified name an unresolved reference.
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     // Firebase config (google-services.json) for push. B0, 2026-07-25.
     id("com.google.gms.google-services")
+}
+
+// The Google Maps key, read from `android/local.properties` — which is
+// gitignored, and is where it must stay.
+//
+// Unlike the Supabase publishable key, this one is not merely "not a secret":
+// it is billed. The protection is not secrecy — an Android app's key is
+// extractable from any APK — it is the **key restriction** you set in the Cloud
+// console: restrict it to Android apps, to this exact package name and signing
+// certificate, and to the Maps SDK for Android alone. Then a copied key is
+// worthless in anyone else's app.
+//
+// Empty when unset, so a checkout with no key still builds. The map then shows
+// Google's "authorization failure" tile rather than failing the build, which is
+// the right trade for a repo more than one person clones.
+val mapsApiKey: String = run {
+    val properties = Properties()
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { properties.load(it) }
+    properties.getProperty("MAPS_API_KEY") ?: ""
 }
 
 android {
@@ -23,6 +48,9 @@ android {
 
     defaultConfig {
         applicationId = "com.siteonlab.zopiqnow"
+        // Read by the meta-data element in AndroidManifest.xml, which is where
+        // the Maps SDK looks for it.
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
         // Locked per ENGINEERING_RULES.md Rule 1 (Android 10+ broad reach) & DEVELOPMENT_SETUP.md.
         minSdk = 24        // Android 7.0 — broad reach
         targetSdk = 35     // Android 15 — Play 2026 requirement
