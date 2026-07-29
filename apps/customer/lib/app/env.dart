@@ -32,10 +32,20 @@ abstract final class Env {
   ///
   /// Public by design, like every OAuth client id: it identifies the app, it does
   /// not authenticate it. The client *secret* lives only in Supabase.
+  /// Reissued 2026-07-29 under a new Cloud project (`789936942272`).
+  ///
+  /// The previous client belonged to a project whose owning account no longer
+  /// exists; Google disabled the client, and the device reported
+  /// `Invalid key value: <sha1>:com.siteonlab.zopiqnow` — its way of saying the
+  /// package and signing certificate are not registered to any live client. The
+  /// old pair could not be re-registered under the new account either, because
+  /// Google reserves (package, certificate) globally and the dead project still
+  /// holds it. Hence the app's own release keystore; see
+  /// `android/app/build.gradle.kts`.
   static const String googleWebClientId = String.fromEnvironment(
     'GOOGLE_WEB_CLIENT_ID',
     defaultValue:
-        '824878750768-thl7npqn43prt1ku2n8ts6ign9ejgdd9.apps.googleusercontent.com',
+        '789936942272-82up4pgu8v6in4vmvnogqhiqa8legtl5.apps.googleusercontent.com',
   );
 }
 
