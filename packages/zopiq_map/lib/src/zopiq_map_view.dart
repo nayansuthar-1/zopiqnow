@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -7,6 +6,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_map/src/map_markers.dart';
 import 'package:zopiq_map/src/polyline_codec.dart';
+import 'package:zopiq_map/src/route_progress.dart';
 
 /// A pin on the map, in the app's own terms rather than the SDK's.
 ///
@@ -21,6 +21,8 @@ class ZopiqMapPin {
     required this.lng,
     required this.kind,
     this.title,
+    this.heading,
+    this.label,
   });
 
   /// Stable across rebuilds, and the whole basis of movement: a pin whose [id]
@@ -32,9 +34,27 @@ class ZopiqMapPin {
   final double lat;
   final double lng;
   final ZopiqPinKind kind;
+
+  /// The info window, shown on tap. Not the same thing as [label], which is
+  /// always on screen.
   final String? title;
 
+  /// Degrees clockwise from north, when the reporting phone was moving enough
+  /// to know. Null draws a plain disc rather than a chevron pointing
+  /// confidently at nothing — a stationary GPS reports no bearing, and guessing
+  /// one would be drawing a direction nobody reported.
+  final double? heading;
+
+  /// A word or two rendered in a capsule above the pin — "6 min". Kept short on
+  /// purpose: this is painted into the marker image, so a long one is a wide
+  /// bitmap covering the map it is describing.
+  final String? label;
+
   LatLng get position => LatLng(lat, lng);
+
+  /// What makes two markers the same *picture*. Two pins with the same kind,
+  /// bearing and label share one rasterised bitmap.
+  String get imageKey => '${kind.name}|$heading|$label';
 }
 
 /// What the map is showing underneath the route.
@@ -70,11 +90,23 @@ enum ZopiqMapLayer {
 /// third party's route on their map and requires the UI to name whose route it
 /// is. That is [_RoutingCredit], and it is why it may not be quietly deleted.
 ///
+/// **The route is drawn in three passes, not one.** A casing under the whole
+/// road, then the part already ridden in grey, then the part still to come in
+/// full colour. The split point is where the rider actually is, so the line
+/// reads as progress rather than as decoration — and when the rider is nowhere
+/// near the quoted road, [splitRoute] refuses and the whole thing stays
+/// "ahead", which is the honest picture of a route we can no longer vouch for.
+///
+/// **There is deliberately no traffic colouring.** Ola's Directions response as
+/// we call it carries a distance and an overview polyline and no per-segment
+/// speeds, so a green-amber-red road would be three colours we made up.
+///
 /// **The camera is fitted once, then left alone.** A map that re-centres itself
 /// whenever the rider moves is a map you cannot read, because it snatches the
 /// view back the moment you drag it. [recenterKey] is the seam for a screen
 /// that wants to re-fit deliberately, and [followPinId] the opt-in for one that
-/// genuinely wants the camera to chase something.
+/// genuinely wants the camera to chase something — offered to the reader as a
+/// button they can switch off, never imposed.
 class ZopiqMapView extends StatefulWidget {
   const ZopiqMapView({
     this.encodedPolyline,
@@ -111,7 +143,8 @@ class ZopiqMapView extends StatefulWidget {
   /// a map that claims drags inside a `ListView` steals the scroll, and one
   /// that does not claim them is a map whose pan does nothing. Neither is a
   /// good answer, so a small map is a still view with an [onTap] that opens the
-  /// real one.
+  /// real one. It also suppresses the controls: a button on a map you cannot
+  /// move has nothing to do.
   final bool interactive;
 
   /// Tapping the map itself. The inline-map-opens-full-screen seam.
@@ -124,8 +157,10 @@ class ZopiqMapView extends StatefulWidget {
   /// Change this to re-fit the camera to the route. Null means "fit once".
   final Object? recenterKey;
 
-  /// The id of a pin the camera should stay with as it moves. Null leaves the
-  /// camera under the reader's control, which is the default for a reason.
+  /// The id of a pin the camera may follow. Supplying one puts a follow button
+  /// on the map and starts with it on; the reader can turn it off, and panning
+  /// the map by hand turns it off for them — a camera that fights the finger
+  /// dragging it is worse than no camera help at all.
   final String? followPinId;
 
   @override
@@ -139,15 +174,34 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
 
   ZopiqMapLayer _layer = ZopiqMapLayer.map;
 
-  /// Marker bitmaps, keyed by [_imageName]. Empty until the first async load
-  /// lands, which is why [_markers] falls back to Google's own pin: a map that
-  /// showed nothing for a frame would flicker on every rebuild.
-  final Map<String, BitmapDescriptor> _icons = <String, BitmapDescriptor>{};
+  /// Marker images, keyed by [ZopiqMapPin.imageKey].
+  final Map<String, _PinImage> _images = <String, _PinImage>{};
+
+  /// The last image actually drawn for a given pin *id*.
+  ///
+  /// A rider's bearing changes with every fix, and each new bearing is a new
+  /// bitmap that has to be rasterised off the frame. Without this the marker
+  /// would fall back to the SDK's default red pin for the frame or two that
+  /// takes, so a moving scooter would flicker red every few seconds. Holding
+  /// the previous image means the worst case is a chevron one fix out of date.
+  final Map<String, _PinImage> _lastDrawn = <String, _PinImage>{};
 
   /// Where a pin currently is on screen, which is not where it was last
   /// reported while it is gliding between the two.
   final Map<String, LatLng> _drawnAt = <String, LatLng>{};
   final Map<String, _Move> _moving = <String, _Move>{};
+
+  /// Whether the camera is currently chasing [ZopiqMapView.followPinId].
+  late bool _follow = widget.followPinId != null;
+
+  /// Where the finger currently on the map first landed.
+  ///
+  /// Following has to stop the moment the reader takes the camera back, and the
+  /// SDK is no help here: `onCameraMoveStarted` fires for *our own*
+  /// `moveCamera` as readily as for a drag, so following would switch itself
+  /// off on its first tick. The finger is the only unambiguous signal, so the
+  /// map watches for one directly.
+  Offset? _touchStart;
 
   /// How many times the opening fit has been attempted.
   ///
@@ -170,7 +224,9 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_loadIcons()));
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(_loadImages()),
+    );
   }
 
   @override
@@ -188,7 +244,7 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
     }
     if (!_samePins(old.pins, widget.pins)) {
       _startMoves(old.pins);
-      unawaited(_loadIcons());
+      unawaited(_loadImages());
     }
   }
 
@@ -198,29 +254,53 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
       if (a[i].id != b[i].id ||
           a[i].lat != b[i].lat ||
           a[i].lng != b[i].lng ||
-          a[i].kind != b[i].kind) {
+          a[i].imageKey != b[i].imageKey) {
         return false;
       }
     }
     return true;
   }
 
-  /// Rasterises any marker bitmap this map needs and does not yet have.
-  Future<void> _loadIcons() async {
+  /// Rasterises any marker image this map needs and does not yet have.
+  Future<void> _loadImages() async {
     if (!mounted) return;
     final double dpr = MediaQuery.devicePixelRatioOf(context);
     bool added = false;
 
     for (final ZopiqMapPin pin in widget.pins) {
-      final String name = pin.kind.name;
-      if (_icons.containsKey(name)) continue;
-      final Uint8List bytes = await MapMarkers.forKind(
-        pin.kind,
-        pixelRatio: dpr,
-      );
-      _icons[name] = BytesMapBitmap(bytes, imagePixelRatio: dpr);
-      added = true;
+      _PinImage? image = _images[pin.imageKey];
+      if (image == null) {
+        final MarkerBitmap drawn = await MapMarkers.forPin(
+          pin.kind,
+          pixelRatio: dpr,
+          heading: pin.heading,
+          label: pin.label,
+        );
+        image = _PinImage(
+          icon: BytesMapBitmap(drawn.bytes, imagePixelRatio: dpr),
+          anchor: drawn.anchor,
+        );
+        _images[pin.imageKey] = image;
+        added = true;
+      }
+      // Held per id, not per image, so the next bearing has something to draw
+      // while it rasterises.
+      if (_lastDrawn[pin.id] != image) {
+        _lastDrawn[pin.id] = image;
+        added = true;
+      }
     }
+
+    // Only the images the current pins use are kept. Each one holds a native
+    // bitmap behind its descriptor, and a rider whose bearing and countdown
+    // both move on every fix would otherwise leave one stranded here every
+    // twenty seconds for the whole ride. Nothing is lost by dropping them: the
+    // bytes are still in MapMarkers' cache, and `_lastDrawn` separately holds
+    // the one image per pin the next frame might still need to fall back to.
+    final Set<String> inUse = <String>{
+      for (final ZopiqMapPin pin in widget.pins) pin.imageKey,
+    };
+    _images.removeWhere((String key, _PinImage _) => !inUse.contains(key));
 
     if (added && mounted) setState(() {});
   }
@@ -256,19 +336,32 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
       _drawnAt[e.key] = e.value.at(t);
     }
 
-    final LatLng? follow = widget.followPinId == null
+    final LatLng? follow = !_follow || widget.followPinId == null
         ? null
         : _drawnAt[widget.followPinId];
     if (follow != null && _controller.isCompleted) {
       unawaited(
         _controller.future.then(
-          (GoogleMapController c) => c.moveCamera(CameraUpdate.newLatLng(follow)),
+          (GoogleMapController c) =>
+              c.moveCamera(CameraUpdate.newLatLng(follow)),
         ),
       );
     }
 
     setState(() {});
     if (_mover.value == 1) _moving.clear();
+  }
+
+  /// Where a pin is being drawn right now — mid-glide, not where it was last
+  /// reported.
+  LatLng _positionOf(ZopiqMapPin pin) => _drawnAt[pin.id] ?? pin.position;
+
+  /// The moving one, if this map has one.
+  ZopiqMapPin? get _rider {
+    for (final ZopiqMapPin pin in widget.pins) {
+      if (pin.kind == ZopiqPinKind.rider) return pin;
+    }
+    return null;
   }
 
   /// Every point that has to be visible, so a rider who has wandered off the
@@ -295,69 +388,143 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
     );
   }
 
+  /// Turns following on and jumps to the pin, or turns it off and leaves the
+  /// camera exactly where it is.
+  Future<void> _toggleFollow() async {
+    final String? id = widget.followPinId;
+    if (id == null) return;
+
+    setState(() => _follow = !_follow);
+    if (!_follow) return;
+
+    for (final ZopiqMapPin pin in widget.pins) {
+      if (pin.id != id) continue;
+      final GoogleMapController controller = await _controller.future;
+      await controller.animateCamera(
+        CameraUpdate.newLatLngZoom(_positionOf(pin), 16),
+      );
+      return;
+    }
+  }
+
   Set<Marker> get _markers => widget.pins.map((ZopiqMapPin pin) {
-    final LatLng at = _drawnAt[pin.id] ?? pin.position;
+    final _PinImage? image = _images[pin.imageKey] ?? _lastDrawn[pin.id];
     return Marker(
       markerId: MarkerId(pin.id),
-      position: at,
-      icon: _icons[pin.kind.name] ?? BitmapDescriptor.defaultMarker,
-      anchor: pin.kind.anchor,
+      position: _positionOf(pin),
+      icon: image?.icon ?? BitmapDescriptor.defaultMarker,
+      anchor: image?.anchor ?? const Offset(0.5, 1),
+      // The moving marker sits over the fixed ones, so a rider at the door is
+      // not hidden underneath it.
+      zIndexInt: pin.kind == ZopiqPinKind.rider ? 2 : 1,
       infoWindow: pin.title == null
           ? InfoWindow.noText
           : InfoWindow(title: pin.title),
     );
   }).toSet();
 
+  /// The road: a casing under everything, then behind-the-rider, then ahead.
+  Set<Polyline> _road(List<LatLng> road) {
+    if (road.length < 2) return const <Polyline>{};
+
+    final ZopiqMapPin? rider = _rider;
+    final RouteProgress? progress = rider == null
+        ? null
+        : splitRoute(road, _positionOf(rider));
+
+    return <Polyline>{
+      // A dark outline under the whole road. Without it an orange line over
+      // satellite imagery of an orange rooftop is invisible, and over a pale
+      // basemap it has no edge at all.
+      Polyline(
+        polylineId: const PolylineId('route-casing'),
+        points: road,
+        color: const Color(0xFF1C2230).withValues(alpha: 0.45),
+        width: 11,
+        startCap: Cap.roundCap,
+        endCap: Cap.roundCap,
+        jointType: JointType.round,
+      ),
+      if (progress != null && progress.travelled.length >= 2)
+        Polyline(
+          polylineId: const PolylineId('route-travelled'),
+          points: progress.travelled,
+          color: ZopiqPalette.textMuted,
+          width: 6,
+          startCap: Cap.roundCap,
+          endCap: Cap.buttCap,
+          jointType: JointType.round,
+          zIndex: 1,
+        ),
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: progress?.remaining ?? road,
+        color: ZopiqPalette.primary,
+        width: 6,
+        startCap: Cap.buttCap,
+        endCap: Cap.roundCap,
+        jointType: JointType.round,
+        zIndex: 2,
+      ),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
     final List<LatLng> road = decodePolyline(widget.encodedPolyline);
     final List<LatLng> points = _framed;
+    final bool canFollow = widget.interactive && widget.followPinId != null;
 
     return Stack(
       children: <Widget>[
-        GoogleMap(
-          initialCameraPosition: CameraPosition(
-            // Somewhere sensible for the moment before the fit lands. India's
-            // centre, so a failed fit is never the middle of the ocean.
-            target: points.isEmpty ? const LatLng(21.13, 82.79) : points.first,
-            zoom: 13,
-          ),
-          mapType: _layer.type,
-          padding: widget.padding,
-          myLocationEnabled: widget.showMyLocation,
-          myLocationButtonEnabled: widget.showMyLocation && widget.interactive,
-          // The stock zoom buttons are redundant beside pinch-to-zoom and they
-          // crowd a small map; the gestures they duplicate stay on.
-          zoomControlsEnabled: false,
-          mapToolbarEnabled: false,
-          compassEnabled: widget.interactive,
-          scrollGesturesEnabled: widget.interactive,
-          zoomGesturesEnabled: widget.interactive,
-          rotateGesturesEnabled: widget.interactive,
-          tiltGesturesEnabled: widget.interactive,
-          onTap: widget.onTap == null ? null : (LatLng _) => widget.onTap!(),
-          polylines: road.length < 2
-              ? const <Polyline>{}
-              : <Polyline>{
-                  Polyline(
-                    polylineId: const PolylineId('route'),
-                    points: road,
-                    color: ZopiqPalette.primary,
-                    width: 6,
-                    startCap: Cap.roundCap,
-                    endCap: Cap.roundCap,
-                  ),
-                },
-          markers: _markers,
-          onMapCreated: (GoogleMapController controller) {
-            if (!_controller.isCompleted) _controller.complete(controller);
-            _openingFit();
+        Listener(
+          onPointerDown: (PointerDownEvent e) => _touchStart = e.position,
+          onPointerUp: (PointerUpEvent _) => _touchStart = null,
+          // A drag, not a tap. Twelve logical pixels is about Flutter's own
+          // slop, so tapping a pin to read its label does not silently stop the
+          // camera following the rider.
+          onPointerMove: (PointerMoveEvent e) {
+            final Offset? start = _touchStart;
+            if (!_follow || start == null) return;
+            if ((e.position - start).distance < 12) return;
+            setState(() => _follow = false);
           },
-          // The second and last opening fit — see [_fitAttempts]. Guarded, so
-          // once the route has been framed this stops firing and a reader who
-          // pans away keeps the view they chose.
-          onCameraIdle: _openingFit,
+          child: GoogleMap(
+            initialCameraPosition: CameraPosition(
+              // Somewhere sensible for the moment before the fit lands. India's
+              // centre, so a failed fit is never the middle of the ocean.
+              target: points.isEmpty
+                  ? const LatLng(21.13, 82.79)
+                  : points.first,
+              zoom: 13,
+            ),
+            mapType: _layer.type,
+            padding: widget.padding,
+            myLocationEnabled: widget.showMyLocation,
+            myLocationButtonEnabled:
+                widget.showMyLocation && widget.interactive,
+            // The stock zoom buttons are redundant beside pinch-to-zoom and they
+            // crowd a small map; the gestures they duplicate stay on.
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            compassEnabled: widget.interactive,
+            scrollGesturesEnabled: widget.interactive,
+            zoomGesturesEnabled: widget.interactive,
+            rotateGesturesEnabled: widget.interactive,
+            tiltGesturesEnabled: widget.interactive,
+            onTap: widget.onTap == null ? null : (LatLng _) => widget.onTap!(),
+            polylines: _road(road),
+            markers: _markers,
+            onMapCreated: (GoogleMapController controller) {
+              if (!_controller.isCompleted) _controller.complete(controller);
+              _openingFit();
+            },
+            // The second and last opening fit — see [_fitAttempts]. Guarded, so
+            // once the route has been framed this stops firing and a reader who
+            // pans away keeps the view they chose.
+            onCameraIdle: _openingFit,
+          ),
         ),
         if (widget.showLayerSwitcher)
           Positioned(
@@ -370,16 +537,55 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
                   setState(() => _layer = layer),
             ),
           ),
-        // Only when there is actually a third party's route on the map.
-        if (road.length >= 2)
-          Positioned(
-            right: widget.padding.right + ZopiqSpacing.sm,
-            bottom: widget.padding.bottom + ZopiqSpacing.sm,
-            child: const _RoutingCredit(),
+        Positioned(
+          right: widget.padding.right + ZopiqSpacing.sm,
+          bottom: widget.padding.bottom + ZopiqSpacing.sm,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              if (canFollow)
+                _MapButton(
+                  icon: _follow ? Icons.navigation : Icons.navigation_outlined,
+                  tooltip: _follow ? 'Stop following' : 'Follow your rider',
+                  colour: _follow ? zc.primary : zc.textMuted,
+                  onPressed: _toggleFollow,
+                ),
+              if (widget.interactive && points.isNotEmpty) ...<Widget>[
+                const SizedBox(height: ZopiqSpacing.xs),
+                _MapButton(
+                  icon: Icons.fullscreen,
+                  tooltip: 'Show the whole route',
+                  colour: zc.textMuted,
+                  onPressed: _fit,
+                ),
+              ],
+              // Only when there is actually a third party's route on the map.
+              if (road.length >= 2) ...<Widget>[
+                const SizedBox(height: ZopiqSpacing.xs),
+                const _RoutingCredit(),
+              ],
+            ],
           ),
+        ),
       ],
     );
   }
+}
+
+/// A rasterised marker, ready for the SDK.
+///
+/// The [BitmapDescriptor] is built once when the bytes are and then held,
+/// because a fresh one on every frame is a fresh object on every frame: the
+/// SDK diffs markers by equality, so rebuilding the descriptor in `build`
+/// would make every marker look changed on every tick and push a full marker
+/// update across the platform channel sixty times a second.
+@immutable
+class _PinImage {
+  const _PinImage({required this.icon, required this.anchor});
+
+  final BitmapDescriptor icon;
+  final Offset anchor;
 }
 
 /// One pin's journey between two fixes.
@@ -398,6 +604,37 @@ class _Move {
     from.latitude + (to.latitude - from.latitude) * t,
     from.longitude + (to.longitude - from.longitude) * t,
   );
+}
+
+/// One round control over the map, sized so a thumb can hit it.
+class _MapButton extends StatelessWidget {
+  const _MapButton({
+    required this.icon,
+    required this.tooltip,
+    required this.colour,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final Color colour;
+  final Future<void> Function() onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      elevation: 2,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: IconButton(
+        tooltip: tooltip,
+        iconSize: 20,
+        onPressed: () => unawaited(onPressed()),
+        icon: Icon(icon, color: colour),
+      ),
+    );
+  }
 }
 
 /// "Routing by Ola Maps".
@@ -423,11 +660,7 @@ class _RoutingCredit extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         child: Text(
           'Routing by Ola Maps',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 10,
-            height: 1.4,
-          ),
+          style: TextStyle(color: Colors.white, fontSize: 10, height: 1.4),
         ),
       ),
     );
