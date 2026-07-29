@@ -253,6 +253,275 @@ export const api = {
   /// A real delete, unlike a restaurant or a rider — nothing hangs off a slide.
   deleteHeroSlide: (id: string) =>
     rpc<void>('admin_delete_hero_slide', { p_id: id }),
+
+  /// No argument is the live board — every order that has not ended. An argument
+  /// is a lookup by order id or phone across every status, because the order
+  /// support gets called about is usually one that already ended badly.
+  orders: (query?: string) =>
+    rpc<AdminOrderRow[]>('admin_orders', { p_query: query ?? null }),
+
+  /// Takes the order off its rider and puts it back in the dispatcher's way.
+  /// The order survives. Returns whoever was holding it.
+  releaseDelivery: (orderId: string, reason: string) =>
+    rpc<string>('admin_release_delivery', {
+      p_order_id: orderId,
+      p_reason: reason,
+    }),
+
+  /// Ends the order at any live status. Refused once delivered — that one has an
+  /// invoice behind it and is a refund, not an erasure.
+  cancelOrder: (orderId: string, reason: string) =>
+    rpc<string>('admin_cancel_order', { p_order_id: orderId, p_reason: reason }),
+
+  listCoupons: () => rpc<CouponRow[]>('admin_list_coupons'),
+
+  /// Platform coupons only — it writes `restaurant_id = null` and refuses a code
+  /// in a restaurant's reserved `<id>-…` namespace.
+  saveCoupon: (c: {
+    code: string
+    min_subtotal: number
+    flat_off: number | null
+    percent_off: number | null
+    max_off: number | null
+    valid_until: string | null
+  }) =>
+    rpc<string>('admin_save_coupon', {
+      p_code: c.code,
+      p_min_subtotal: c.min_subtotal,
+      p_flat_off: c.flat_off,
+      p_percent_off: c.percent_off,
+      p_max_off: c.max_off,
+      p_valid_until: c.valid_until,
+    }),
+
+  /// A restaurant's own code can be switched off from here, and only off.
+  setCouponActive: (code: string, active: boolean) =>
+    rpc<void>('admin_set_coupon_active', { p_code: code, p_active: active }),
+
+  /// Only ever succeeds for a platform code no order has carried.
+  deleteCoupon: (code: string) =>
+    rpc<void>('admin_delete_coupon', { p_code: code }),
+
+  broadcastReach: (audience: Audience) =>
+    rpc<number>('admin_broadcast_reach', { p_audience: audience }),
+
+  sendBroadcast: (audience: Audience, title: string, body: string) =>
+    rpc<number>('admin_send_broadcast', {
+      p_audience: audience,
+      p_title: title,
+      p_body: body,
+    }),
+
+  listBroadcasts: () => rpc<BroadcastRow[]>('admin_list_broadcasts'),
+
+  /// Returns a table of exactly one row, like the pay rates do.
+  platformStats: (days: number) =>
+    rpc<PlatformStats[]>('admin_platform_stats', { p_days: days }),
+
+  dailyOrders: (days: number) =>
+    rpc<DailyOrders[]>('admin_daily_orders', { p_days: days }),
+
+  topRestaurants: (days: number, limit = 10) =>
+    rpc<TopRestaurant[]>('admin_top_restaurants', {
+      p_days: days,
+      p_limit: limit,
+    }),
+
+  listSettlements: (status?: 'pending' | 'paid') =>
+    rpc<SettlementRow[]>('admin_list_settlements', { p_status: status ?? null }),
+
+  markSettlementPaid: (id: number, reference: string) =>
+    rpc<void>('admin_mark_settlement_paid', { p_id: id, p_reference: reference }),
+
+  /// The full account number, for whoever is making the transfer.
+  /// `getRestaurant` returns the last four and will keep returning the last four.
+  getRestaurantBank: (id: string) =>
+    rpc<RestaurantBank[]>('admin_get_restaurant_bank', { p_id: id }),
+}
+
+/// The three audiences a `notifications` row can be addressed to.
+export type Audience = 'customer' | 'rider' | 'restaurant'
+
+/// One order on the live board, or one search hit. Everything a support call
+/// needs is on the row — the kitchen, the rider, the offer in flight, the ETA
+/// and the sentence explaining it — so answering "where is my food" is one
+/// round trip. The delivery *codes* are deliberately absent: 0049 put those
+/// beyond every read but one function per identity, and an admin is not one of
+/// those identities.
+export type AdminOrderRow = {
+  order_id: string
+  restaurant_id: string
+  restaurant_name: string
+  status: OrderStatus
+  status_reason: string | null
+  placed_at: string
+  accept_deadline: string
+  ready_by: string | null
+  eta_at: string | null
+  eta_reason: string | null
+  total: number
+  payment_method: 'cod' | 'upi'
+  coupon_code: string | null
+  delivery_to: string
+  customer_phone: string
+  route_km: number | null
+  rider_email: string | null
+  rider_name: string | null
+  rider_phone: string | null
+  rider_vehicle: Vehicle | null
+  delivery_state: DeliveryState | null
+  claimed_at: string | null
+  /// A rider currently deciding on this order. Mutually exclusive with a rider
+  /// holding it — the dispatcher will not offer an order that has a delivery.
+  offer_to: string | null
+  offer_expires_at: string | null
+}
+
+export type OrderStatus =
+  | 'placed'
+  | 'accepted'
+  | 'preparing'
+  | 'ready_for_pickup'
+  | 'out_for_delivery'
+  | 'delivered'
+  | 'rejected'
+  | 'cancelled'
+
+export type DeliveryState =
+  | 'claimed'
+  | 'arrived_at_restaurant'
+  | 'picked_up'
+  | 'arrived_at_customer'
+  | 'delivered'
+  | 'cancelled'
+
+/// What the board calls each status. The wire values are the database's and are
+/// never shown raw — `ready_for_pickup` is not a sentence anybody says.
+export const STATUS_LABEL: Record<OrderStatus, string> = {
+  placed: 'Awaiting accept',
+  accepted: 'Accepted',
+  preparing: 'Cooking',
+  ready_for_pickup: 'On the shelf',
+  out_for_delivery: 'On the way',
+  delivered: 'Delivered',
+  rejected: 'Rejected',
+  cancelled: 'Cancelled',
+}
+
+export const DELIVERY_LABEL: Record<DeliveryState, string> = {
+  claimed: 'heading to the kitchen',
+  arrived_at_restaurant: 'at the counter',
+  picked_up: 'carrying',
+  arrived_at_customer: 'at the door',
+  delivered: 'delivered',
+  cancelled: 'released',
+}
+
+/// A coupon as the console lists it. `restaurant_id` null is a platform code —
+/// the only kind this screen can create or edit. A restaurant's own offer is
+/// here to be *seen* (and, if it has to be, switched off), which is what makes
+/// "why was this order ₹200 off" answerable.
+export type CouponRow = {
+  code: string
+  restaurant_id: string | null
+  restaurant_name: string | null
+  min_subtotal: number
+  flat_off: number | null
+  percent_off: number | null
+  max_off: number | null
+  valid_until: string | null
+  is_active: boolean
+  created_at: string
+  redeemed: number
+  discount_given: number
+}
+
+/// What a coupon is doing right now — the same three fields `validate_coupon`
+/// reads, so the pill and the checkout can never disagree.
+export type CouponState = 'live' | 'off' | 'expired'
+
+export function couponStateOf(c: CouponRow, now = Date.now()): CouponState {
+  if (c.valid_until && Date.parse(c.valid_until) <= now) return 'expired'
+  return c.is_active ? 'live' : 'off'
+}
+
+/// One message sent to everybody in an audience. The row exists so a broadcast
+/// leaves a mark: it is the most public thing this console can do and it has no
+/// undo.
+export type BroadcastRow = {
+  id: number
+  audience: Audience
+  title: string
+  body: string | null
+  recipient_count: number
+  sent_by: string
+  created_at: string
+}
+
+/// The platform's own numbers, derived on every call. There is no rollup table
+/// and there should not be one at this volume — a stored figure is a figure that
+/// can be wrong.
+export type PlatformStats = {
+  days: number
+  orders_placed: number
+  orders_delivered: number
+  orders_cancelled: number
+  orders_rejected: number
+  /// Delivered orders only. A placed-then-cancelled order is not revenue.
+  gmv: number
+  /// The platform's cut, on `subtotal` — never on tax or the delivery fee.
+  commission: number
+  discount_given: number
+  avg_order: number
+  live_orders: number
+  restaurants_live: number
+  riders_active: number
+  riders_carrying: number
+  customers_ordering: number
+}
+
+export type DailyOrders = {
+  day: string
+  placed: number
+  delivered: number
+  cancelled: number
+  gmv: number
+}
+
+export type TopRestaurant = {
+  restaurant_id: string
+  name: string
+  orders: number
+  gmv: number
+  rating: number
+  rating_count: number
+}
+
+/// One week's trade for one restaurant (migration 0017), rolled up every Monday
+/// by `run_settlement_batch`. Nothing in the console creates one.
+export type SettlementRow = {
+  id: number
+  restaurant_id: string
+  restaurant_name: string
+  period_start: string
+  period_end: string
+  order_count: number
+  gross_sales: number
+  commission: number
+  net_payable: number
+  status: 'pending' | 'paid'
+  reference: string | null
+  has_bank: boolean
+  paid_at: string | null
+}
+
+export type RestaurantBank = {
+  account_holder: string | null
+  account_number: string | null
+  ifsc: string | null
+  bank_name: string | null
+  verified: boolean
+  updated_at: string
 }
 
 /// One campaign slide on the customer home hero (migration 0053).

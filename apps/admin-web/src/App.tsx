@@ -8,6 +8,11 @@ import { RidersPage } from './riders/RidersPage'
 import { HeroSlidesPage } from './content/HeroSlidesPage'
 import { PayoutsPage } from './payouts/PayoutsPage'
 import { SettingsPage } from './settings/SettingsPage'
+import { LiveOrdersPage } from './orders/LiveOrdersPage'
+import { AnalyticsPage } from './analytics/AnalyticsPage'
+import { CouponsPage } from './coupons/CouponsPage'
+import { BroadcastPage } from './broadcast/BroadcastPage'
+import { SettlementsPage } from './settlements/SettlementsPage'
 
 export default function App() {
   const { loading, session, isAdmin, email, signOut } = useSession()
@@ -27,7 +32,12 @@ export default function App() {
     <BrowserRouter>
       <AppShell>
         <Routes>
-          <Route path="/" element={<RestaurantsPage />} />
+          {/* The floor, not the filing cabinet. Onboarding a restaurant is a
+              thing somebody does once; an order going wrong is happening now,
+              so B7 moved the landing screen to the live board and left
+              Restaurants where it was, one click away. */}
+          <Route path="/" element={<LiveOrdersPage />} />
+          <Route path="/restaurants" element={<RestaurantsPage />} />
           {/* Keyed so switching from an existing restaurant to /new remounts the
               wizard — otherwise React keeps the old form state and the new draft
               starts life pre-filled with someone else's restaurant. */}
@@ -35,6 +45,10 @@ export default function App() {
           <Route path="/restaurants/:id" element={<WizardPage key="edit" />} />
           <Route path="/riders" element={<RidersPage />} />
           <Route path="/hero" element={<HeroSlidesPage />} />
+          <Route path="/coupons" element={<CouponsPage />} />
+          <Route path="/broadcast" element={<BroadcastPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/settlements" element={<SettlementsPage />} />
           <Route path="/payouts" element={<PayoutsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

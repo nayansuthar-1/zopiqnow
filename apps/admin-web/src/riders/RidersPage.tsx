@@ -265,7 +265,7 @@ export function RidersPage() {
                       onClick={() => setDeactivating(r)}
                       title={
                         r.live_order_id
-                          ? `They are carrying ${r.live_order_id}. They must drop it in the rider app first.`
+                          ? `They are carrying ${r.live_order_id}. Release it from Live orders first — that works even if they have stopped answering.`
                           : undefined
                       }
                       className="text-sm font-medium text-ink-muted hover:text-non-veg disabled:opacity-40 disabled:hover:text-ink-muted"

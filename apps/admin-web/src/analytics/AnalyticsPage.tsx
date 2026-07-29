@@ -1,0 +1,276 @@
+import { useCallback, useEffect, useState } from 'react'
+import { api } from '../lib/api'
+import type { DailyOrders, PlatformStats, TopRestaurant } from '../lib/api'
+import { PageHeader } from '../ui/AppShell'
+
+/// The platform's own numbers. The vendor app has had a restaurant's since
+/// migration 0017; nobody has ever been able to ask how the whole thing is
+/// doing, which is a strange thing to be unable to ask from the platform's own
+/// console.
+///
+/// Everything is derived on every call — there is no rollup table and there
+/// should not be one at this volume. 0062's argument about `restaurants.rating`
+/// holds for a dashboard too: a figure somebody stores is a figure that can be
+/// wrong, and the only tile here that cannot lie is one computed from the rows
+/// underneath it every time it is drawn.
+///
+/// **The chart is drawn, not plotted.** An SVG polyline over `admin_daily_orders`
+/// is about thirty lines; a charting library is a new dependency, and Rule 4
+/// makes that an explicit request, not a convenience.
+
+const RANGES = [7, 30, 90] as const
+
+function inr(n: number) {
+  return `₹${n.toLocaleString('en-IN')}`
+}
+
+export function AnalyticsPage() {
+  const [days, setDays] = useState<number>(30)
+  const [stats, setStats] = useState<PlatformStats | null>(null)
+  const [series, setSeries] = useState<DailyOrders[] | null>(null)
+  const [top, setTop] = useState<TopRestaurant[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async (d: number) => {
+    try {
+      const [s, series, t] = await Promise.all([
+        api.platformStats(d),
+        api.dailyOrders(d),
+        api.topRestaurants(d, 10),
+      ])
+      setStats(s[0] ?? null)
+      setSeries(series)
+      setTop(t)
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }, [])
+
+  useEffect(() => {
+    void load(days)
+  }, [load, days])
+
+  return (
+    <>
+      <PageHeader
+        title="Platform"
+        subtitle={
+          stats
+            ? `${stats.live_orders} order${stats.live_orders === 1 ? '' : 's'} open right now · ${stats.riders_carrying} rider${stats.riders_carrying === 1 ? '' : 's'} on the road`
+            : 'Everything, across every restaurant.'
+        }
+      />
+
+      <div className="space-y-6 p-6">
+        {error && (
+          <p className="max-w-2xl rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
+            {error}
+          </p>
+        )}
+
+        <div className="flex gap-1">
+          {RANGES.map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setDays(d)}
+              className={`rounded-[8px] px-3 py-1.5 text-sm font-medium transition-colors ${
+                days === d
+                  ? 'bg-brand-soft text-brand-deep'
+                  : 'text-ink-muted hover:bg-canvas hover:text-ink'
+              }`}
+            >
+              Last {d} days
+            </button>
+          ))}
+        </div>
+
+        {stats === null ? (
+          <p className="text-sm text-ink-muted">Loading…</p>
+        ) : (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Tile
+                label="Delivered"
+                value={String(stats.orders_delivered)}
+                sub={`of ${stats.orders_placed} placed`}
+              />
+              <Tile
+                label="GMV"
+                value={inr(stats.gmv)}
+                sub="delivered orders only"
+              />
+              <Tile
+                label="Commission"
+                value={inr(stats.commission)}
+                sub="on subtotal, never on tax or delivery"
+              />
+              <Tile
+                label="Average order"
+                value={inr(stats.avg_order)}
+                sub={`${stats.customers_ordering} customer${stats.customers_ordering === 1 ? '' : 's'} ordered`}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Tile
+                label="Cancelled"
+                value={String(stats.orders_cancelled)}
+                sub={
+                  stats.orders_placed > 0
+                    ? `${Math.round((stats.orders_cancelled / stats.orders_placed) * 100)}% of orders placed`
+                    : 'nothing placed'
+                }
+              />
+              <Tile
+                label="Rejected by kitchens"
+                value={String(stats.orders_rejected)}
+                sub="includes the 5-minute auto-timeout"
+              />
+              <Tile
+                label="Discount given"
+                value={inr(stats.discount_given)}
+                sub="coupons, on delivered orders"
+              />
+              <Tile
+                label="Taking orders"
+                value={`${stats.restaurants_live} kitchens`}
+                sub={`${stats.riders_active} rider${stats.riders_active === 1 ? '' : 's'} on the roster`}
+              />
+            </div>
+
+            {series && series.length > 1 && <Chart series={series} />}
+
+            <section>
+              <h2 className="text-base font-bold text-ink">
+                Busiest restaurants
+              </h2>
+              <p className="mt-0.5 mb-3 text-sm text-ink-muted">
+                By delivered value over the last {days} days.
+              </p>
+              {top === null || top.length === 0 ? (
+                <p className="text-sm text-ink-muted">
+                  Nothing delivered in this window.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
+                  <table className="w-full min-w-[560px] text-sm">
+                    <thead className="border-b border-line text-left text-ink-muted">
+                      <tr>
+                        <th className="px-5 py-3 font-medium">Restaurant</th>
+                        <th className="px-5 py-3 text-right font-medium">
+                          Orders
+                        </th>
+                        <th className="px-5 py-3 text-right font-medium">
+                          Delivered value
+                        </th>
+                        <th className="px-5 py-3 text-right font-medium">
+                          Rating
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                      {top.map((r) => (
+                        <tr key={r.restaurant_id}>
+                          <td className="px-5 py-3 font-medium text-ink">
+                            {r.name}
+                          </td>
+                          <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
+                            {r.orders}
+                          </td>
+                          <td className="px-5 py-3 text-right font-semibold tabular-nums text-ink">
+                            {inr(r.gmv)}
+                          </td>
+                          <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
+                            {r.rating.toFixed(1)} ★
+                            <span className="ml-1">({r.rating_count})</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </>
+        )}
+      </div>
+    </>
+  )
+}
+
+function Tile({
+  label,
+  value,
+  sub,
+}: {
+  label: string
+  value: string
+  sub: string
+}) {
+  return (
+    <div className="rounded-[12px] border border-line bg-white p-5">
+      <p className="text-xs font-medium tracking-wide text-ink-muted uppercase">
+        {label}
+      </p>
+      <p className="mt-1.5 text-2xl font-bold tabular-nums text-ink">{value}</p>
+      <p className="mt-0.5 text-sm text-ink-muted">{sub}</p>
+    </div>
+  )
+}
+
+/// Delivered orders per day. `admin_daily_orders` fills the quiet days in with
+/// zeroes rather than dropping them, so the line has the shape of the week and
+/// not the shape of the days that happened to have trade.
+function Chart({ series }: { series: DailyOrders[] }) {
+  const W = 800
+  const H = 180
+  const PAD = 8
+
+  const peak = Math.max(1, ...series.map((d) => d.placed))
+  const x = (i: number) => PAD + (i * (W - PAD * 2)) / (series.length - 1)
+  const y = (v: number) => H - PAD - (v / peak) * (H - PAD * 2)
+
+  const line = series.map((d, i) => `${x(i)},${y(d.delivered)}`).join(' ')
+  const area = `${PAD},${H - PAD} ${series
+    .map((d, i) => `${x(i)},${y(d.placed)}`)
+    .join(' ')} ${W - PAD},${H - PAD}`
+
+  const first = series[0]
+  const last = series[series.length - 1]
+  const label = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+
+  return (
+    <section>
+      <h2 className="text-base font-bold text-ink">Orders a day</h2>
+      <p className="mt-0.5 mb-3 text-sm text-ink-muted">
+        Placed in the tint, delivered on the line. Peak {peak} in a day.
+      </p>
+      <div className="rounded-[12px] border border-line bg-white p-5">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          className="h-44 w-full"
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={`Orders per day from ${label(first.day)} to ${label(last.day)}`}
+        >
+          <polygon points={area} fill="var(--color-brand-soft)" />
+          <polyline
+            points={line}
+            fill="none"
+            stroke="var(--color-brand)"
+            strokeWidth="2"
+            vectorEffect="non-scaling-stroke"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <div className="mt-2 flex justify-between text-xs text-ink-muted">
+          <span>{label(first.day)}</span>
+          <span>{label(last.day)}</span>
+        </div>
+      </div>
+    </section>
+  )
+}

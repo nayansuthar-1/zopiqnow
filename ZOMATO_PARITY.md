@@ -303,13 +303,99 @@ reading the migration back.
 
 ---
 
-### B7 — Admin panel completion
-- [ ] Live order monitoring (every open order, its status, its rider)
-- [ ] Coupon management
-- [ ] Push notification panel
-- [ ] Platform analytics dashboard (vendor-scoped analytics exists; platform-wide does not)
-- [ ] Vendor settlement reports (rider payouts page exists; the vendor side is vendor-only)
-- [ ] Admin force-abandon / support override — the known structural gap from 8b-4
+### B7 — Admin panel completion ✅ **DONE 2026-07-29** (migration 0066)
+Everything the console could do until now was *setup* — onboard a restaurant, add a
+rider, write a hero slide, settle last week's rider pay. None of it was about today.
+An order going wrong right now was invisible to ops, and the only lever anybody had
+over it was a `psql` prompt.
+
+- [x] **Live order monitoring** — every open order, oldest first, with the kitchen, the
+      rider and what they are doing, the offer in flight and its countdown, the ETA and
+      the sentence explaining it. `/` is this screen now; Restaurants moved to
+      `/restaurants`, one click away
+- [x] **Coupon management** — platform codes are writable at last (they have been seed
+      data since 0003), restaurant offers are listed read-only beside them
+- [x] **Push notification panel** — one message to an audience, the reach shown as a
+      number *before* the send, and every send recorded in `broadcasts`
+- [x] **Platform analytics** — orders, GMV, commission, discount, cancellation rate,
+      what is live right now, a daily chart and the busiest kitchens
+- [x] **Vendor settlement reports** — `settlements` has been rolled up every Monday
+      since 0017 and read by nobody but the vendor. Same shape as rider payouts, down
+      to the mandatory UTR
+- [x] **Admin force-abandon / support override** — the gap 8b-4 named and would not
+      guess the shape of
+
+**The override is two levers, not one.** 8b-4 left this open because *"inventing its
+shape here would be guessing"*. The shape it took: **release** takes the order off its
+rider and puts it back on the shelf, and **cancel** ends it. A rider who has gone dark
+and an order that has to be called off are different problems, and one button would
+have had to guess which was happening. Both refuse a blank reason — an override is the
+one action in this system with no predicate behind it, allowed because a person said
+so, and the sentence is the only thing that makes it auditable afterwards. A cancel
+is refused once an order is `delivered`: 0063 issued an invoice out of a gapless
+series, and cancelling behind it would leave a statutory document describing a supply
+that never happened. That case is a refund (B2b) — a second document, not the erasure
+of the first.
+
+**Release puts an `out_for_delivery` order back to `ready_for_pickup`**, because
+`dispatch_deliveries` only looks at `preparing` and `ready_for_pickup` and would
+otherwise never come looking. `ready_for_pickup` and not `preparing` because that is
+what is true — the food was cooked and packed. Whether it needs cooking *again*, the
+released rider still having the bag, is a judgement about the real world that no
+predicate can make, so the kitchen is told and decides.
+
+**The bug this phase existed to find.** 0040 promised a rider could not be switched
+off while carrying an order, and checked `state in ('claimed','picked_up')` — the whole
+set on 2026-07-22, and two-thirds of it since 0049 added `arrived_at_restaurant` and
+`arrived_at_customer`. For five phases a rider standing at the customer's door read to
+the console as free and the switch that was meant to be refused was offered. Both
+functions now say it negatively: a delivery is live unless it is `delivered` or
+`cancelled`. **A positive list of live states goes stale the next time somebody adds
+one; the negative list cannot.**
+
+**And what fixing it uncovered.** A `deliveries` row sitting at `arrived_at_customer`
+under an order that reached `delivered` by some other route back in B1 — a job that
+ended and never closed its own row. Invisible under the old list; under a corrected
+list *and nothing else* it would have pinned its rider to the roster as permanently
+carrying and refused every attempt to switch them off, for ever. So "live" is the
+conjunction it always meant: this delivery has not ended **and** the order it belongs
+to has not either. True of every orphan, not just the one that exists today. The row
+itself is left where it is — closing it would move it into the next Monday's payout
+batch, and **paying somebody is not a data repair**.
+
+**The console polls, and says so.** Every other live surface here is on Realtime, which
+this screen cannot use: `orders` grants an admin no read at all, `admin_orders` is a
+`security definer` function, and a function cannot be subscribed to. An admin policy on
+`orders` would buy a socket at the cost of the console's one structural guarantee —
+that it reaches the database through named functions and nothing else. Fifteen seconds,
+a visible clock, a refresh button. An ops screen at a desk can afford to be a
+quarter-minute behind; it cannot afford to be the reason a table got a read policy.
+
+**A broadcast is not a new mechanism.** 0047 built one path from a `notifications` row
+to a phone; a broadcast is that path walked many times, one row per recipient, because
+an inbox belongs to a person and a shared row would have no owner and no read receipt.
+It is the most public thing the console can do and it has no undo, so: the reach is a
+number on screen before the send, the send needs a second click against that number,
+and the database refuses the identical message twice inside five minutes — which is the
+realistic accident, not a wrong audience.
+
+**A coupon bug the edge-case run caught before it shipped.** The first cut of
+`admin_save_coupon` copied 0064's normalisation, which strips everything but letters
+and digits. But a vendor code *is* `<restaurant id>-<suffix>` — the hyphen is
+structural — so `R1-SUMMER` normalised to `R1SUMMER`, a code that does not exist, which
+the ownership check therefore could not see, and which was cheerfully created as a new
+platform coupon. Hyphens survive the strip now, and the reserved prefix is stated out
+loud rather than left implied: `<restaurant id>-…` belongs to that kitchen whether or
+not a code is there yet.
+
+**28 edge cases, run against the live database in a rolled-back transaction**, and
+three of the first failures were the *test* being wrong rather than the code — RLS
+hiding `coupons`, `orders` and `notifications` rows from an `authenticated` reader
+exactly as designed, and `delivery_codes` refusing the read outright (0049). Every
+refusal read back as a sentence; all 18 functions refused a signed-in non-admin with
+"You are not a Zopiqnow admin."; `anon` can reach none of them; `broadcasts` arrived
+with RLS on, no policies and no grants (0061's lesson, applied without having to learn
+it again); and no overload was created (0051's).
 
 ---
 
