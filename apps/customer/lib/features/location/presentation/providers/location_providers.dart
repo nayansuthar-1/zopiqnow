@@ -96,6 +96,7 @@ class AddressBookController extends Notifier<bool> {
     required double latitude,
     required double longitude,
     String? label,
+    String? deliveryNotes,
   }) => _write(
     () => ref
         .read(addressRepositoryProvider)
@@ -105,6 +106,7 @@ class AddressBookController extends Notifier<bool> {
           latitude: latitude,
           longitude: longitude,
           label: label,
+          deliveryNotes: deliveryNotes,
         ),
   );
 

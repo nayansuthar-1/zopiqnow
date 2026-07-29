@@ -16,6 +16,7 @@ import 'package:zopiqnow/features/checkout/domain/gateways/payment_gateway.dart'
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
 import 'package:zopiqnow/features/checkout/presentation/gateways/mock_payment_gateway.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 
 /// Data source binding — Postgres, as of Step 7. Tests override it with
 /// [OrderMockDataSource] to drop the network.
@@ -165,6 +166,9 @@ class CheckoutController extends Notifier<CheckoutState> {
             // call, made again against the subtotal the service computes.
             couponCode: state.coupon?.code,
             paymentId: paymentId,
+            // Read here rather than passed in: the note is checkout's own state,
+            // and the button that calls this already has enough arguments.
+            deliveryNotes: ref.read(deliveryNotesProvider),
           );
       ref.read(lastPlacedOrderProvider.notifier).record(order);
       // Clearing the cart also resets this notifier (build watches subtotal).
@@ -184,6 +188,34 @@ final NotifierProvider<CheckoutController, CheckoutState>
 checkoutControllerProvider = NotifierProvider<CheckoutController, CheckoutState>(
   CheckoutController.new,
 );
+
+/// What the rider will be told about this door, for *this* order.
+///
+/// Deliberately not a field of [CheckoutState]: that notifier rebuilds whenever
+/// the cart's subtotal changes, because an applied coupon was validated against
+/// a subtotal and goes stale with it. A note is not priced and does not go
+/// stale — losing "gate 2, blue building" because somebody added a drink would
+/// be a small daily insult.
+///
+/// It starts as whatever is saved on the selected address, so the common case is
+/// typed once and never again, and switching address picks up that address's own
+/// note. Overriding it here changes tonight's order and not the address book:
+/// "the lift is out today" is not a fact about where you live.
+class DeliveryNotesController extends Notifier<String?> {
+  @override
+  String? build() =>
+      ref.watch(selectedAddressProvider)?.deliveryNotes;
+
+  void set(String? notes) {
+    final String trimmed = (notes ?? '').trim();
+    state = trimmed.isEmpty ? null : trimmed;
+  }
+}
+
+final NotifierProvider<DeliveryNotesController, String?> deliveryNotesProvider =
+    NotifierProvider<DeliveryNotesController, String?>(
+      DeliveryNotesController.new,
+    );
 
 /// Codes the checkout screen advertises. Empty on failure — a missing hint must
 /// never take checkout down.

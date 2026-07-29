@@ -193,6 +193,58 @@ class DeliveryOffer {
   bool isExpired(DateTime now) => !expiresAt.isAfter(now);
 }
 
+/// One line of the thread with the customer waiting for this job (0061).
+///
+/// The customer app has the same class from the other side, and the only
+/// difference between them is which value of `sender` counts as "mine". That
+/// question is answered at parse time so the bubble never has to ask it.
+@immutable
+class JobMessage {
+  const JobMessage({
+    required this.id,
+    required this.isMine,
+    required this.body,
+    required this.sentAt,
+    required this.isRead,
+  });
+
+  factory JobMessage.fromJson(Map<String, dynamic> json) => JobMessage(
+    id: (json['id'] as num).toInt(),
+    isMine: json['sender'] == 'rider',
+    body: json['body'] as String,
+    sentAt: DateTime.parse(json['created_at'] as String).toLocal(),
+    isRead: json['read_at'] != null,
+  );
+
+  final int id;
+  final bool isMine;
+  final String body;
+  final DateTime sentAt;
+
+  /// Whether the customer has opened the thread since this arrived. Only
+  /// meaningful on a line of the rider's own.
+  final bool isRead;
+}
+
+/// One sentence this rider may send, as the database words it.
+///
+/// Fetched rather than written here, and that is the point: 0061 owns the
+/// wording, so the chip says exactly what will be stored. A second copy of the
+/// list in this app is a list that will one day disagree with the one that
+/// actually gets sent.
+@immutable
+class CannedMessage {
+  const CannedMessage({required this.code, required this.body});
+
+  factory CannedMessage.fromJson(Map<String, dynamic> json) => CannedMessage(
+    code: json['code'] as String,
+    body: json['body'] as String,
+  );
+
+  final String code;
+  final String body;
+}
+
 /// One day's work, as `rider_earnings` counts it (migration 0043).
 ///
 /// Only delivered jobs are in here. A job in hand has not been earned yet, and
@@ -282,9 +334,11 @@ class Job {
     required this.restaurantName,
     required this.restaurantLat,
     required this.restaurantLng,
+    required this.restaurantPhone,
     required this.deliverTo,
     required this.deliverLat,
     required this.deliverLng,
+    required this.deliveryNotes,
     required this.customerPhone,
     // Optional, unlike its neighbours: it is genuinely absent on most jobs
     // until the route lookup lands, and defaulting it keeps every existing
@@ -309,9 +363,11 @@ class Job {
     restaurantName: json['restaurant_name'] as String? ?? 'Restaurant',
     restaurantLat: (json['restaurant_lat'] as num?)?.toDouble(),
     restaurantLng: (json['restaurant_lng'] as num?)?.toDouble(),
+    restaurantPhone: json['restaurant_phone'] as String?,
     deliverTo: json['deliver_to'] as String? ?? '',
     deliverLat: (json['deliver_lat'] as num?)?.toDouble(),
     deliverLng: (json['deliver_lng'] as num?)?.toDouble(),
+    deliveryNotes: json['delivery_notes'] as String?,
     customerPhone: json['customer_phone'] as String? ?? '',
     routePolyline: json['route_polyline'] as String?,
     total: json['total'] as int? ?? 0,
@@ -352,6 +408,19 @@ class Job {
   final double? deliverLat;
   final double? deliverLng;
 
+  /// The kitchen's own number (0027, handed over by `my_deliveries` since 0061).
+  /// Null on every seeded restaurant and on any an admin has not filled in — and
+  /// a null here means no Call button rather than a dialler opening on nothing.
+  /// The one question it answers is the one a rider asks at a counter with
+  /// nobody behind it: *is anyone making this?*
+  final String? restaurantPhone;
+
+  /// What the customer said about their own front door — "gate 2, blue
+  /// building". Null when they said nothing, and withheld once the job is
+  /// delivered, exactly as [customerPhone] is: the note describes where somebody
+  /// lives, and the job is over.
+  final String? deliveryNotes;
+
   /// Where this job is going *right now* — the kitchen until it is collected,
   /// the customer after. The one question a navigation button has to answer,
   /// and answering it from [state] means the rider never picks the wrong end.
@@ -364,6 +433,17 @@ class Job {
   double? get targetLat => isCarrying ? deliverLat : restaurantLat;
   double? get targetLng => isCarrying ? deliverLng : restaurantLng;
   String get targetLabel => isCarrying ? deliverTo : restaurantName;
+
+  /// Who the Call button rings, which is whichever end of the ride the rider is
+  /// at — the same rule the map pin follows, so the two can never point at
+  /// different people. Null when that end has no number on file, and the button
+  /// is then absent rather than dead.
+  String? get targetPhone => isCarrying
+      ? (customerPhone.isEmpty ? null : customerPhone)
+      : restaurantPhone;
+
+  /// What to call them, for the button's label and its confirmation.
+  String get targetWho => isCarrying ? 'Customer' : 'Restaurant';
   final int total;
   final bool isCash;
 

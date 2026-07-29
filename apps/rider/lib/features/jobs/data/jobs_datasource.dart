@@ -79,6 +79,28 @@ abstract interface class JobsDataSource {
 
   /// This rider's weekly pay batches, newest first.
   Future<List<Payout>> fetchPayouts();
+
+  /// The sentences this rider may send, in the order to show them (0061).
+  ///
+  /// The role is not passed: `order_message_menu` derives it from the caller, so
+  /// a rider asking for the list gets the rider's half of it and could not ask
+  /// for the customer's.
+  Future<List<CannedMessage>> fetchMessageMenu();
+
+  /// The thread on a job, now and as either side adds to it.
+  ///
+  /// The one `.stream()` in this file, and the one place a rider reads a table
+  /// rather than calling a function — `order_messages` has a policy scoped to
+  /// the jobs this rider holds, which is the same guarantee an RPC would give
+  /// and the only shape a subscription can take.
+  Stream<List<JobMessage>> watchMessages(String orderId);
+
+  /// Says one of [fetchMessageMenu]'s lines. Throws [JobFailure] with the
+  /// database's own sentence when it refuses.
+  Future<void> sendMessage({required String orderId, required String code});
+
+  /// Marks the customer's lines seen. Never throws.
+  Future<void> markMessagesRead(String orderId);
 }
 
 /// A call the database refused — a rule in 0025 (`P0001`: somebody else claimed
@@ -323,6 +345,65 @@ class JobsSupabaseDataSource implements JobsDataSource {
               .order('period_end', ascending: false),
         );
     return rows.map(Payout.fromJson).toList(growable: false);
+  }
+
+  @override
+  Future<List<CannedMessage>> fetchMessageMenu() async {
+    final List<dynamic> rows = await _guard<List<dynamic>>(
+      () => _db.rpc<List<dynamic>>('order_message_menu'),
+    );
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map(CannedMessage.fromJson)
+        .toList(growable: false);
+  }
+
+  /// The second table read in this file, and for the same reason as
+  /// [fetchPayouts]: `order_messages` has a select policy scoped to the jobs
+  /// this rider actually holds (0061), and a function wrapping it would enforce
+  /// nothing the policy does not. Writes are still an RPC — the policy set
+  /// grants `select` and nothing else, so a message can only be said through
+  /// `send_order_message`, which is what makes "canned" mean anything.
+  @override
+  Stream<List<JobMessage>> watchMessages(String orderId) {
+    return _db
+        .from('order_messages')
+        .stream(primaryKey: const <String>['id'])
+        .eq('order_id', orderId)
+        .order('created_at', ascending: true)
+        .map(
+          (List<Map<String, dynamic>> rows) =>
+              rows.map(JobMessage.fromJson).toList(growable: false),
+        );
+  }
+
+  @override
+  Future<void> sendMessage({
+    required String orderId,
+    required String code,
+  }) async {
+    // `int`, not `void`: the function returns the new message's id, and asking
+    // the client to decode a bigint as void is how a successful send comes back
+    // as a type error.
+    await _guard<int>(
+      () => _db.rpc<int>(
+        'send_order_message',
+        params: <String, dynamic>{'p_order_id': orderId, 'p_code': code},
+      ),
+    );
+  }
+
+  @override
+  Future<void> markMessagesRead(String orderId) async {
+    try {
+      await _db.rpc<void>(
+        'mark_order_messages_read',
+        params: <String, dynamic>{'p_order_id': orderId},
+      );
+    } on PostgrestException {
+      // A read receipt nobody got. There is nothing a rider on a bike could do
+      // about it, and nothing worth a snackbar.
+    }
   }
 
   static String _asDate(DateTime d) =>

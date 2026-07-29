@@ -37,6 +37,7 @@ class _AddressFormPageState extends ConsumerState<AddressFormPage> {
   late final TextEditingController _line1;
   late final TextEditingController _city;
   late final TextEditingController _label;
+  late final TextEditingController _notes;
 
   /// The point we hold, and the text it describes. Kept together because the
   /// pair is the whole question: a point is only valid for the text it came from.
@@ -53,6 +54,7 @@ class _AddressFormPageState extends ConsumerState<AddressFormPage> {
     _line1 = TextEditingController(text: existing?.line1 ?? '');
     _city = TextEditingController(text: existing?.city ?? '');
     _label = TextEditingController(text: existing?.label ?? '');
+    _notes = TextEditingController(text: existing?.deliveryNotes ?? '');
     if (existing != null) {
       _point = GeoPoint(existing.latitude, existing.longitude);
       _pointText = _query(existing.line1, existing.city);
@@ -64,6 +66,7 @@ class _AddressFormPageState extends ConsumerState<AddressFormPage> {
     _line1.dispose();
     _city.dispose();
     _label.dispose();
+    _notes.dispose();
     super.dispose();
   }
 
@@ -115,6 +118,7 @@ class _AddressFormPageState extends ConsumerState<AddressFormPage> {
     final String line1 = _line1.text.trim();
     final String city = _city.text.trim();
     final String label = _label.text.trim();
+    final String notes = _notes.text.trim();
 
     if (line1.isEmpty) {
       setState(() => _error = 'Add the flat, building, or street.');
@@ -146,6 +150,7 @@ class _AddressFormPageState extends ConsumerState<AddressFormPage> {
           latitude: point.latitude,
           longitude: point.longitude,
           label: label.isEmpty ? null : label,
+          deliveryNotes: notes.isEmpty ? null : notes,
         );
       } else {
         await book.update(
@@ -156,6 +161,7 @@ class _AddressFormPageState extends ConsumerState<AddressFormPage> {
             city: city,
             latitude: point.latitude,
             longitude: point.longitude,
+            deliveryNotes: notes.isEmpty ? null : notes,
           ),
         );
       }
@@ -206,6 +212,18 @@ class _AddressFormPageState extends ConsumerState<AddressFormPage> {
             label: 'Save as (optional)',
             hint: 'Home, Work, Mum\'s place',
           ),
+          const SizedBox(height: ZopiqSpacing.md),
+          // Typed once and reused on every order to this door — checkout
+          // prefills it and still lets tonight's order say something different.
+          // Capped where the column is (0061): a note a rider does not read at
+          // the gate is worse than no note.
+          _Field(
+            controller: _notes,
+            label: 'Note for the rider (optional)',
+            hint: 'Gate 2, blue building. Ring twice.',
+            maxLength: 160,
+            capitalizeSentences: true,
+          ),
 
           if (_error != null) ...<Widget>[
             const SizedBox(height: ZopiqSpacing.md),
@@ -231,6 +249,8 @@ class _Field extends StatelessWidget {
     required this.label,
     required this.hint,
     this.autofocus = false,
+    this.maxLength,
+    this.capitalizeSentences = false,
   });
 
   final TextEditingController controller;
@@ -238,12 +258,23 @@ class _Field extends StatelessWidget {
   final String hint;
   final bool autofocus;
 
+  /// Set only on the rider note, where the column has a limit (0061) and the
+  /// counter is the honest way to show it.
+  final int? maxLength;
+
+  /// A note is a sentence; an address line is a set of proper nouns.
+  final bool capitalizeSentences;
+
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       autofocus: autofocus,
-      textCapitalization: TextCapitalization.words,
+      maxLength: maxLength,
+      maxLines: capitalizeSentences ? 2 : 1,
+      textCapitalization: capitalizeSentences
+          ? TextCapitalization.sentences
+          : TextCapitalization.words,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,

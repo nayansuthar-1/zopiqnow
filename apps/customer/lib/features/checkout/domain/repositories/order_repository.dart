@@ -2,6 +2,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
@@ -40,6 +41,7 @@ abstract interface class OrderRepository {
     required String userPhone,
     String? couponCode,
     String? paymentId,
+    String? deliveryNotes,
   });
 
   /// Coupon codes to advertise on the checkout screen.
@@ -96,6 +98,36 @@ abstract interface class OrderRepository {
   /// on purpose: a rider's name is a nicety, and a cancellation that quietly
   /// did nothing is a customer who believes their order has stopped.
   Future<void> cancelOrder({required String orderId, String? reason});
+
+  /// The sentences this customer may send on a live order. Empty is a real
+  /// answer and means the chat has nothing to offer — the sheet does not open.
+  Future<List<CannedMessage>> getMessageMenu();
+
+  /// The thread on an order, now and as either side adds to it.
+  Stream<List<OrderMessage>> watchMessages(String orderId);
+
+  /// Says one of [getMessageMenu]'s lines.
+  ///
+  /// Throws [OrderMessageFailure] — always, on any failure. The opposite of
+  /// [getRider] on purpose: a message that quietly did not send is a customer
+  /// standing at a window believing they have been told where to wait.
+  Future<void> sendMessage({required String orderId, required String code});
+
+  /// Marks the rider's lines seen. Never throws.
+  Future<void> markMessagesRead(String orderId);
+}
+
+/// A message the order service refused, or one that never reached it.
+/// [message] is written for the customer and the sheet shows it verbatim.
+class OrderMessageFailure implements Exception {
+  const OrderMessageFailure([
+    this.message = 'We couldn\'t send that. Please try again.',
+  ]);
+
+  final String message;
+
+  @override
+  String toString() => 'OrderMessageFailure: $message';
 }
 
 /// A cancellation the order service refused, or one that never reached it.

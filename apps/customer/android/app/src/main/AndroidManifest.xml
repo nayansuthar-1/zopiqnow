@@ -79,5 +79,15 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+
+        <!-- Android 11 (API 30) hides other apps from this one unless they are
+             declared here. Without this, `canLaunchUrl` returns false on every
+             modern phone and the Call buttons silently do nothing — the failure
+             looks like a bug in our code and is not one. The rider app has
+             carried the same declaration since 8g. -->
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+            <data android:scheme="tel"/>
+        </intent>
     </queries>
 </manifest>

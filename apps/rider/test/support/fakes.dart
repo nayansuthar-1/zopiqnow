@@ -169,9 +169,11 @@ class FakeJobsDataSource implements JobsDataSource {
         restaurantName: offer.restaurantName,
         restaurantLat: 24.6061,
         restaurantLng: 72.3283,
+        restaurantPhone: '9876543210',
         deliverTo: offer.deliverTo,
         deliverLat: 24.5881,
         deliverLng: 72.3163,
+        deliveryNotes: null,
         customerPhone: '+919876543210',
         total: offer.total,
         isCash: offer.isCash,
@@ -324,6 +326,31 @@ class FakeJobsDataSource implements JobsDataSource {
   @override
   Future<List<Payout>> fetchPayouts() async => List<Payout>.unmodifiable(payouts);
 
+  /// The thread (0061). Empty and inert: a canned message is a round trip to a
+  /// `security definer` function that decides who the caller is, and there is
+  /// nothing about that this fake could stand in for honestly. The chat button
+  /// is only reachable on a carried job in the real app anyway.
+  @override
+  Future<List<CannedMessage>> fetchMessageMenu() async =>
+      const <CannedMessage>[];
+
+  @override
+  Stream<List<JobMessage>> watchMessages(String orderId) =>
+      Stream<List<JobMessage>>.value(const <JobMessage>[]);
+
+  @override
+  Future<void> sendMessage({
+    required String orderId,
+    required String code,
+  }) async {
+    throw const JobFailure(
+      'There is nobody on this order to message right now.',
+    );
+  }
+
+  @override
+  Future<void> markMessagesRead(String orderId) async {}
+
   void _replace(Job job, {required JobState state, String? orderStatus}) {
     _mine = _mine
         .map(
@@ -335,9 +362,11 @@ class FakeJobsDataSource implements JobsDataSource {
                   restaurantName: j.restaurantName,
                   restaurantLat: j.restaurantLat,
                   restaurantLng: j.restaurantLng,
+                  restaurantPhone: j.restaurantPhone,
                   deliverTo: j.deliverTo,
                   deliverLat: j.deliverLat,
                   deliverLng: j.deliverLng,
+                  deliveryNotes: j.deliveryNotes,
                   customerPhone: j.customerPhone,
                   total: j.total,
                   isCash: j.isCash,
@@ -405,9 +434,11 @@ Job job({
   restaurantName: 'Paradise Biryani',
   restaurantLat: restaurantLat,
   restaurantLng: restaurantLng,
+  restaurantPhone: '9876543210',
   deliverTo: 'Banjara Hills, Hyderabad',
   deliverLat: 24.5881,
   deliverLng: 72.3163,
+  deliveryNotes: 'Gate 2, blue building. Ring twice.',
   customerPhone: customerPhone,
   total: 720,
   isCash: isCash,

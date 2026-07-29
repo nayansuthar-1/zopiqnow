@@ -287,6 +287,32 @@ final Provider<List<Job>> deliveredJobsProvider = Provider<List<Job>>((Ref ref) 
 /// boundary between them: claiming takes it off the board and onto the rider,
 /// abandoning puts it back, delivering ends it — and delivering also moves the
 /// earnings total, so that goes too.
+/// The thread on one job, live (0061).
+///
+/// Streamed rather than fetched, unlike every other read in this app: a customer
+/// answering "which gate?" while the rider is sitting outside their building is
+/// the entire reason the feature exists. Errors are swallowed to nothing — a
+/// thread that went red because a socket hiccuped would look, to a rider at a
+/// kerb, like the customer had hung up.
+final AutoDisposeStreamProviderFamily<List<JobMessage>, String>
+jobMessagesProvider =
+    StreamProvider.autoDispose.family<List<JobMessage>, String>((
+      Ref ref,
+      String orderId,
+    ) {
+      return ref
+          .watch(jobsDataSourceProvider)
+          .watchMessages(orderId)
+          .handleError((Object _) {});
+    });
+
+/// The sentences this rider may send. A constant on the server, so one round
+/// trip per time the sheet is opened rather than one per message.
+final AutoDisposeFutureProvider<List<CannedMessage>> messageMenuProvider =
+    FutureProvider.autoDispose<List<CannedMessage>>(
+      (Ref ref) => ref.watch(jobsDataSourceProvider).fetchMessageMenu(),
+    );
+
 class JobsController extends Notifier<void> {
   @override
   void build() {}
@@ -352,6 +378,31 @@ class JobsController extends Notifier<void> {
         ? 'We couldn\'t start your shift.'
         : 'We couldn\'t end your shift.',
   );
+
+  /// Says one canned line to the customer.
+  ///
+  /// Deliberately **not** routed through [_write]: sending a message changes no
+  /// job state, and invalidating the board, the offers and the earnings on every
+  /// chip tap would be six requests to say "on my way". The thread refreshes
+  /// itself over its own socket.
+  Future<String?> sendMessage({
+    required String orderId,
+    required String code,
+  }) async {
+    try {
+      await _ds.sendMessage(orderId: orderId, code: code);
+      return null;
+    } on JobFailure catch (e) {
+      return e.message;
+    } on Object {
+      return 'We couldn\'t send that.';
+    }
+  }
+
+  /// Marks the customer's lines seen. Never reports anything — see
+  /// [JobsDataSource.markMessagesRead].
+  Future<void> markMessagesRead(String orderId) =>
+      _ds.markMessagesRead(orderId);
 
   Future<String?> _write(Future<void> Function() call, String fallback) async {
     try {

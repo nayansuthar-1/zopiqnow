@@ -15,6 +15,7 @@ abstract interface class AddressDataSource {
     required double latitude,
     required double longitude,
     String? label,
+    String? deliveryNotes,
   });
 
   Future<Address> updateAddress(Address address);

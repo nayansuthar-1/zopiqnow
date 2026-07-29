@@ -1,15 +1,21 @@
 import 'package:flutter/foundation.dart';
 
-/// What kind of alert a row is. A customer only ever receives order updates and
-/// the occasional system notice today; an unknown wire value degrades to
-/// [system] rather than crashing an older build (the reason 0047 keeps `kind` a
-/// tolerant check, not an enum the client must know in full).
+/// What kind of alert a row is. A customer receives order updates, a line their
+/// rider sent them (0061), and the occasional system notice; an unknown wire
+/// value degrades to [system] rather than crashing an older build (the reason
+/// 0047 keeps `kind` a tolerant check, not an enum the client must know in full).
 enum CustomerNotificationKind {
   orderUpdate,
+
+  /// The rider said something. Distinct from [orderUpdate] because it is
+  /// correspondence rather than a state change — somebody is waiting for an
+  /// answer, and an inbox that renders the two identically buries that.
+  message,
   system;
 
   static CustomerNotificationKind fromWire(String wire) => switch (wire) {
     'order_update' => orderUpdate,
+    'message' => message,
     _ => system,
   };
 }

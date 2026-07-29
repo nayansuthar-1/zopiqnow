@@ -141,6 +141,8 @@ class CustomerOrder {
     required this.total,
     required this.lines,
     this.restaurantImageUrl = '',
+    this.restaurantPhone,
+    this.deliveryNotes,
     this.couponCode,
     this.paymentId,
     this.statusReason,
@@ -159,6 +161,12 @@ class CustomerOrder {
   /// so it is empty for a delisted restaurant, and the UI falls back.
   final String restaurantImageUrl;
 
+  /// The kitchen's number, read from the live catalog like the photo above it
+  /// (0027 added the column; B5 is what finally shows it). Null on every seeded
+  /// restaurant and on any an admin has not filled in — and a null here means no
+  /// Call button, not an empty one.
+  final String? restaurantPhone;
+
   final OrderStatus status;
 
   /// Why the order ended, when it ended early — the kitchen's note on a
@@ -171,6 +179,13 @@ class CustomerOrder {
   final DateTime placedAt;
 
   final String deliveryTo;
+
+  /// What the customer told the rider about their own front door — "gate 2, the
+  /// blue door" (0061). Frozen onto the order at checkout rather than read back
+  /// off the address, so editing the address later cannot rewrite what the rider
+  /// was actually told. Null when nothing was said.
+  final String? deliveryNotes;
+
   final int etaMinutes;
 
   final PaymentMethod paymentMethod;

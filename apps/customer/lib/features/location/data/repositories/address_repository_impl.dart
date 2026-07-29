@@ -52,6 +52,7 @@ class AddressRepositoryImpl implements AddressRepository {
     required double latitude,
     required double longitude,
     String? label,
+    String? deliveryNotes,
   }) async {
     try {
       return await _dataSource.insertAddress(
@@ -60,6 +61,7 @@ class AddressRepositoryImpl implements AddressRepository {
         latitude: latitude,
         longitude: longitude,
         label: label,
+        deliveryNotes: deliveryNotes,
       );
     } on Object catch (_) {
       throw const AddressBookFailure('We couldn\'t save that address.');

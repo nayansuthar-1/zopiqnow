@@ -2,6 +2,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
@@ -21,6 +22,11 @@ abstract interface class OrderDataSource {
   /// No user id: `place_order` reads it from the caller's JWT (`auth.uid()`).
   /// A client that could name the buyer could buy in someone else's name.
   /// [userPhone] is a delivery contact, not an identity.
+  ///
+  /// [deliveryNotes] is the customer's sentence about their own front door, and
+  /// is frozen onto the order rather than read back off the address later —
+  /// editing "ring twice" into "the bell is broken" must not rewrite what the
+  /// rider was told last Tuesday.
   Future<PlacedOrder> placeOrder({
     required Cart cart,
     required Address deliveryAddress,
@@ -28,6 +34,7 @@ abstract interface class OrderDataSource {
     required String userPhone,
     String? couponCode,
     String? paymentId,
+    String? deliveryNotes,
   });
 
   /// Codes to advertise on the checkout screen, e.g. `WELCOME50 · ₹50 off`.
@@ -97,4 +104,32 @@ abstract interface class OrderDataSource {
   /// an error to bury: it says whether the food is being cooked, packed, or
   /// already on a bike.
   Future<void> cancelOrder({required String orderId, String? reason});
+
+  /// The sentences this customer may send, in the order to show them.
+  ///
+  /// Fetched, not hard-coded: migration 0061 owns the wording, so what a button
+  /// says is exactly what will be stored. The list is a constant on the server
+  /// and changes only when a migration changes it, so one call per thread is
+  /// the whole cost.
+  Future<List<CannedMessage>> fetchMessageMenu();
+
+  /// The thread on an order, now and as either side adds to it.
+  ///
+  /// A subscription rather than a poll for the reason the status stream is one:
+  /// the interesting moment is a rider answering while the customer is looking
+  /// at the screen. RLS filters it — the socket carries this order's thread
+  /// because the policy says so, not because of the `.eq` that shapes it.
+  Stream<List<OrderMessage>> watchMessages(String orderId);
+
+  /// Says one of [fetchMessageMenu]'s lines.
+  ///
+  /// Throws [OrderMessageFailure] with the service's own sentence when it
+  /// refuses — "There is nobody on this order to message right now." is the
+  /// answer when the rider has just handed the food over, and it is worth
+  /// showing verbatim.
+  Future<void> sendMessage({required String orderId, required String code});
+
+  /// Marks the rider's lines seen. Never throws: a read receipt that failed to
+  /// register is not worth interrupting a conversation for.
+  Future<void> markMessagesRead(String orderId);
 }

@@ -12,6 +12,7 @@ import 'package:zopiq_rider/features/auth/presentation/providers/auth_providers.
 import 'package:zopiq_rider/features/jobs/domain/entities/job.dart';
 import 'package:zopiq_rider/features/jobs/presentation/providers/jobs_providers.dart';
 import 'package:zopiq_rider/features/jobs/presentation/pages/job_map_page.dart';
+import 'package:zopiq_rider/features/jobs/presentation/widgets/customer_chat_sheet.dart';
 import 'package:zopiq_rider/features/jobs/presentation/widgets/pickup_sheet.dart';
 import 'package:zopiq_rider/features/notifications/presentation/widgets/notification_bell.dart';
 
@@ -658,11 +659,23 @@ class _RunJobCardState extends ConsumerState<_RunJobCard> {
     if (!ok) _say('No maps app could open that address.');
   }
 
+  /// Rings whichever end of the ride the rider is at — the kitchen while
+  /// collecting, the customer while carrying. The same rule the map pin follows
+  /// (see [Job.targetPhone]), so the button and the pin can never point at
+  /// different people.
   Future<void> _call() async {
-    final bool ok =
-        await ref.read(launcherProvider).dial(widget.job.customerPhone);
+    final String? phone = widget.job.targetPhone;
+    if (phone == null) return;
+    final bool ok = await ref.read(launcherProvider).dial(phone);
     if (!ok) _say('This phone can\'t make calls.');
   }
+
+  /// Six sentences, one tap each — for the times a call is the wrong weight.
+  /// Only offered while carrying, because that is the window Postgres will
+  /// accept a message in (0061): before pickup the customer has not been told
+  /// who the rider is, and a thread with a stranger is not a thread.
+  Future<void> _chat() =>
+      showCustomerChatSheet(context, orderId: widget.job.orderId);
 
   void _say(String message) {
     if (!mounted) return;
@@ -841,12 +854,17 @@ class _RunJobCardState extends ConsumerState<_RunJobCard> {
               iconColor: zc.textMuted,
               text: 'Order #${job.orderId.substring(0, job.orderId.length > 8 ? 8 : job.orderId.length).toUpperCase()}',
             ),
-            if (job.customerPhone.isNotEmpty) ...<Widget>[
+            // The customer's own words about their front door (0061). Shown only
+            // while carrying: "gate 2, blue building" is noise at a restaurant
+            // counter and is the single most useful line on the screen at a
+            // gate. Emphasised, because a note nobody reads is a phone call.
+            if (job.isCarrying && job.deliveryNotes != null) ...<Widget>[
               const SizedBox(height: ZopiqSpacing.xs),
               _SvgInfoRow(
-                svgType: RiderSvgType.phoneCall,
-                iconColor: zc.textMuted,
-                text: job.customerPhone,
+                svgType: RiderSvgType.navigationPin,
+                iconColor: zc.primary,
+                text: job.deliveryNotes!,
+                emphasis: true,
               ),
             ],
             const SizedBox(height: ZopiqSpacing.xs),
@@ -884,9 +902,14 @@ class _RunJobCardState extends ConsumerState<_RunJobCard> {
                   ),
                 ),
                 const SizedBox(width: ZopiqSpacing.sm),
+                // Rings whichever end of the ride this is — the kitchen while
+                // collecting, the customer while carrying. Disabled, not hidden,
+                // when that end has no number on file: the row would otherwise
+                // reflow mid-job, and a button that moves is a button pressed by
+                // accident.
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: job.customerPhone.isEmpty ? null : _call,
+                    onPressed: job.targetPhone == null ? null : _call,
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -898,11 +921,40 @@ class _RunJobCardState extends ConsumerState<_RunJobCard> {
                       size: 18,
                       color: zc.primary,
                     ),
-                    label: Text('Call Customer', style: TextStyle(color: zc.primary)),
+                    label: Text(
+                      'Call ${job.targetWho}',
+                      style: TextStyle(color: zc.primary),
+                    ),
                   ),
                 ),
               ],
             ),
+
+            // The quiet way to say something, and only once the customer knows
+            // who this rider is — which is the same window `send_order_message`
+            // will accept a line in (0061). Its own row rather than a third
+            // button squeezed beside the other two: three labels across a phone
+            // held in a glove is three unreadable labels.
+            if (job.isCarrying) ...<Widget>[
+              const SizedBox(height: ZopiqSpacing.sm),
+              OutlinedButton.icon(
+                onPressed: _chat,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  minimumSize: const Size.fromHeight(0),
+                  shape: RoundedRectangleBorder(borderRadius: ZopiqRadii.rMd),
+                ),
+                icon: Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  size: 18,
+                  color: zc.primary,
+                ),
+                label: Text(
+                  'Message Customer',
+                  style: TextStyle(color: zc.primary),
+                ),
+              ),
+            ],
 
             const SizedBox(height: ZopiqSpacing.md),
 

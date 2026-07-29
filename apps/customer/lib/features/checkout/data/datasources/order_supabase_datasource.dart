@@ -5,6 +5,7 @@ import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dar
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
@@ -55,6 +56,7 @@ class OrderSupabaseDataSource implements OrderDataSource {
     required String userPhone,
     String? couponCode,
     String? paymentId,
+    String? deliveryNotes,
   }) async {
     try {
       // The session's JWT rides along on the RPC, and `place_order` takes the
@@ -85,6 +87,7 @@ class OrderSupabaseDataSource implements OrderDataSource {
               'p_payment_method': paymentMethod.name,
               'p_coupon_code': couponCode,
               'p_payment_id': paymentId,
+              'p_delivery_notes': deliveryNotes,
             },
           );
 
@@ -117,11 +120,13 @@ class OrderSupabaseDataSource implements OrderDataSource {
   /// ask for is a field that is null on exactly one of them.
   static const String _orderColumns =
       'id, restaurant_id, restaurant_name, status, status_reason, created_at, '
-      'delivery_to, eta_minutes, payment_method, payment_id, subtotal, '
-      'delivery_fee, taxes, discount, total, coupon_code, '
-      // The catalog join is for the photo alone — the name is on the order,
-      // so a delisted restaurant costs us an image and not an identity.
-      'restaurants(image_url), '
+      'delivery_to, delivery_notes, eta_minutes, payment_method, payment_id, '
+      'subtotal, delivery_fee, taxes, discount, total, coupon_code, '
+      // The catalog join is for the photo and the kitchen's phone number — the
+      // name is on the order, so a delisted restaurant costs us an image and a
+      // number, not an identity. `contact_phone` has been world-readable on an
+      // active restaurant since 0027; showing it only here is a product choice.
+      'restaurants(image_url, contact_phone), '
       'order_items(menu_item_id, name, unit_price, quantity, line_total, '
       'order_item_options(name, price_delta))';
 
@@ -275,6 +280,67 @@ class OrderSupabaseDataSource implements OrderDataSource {
     }
   }
 
+  @override
+  Future<List<CannedMessage>> fetchMessageMenu() async {
+    // No argument. `order_message_menu` derives the role from the caller — a
+    // customer asking for the rider's half of the list gets their own.
+    final List<dynamic> rows = await _db.rpc<List<dynamic>>(
+      'order_message_menu',
+    );
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map(CannedMessage.fromJson)
+        .toList(growable: false);
+  }
+
+  @override
+  Stream<List<OrderMessage>> watchMessages(String orderId) {
+    return _db
+        .from('order_messages')
+        .stream(primaryKey: const <String>['id'])
+        .eq('order_id', orderId)
+        // Oldest first: a thread reads downward, and the sheet scrolls to the
+        // bottom. `.order` on a stream sorts the snapshot it holds, which is
+        // why the list arrives ordered rather than in insert order.
+        .order('created_at', ascending: true)
+        .map(
+          (List<Map<String, dynamic>> rows) =>
+              rows.map(OrderMessage.fromJson).toList(growable: false),
+        );
+  }
+
+  @override
+  Future<void> sendMessage({
+    required String orderId,
+    required String code,
+  }) async {
+    try {
+      await _db.rpc<int>(
+        'send_order_message',
+        params: <String, dynamic>{'p_order_id': orderId, 'p_code': code},
+      );
+    } on PostgrestException catch (e) {
+      // "There is nobody on this order to message right now." — the rider handed
+      // the food over while the sheet was open. A rule we wrote, phrased for the
+      // customer, and the only useful thing to say at that moment.
+      if (e.code == _businessRuleErrorCode) throw OrderMessageFailure(e.message);
+      throw const OrderMessageFailure();
+    }
+  }
+
+  @override
+  Future<void> markMessagesRead(String orderId) async {
+    try {
+      await _db.rpc<void>(
+        'mark_order_messages_read',
+        params: <String, dynamic>{'p_order_id': orderId},
+      );
+    } on PostgrestException {
+      // A read receipt nobody got. Swallowed on purpose — there is nothing the
+      // customer could do about it and nothing worth interrupting them for.
+    }
+  }
+
   CustomerOrder _orderFrom(Map<String, dynamic> row) {
     final Map<String, dynamic>? restaurant =
         row['restaurants'] as Map<String, dynamic>?;
@@ -308,10 +374,15 @@ class OrderSupabaseDataSource implements OrderDataSource {
       restaurantId: row['restaurant_id'] as String,
       restaurantName: row['restaurant_name'] as String,
       restaurantImageUrl: restaurant?['image_url'] as String? ?? '',
+      // Null on every seeded restaurant and on any draft an admin has not
+      // finished (0027). Null means no Call button, which beats a dialler
+      // opening on an empty number.
+      restaurantPhone: restaurant?['contact_phone'] as String?,
       status: OrderStatus.fromWire(row['status'] as String),
       statusReason: row['status_reason'] as String?,
       placedAt: DateTime.parse(row['created_at'] as String).toLocal(),
       deliveryTo: row['delivery_to'] as String,
+      deliveryNotes: row['delivery_notes'] as String?,
       etaMinutes: (row['eta_minutes'] as num).toInt(),
       paymentMethod: PaymentMethod.values.byName(row['payment_method'] as String),
       paymentId: row['payment_id'] as String?,

@@ -35,6 +35,7 @@ abstract interface class AddressRepository {
     required double latitude,
     required double longitude,
     String? label,
+    String? deliveryNotes,
   });
 
   /// Edits a saved address. If it is the one selected on this device, the

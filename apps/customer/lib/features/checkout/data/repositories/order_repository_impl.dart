@@ -3,6 +3,7 @@ import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dar
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
@@ -33,6 +34,7 @@ class OrderRepositoryImpl implements OrderRepository {
     required String userPhone,
     String? couponCode,
     String? paymentId,
+    String? deliveryNotes,
   }) async {
     try {
       return await _dataSource.placeOrder(
@@ -42,6 +44,7 @@ class OrderRepositoryImpl implements OrderRepository {
         userPhone: userPhone,
         couponCode: couponCode,
         paymentId: paymentId,
+        deliveryNotes: deliveryNotes,
       );
     } on OrderPlacementFailure {
       // Already a domain failure carrying the service's own message — relabelling
@@ -128,6 +131,49 @@ class OrderRepositoryImpl implements OrderRepository {
       // right answer: the tracking card is already rendering the order. Failing
       // it over a name would be trading the screen for a nicety.
       return null;
+    }
+  }
+
+  @override
+  Future<List<CannedMessage>> getMessageMenu() async {
+    try {
+      return await _dataSource.fetchMessageMenu();
+    } on Object catch (_) {
+      // Empty is already "the chat has nothing to offer", and the sheet handles
+      // it by not opening. A failed read looks the same, which is the honest
+      // outcome: without the list there is nothing to tap.
+      return const <CannedMessage>[];
+    }
+  }
+
+  @override
+  Stream<List<OrderMessage>> watchMessages(String orderId) =>
+      // Passed through untouched, like [watchOrderStatus]. A dropped socket
+      // costs the thread its liveness, not the lines already on screen.
+      _dataSource.watchMessages(orderId);
+
+  @override
+  Future<void> sendMessage({
+    required String orderId,
+    required String code,
+  }) async {
+    try {
+      await _dataSource.sendMessage(orderId: orderId, code: code);
+    } on OrderMessageFailure {
+      // Already carries the service's own sentence. Relabelling it would throw
+      // away the only useful thing in it.
+      rethrow;
+    } on Object catch (_) {
+      throw const OrderMessageFailure();
+    }
+  }
+
+  @override
+  Future<void> markMessagesRead(String orderId) async {
+    try {
+      await _dataSource.markMessagesRead(orderId);
+    } on Object catch (_) {
+      // A read receipt nobody got. Nothing the customer could do about it.
     }
   }
 

@@ -202,12 +202,48 @@ expression collapse to the original number: no new information, no new estimate.
 
 ---
 
-### B5 — Communication
-- [ ] Customer → rider call (`url_launcher` is already in the lockfile; masked number later)
-- [ ] Customer → restaurant call
-- [ ] Rider → restaurant call
-- [ ] Customer ↔ rider chat (canned messages first — a live chat needs moderation and history)
-- [ ] **Delivery instructions** on the address / at checkout, surfaced to the rider
+### B5 — Communication ✅ **DONE 2026-07-29** (migration 0061)
+- [x] Customer → rider call. `url_launcher` moved from transitive to direct in the
+      customer app at the version the root lockfile already froze — **not one new
+      version** (Rule 3), plus the `tel:` `<queries>` entry the rider app has had
+      since 8g. Masked numbers are still owed and are a vendor contract, not a button
+- [x] Customer → restaurant call, on the order screen while the order is live
+- [x] Rider → restaurant call. One button whose *target* switches with the job —
+      the kitchen while collecting, the customer while carrying, the same rule the
+      map pin follows, so the two can never point at different people
+- [x] Customer ↔ rider chat, canned. Realtime thread, read receipts, a push each way
+- [x] **Delivery instructions** — on the address, prefilled at checkout, overridable
+      for one order, frozen onto the order, printed on the rider's card while carrying
+
+**The database owns the words.** "Canned messages" means nothing if an app decides
+what a code says: the app would be free to put any sentence under any button. So
+`order_message_body(sender, code)` is the only place the twelve sentences exist,
+`order_message_menu()` hands each caller *its own* half of the list (the role is
+derived from the caller, never passed), and `send_order_message` writes the body it
+looks up rather than one it was given. Two copies of the list would be two lists, and
+the day they drift is the day somebody taps "Leave it at the door" and sends "Thank
+you!". The body is then *stored* on the row beside the code, so rewording a line next
+month cannot rewrite a conversation that already happened — `order_items.name`'s
+argument about a renamed dish.
+
+**The window is the one the customer already had.** A thread opens at `picked_up` and
+closes at `delivered` — precisely the states 0049 lets a customer see their rider in.
+Earlier, the rider may still drop the job and the customer has not been told their
+name; later, the job is over and the rider's number is theirs again (0039's rule).
+The rider's `delivery_notes` and `customer_phone` both go null at `delivered` for the
+same reason: a note is the customer's description of their own front door.
+
+**`revoke all`, on a table this time.** Supabase's default privileges grant `anon` and
+`authenticated` insert/update/delete on every new table in `public`, so `order_messages`
+arrived writable and a bare `grant select` added nothing. RLS would still have refused
+the write for want of a policy — but "no policy exists yet" is a weaker guarantee than
+"no grant exists", and the next migration to add an insert policy for one purpose would
+have silently opened all three. Found by reading the grants back in the rolled-back
+dry run, not by assuming. That is 0045's lesson applied to a table.
+
+**Two things deliberately not built.** No masked numbers — a `tel:` to the real number
+is what this platform can honestly do today, and masking is a provider with a contract
+behind it. No vendor side of the chat: a kitchen with a headset is a support product.
 
 ---
 

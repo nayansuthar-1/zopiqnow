@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/core/dialler.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
@@ -9,6 +10,7 @@ import 'package:zopiqnow/features/checkout/presentation/providers/orders_provide
 import 'package:zopiqnow/features/checkout/presentation/widgets/live_delivery_map.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_card.dart'
     show formatClockTime;
+import 'package:zopiqnow/features/checkout/presentation/widgets/rider_chat_sheet.dart';
 
 /// Where the order is right now, and where it goes next.
 ///
@@ -251,21 +253,70 @@ class _Rider extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(width: ZopiqSpacing.sm),
-          // Shown, not dialled: placing a call needs a plugin this app does not
-          // carry, and a button that looks like it rings someone and doesn't is
-          // worse than a number the customer can read out.
-          Text(
-            rider.phone,
-            style: t.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+          const SizedBox(width: ZopiqSpacing.xs),
+          // Two ways to reach them, in the order they should be reached in.
+          // Chat is the quiet one and comes first; the phone is the interrupt.
+          //
+          // The number itself is no longer printed. It was, for four phases,
+          // because this app carried no dialler — that is what B5 fixed, and a
+          // ten-digit string beside a button that dials it is noise.
+          _RiderAction(
+            icon: Icons.chat_bubble_outline_rounded,
+            tooltip: 'Message ${rider.name}',
+            onTap: () => showRiderChatSheet(
+              context,
+              orderId: orderId,
+              riderName: rider.name,
             ),
+          ),
+          _RiderAction(
+            icon: Icons.call_rounded,
+            tooltip: 'Call ${rider.name}',
+            onTap: () async {
+              final bool ok = await dialNumber(rider.phone);
+              if (!ok && context.mounted) {
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    const SnackBar(content: Text('This phone can\'t dial.')),
+                  );
+              }
+            },
           ),
             ],
           ),
         ],
       ),
+    );
+  }
+}
+
+/// One round action beside the rider's name. A pair of them, sized for a thumb
+/// on a screen somebody is holding while watching for a doorbell.
+class _RiderAction extends StatelessWidget {
+  const _RiderAction({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+
+    return IconButton(
+      icon: Icon(icon, size: 20),
+      color: zc.primary,
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      style: IconButton.styleFrom(
+        backgroundColor: zc.primary.withValues(alpha: 0.10),
+      ),
+      onPressed: onTap,
     );
   }
 }

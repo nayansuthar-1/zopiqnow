@@ -6,6 +6,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
@@ -132,6 +133,70 @@ riderPositionProvider =
           .watchRiderPosition(carrierKey)
           .handleError((Object _) {});
     });
+
+/// The thread with the rider, live.
+///
+/// Streamed rather than fetched, unlike everything else on this screen: a reply
+/// arriving while the customer is looking at the sheet is the entire point of a
+/// chat. Errors are swallowed to an empty list — a thread that goes red because
+/// a socket hiccuped would look like the rider had vanished.
+final AutoDisposeStreamProviderFamily<List<OrderMessage>, String>
+orderMessagesProvider =
+    StreamProvider.autoDispose.family<List<OrderMessage>, String>((
+      Ref ref,
+      String orderId,
+    ) {
+      return ref
+          .watch(orderRepositoryProvider)
+          .watchMessages(orderId)
+          .handleError((Object _) {});
+    });
+
+/// The sentences this customer may send, as 0061 words them.
+///
+/// Not keyed by order: the list is the same for every order a customer has, and
+/// it is a constant on the server. Auto-disposed, so it is one round trip per
+/// time the sheet is opened rather than one per message.
+final AutoDisposeFutureProvider<List<CannedMessage>> messageMenuProvider =
+    FutureProvider.autoDispose<List<CannedMessage>>(
+      (Ref ref) => ref.watch(orderRepositoryProvider).getMessageMenu(),
+    );
+
+/// Sends one canned line, and reports what the order service said if it refused.
+///
+/// State is whether a send is in flight — the same shape as
+/// [OrderCancelController], and for the same reason. Returns the refusal rather
+/// than throwing it: "There is nobody on this order to message right now." is
+/// the answer when the rider handed the food over a moment ago, and it is the
+/// most useful sentence on the screen.
+class OrderMessageController extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  Future<String?> send({required String orderId, required String code}) async {
+    if (state) return null;
+    state = true;
+    try {
+      await ref
+          .read(orderRepositoryProvider)
+          .sendMessage(orderId: orderId, code: code);
+      return null;
+    } on OrderMessageFailure catch (failure) {
+      return failure.message;
+    } finally {
+      state = false;
+    }
+  }
+
+  /// Marks the rider's lines seen. Fire-and-forget by design — see
+  /// [OrderRepository.markMessagesRead], which never throws.
+  Future<void> markRead(String orderId) =>
+      ref.read(orderRepositoryProvider).markMessagesRead(orderId);
+}
+
+final NotifierProvider<OrderMessageController, bool>
+orderMessageControllerProvider =
+    NotifierProvider<OrderMessageController, bool>(OrderMessageController.new);
 
 /// Calls an order off, and reports what the order service said if it refused.
 ///

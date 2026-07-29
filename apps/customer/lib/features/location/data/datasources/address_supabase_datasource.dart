@@ -17,7 +17,8 @@ class AddressSupabaseDataSource implements AddressDataSource {
   /// The columns, in the order the UI needs them. `user_id` is never sent: the
   /// insert policy takes it from the JWT via the column default's `auth.uid()`
   /// check, so naming it here would only be a chance to name it wrong.
-  static const String _columns = 'id, label, line1, city, latitude, longitude';
+  static const String _columns =
+      'id, label, line1, city, latitude, longitude, delivery_notes';
 
   @override
   Future<List<Address>> fetchAddresses() async {
@@ -41,6 +42,7 @@ class AddressSupabaseDataSource implements AddressDataSource {
     required double latitude,
     required double longitude,
     String? label,
+    String? deliveryNotes,
   }) async {
     final Map<String, dynamic> row = await _db
         .from('addresses')
@@ -55,6 +57,7 @@ class AddressSupabaseDataSource implements AddressDataSource {
           'city': city,
           'latitude': latitude,
           'longitude': longitude,
+          'delivery_notes': deliveryNotes,
         })
         .select(_columns)
         .single();
@@ -72,6 +75,7 @@ class AddressSupabaseDataSource implements AddressDataSource {
           'city': address.city,
           'latitude': address.latitude,
           'longitude': address.longitude,
+          'delivery_notes': address.deliveryNotes,
         })
         // Not `.eq('user_id', …)` as well: the policy already restricts this to
         // the caller's rows, and a second copy of that rule here could only
@@ -94,5 +98,6 @@ class AddressSupabaseDataSource implements AddressDataSource {
     city: row['city'] as String,
     latitude: (row['latitude'] as num).toDouble(),
     longitude: (row['longitude'] as num).toDouble(),
+    deliveryNotes: row['delivery_notes'] as String?,
   );
 }

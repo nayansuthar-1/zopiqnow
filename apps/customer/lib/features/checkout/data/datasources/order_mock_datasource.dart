@@ -6,6 +6,7 @@ import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dar
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
@@ -99,6 +100,33 @@ class OrderMockDataSource implements OrderDataSource {
   Stream<RiderPosition?> watchRiderPosition(String carrierKey) =>
       Stream<RiderPosition?>.value(null);
 
+  /// No thread without the other end of it. Nobody is carrying a mock order, so
+  /// there is nobody to talk to — the same answer [fetchRider] gives, and the
+  /// chat button is hidden by the same absence of a rider.
+  @override
+  Future<List<CannedMessage>> fetchMessageMenu() async =>
+      const <CannedMessage>[];
+
+  @override
+  Stream<List<OrderMessage>> watchMessages(String orderId) =>
+      Stream<List<OrderMessage>>.value(const <OrderMessage>[]);
+
+  /// Refuses in the same words `send_order_message` refuses in. A fake that
+  /// accepted a message nobody would ever receive is a fake that teaches the
+  /// sheet the wrong lesson.
+  @override
+  Future<void> sendMessage({
+    required String orderId,
+    required String code,
+  }) async {
+    throw const OrderMessageFailure(
+      'There is nobody on this order to message right now.',
+    );
+  }
+
+  @override
+  Future<void> markMessagesRead(String orderId) async {}
+
   /// Calls a mock order off, refusing on exactly the statuses `cancel_my_order`
   /// refuses on — and with the same sentence. A fake that let a customer cancel
   /// an order the real service would not is a fake that teaches the screen the
@@ -130,6 +158,7 @@ class OrderMockDataSource implements OrderDataSource {
           : reason!.trim(),
       placedAt: order.placedAt,
       deliveryTo: order.deliveryTo,
+      deliveryNotes: order.deliveryNotes,
       etaMinutes: order.etaMinutes,
       paymentMethod: order.paymentMethod,
       paymentId: order.paymentId,
@@ -175,6 +204,7 @@ class OrderMockDataSource implements OrderDataSource {
     required String userPhone,
     String? couponCode,
     String? paymentId,
+    String? deliveryNotes,
   }) async {
     await Future<void>.delayed(latency);
 
@@ -203,6 +233,7 @@ class OrderMockDataSource implements OrderDataSource {
         status: OrderStatus.placed,
         placedAt: DateTime.now(),
         deliveryTo: deliveryAddress.shortDisplay,
+        deliveryNotes: deliveryNotes,
         etaMinutes: etaMinutes,
         paymentMethod: paymentMethod,
         paymentId: paymentId,

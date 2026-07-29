@@ -53,6 +53,7 @@ class AddressMockDataSource implements AddressDataSource {
     required double latitude,
     required double longitude,
     String? label,
+    String? deliveryNotes,
   }) async {
     await Future<void>.delayed(latency);
     // The id comes from the service, never from the caller — same as Postgres,
@@ -64,6 +65,7 @@ class AddressMockDataSource implements AddressDataSource {
       city: city,
       latitude: latitude,
       longitude: longitude,
+      deliveryNotes: deliveryNotes,
     );
     _addresses.add(saved);
     return saved;

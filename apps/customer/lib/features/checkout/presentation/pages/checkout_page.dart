@@ -19,6 +19,7 @@ import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.
 import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/delivery_notes_sheet.dart';
 import 'package:zopiqnow/features/location/presentation/widgets/address_picker_sheet.dart';
 
 /// Checkout: who is ordering, where it goes, what it costs after a coupon, and
@@ -73,6 +74,7 @@ class CheckoutPage extends ConsumerWidget {
 
     final CartBill bill = ref.watch(checkoutBillProvider);
     final Address? address = ref.watch(selectedAddressProvider);
+    final String? notes = ref.watch(deliveryNotesProvider);
     final AuthState auth = ref.watch(authControllerProvider);
     final CheckoutState checkout = ref.watch(checkoutControllerProvider);
 
@@ -123,6 +125,17 @@ class CheckoutPage extends ConsumerWidget {
                         actionLabel: needsPhone ? 'Add' : 'Change',
                         isMissing: needsPhone,
                         onAction: () => showDeliveryPhoneSheet(context),
+                      ),
+                      Divider(height: 1, color: zc.divider),
+                      // Optional, and never [isMissing]: an order with no note
+                      // is a perfectly good order, and a warm border round a
+                      // blank field would be checkout inventing an obstacle.
+                      _SectionCard(
+                        icon: Icons.sticky_note_2_outlined,
+                        title: 'Note for the rider',
+                        body: notes ?? 'Gate number, landmark, floor…',
+                        actionLabel: notes == null ? 'Add' : 'Change',
+                        onAction: () => showDeliveryNotesSheet(context),
                       ),
                     ],
                   ],

@@ -8,6 +8,7 @@ class Address {
     required this.latitude,
     required this.longitude,
     this.label,
+    this.deliveryNotes,
   });
 
   final String id;
@@ -18,6 +19,12 @@ class Address {
   final double latitude;
   final double longitude;
   final String? label;
+
+  /// What to tell the rider about this door — "gate 2, blue building", "ring
+  /// twice, the bell is faint" (0061). Saved with the address so it is typed
+  /// once, and *copied* onto each order rather than read back from here: an
+  /// order must still say what the rider was told after the note is rewritten.
+  final String? deliveryNotes;
 
   /// What the Home header renders: `Banjara Hills, Hyderabad`. A reverse-geocode
   /// can come back with no city, so never render a dangling comma.
@@ -30,6 +37,7 @@ class Address {
     'latitude': latitude,
     'longitude': longitude,
     'label': label,
+    'delivery_notes': deliveryNotes,
   };
 
   static Address fromJson(Map<String, dynamic> json) => Address(
@@ -39,5 +47,6 @@ class Address {
     latitude: (json['latitude']! as num).toDouble(),
     longitude: (json['longitude']! as num).toDouble(),
     label: json['label'] as String?,
+    deliveryNotes: json['delivery_notes'] as String?,
   );
 }

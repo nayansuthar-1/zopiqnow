@@ -104,6 +104,13 @@ dependencies:
   firebase_messaging: 15.1.6
   flutter_local_notifications: 18.0.1
 
+  # --- Calling the rider and the restaurant (B5, 2026-07-29) ------------------
+  # The dialler, and nothing else — see `core/dialler.dart` for why `tel:` opens
+  # the keypad rather than placing the call. **Not a new version** (Rule 3): the
+  # rider app has pinned 6.3.2 since 8g and the root lockfile already froze it,
+  # so this moves the package from transitive to direct and changes no number.
+  url_launcher: 6.3.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
