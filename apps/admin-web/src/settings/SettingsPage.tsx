@@ -3,7 +3,7 @@ import { api } from '../lib/api'
 import type { AdminRow, RiderPayRates } from '../lib/api'
 import { useSession } from '../auth/session'
 import { PageHeader } from '../ui/AppShell'
-import { Button, ConfirmDialog, Field } from '../ui/primitives'
+import { Banner, Button, ConfirmDialog, Field, Skeleton } from '../ui/primitives'
 
 /// Who else can run the platform.
 ///
@@ -58,9 +58,7 @@ export function SettingsPage() {
 
       <div className="max-w-2xl p-6">
         {error && (
-          <p className="mb-4 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
-            {error}
-          </p>
+          <Banner tone="error" className="mb-4">{error}</Banner>
         )}
 
         <div className="rounded-[12px] border border-line bg-white p-6">
@@ -71,7 +69,7 @@ export function SettingsPage() {
           </p>
 
           {admins === null ? (
-            <p className="mt-5 text-sm text-ink-muted">Loading…</p>
+            <div className="mt-5 space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
           ) : (
             <div className="mt-5 divide-y divide-line rounded-[8px] border border-line">
               {admins.map((a) => {
@@ -207,13 +205,11 @@ function RiderPayCard() {
       </p>
 
       {error && (
-        <p className="mt-4 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
-          {error}
-        </p>
+        <Banner tone="error" className="mt-4">{error}</Banner>
       )}
 
       {rates === null ? (
-        <p className="mt-5 text-sm text-ink-muted">Loading…</p>
+        <div className="mt-5 space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
       ) : (
         <>
           <form

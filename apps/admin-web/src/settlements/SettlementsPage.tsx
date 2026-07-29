@@ -2,7 +2,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import type { RestaurantBank, SettlementRow } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
-import { Button, Field } from '../ui/primitives'
+import {
+  Banner,
+  Button,
+  EmptyState,
+  Field,
+  Modal,
+  SegmentedControl,
+  TableSkeleton,
+} from '../ui/primitives'
 
 /// What the platform owes its restaurants, and the record that it paid.
 ///
@@ -95,36 +103,39 @@ export function SettlementsPage() {
 
       <div className="p-6">
         {error && (
-          <p className="mb-4 max-w-2xl rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
+          <Banner
+            tone="error"
+            className="mb-4 max-w-2xl"
+            onDismiss={() => setError(null)}
+          >
             {error}
-          </p>
+          </Banner>
         )}
 
-        <div className="mb-4 flex gap-1">
-          {(['pending', 'paid', 'all'] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFilter(f)}
-              className={`rounded-[8px] px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-                filter === f
-                  ? 'bg-brand-soft text-brand-deep'
-                  : 'text-ink-muted hover:bg-canvas hover:text-ink'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
+        <div className="mb-4">
+          <SegmentedControl
+            label="Filter settlements"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: 'pending', label: 'Pending' },
+              { value: 'paid', label: 'Paid' },
+              { value: 'all', label: 'All' },
+            ]}
+          />
         </div>
 
         {rows === null ? (
-          <p className="text-sm text-ink-muted">Loading…</p>
+          <TableSkeleton />
         ) : rows.length === 0 ? (
-          <p className="text-sm text-ink-muted">
-            {filter === 'pending'
-              ? 'Nothing owed. Either every settlement is paid, or no orders have been delivered since the last run.'
-              : 'Nothing here yet.'}
-          </p>
+          <EmptyState
+            title={filter === 'pending' ? 'Nothing owed' : 'Nothing here yet'}
+            body={
+              filter === 'pending'
+                ? 'Either every settlement is paid, or no orders have been delivered since the last Monday run.'
+                : 'Settlements are rolled up every Monday at 00:30 for the week before. Nothing has been rolled up yet.'
+            }
+          />
         ) : (
           <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
             <table className="w-full min-w-[880px] text-sm">
@@ -177,8 +188,13 @@ export function SettlementsPage() {
                         {s.status === 'pending' && (
                           <Button
                             variant="secondary"
-                            className="h-9 px-3"
+                            size="sm"
                             disabled={!s.has_bank}
+                            title={
+                              s.has_bank
+                                ? undefined
+                                : 'No account on file for this restaurant. Add it from the restaurant’s Bank step first.'
+                            }
                             onClick={() => void beginPayment(s)}
                           >
                             Mark paid
@@ -195,49 +211,17 @@ export function SettlementsPage() {
       </div>
 
       {paying && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <div className="w-full max-w-md rounded-[12px] bg-white p-6">
-            <h2 className="text-base font-bold text-ink">
-              Mark ₹{paying.net_payable.toLocaleString('en-IN')} to{' '}
-              {paying.restaurant_name} as paid
-            </h2>
-            <p className="mt-1 text-sm text-ink-muted">
-              This records the payment — it does not send it. Make the transfer
-              first, then put the bank&rsquo;s reference here.
-            </p>
-
-            <div className="mt-4 rounded-[8px] bg-canvas px-4 py-3 text-sm">
-              {bank === null ? (
-                <p className="text-ink-muted">Fetching account details…</p>
-              ) : (
-                <>
-                  <p className="font-medium text-ink">
-                    {bank.account_holder ?? 'No account holder on file'}
-                  </p>
-                  <p className="tabular-nums text-ink-muted">
-                    {bank.account_number} · {bank.ifsc}
-                  </p>
-                  <p className="text-ink-muted">
-                    {bank.bank_name}
-                    {!bank.verified && ' · not verified'}
-                  </p>
-                </>
-              )}
-            </div>
-
-            <div className="mt-4">
-              <Field
-                label="Bank reference (UTR)"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                placeholder="N123456789012345"
-                hint="Without this the payment cannot be traced later."
-              />
-            </div>
-
-            <div className="mt-5 flex justify-end gap-2">
+        <Modal
+          busy={busy}
+          onClose={() => {
+            setPaying(null)
+            setBank(null)
+          }}
+          title={`Mark ₹${paying.net_payable.toLocaleString('en-IN')} to ${paying.restaurant_name} as paid`}
+          footer={
+            <>
               <Button
-                variant="ghost"
+                variant="secondary"
                 onClick={() => {
                   setPaying(null)
                   setBank(null)
@@ -248,13 +232,47 @@ export function SettlementsPage() {
               </Button>
               <Button
                 onClick={() => void markPaid()}
-                disabled={busy || reference.trim() === ''}
+                loading={busy}
+                disabled={reference.trim() === ''}
               >
                 Mark paid
               </Button>
-            </div>
+            </>
+          }
+        >
+          <p className="text-sm text-ink-muted">
+            This records the payment — it does not send it. Make the transfer
+            first, then put the bank&rsquo;s reference here.
+          </p>
+
+          <div className="mt-4 rounded-[8px] bg-canvas px-4 py-3 text-sm">
+            {bank === null ? (
+              <p className="text-ink-muted">Fetching account details…</p>
+            ) : (
+              <>
+                <p className="font-medium text-ink">
+                  {bank.account_holder ?? 'No account holder on file'}
+                </p>
+                <p className="text-ink-muted tabular-nums">
+                  {bank.account_number} · {bank.ifsc}
+                </p>
+                <p className="text-ink-muted">
+                  {bank.bank_name}
+                  {!bank.verified && ' · not verified'}
+                </p>
+              </>
+            )}
           </div>
-        </div>
+
+          <Field
+            className="mt-4"
+            label="Bank reference (UTR)"
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+            placeholder="N123456789012345"
+            hint="Without this the payment cannot be traced later."
+          />
+        </Modal>
       )}
     </>
   )

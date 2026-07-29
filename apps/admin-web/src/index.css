@@ -41,4 +41,44 @@ body {
   color: var(--color-ink);
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Long restaurant names and pasted UTRs are the two strings that overflow a
+     cell in this console. Neither has spaces to break at, so without this the
+     table gets a horizontal scrollbar the width of one customer's address. */
+  overflow-wrap: break-word;
+}
+
+/* The keyboard's own outline, and only the keyboard's. `:focus-visible` is
+   already what browsers use to decide whether a ring is warranted; the default
+   ring is just too quiet against a white card to be the thing somebody tabs
+   through a payout list with. Components that own a shaped ring (Button, Field,
+   Toggle) set their own and this never reaches them. */
+:where(a, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Numbers in a money column have to line up. Applied here rather than remembered
+   at every call site — a settlement table where the rupee figures are
+   proportionally spaced is one nobody can scan down. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--color-brand-soft);
+  color: var(--color-brand-deep);
+}
+
+/* The console has three animations: a spinner, a skeleton pulse, and colour
+   transitions. Somebody who has asked their OS to stop animations has asked for
+   all three. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

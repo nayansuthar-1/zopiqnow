@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import type { RestaurantDetail } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
+import { Banner } from '../ui/primitives'
 import { StorefrontStep } from './steps/StorefrontStep'
 import { AddressStep } from './steps/AddressStep'
 import { LegalStep } from './steps/LegalStep'
@@ -125,9 +126,7 @@ export function WizardPage() {
 
       <div className="p-6">
         {error && (
-          <p className="mb-4 max-w-2xl rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
-            {error}
-          </p>
+          <Banner tone="error" className="mb-4 max-w-2xl">{error}</Banner>
         )}
 
         {/* The menu is a list of lists and needs the width; the forms read better

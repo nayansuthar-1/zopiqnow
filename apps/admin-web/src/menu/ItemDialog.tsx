@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { MenuItemRow } from '../lib/api'
 import { uploadPhoto, UploadFailure } from '../lib/uploads'
-import { Button, Field, Toggle } from '../ui/primitives'
+import { Banner, Button, Field, Modal, Toggle } from '../ui/primitives'
 
 /// Add or edit one dish. The same dialog for both, because they are the same
 /// fields — the only difference is whether an id goes back with them.
@@ -70,23 +70,19 @@ export function ItemDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-6"
-      onClick={onCancel}
+    <Modal
+      size="lg"
+      busy={busy || uploading}
+      onClose={onCancel}
+      title={item ? 'Edit dish' : 'Add dish'}
     >
       <form
-        className="w-full max-w-lg rounded-[12px] bg-white p-6"
-        onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault()
           submit()
         }}
       >
-        <h2 className="text-base font-bold text-ink">
-          {item ? 'Edit dish' : 'Add dish'}
-        </h2>
-
-        <div className="mt-5 space-y-4">
+        <div className="space-y-4">
           <Field
             label="Name"
             required
@@ -196,9 +192,9 @@ export function ItemDialog({
         </div>
 
         {error && (
-          <p className="mt-4 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
+          <Banner tone="error" className="mt-4" onDismiss={() => setError(null)}>
             {error}
-          </p>
+          </Banner>
         )}
 
         <div className="mt-6 flex justify-end gap-2">
@@ -210,6 +206,6 @@ export function ItemDialog({
           </Button>
         </div>
       </form>
-    </div>
+    </Modal>
   )
 }

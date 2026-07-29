@@ -2,7 +2,16 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import type { Audience, BroadcastRow } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
-import { Button, Field } from '../ui/primitives'
+import {
+  Banner,
+  Button,
+  CardSkeleton,
+  EmptyState,
+  Field,
+  Modal,
+  SegmentedControl,
+  TextArea,
+} from '../ui/primitives'
 
 /// One message to everybody in an audience.
 ///
@@ -118,33 +127,23 @@ export function BroadcastPage() {
       <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
         <div className="rounded-[12px] border border-line bg-white p-6">
           {error && (
-            <p className="mb-4 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
+            <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
               {error}
-            </p>
+            </Banner>
           )}
           {note && (
-            <p className="mb-4 rounded-[8px] bg-veg-soft px-4 py-3 text-sm text-veg">
+            <Banner tone="success" className="mb-4" onDismiss={() => setNote(null)}>
               {note}
-            </p>
+            </Banner>
           )}
 
           <span className="mb-1.5 block text-sm font-medium text-ink">To</span>
-          <div className="flex gap-1">
-            {audiences.map((a) => (
-              <button
-                key={a.value}
-                type="button"
-                onClick={() => setAudience(a.value)}
-                className={`rounded-[8px] px-3 py-1.5 text-sm font-medium transition-colors ${
-                  audience === a.value
-                    ? 'bg-brand-soft text-brand-deep'
-                    : 'text-ink-muted hover:bg-canvas hover:text-ink'
-                }`}
-              >
-                {a.label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            label="Audience"
+            value={audience}
+            onChange={setAudience}
+            options={audiences.map((a) => ({ value: a.value, label: a.label }))}
+          />
           <p className="mt-2 text-sm text-ink-muted">
             {picked.who}{' '}
             {reach === null ? (
@@ -166,22 +165,14 @@ export function BroadcastPage() {
               hint={`${title.length}/80 — this is the line on the lock screen.`}
             />
 
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-ink">
-                Message
-              </span>
-              <textarea
-                className="min-h-24 w-full rounded-[8px] border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand"
-                value={body}
-                maxLength={240}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder="We're open until 1am this Sunday. Order late."
-              />
-              <span className="mt-1.5 block text-sm text-ink-muted">
-                {body.length}/240 — optional, but a title alone rarely says
-                enough.
-              </span>
-            </label>
+            <TextArea
+              label="Message"
+              value={body}
+              maxLength={240}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="We're open until 1am this Sunday. Order late."
+              hint={`${body.length}/240 — optional, but a title alone rarely says enough.`}
+            />
           </div>
 
           <div className="mt-6">
@@ -202,11 +193,12 @@ export function BroadcastPage() {
           </p>
 
           {sent === null ? (
-            <p className="text-sm text-ink-muted">Loading…</p>
+            <CardSkeleton rows={2} />
           ) : sent.length === 0 ? (
-            <p className="text-sm text-ink-muted">
-              Nothing has been broadcast yet.
-            </p>
+            <EmptyState
+              title="Nothing broadcast yet"
+              body="Every message sent from this screen is listed here with its audience, its reach and who sent it."
+            />
           ) : (
             <div className="space-y-2">
               {sent.map((b) => (
@@ -236,22 +228,14 @@ export function BroadcastPage() {
       </div>
 
       {confirming && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <div className="w-full max-w-md rounded-[12px] bg-white p-6">
-            <h2 className="text-base font-bold text-ink">
-              Send to {reach} {picked.label.toLowerCase()}?
-            </h2>
-            <p className="mt-2 text-sm text-ink-muted">
-              {reach} phone{reach === 1 ? '' : 's'} will ring and {reach === 1 ? 'it' : 'they'} cannot be
-              un-rung. Read it once more:
-            </p>
-            <div className="mt-4 rounded-[8px] bg-canvas px-4 py-3">
-              <p className="font-semibold text-ink">{title}</p>
-              {body && <p className="mt-0.5 text-sm text-ink-muted">{body}</p>}
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
+        <Modal
+          busy={busy}
+          onClose={() => setConfirming(false)}
+          title={`Send to ${reach} ${picked.label.toLowerCase()}?`}
+          footer={
+            <>
               <Button
-                variant="ghost"
+                variant="secondary"
                 onClick={() => setConfirming(false)}
                 disabled={busy}
               >
@@ -260,9 +244,22 @@ export function BroadcastPage() {
               <Button onClick={() => void send()} loading={busy}>
                 Send it
               </Button>
-            </div>
+            </>
+          }
+        >
+          <p className="text-sm text-ink-muted">
+            {reach} phone{reach === 1 ? '' : 's'} will ring and{' '}
+            {reach === 1 ? 'it' : 'they'} cannot be un-rung. Read it once more:
+          </p>
+          {/* The lock screen, near enough. Reading your own copy back in a
+              different shape from the one you typed it in is how a typo gets
+              caught — the same reason a proof is set, not re-read in the
+              manuscript. */}
+          <div className="mt-4 rounded-[8px] bg-canvas px-4 py-3">
+            <p className="font-semibold text-ink">{title}</p>
+            {body && <p className="mt-0.5 text-sm text-ink-muted">{body}</p>}
           </div>
-        </div>
+        </Modal>
       )}
     </>
   )

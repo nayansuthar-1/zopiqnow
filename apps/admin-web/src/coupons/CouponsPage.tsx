@@ -2,7 +2,17 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, couponStateOf } from '../lib/api'
 import type { CouponRow, CouponState } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
-import { Button, ConfirmDialog, Field } from '../ui/primitives'
+import {
+  Banner,
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  Field,
+  Modal,
+  Pill,
+  SegmentedControl,
+  TableSkeleton,
+} from '../ui/primitives'
 
 /// Platform coupons — the `restaurant_id is null` ones that work at any
 /// restaurant. They have existed since migration 0003 and have only ever been
@@ -20,10 +30,10 @@ const stateLabels: Record<CouponState, string> = {
   expired: 'Expired',
 }
 
-const stateStyles: Record<CouponState, string> = {
-  live: 'bg-veg-soft text-veg',
-  off: 'bg-canvas text-ink-muted',
-  expired: 'bg-non-veg-soft text-non-veg',
+const stateTones: Record<CouponState, 'live' | 'neutral' | 'danger'> = {
+  live: 'live',
+  off: 'neutral',
+  expired: 'danger',
 }
 
 /// What the code is worth, in the words the customer's cart uses.
@@ -143,20 +153,23 @@ export function CouponsPage() {
 
       <div className="space-y-8 p-6">
         {error && (
-          <p className="max-w-2xl rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
+          <Banner tone="error" className="max-w-2xl" onDismiss={() => setError(null)}>
             {error}
-          </p>
+          </Banner>
         )}
 
         {rows === null ? (
-          <p className="text-sm text-ink-muted">Loading…</p>
+          <TableSkeleton />
         ) : (
           <>
             <Table
               title="Platform codes"
               caption="Yours to write, edit and switch off. They apply at every restaurant, and the platform absorbs the discount."
               rows={platform}
-              empty="No platform coupon yet."
+              empty={{
+                title: 'No platform coupon yet',
+                body: 'A platform code works at every restaurant and the platform absorbs the discount. Add one to get started.',
+              }}
               onEdit={(c) =>
                 setDraft({
                   code: c.code,
@@ -178,7 +191,10 @@ export function CouponsPage() {
               title="Restaurant offers"
               caption="Run by the kitchens themselves (migration 0064). Here so an unexpected discount on an order has an explanation. They can be switched off from here and only switched back on by their owner."
               rows={vendor}
-              empty="No restaurant is running an offer."
+              empty={{
+                title: 'No restaurant is running an offer',
+                body: 'Kitchens create these themselves from their own Offers screen. Any that exist show up here.',
+              }}
               onToggle={toggle}
             />
           </>
@@ -186,15 +202,30 @@ export function CouponsPage() {
       </div>
 
       {draft && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/40 p-4">
-          <div className="w-full max-w-md rounded-[12px] bg-white p-6">
-            <h2 className="text-base font-bold text-ink">
-              {rows?.some((c) => c.code === draft.code.toUpperCase())
-                ? draft.code.toUpperCase()
-                : 'New coupon'}
-            </h2>
-
-            <div className="mt-5 space-y-4">
+        <Modal
+          busy={busy}
+          onClose={() => setDraft(null)}
+          title={
+            rows?.some((c) => c.code === draft.code.toUpperCase())
+              ? draft.code.toUpperCase()
+              : 'New coupon'
+          }
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setDraft(null)}
+                disabled={busy}
+              >
+                Cancel
+              </Button>
+              <Button onClick={() => void save()} loading={busy}>
+                Save
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
               <Field
                 label="Code"
                 value={draft.code}
@@ -207,22 +238,15 @@ export function CouponsPage() {
                 <span className="mb-1.5 block text-sm font-medium text-ink">
                   Discount
                 </span>
-                <div className="flex gap-1">
-                  {(['flat', 'percent'] as const).map((k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setDraft({ ...draft, kind: k })}
-                      className={`rounded-[8px] px-3 py-1.5 text-sm font-medium transition-colors ${
-                        draft.kind === k
-                          ? 'bg-brand-soft text-brand-deep'
-                          : 'text-ink-muted hover:bg-canvas hover:text-ink'
-                      }`}
-                    >
-                      {k === 'flat' ? 'Flat amount' : 'Percentage'}
-                    </button>
-                  ))}
-                </div>
+                <SegmentedControl
+                  label="Discount kind"
+                  value={draft.kind}
+                  onChange={(kind) => setDraft({ ...draft, kind })}
+                  options={[
+                    { value: 'flat', label: 'Flat amount' },
+                    { value: 'percent', label: 'Percentage' },
+                  ]}
+                />
               </div>
 
               {draft.kind === 'flat' ? (
@@ -274,18 +298,8 @@ export function CouponsPage() {
                 }
                 hint="Leave empty for no end date."
               />
-            </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setDraft(null)} disabled={busy}>
-                Cancel
-              </Button>
-              <Button onClick={() => void save()} loading={busy}>
-                Save
-              </Button>
-            </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {deleting && (
@@ -293,6 +307,7 @@ export function CouponsPage() {
           title={`Delete ${deleting.code}?`}
           body="This removes the code entirely. It only works for a code no order has ever carried — anything redeemed is part of somebody's bill and can only be switched off."
           confirmLabel="Delete"
+          tone="danger"
           busy={busy}
           onConfirm={() => void remove()}
           onCancel={() => setDeleting(null)}
@@ -314,7 +329,7 @@ function Table({
   title: string
   caption: string
   rows: CouponRow[]
-  empty: string
+  empty: { title: string; body: string }
   onEdit?: (c: CouponRow) => void
   onToggle: (c: CouponRow) => void
   onDelete?: (c: CouponRow) => void
@@ -325,7 +340,7 @@ function Table({
       <p className="mt-0.5 mb-3 max-w-2xl text-sm text-ink-muted">{caption}</p>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-ink-muted">{empty}</p>
+        <EmptyState title={empty.title} body={empty.body} />
       ) : (
         <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
           <table className="w-full min-w-[820px] text-sm">
@@ -367,18 +382,14 @@ function Table({
                         : 'no end date'}
                     </td>
                     <td className="px-5 py-3">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${stateStyles[state]}`}
-                      >
-                        {stateLabels[state]}
-                      </span>
+                      <Pill tone={stateTones[state]}>{stateLabels[state]}</Pill>
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex justify-end gap-2">
                         {onEdit && (
                           <Button
                             variant="ghost"
-                            className="h-9 px-3"
+                            size="sm"
                             onClick={() => onEdit(c)}
                           >
                             Edit
@@ -388,7 +399,7 @@ function Table({
                         {(c.restaurant_id === null || c.is_active) && (
                           <Button
                             variant="secondary"
-                            className="h-9 px-3"
+                            size="sm"
                             onClick={() => onToggle(c)}
                           >
                             {c.is_active ? 'Switch off' : 'Switch on'}
@@ -397,7 +408,7 @@ function Table({
                         {onDelete && c.redeemed === 0 && (
                           <Button
                             variant="ghost"
-                            className="h-9 px-3"
+                            size="sm"
                             onClick={() => onDelete(c)}
                           >
                             Delete

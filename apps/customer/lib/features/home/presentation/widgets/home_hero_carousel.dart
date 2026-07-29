@@ -534,7 +534,12 @@ class _PublishedSlideViewState extends State<_PublishedSlideView>
     if (widget.reduceMotion) {
       _entrance.value = 1;
     } else {
-      _pulse.repeat(reverse: true);
+      // Only if there is a button to breathe. Since 0067 a slide can have none,
+      // and a repeating controller with no listener is a ticker firing sixty
+      // times a second to move nothing — the kind of cost that only shows up on
+      // the Android 10 floor, and with a carousel that keeps several pages
+      // alive it would be several of them.
+      if (widget.slide.ctaLabel.isNotEmpty) _pulse.repeat(reverse: true);
       _entrance.forward();
     }
   }
@@ -563,13 +568,26 @@ class _PublishedSlideViewState extends State<_PublishedSlideView>
     // is a field and would need a `!` at the use site.
     final String? motion = s.motionUrl;
 
-    return Stack(
+    final Widget slide = Stack(
       fit: StackFit.expand,
       children: <Widget>[
         // The brand gradient is the fallback, not a backdrop: a slide whose
         // artwork fails to load still reads as the app, with its copy intact.
+        //
+        // `fill` and not the package default of `cover`, which is the one place
+        // this widget disagrees with every other image in the app. Everywhere
+        // else the picture is *of* something — a dish, a shopfront — and cover
+        // crops the edges to protect the subject. A hero slide is a composed
+        // banner: cropping it cuts off the corner the designer put the price
+        // in. Stretching costs almost nothing here because the hero is
+        // 393 × 396 at the reference phone — square to within one percent — so
+        // the "roughly square" upload the console asks for arrives at
+        // essentially its own aspect ratio. On a wider or taller phone the
+        // stretch is a few percent, which is invisible on a banner and visible
+        // as a missing price if it were cropped instead.
         ZopiqNetworkImage(
           url: s.imageUrl,
+          fit: BoxFit.fill,
           fallback: const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -601,20 +619,32 @@ class _PublishedSlideViewState extends State<_PublishedSlideView>
             ),
           ),
 
-        const Positioned.fill(
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: <Color>[Color(0x33000000), Color(0x99000000)],
-                  stops: <double>[0.35, 1],
+        // The scrim, and only when there is copy for it to be a floor under.
+        //
+        // It was never decoration: artwork is uploaded by somebody who cannot
+        // know what the headline will sit on, so white text over an unknown
+        // photograph needs something beneath it or a pale sky swallows it. That
+        // argument is entirely about the text. On a slide that is nothing but
+        // artwork (0067) it darkens the bottom half of a picture for the sake of
+        // words that are not there — which is the thing the change exists to
+        // stop, arriving by a different door.
+        if (s.title.isNotEmpty ||
+            s.subtitle.isNotEmpty ||
+            s.ctaLabel.isNotEmpty)
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[Color(0x33000000), Color(0x99000000)],
+                    stops: <double>[0.35, 1],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
         FadeTransition(
           opacity: CurvedAnimation(parent: _entrance, curve: ZopiqCurves.enter),
           child: SlideTransition(
@@ -648,28 +678,38 @@ class _PublishedSlideViewState extends State<_PublishedSlideView>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: <Widget>[
-                    Text(
-                      s.title,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: t.displayLarge?.copyWith(
-                        color: ZopiqPalette.white,
-                        fontSize: widget.headlineSize,
-                        height: 1.05,
-                        fontWeight: FontWeight.w800,
-                        fontVariations: const <FontVariation>[
-                          FontVariation('wght', 800),
-                        ],
-                        shadows: const <Shadow>[
-                          Shadow(color: Color(0x66000000), offset: Offset(0, 2)),
-                        ],
+                    // Every one of these three is optional since 0067, and each
+                    // costs no vertical space when it is absent rather than
+                    // leaving a gap where it would have been. A slide with none
+                    // of them is the artwork and nothing else, which is the
+                    // whole point of the change: a designed banner already says
+                    // what it says, and a headline drawn over it is the same
+                    // words twice.
+                    if (s.title.isNotEmpty)
+                      Text(
+                        s.title,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.displayLarge?.copyWith(
+                          color: ZopiqPalette.white,
+                          fontSize: widget.headlineSize,
+                          height: 1.05,
+                          fontWeight: FontWeight.w800,
+                          fontVariations: const <FontVariation>[
+                            FontVariation('wght', 800),
+                          ],
+                          shadows: const <Shadow>[
+                            Shadow(
+                              color: Color(0x66000000),
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    // An empty subtitle is allowed by the table, so it costs no
-                    // vertical space here rather than an empty line.
                     if (s.subtitle.isNotEmpty) ...<Widget>[
-                      const SizedBox(height: ZopiqSpacing.xs),
+                      if (s.title.isNotEmpty)
+                        const SizedBox(height: ZopiqSpacing.xs),
                       Text(
                         s.subtitle,
                         textAlign: TextAlign.center,
@@ -683,17 +723,20 @@ class _PublishedSlideViewState extends State<_PublishedSlideView>
                         ),
                       ),
                     ],
-                    const SizedBox(height: ZopiqSpacing.md),
-                    _PulsingCta(
-                      pulse: _pulse,
-                      label: s.ctaLabel,
-                      // The arrow says where the tap goes. Down for the slide
-                      // that scrolls the feed, forward for one that leaves it.
-                      icon: s.ctaTarget == null
-                          ? Icons.arrow_downward_rounded
-                          : Icons.arrow_forward_rounded,
-                      onTap: _onTap,
-                    ),
+                    if (s.ctaLabel.isNotEmpty) ...<Widget>[
+                      if (s.title.isNotEmpty || s.subtitle.isNotEmpty)
+                        const SizedBox(height: ZopiqSpacing.md),
+                      _PulsingCta(
+                        pulse: _pulse,
+                        label: s.ctaLabel,
+                        // The arrow says where the tap goes. Down for the slide
+                        // that scrolls the feed, forward for one that leaves it.
+                        icon: s.ctaTarget == null
+                            ? Icons.arrow_downward_rounded
+                            : Icons.arrow_forward_rounded,
+                        onTap: _onTap,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -701,6 +744,32 @@ class _PublishedSlideViewState extends State<_PublishedSlideView>
           ),
         ),
       ],
+    );
+
+    // With a button, the button is the tap target and the artwork around it is
+    // not — that is how it has worked since 0053 and how a hero normally works.
+    //
+    // With no button (0067) the tap has to live somewhere, or a designed banner
+    // that names a `cta_target` would be a link with nothing to click. So the
+    // whole slide becomes the target. `HitTestBehavior.opaque` is needed
+    // because most of a slide is a picture with transparent regions above it,
+    // and without it a tap on the artwork would fall through to nothing.
+    //
+    // This does not fight the carousel: `PageView` claims the horizontal drag
+    // gesture in the arena and a tap is only recognised once no drag has been.
+    // Swiping past a slide never opens it.
+    if (s.ctaLabel.isNotEmpty) return slide;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _onTap,
+      child: Semantics(
+        button: true,
+        // The artwork carries the words, and the words are pixels — so the only
+        // thing a screen reader has to go on is what the slide *does*.
+        label: s.title.isNotEmpty ? s.title : 'Offer banner',
+        child: slide,
+      ),
     );
   }
 }
@@ -779,7 +848,10 @@ class _SlideMotionState extends State<_SlideMotion> {
         enabled: _current,
         child: Image.network(
           widget.url,
-          fit: BoxFit.cover,
+          // Matches the still underneath it (0067). Two different fits on two
+          // layers of the same slide would make the loop jump out of register
+          // with the artwork it is supposed to be animating.
+          fit: BoxFit.fill,
           // No `cacheWidth`, unlike every still in the app. The loop is already
           // delivered at 720px by the Cloudinary transformation that built it,
           // which is the memory bound; asking for the phone's own width on top

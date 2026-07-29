@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { csvTemplate, missingColumns, parseCsv, toMenuItem } from './csv'
 import type { ParsedRow } from './csv'
-import { Button } from '../ui/primitives'
+import { Banner, Button, Modal } from '../ui/primitives'
 
 /// Bulk import, with a preview that has to be looked at before anything is written.
 ///
@@ -51,16 +51,9 @@ export function ImportDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-6"
-      onClick={onCancel}
-    >
-      <div
-        className="w-full max-w-2xl rounded-[12px] bg-white p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-base font-bold text-ink">Import a menu</h2>
-        <p className="mt-1 text-sm text-ink-muted">
+    <Modal size="lg" busy={busy} onClose={onCancel} title="Import a menu">
+      <div>
+        <p className="text-sm text-ink-muted">
           One row per dish. Sections are created in the order they first appear, and
           dishes keep the order they are listed in.
         </p>
@@ -89,9 +82,7 @@ export function ImportDialog({
         </div>
 
         {headerProblem && (
-          <p className="mt-4 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
-            {headerProblem}
-          </p>
+          <Banner tone="error" className="mt-4">{headerProblem}</Banner>
         )}
 
         {rows && (
@@ -146,9 +137,7 @@ export function ImportDialog({
         )}
 
         {error && (
-          <p className="mt-4 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
-            {error}
-          </p>
+          <Banner tone="error" className="mt-4" onDismiss={() => setError(null)}>{error}</Banner>
         )}
 
         <div className="mt-6 flex justify-end gap-2">
@@ -170,6 +159,6 @@ export function ImportDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }

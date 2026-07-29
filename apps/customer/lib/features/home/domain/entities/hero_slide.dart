@@ -22,12 +22,21 @@ class HeroSlide {
   final String id;
 
   /// The headline, e.g. "FLAT ₹150 OFF".
+  ///
+  /// **May be empty** (migration 0067), and empty is a decision rather than a
+  /// gap: a designed banner has the offer set into the artwork already, and a
+  /// headline drawn over it would be the same words twice in two typefaces.
   final String title;
 
   /// The line under it. May be empty — a slide is allowed to be one line.
+  /// The database refuses a sub-line with no [title] above it.
   final String subtitle;
 
   /// What the button says, e.g. "Order now".
+  ///
+  /// **Empty means the slide has no button** (migration 0067). The tap does not
+  /// go away with it — the whole slide becomes the target instead, so a banner
+  /// with its own painted-on button still opens [ctaTarget].
   final String ctaLabel;
 
   /// Cloudinary-hosted artwork. Never empty: the table requires it.

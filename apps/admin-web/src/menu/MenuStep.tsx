@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api'
 import type { MenuItemRow } from '../lib/api'
-import { Button, ConfirmDialog } from '../ui/primitives'
+import { Banner, Button, ConfirmDialog } from '../ui/primitives'
 import { ItemDialog } from './ItemDialog'
 import { ImportDialog } from './ImportDialog'
 
@@ -167,9 +167,7 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
       </div>
 
       {error && (
-        <p className="mt-4 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
-          {error}
-        </p>
+        <Banner tone="error" className="mt-4" onDismiss={() => setError(null)}>{error}</Banner>
       )}
 
       <div className="mt-5 space-y-5">

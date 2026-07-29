@@ -9,7 +9,15 @@ import {
   UploadFailure,
 } from '../lib/uploads'
 import { PageHeader } from '../ui/AppShell'
-import { Button, ConfirmDialog, Field } from '../ui/primitives'
+import {
+  Banner,
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  Field,
+  Pill,
+  Toggle,
+} from '../ui/primitives'
 
 /// The customer home hero.
 ///
@@ -79,6 +87,12 @@ function StatePill({ state }: { state: SlideState }) {
 /// the artwork* — they are not a bar above it — so the top 40% of every upload is
 /// underneath them. An admin who cannot see that will centre a face there and
 /// ship a headline across somebody's nose.
+///
+/// **Nothing here is a placeholder.** It used to print "Your headline" and
+/// "Order now" into an empty slide, which was fine when both were compulsory and
+/// became a lie the moment they were not: an admin turning the headline off saw
+/// the words still sitting there and could not tell whether they had worked.
+/// What this draws is what ships, including nothing.
 function SlidePreview({
   imageUrl,
   motionUrl,
@@ -94,6 +108,7 @@ function SlidePreview({
   ctaLabel: string
   hasTarget: boolean
 }) {
+  const bare = !title && !subtitle && !ctaLabel
   return (
     <div>
       <div
@@ -101,7 +116,11 @@ function SlidePreview({
         style={{ width: `${PREVIEW_WIDTH}px`, height: px(HERO_HEIGHT) }}
       >
         {imageUrl ? (
-          <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+          // `object-fill`, matching the app's `BoxFit.fill` since 0067. Not a
+          // detail: `object-cover` here would quietly crop the preview the same
+          // way the phone used to, and an admin would compose against a frame
+          // the phone no longer draws.
+          <img src={imageUrl} alt="" className="h-full w-full object-fill" />
         ) : (
           // The app's fallback, so an empty preview is still honest about what a
           // slide with no artwork would look like — which is why the RPC refuses
@@ -118,18 +137,24 @@ function SlidePreview({
           <img
             src={motionUrl}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-fill"
           />
         )}
 
-        {/* The scrim the app draws under its copy. */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              'linear-gradient(to bottom, rgba(0,0,0,0.2) 35%, rgba(0,0,0,0.6))',
-          }}
-        />
+        {/* The scrim the app draws under its copy — and only when there is copy
+            to put a floor under. A slide that is nothing but artwork gets no
+            scrim, because darkening the bottom half of a picture for the sake
+            of text that is not there is exactly the thing this change exists to
+            stop. The app makes the same test. */}
+        {!bare && (
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(to bottom, rgba(0,0,0,0.2) 35%, rgba(0,0,0,0.6))',
+            }}
+          />
+        )}
 
         {/* Location row. */}
         <div
@@ -171,46 +196,58 @@ function SlidePreview({
             justifyContent: 'flex-end',
           }}
         >
-          <span
-            className="w-full font-extrabold leading-none text-white"
-            style={{
-              fontSize: px(HEADLINE_SIZE),
-              // Two lines and then it clips, same as the app's `maxLines: 2`.
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-              textShadow: '0 1px 2px rgba(0,0,0,0.4)',
-            }}
-          >
-            {title || 'Your headline'}
-          </span>
+          {title && (
+            <span
+              className="w-full font-extrabold text-white"
+              style={{
+                fontSize: px(HEADLINE_SIZE),
+                lineHeight: 1.05,
+                // Two lines and then it clips, same as the app's `maxLines: 2`.
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+              }}
+            >
+              {title}
+            </span>
+          )}
           {subtitle && (
             <span
-              className="mt-1 w-full text-white/90"
-              style={{ fontSize: px(14) }}
+              className="w-full text-white/90"
+              style={{ fontSize: px(14), marginTop: title ? px(4) : 0 }}
             >
               {subtitle}
             </span>
           )}
-          <span
-            className="mt-3 inline-flex items-center rounded-full bg-white font-semibold text-brand-deep"
-            style={{
-              fontSize: px(14),
-              paddingLeft: px(24),
-              paddingRight: px(24),
-              paddingTop: px(12),
-              paddingBottom: px(12),
-            }}
-          >
-            {ctaLabel || 'Order now'} {hasTarget ? '→' : '↓'}
-          </span>
+          {ctaLabel && (
+            <span
+              className="inline-flex items-center rounded-full bg-white font-semibold text-brand-deep"
+              style={{
+                fontSize: px(14),
+                marginTop: title || subtitle ? px(16) : 0,
+                paddingLeft: px(24),
+                paddingRight: px(24),
+                paddingTop: px(12),
+                paddingBottom: px(12),
+              }}
+            >
+              {ctaLabel} {hasTarget ? '→' : '↓'}
+            </span>
+          )}
         </div>
       </div>
       <p className="mt-2 max-w-[264px] text-xs text-ink-muted">
         A 393pt phone, to scale. The location row and search pill float on the
         artwork — keep faces and text out of the top third.
       </p>
+      {bare && (
+        <p className="mt-1.5 max-w-[264px] text-xs text-ink-muted">
+          Artwork only. The whole slide is the tap target, so a destination below
+          still works.
+        </p>
+      )}
     </div>
   )
 }
@@ -233,6 +270,29 @@ function SlideForm({
   const [subtitle, setSubtitle] = useState(editing?.subtitle ?? '')
   const [ctaLabel, setCtaLabel] = useState(editing?.cta_label ?? 'Order now')
   const [ctaTarget, setCtaTarget] = useState(editing?.cta_target ?? '')
+
+  // Whether the slide *has* a headline and a button, held apart from what they
+  // say. Two states and not one, so switching the headline off and back on
+  // returns the words that were there rather than an empty box — an admin
+  // comparing "with the headline" against "without it" should not have to retype
+  // it each time they look.
+  //
+  // A new slide starts with both on, because that is the shape almost every
+  // campaign has. An existing one starts with whatever it was saved as: the
+  // empty string is the absence, exactly as the column means it.
+  const [hasTitle, setHasTitle] = useState(
+    editing ? editing.title !== '' : true,
+  )
+  const [hasCta, setHasCta] = useState(
+    editing ? editing.cta_label !== '' : true,
+  )
+
+  // What actually reaches the database, and what the preview draws. Everything
+  // below reads these rather than the raw fields, so there is one answer to
+  // "does this slide have a headline" instead of two that can disagree.
+  const liveTitle = hasTitle ? title : ''
+  const liveSubtitle = hasTitle ? subtitle : ''
+  const liveCta = hasCta ? ctaLabel : ''
   const [imageUrl, setImageUrl] = useState(editing?.image_url ?? '')
   const [motionUrl, setMotionUrl] = useState(editing?.motion_url ?? '')
   const [sortOrder, setSortOrder] = useState(String(editing?.sort_order ?? 0))
@@ -287,9 +347,9 @@ function SlideForm({
         e.preventDefault()
         onSubmit({
           id: editing?.id ?? null,
-          title,
-          subtitle,
-          cta_label: ctaLabel,
+          title: liveTitle,
+          subtitle: liveSubtitle,
+          cta_label: liveCta,
           cta_target: ctaTarget,
           image_url: imageUrl,
           motion_url: motionUrl,
@@ -304,46 +364,71 @@ function SlideForm({
     >
       <div className="flex flex-wrap gap-6">
         <div className="min-w-72 flex-1 space-y-4">
-          <Field
-            label="Headline"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="FLAT ₹150 OFF"
-            hint="Two lines at most, and short ones. It is set at 42pt on the phone."
-          />
-          <Field
-            label="Sub-line (optional)"
-            value={subtitle}
-            onChange={(e) => setSubtitle(e.target.value)}
-            placeholder="On orders above ₹399"
-          />
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Button text"
-              value={ctaLabel}
-              onChange={(e) => setCtaLabel(e.target.value)}
-              placeholder="Order now"
+          {/* Two switches rather than "leave the box empty", because an empty
+              box is ambiguous — it reads as something not filled in yet, and an
+              admin who wanted no headline could never be sure they had got what
+              they asked for. A switch that is off is a decision. */}
+          <div className="space-y-4 rounded-[8px] bg-canvas p-4">
+            <Toggle
+              label="Headline"
+              checked={hasTitle}
+              onChange={setHasTitle}
+              hint="Off for artwork that already carries its own words — the app draws nothing over the picture, and no dark scrim under it."
             />
+            {hasTitle && (
+              <div className="space-y-4">
+                <Field
+                  label="Headline text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="FLAT ₹150 OFF"
+                  hint="Two lines at most, and short ones. It is set at 42pt on the phone."
+                />
+                <Field
+                  label="Sub-line (optional)"
+                  value={subtitle}
+                  onChange={(e) => setSubtitle(e.target.value)}
+                  placeholder="On orders above ₹399"
+                  hint="Needs a headline above it — the database refuses a sub-line on its own."
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4 rounded-[8px] bg-canvas p-4">
+            <Toggle
+              label="Button"
+              checked={hasCta}
+              onChange={setHasCta}
+              hint="Off and the whole slide becomes tappable instead, so a banner with its own painted-on button still goes where you send it."
+            />
+            {hasCta && (
+              <Field
+                label="Button text"
+                value={ctaLabel}
+                onChange={(e) => setCtaLabel(e.target.value)}
+                placeholder="Order now"
+              />
+            )}
             <Field
-              label="Position"
-              type="number"
-              min={0}
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
-              hint="Lowest first."
+              label={hasCta ? 'Where the button goes (optional)' : 'Where the slide goes (optional)'}
+              value={ctaTarget}
+              onChange={(e) => setCtaTarget(e.target.value)}
+              placeholder="/restaurant/r3"
+              // The database owns this list and refuses anything else, including
+              // a restaurant that is not published. Stating it here saves a
+              // round trip; it does not replace the check.
+              hint={`Leave empty and the tap scrolls the customer to the restaurant list — the way it works today. Otherwise: /restaurant/<id>, /gifts, /orders or /favourites.`}
             />
           </div>
 
           <Field
-            label="Where the button goes (optional)"
-            value={ctaTarget}
-            onChange={(e) => setCtaTarget(e.target.value)}
-            placeholder="/restaurant/r3"
-            // The database owns this list and refuses anything else, including a
-            // restaurant that is not published. Stating it here saves a round
-            // trip; it does not replace the check.
-            hint="Leave empty and the button scrolls the customer to the restaurant list — the way it works today. Otherwise: /restaurant/<id>, /gifts, /orders or /favourites."
+            label="Position"
+            type="number"
+            min={0}
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            hint="Lowest first."
           />
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -383,8 +468,15 @@ function SlideForm({
               />
             </label>
             <p className="mt-1.5 text-sm text-ink-muted">
-              Roughly square, and at least 800px wide. Uploaded to Cloudinary —
-              the database will not accept art from anywhere else.
+              Square, and at least 800px wide. The app <strong>stretches</strong>{' '}
+              the picture to fill the phone rather than cropping it, so nothing
+              you put near an edge is ever cut off — but a picture that is not
+              square arrives slightly squashed. The hero is 393 × 396 on a
+              typical phone, so square is the shape that lands untouched.
+            </p>
+            <p className="mt-1 text-sm text-ink-muted">
+              Uploaded to Cloudinary — the database will not accept art from
+              anywhere else.
             </p>
             {uploadError && (
               <p className="mt-1.5 text-sm text-non-veg">{uploadError}</p>
@@ -477,9 +569,9 @@ function SlideForm({
         <SlidePreview
           imageUrl={imageUrl}
           motionUrl={motionUrl}
-          title={title}
-          subtitle={subtitle}
-          ctaLabel={ctaLabel}
+          title={liveTitle}
+          subtitle={liveSubtitle}
+          ctaLabel={liveCta}
           hasTarget={ctaTarget.trim() !== ''}
         />
       </div>
@@ -553,9 +645,9 @@ export function HeroSlidesPage() {
 
       <div className="max-w-5xl p-6">
         {error && (
-          <p className="mb-4 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
+          <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
             {error}
-          </p>
+          </Banner>
         )}
 
         <div className="rounded-[12px] border border-line bg-white p-6">
@@ -595,9 +687,13 @@ export function HeroSlidesPage() {
           )}
 
           {slides !== null && slides.length === 0 && !adding && (
-            <p className="mt-5 text-sm text-ink-muted">
-              No slides yet. Add one — it stays switched off until you publish it.
-            </p>
+            <div className="mt-5">
+              <EmptyState
+                title="No slides yet"
+                body="The app is showing the artwork it ships with, which is a working home screen. A slide you add here stays switched off until you publish it."
+                action={<Button onClick={() => setAdding(true)}>Add slide</Button>}
+              />
+            </div>
           )}
 
           {slides !== null && slides.length > 0 && (
@@ -613,19 +709,24 @@ export function HeroSlidesPage() {
                     />
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-2 text-sm font-medium text-ink">
-                        <span className="tabular-nums text-ink-muted">
+                        <span className="text-ink-muted tabular-nums">
                           {s.sort_order}
                         </span>
-                        <span className="truncate">{s.title}</span>
+                        {/* A slide can have no headline since 0067, and the row
+                            has to be identifiable anyway. "Artwork only" is what
+                            it is, not a missing value to be apologised for. */}
+                        <span
+                          className={`truncate ${s.title ? '' : 'text-ink-muted italic'}`}
+                        >
+                          {s.title || 'Artwork only'}
+                        </span>
                         <StatePill state={state} />
-                        {s.motion_url && (
-                          <span className="inline-block whitespace-nowrap rounded-full bg-canvas px-2.5 py-1 text-xs font-semibold text-ink-muted">
-                            Loop
-                          </span>
-                        )}
+                        {s.motion_url && <Pill>Loop</Pill>}
                       </p>
                       <p className="truncate text-sm text-ink-muted">
-                        {s.cta_label} →{' '}
+                        {s.cta_label
+                          ? `${s.cta_label} → `
+                          : 'whole slide taps → '}
                         {s.cta_target ?? 'the restaurant list (scrolls down)'} ·{' '}
                         {windowText(s)}
                       </p>
@@ -685,9 +786,14 @@ export function HeroSlidesPage() {
 
       {deleting && (
         <ConfirmDialog
-          title={`Delete "${deleting.title}"?`}
+          title={
+            deleting.title
+              ? `Delete "${deleting.title}"?`
+              : `Delete the slide at position ${deleting.sort_order}?`
+          }
           body="The slide and its schedule are erased. The uploaded image stays on Cloudinary. If this campaign might come back, switch it off instead — that is reversible and this is not."
           confirmLabel="Delete"
+          tone="danger"
           busy={busy}
           onCancel={() => setDeleting(null)}
           onConfirm={() =>

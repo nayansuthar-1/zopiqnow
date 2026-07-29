@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api, statusOf } from '../lib/api'
 import type { RestaurantRow, Status } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
-import { Button, ConfirmDialog } from '../ui/primitives'
+import { Banner, Button, ConfirmDialog, EmptyState, Pill, TableSkeleton } from '../ui/primitives'
 
 const statusLabels: Record<Status, string> = {
   live: 'Live',
@@ -12,21 +12,15 @@ const statusLabels: Record<Status, string> = {
   delisted: 'Delisted',
 }
 
-const statusStyles: Record<Status, string> = {
-  live: 'bg-veg-soft text-veg',
-  paused: 'bg-warn-soft text-warn',
-  draft: 'bg-canvas text-ink-muted',
-  delisted: 'bg-non-veg-soft text-non-veg',
+const statusTones: Record<Status, 'live' | 'warn' | 'neutral' | 'danger'> = {
+  live: 'live',
+  paused: 'warn',
+  draft: 'neutral',
+  delisted: 'danger',
 }
 
 function StatusPill({ status }: { status: Status }) {
-  return (
-    <span
-      className={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyles[status]}`}
-    >
-      {statusLabels[status]}
-    </span>
-  )
+  return <Pill tone={statusTones[status]}>{statusLabels[status]}</Pill>
 }
 
 export function RestaurantsPage() {
@@ -135,21 +129,28 @@ export function RestaurantsPage() {
         </div>
 
         {error && (
-          <p className="mb-4 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
-            {error}
-          </p>
+          <Banner tone="error" className="mb-4">{error}</Banner>
         )}
 
         {rows === null ? (
-          <p className="text-sm text-ink-muted">Loading…</p>
+          <TableSkeleton rows={5} />
         ) : visible.length === 0 ? (
-          <div className="rounded-[12px] border border-line bg-white px-6 py-12 text-center">
-            <p className="text-sm text-ink-muted">
-              {rows.length === 0
-                ? 'No restaurants yet. Add the first one.'
-                : 'Nothing matches that.'}
-            </p>
-          </div>
+          rows.length === 0 ? (
+            <EmptyState
+              title="No restaurants yet"
+              body="Restaurants are onboarded here and nowhere else — there is no self-service signup. Add the first one."
+              action={
+                <Button onClick={() => navigate('/restaurants/new')}>
+                  Add restaurant
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              title="Nothing matches that"
+              body="No restaurant matches this search and filter together. Try clearing one of them."
+            />
+          )
         ) : (
           <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
             <table className="w-full min-w-[820px] text-left text-sm">

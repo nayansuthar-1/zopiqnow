@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import type { DailyOrders, PlatformStats, TopRestaurant } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
+import { Banner, SegmentedControl, Skeleton } from '../ui/primitives'
 
 /// The platform's own numbers. The vendor app has had a restaurant's since
 /// migration 0017; nobody has ever been able to ask how the whole thing is
@@ -64,30 +65,31 @@ export function AnalyticsPage() {
 
       <div className="space-y-6 p-6">
         {error && (
-          <p className="max-w-2xl rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
+          <Banner tone="error" className="max-w-2xl" onDismiss={() => setError(null)}>
             {error}
-          </p>
+          </Banner>
         )}
 
-        <div className="flex gap-1">
-          {RANGES.map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => setDays(d)}
-              className={`rounded-[8px] px-3 py-1.5 text-sm font-medium transition-colors ${
-                days === d
-                  ? 'bg-brand-soft text-brand-deep'
-                  : 'text-ink-muted hover:bg-canvas hover:text-ink'
-              }`}
-            >
-              Last {d} days
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Time range"
+          value={String(days)}
+          onChange={(v) => setDays(Number(v))}
+          options={RANGES.map((d) => ({
+            value: String(d),
+            label: `Last ${d} days`,
+          }))}
+        />
 
         {stats === null ? (
-          <p className="text-sm text-ink-muted">Loading…</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 8 }, (_, i) => (
+              <div key={i} className="rounded-[12px] border border-line bg-white p-5">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="mt-3 h-7 w-28" />
+                <Skeleton className="mt-2 h-3 w-32" />
+              </div>
+            ))}
+          </div>
         ) : (
           <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

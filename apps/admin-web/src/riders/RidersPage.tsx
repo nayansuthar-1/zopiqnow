@@ -2,7 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import type { RiderRow, Vehicle } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
-import { Button, ConfirmDialog, Field } from '../ui/primitives'
+import {
+  Banner,
+  Button,
+  ConfirmDialog,
+  Field,
+  Modal,
+  Skeleton,
+} from '../ui/primitives'
 
 /// The delivery fleet.
 ///
@@ -163,9 +170,7 @@ export function RidersPage() {
 
       <div className="max-w-3xl p-6">
         {error && (
-          <p className="mb-4 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
-            {error}
-          </p>
+          <Banner tone="error" className="mb-4">{error}</Banner>
         )}
 
         <div className="rounded-[12px] border border-line bg-white p-6">
@@ -356,25 +361,31 @@ function BankDialog({ rider, onClose }: { rider: RiderRow; onClose: () => void }
   }, [rider.email])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-      <div className="w-full max-w-md rounded-[12px] bg-white p-6">
-        <h2 className="text-base font-bold text-ink">Bank details · {rider.name}</h2>
-        <p className="mt-1 text-sm text-ink-muted">
-          Where their weekly payout is sent. The rider never sees or edits this.
-        </p>
+    <Modal
+      busy={busy}
+      onClose={onClose}
+      title={`Bank details · ${rider.name}`}
+    >
+      <p className="text-sm text-ink-muted">
+        Where their weekly payout is sent. The rider never sees or edits this.
+      </p>
 
-        {error && (
-          <p className="mt-4 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
-            {error}
-          </p>
-        )}
+      {error && (
+        <Banner tone="error" className="mt-4" onDismiss={() => setError(null)}>
+          {error}
+        </Banner>
+      )}
 
-        {!loaded ? (
-          <p className="mt-5 text-sm text-ink-muted">Loading…</p>
-        ) : (
-          <form
-            className="mt-5 grid gap-4"
-            onSubmit={(e) => {
+      {!loaded ? (
+        <div className="mt-5 space-y-3">
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+        </div>
+      ) : (
+        <form
+          className="mt-5 grid gap-4"
+          onSubmit={(e) => {
               e.preventDefault()
               setBusy(true)
               setError(null)
@@ -420,17 +431,21 @@ function BankDialog({ rider, onClose }: { rider: RiderRow; onClose: () => void }
               onChange={(e) => setBank(e.target.value)}
               placeholder="State Bank of India"
             />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={busy}>
-                Save
-              </Button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onClose}
+              disabled={busy}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" loading={busy}>
+              Save
+            </Button>
+          </div>
+        </form>
+      )}
+    </Modal>
   )
 }

@@ -3,7 +3,15 @@ import type { ReactNode } from 'react'
 import { api, DELIVERY_LABEL, STATUS_LABEL } from '../lib/api'
 import type { AdminOrderRow, OrderStatus } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
-import { Button, Field } from '../ui/primitives'
+import {
+  Banner,
+  Button,
+  CardSkeleton,
+  EmptyState,
+  Field,
+  Modal,
+  Pill,
+} from '../ui/primitives'
 
 /// The running floor. Every order that has not ended, oldest first, because the
 /// order that has been open longest is the one somebody is about to ring about.
@@ -20,15 +28,18 @@ import { Button, Field } from '../ui/primitives'
 
 const REFRESH_MS = 15_000
 
-const statusStyles: Record<OrderStatus, string> = {
-  placed: 'bg-warn-soft text-warn',
-  accepted: 'bg-brand-soft text-brand-deep',
-  preparing: 'bg-brand-soft text-brand-deep',
-  ready_for_pickup: 'bg-brand-soft text-brand-deep',
-  out_for_delivery: 'bg-veg-soft text-veg',
-  delivered: 'bg-veg-soft text-veg',
-  rejected: 'bg-non-veg-soft text-non-veg',
-  cancelled: 'bg-canvas text-ink-muted',
+const statusTones: Record<
+  OrderStatus,
+  'live' | 'warn' | 'danger' | 'neutral' | 'brand'
+> = {
+  placed: 'warn',
+  accepted: 'brand',
+  preparing: 'brand',
+  ready_for_pickup: 'brand',
+  out_for_delivery: 'live',
+  delivered: 'live',
+  rejected: 'danger',
+  cancelled: 'neutral',
 }
 
 function minutesSince(iso: string) {
@@ -154,20 +165,14 @@ export function LiveOrdersPage() {
 
       <div className="p-6">
         {error && (
-          <p className="mb-4 max-w-2xl rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
+          <Banner tone="error" className="mb-4 max-w-2xl" onDismiss={() => setError(null)}>
             {error}
-          </p>
+          </Banner>
         )}
         {note && (
-          <div className="mb-4 flex max-w-3xl items-start justify-between gap-4 rounded-[8px] bg-veg-soft px-4 py-3">
-            <p className="text-sm text-veg">{note}</p>
-            <button
-              className="text-sm font-semibold text-veg"
-              onClick={() => setNote(null)}
-            >
-              Dismiss
-            </button>
-          </div>
+          <Banner tone="success" className="mb-4 max-w-3xl" onDismiss={() => setNote(null)}>
+            {note}
+          </Banner>
         )}
 
         <form
@@ -202,13 +207,30 @@ export function LiveOrdersPage() {
         </form>
 
         {rows === null ? (
-          <p className="text-sm text-ink-muted">Loading…</p>
+          <CardSkeleton />
         ) : rows.length === 0 ? (
-          <p className="text-sm text-ink-muted">
-            {searching
-              ? 'No order with that id or phone number.'
-              : 'Nothing open. Every order placed today has been delivered, cancelled or rejected.'}
-          </p>
+          searching ? (
+            <EmptyState
+              title="No match"
+              body="No order carries that id, and no customer has that number. Order ids look like ZPQ-1044; a phone number matches on its last digits, with or without +91."
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setQuery('')
+                    void load('')
+                  }}
+                >
+                  Back to live
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              title="Nothing open"
+              body="Every order placed has been delivered, cancelled or rejected. This screen fills itself the moment somebody orders."
+            />
+          )
         ) : (
           <div className="space-y-3">
             {rows.map((o) => (
@@ -231,48 +253,52 @@ export function LiveOrdersPage() {
       </div>
 
       {acting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <div className="w-full max-w-md rounded-[12px] bg-white p-6">
-            <h2 className="text-base font-bold text-ink">
-              {acting.kind === 'release'
-                ? `Take ${acting.order.order_id} off its rider?`
-                : `Cancel ${acting.order.order_id}?`}
-            </h2>
-            <p className="mt-2 text-sm text-ink-muted">
-              {acting.kind === 'release'
-                ? `${acting.order.rider_name ?? 'The rider'} loses the job and is told why. The order goes back on the shelf and the dispatcher offers it to somebody else. They are never offered this order again.`
-                : `The order ends here. ${acting.order.customer_phone} is shown your sentence, the kitchen is told, and any rider on it is released. There is no undo — a delivered order can only be refunded.`}
-            </p>
-            <div className="mt-5">
-              <Field
-                label="Why"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder={
-                  acting.kind === 'release'
-                    ? 'Rider unreachable for 20 minutes'
-                    : 'Restaurant closed unexpectedly'
-                }
-                hint="This is the only record of the decision, and the customer reads it."
-              />
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
+        <Modal
+          busy={busy}
+          onClose={() => setActing(null)}
+          title={
+            acting.kind === 'release'
+              ? `Take ${acting.order.order_id} off its rider?`
+              : `Cancel ${acting.order.order_id}?`
+          }
+          footer={
+            <>
               <Button
-                variant="ghost"
+                variant="secondary"
                 onClick={() => setActing(null)}
                 disabled={busy}
               >
                 Keep it
               </Button>
               <Button
+                variant={acting.kind === 'cancel' ? 'danger' : 'primary'}
                 onClick={() => void act()}
-                disabled={busy || reason.trim() === ''}
+                loading={busy}
+                disabled={reason.trim() === ''}
               >
                 {acting.kind === 'release' ? 'Release' : 'Cancel the order'}
               </Button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p className="text-sm text-ink-muted">
+            {acting.kind === 'release'
+              ? `${acting.order.rider_name ?? 'The rider'} loses the job and is told why. The order goes back on the shelf and the dispatcher offers it to somebody else. They are never offered this order again.`
+              : `The order ends here. ${acting.order.customer_phone} is shown your sentence, the kitchen is told, and any rider on it is released. There is no undo — a delivered order can only be refunded.`}
+          </p>
+          <Field
+            className="mt-5"
+            label="Why"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={
+              acting.kind === 'release'
+                ? 'Rider unreachable for 20 minutes'
+                : 'Restaurant closed unexpectedly'
+            }
+            hint="This is the only record of the decision, and the customer reads it."
+          />
+        </Modal>
       )}
     </>
   )
@@ -307,11 +333,7 @@ function OrderCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-ink">{o.order_id}</span>
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyles[o.status]}`}
-            >
-              {STATUS_LABEL[o.status]}
-            </span>
+            <Pill tone={statusTones[o.status]}>{STATUS_LABEL[o.status]}</Pill>
             {awaitingAccept && (
               // The kitchen's five minutes (0051). Counted against
               // `orders.accept_deadline`, the same column the vendor tablet
@@ -341,11 +363,11 @@ function OrderCard({
         {!ended && (
           <div className="flex gap-2">
             {(o.rider_email || o.offer_to) && (
-              <Button variant="secondary" className="h-9 px-3" onClick={onRelease}>
+              <Button variant="secondary" size="sm" onClick={onRelease}>
                 Release rider
               </Button>
             )}
-            <Button variant="secondary" className="h-9 px-3" onClick={onCancel}>
+            <Button variant="secondary" size="sm" onClick={onCancel}>
               Cancel order
             </Button>
           </div>

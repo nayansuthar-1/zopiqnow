@@ -2,7 +2,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import type { RiderPayoutRow } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
-import { Button, Field } from '../ui/primitives'
+import {
+  Banner,
+  Button,
+  EmptyState,
+  Field,
+  Modal,
+  SegmentedControl,
+  TableSkeleton,
+} from '../ui/primitives'
 
 /// What the platform owes its riders, and the record that it paid.
 ///
@@ -77,36 +85,39 @@ export function PayoutsPage() {
 
       <div className="p-6">
         {error && (
-          <p className="mb-4 max-w-2xl rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
+          <Banner
+            tone="error"
+            className="mb-4 max-w-2xl"
+            onDismiss={() => setError(null)}
+          >
             {error}
-          </p>
+          </Banner>
         )}
 
-        <div className="mb-4 flex gap-1">
-          {(['pending', 'paid', 'all'] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFilter(f)}
-              className={`rounded-[8px] px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-                filter === f
-                  ? 'bg-brand-soft text-brand-deep'
-                  : 'text-ink-muted hover:bg-canvas hover:text-ink'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
+        <div className="mb-4">
+          <SegmentedControl
+            label="Filter payouts"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: 'pending', label: 'Pending' },
+              { value: 'paid', label: 'Paid' },
+              { value: 'all', label: 'All' },
+            ]}
+          />
         </div>
 
         {rows === null ? (
-          <p className="text-sm text-ink-muted">Loading…</p>
+          <TableSkeleton />
         ) : rows.length === 0 ? (
-          <p className="text-sm text-ink-muted">
-            {filter === 'pending'
-              ? 'Nothing owed. Either every payout is settled, or no deliveries have been completed since the last run.'
-              : 'Nothing here yet.'}
-          </p>
+          <EmptyState
+            title={filter === 'pending' ? 'Nothing owed' : 'Nothing here yet'}
+            body={
+              filter === 'pending'
+                ? 'Either every payout is settled, or no deliveries have been completed since the last Monday run.'
+                : 'Payouts are rolled up every Monday at 01:00 for the week before. Nothing has been rolled up yet.'
+            }
+          />
         ) : (
           <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
             <table className="w-full min-w-[760px] text-sm">
@@ -152,8 +163,13 @@ export function PayoutsPage() {
                         {r.status === 'pending' && (
                           <Button
                             variant="secondary"
-                            className="h-9 px-3"
+                            size="sm"
                             disabled={!r.has_bank}
+                            title={
+                              r.has_bank
+                                ? undefined
+                                : 'No account on file for this rider. Add it from the Riders screen first.'
+                            }
                             onClick={() => {
                               setPaying(r)
                               setReference('')
@@ -173,27 +189,14 @@ export function PayoutsPage() {
       </div>
 
       {paying && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <div className="w-full max-w-md rounded-[12px] bg-white p-6">
-            <h2 className="text-base font-bold text-ink">
-              Mark ₹{paying.amount} to {paying.partner_name} as paid
-            </h2>
-            <p className="mt-1 text-sm text-ink-muted">
-              This records the payment — it does not send it. Make the transfer
-              first, then put the bank&rsquo;s reference here.
-            </p>
-            <div className="mt-5">
-              <Field
-                label="Bank reference (UTR)"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                placeholder="N123456789012345"
-                hint="Without this the payment cannot be traced later."
-              />
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
+        <Modal
+          busy={busy}
+          onClose={() => setPaying(null)}
+          title={`Mark ₹${paying.amount} to ${paying.partner_name} as paid`}
+          footer={
+            <>
               <Button
-                variant="ghost"
+                variant="secondary"
                 onClick={() => setPaying(null)}
                 disabled={busy}
               >
@@ -201,13 +204,27 @@ export function PayoutsPage() {
               </Button>
               <Button
                 onClick={() => void markPaid()}
-                disabled={busy || reference.trim() === ''}
+                loading={busy}
+                disabled={reference.trim() === ''}
               >
                 Mark paid
               </Button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p className="text-sm text-ink-muted">
+            This records the payment — it does not send it. Make the transfer
+            first, then put the bank&rsquo;s reference here.
+          </p>
+          <Field
+            className="mt-5"
+            label="Bank reference (UTR)"
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+            placeholder="N123456789012345"
+            hint="Without this the payment cannot be traced later."
+          />
+        </Modal>
       )}
     </>
   )

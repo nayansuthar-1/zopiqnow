@@ -39,9 +39,13 @@ class HeroSlideDataSource {
 
 HeroSlide _fromRow(Map<String, dynamic> row) => HeroSlide(
   id: row['id'] as String,
-  title: row['title'] as String,
+  title: (row['title'] as String?) ?? '',
+  // Not `?? 'Order now'` any more. 0067 made an empty label mean "no button",
+  // and defaulting here would have put one back on every slide that asked not
+  // to have one — the fallback would have been reading the *absence* of a
+  // button as a missing value.
+  ctaLabel: (row['cta_label'] as String?) ?? '',
   subtitle: (row['subtitle'] as String?) ?? '',
-  ctaLabel: (row['cta_label'] as String?) ?? 'Order now',
   imageUrl: row['image_url'] as String,
   motionUrl: row['motion_url'] as String?,
   ctaTarget: row['cta_target'] as String?,
