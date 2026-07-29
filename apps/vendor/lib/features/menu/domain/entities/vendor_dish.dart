@@ -20,6 +20,11 @@ class VendorDish {
     required this.isAvailable,
     this.isBestseller = false,
     this.imageUrl = '',
+    this.originalPrice,
+    this.unavailableReason = '',
+    this.prepMinutes,
+    this.serveFromMinutes,
+    this.serveToMinutes,
   });
 
   /// A dish being created, before the database has given it an id. `saveDish`
@@ -33,7 +38,12 @@ class VendorDish {
     this.imageUrl = '',
   }) : id = '',
        isAvailable = true,
-       isBestseller = false;
+       isBestseller = false,
+       originalPrice = null,
+       unavailableReason = '',
+       prepMinutes = null,
+       serveFromMinutes = null,
+       serveToMinutes = null;
 
   final String id;
   final String name;
@@ -45,6 +55,17 @@ class VendorDish {
 
   /// Price in whole rupees. The check constraint refuses anything <= 0.
   final int price;
+
+  /// A higher, struck-through number shown beside [price]. Null when there is
+  /// none, which is most dishes.
+  ///
+  /// **Display only.** `place_order` prices every line off [price] and has no
+  /// idea this column exists (migration 0068 says so on the line that does the
+  /// arithmetic). Nothing here computes it from [price] either — the vendor
+  /// types it, because a "was" price nobody ever charged is a misleading price
+  /// claim and the number has to be theirs.
+  final int? originalPrice;
+
   final bool isVeg;
 
   /// The menu section this dish sits under — "Recommended", "Biryanis". Free
@@ -57,12 +78,37 @@ class VendorDish {
   /// customer menu without anyone touching the price or deleting anything.
   final bool isAvailable;
 
+  /// Why it is off — "Paneer is over", "Tandoor is down". Kitchen-facing only:
+  /// an unavailable dish is already invisible to customers, so this is the note
+  /// the *next* shift reads, not an apology to a diner. '' when unstated.
+  final String unavailableReason;
+
   /// Whether the kitchen has flagged this as a bestseller. Shown to customers as
   /// a badge (the `is_bestseller` column has existed since 0002 and the customer
   /// menu already renders it) — this is the vendor finally getting to set it.
   final bool isBestseller;
 
+  /// How long this dish takes to cook, in minutes. Null when the kitchen has not
+  /// said — most dishes — and the prep-time sheet falls back to its own presets.
+  final int? prepMinutes;
+
+  /// The daily window this dish is served in, as minutes since midnight IST.
+  /// Both null (the common case) means all day. A [serveToMinutes] *earlier*
+  /// than [serveFromMinutes] crosses midnight, exactly as a restaurant's own
+  /// hours have since migration 0036.
+  final int? serveFromMinutes;
+  final int? serveToMinutes;
+
   bool get isNew => id.isEmpty;
+
+  /// Whether this dish is sold only during part of the day.
+  bool get hasServingWindow =>
+      serveFromMinutes != null && serveToMinutes != null;
+
+  /// True when a serving window runs past midnight — worth saying out loud in
+  /// the UI, because "22:00 – 02:00" on one row reads like a typo until it is.
+  bool get windowCrossesMidnight =>
+      hasServingWindow && serveToMinutes! < serveFromMinutes!;
 
   VendorDish copyWith({
     String? name,
@@ -73,6 +119,18 @@ class VendorDish {
     bool? isAvailable,
     bool? isBestseller,
     String? imageUrl,
+    String? unavailableReason,
+    // Nullable fields need a way to be cleared, and `null` already means "leave
+    // it alone" in a copyWith. So each takes an explicit `clear` flag rather
+    // than a sentinel value — the vendor removing a serving window is a real
+    // edit, not an absent one.
+    int? originalPrice,
+    bool clearOriginalPrice = false,
+    int? prepMinutes,
+    bool clearPrepMinutes = false,
+    int? serveFromMinutes,
+    int? serveToMinutes,
+    bool clearServingWindow = false,
   }) => VendorDish(
     id: id,
     name: name ?? this.name,
@@ -83,6 +141,17 @@ class VendorDish {
     isAvailable: isAvailable ?? this.isAvailable,
     isBestseller: isBestseller ?? this.isBestseller,
     imageUrl: imageUrl ?? this.imageUrl,
+    unavailableReason: unavailableReason ?? this.unavailableReason,
+    originalPrice: clearOriginalPrice
+        ? null
+        : (originalPrice ?? this.originalPrice),
+    prepMinutes: clearPrepMinutes ? null : (prepMinutes ?? this.prepMinutes),
+    serveFromMinutes: clearServingWindow
+        ? null
+        : (serveFromMinutes ?? this.serveFromMinutes),
+    serveToMinutes: clearServingWindow
+        ? null
+        : (serveToMinutes ?? this.serveToMinutes),
   );
 
   @override

@@ -336,22 +336,48 @@ class _CardImage extends StatelessWidget {
                 child: ColoredBox(
                   color: Colors.black.withValues(alpha: 0.55),
                   child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: ZopiqSpacing.md,
-                        vertical: ZopiqSpacing.xs + 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: ZopiqRadii.rPill,
-                      ),
-                      child: Text(
-                        'Closed for now',
-                        style: t.labelLarge?.copyWith(
-                          color: Colors.black,
-                          fontWeight: FontWeight.w700,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: ZopiqSpacing.md,
+                            vertical: ZopiqSpacing.xs + 2,
+                          ),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: ZopiqRadii.rPill,
+                          ),
+                          child: Text(
+                            'Closed for now',
+                            style: t.labelLarge?.copyWith(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                      ),
+                        // The kitchen's own reason, under the pill rather than
+                        // inside it: the pill is the fact and has to stay one
+                        // glance wide, the reason is the detail and may not fit.
+                        if (restaurant.pauseReason.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              ZopiqSpacing.lg,
+                              ZopiqSpacing.xs,
+                              ZopiqSpacing.lg,
+                              0,
+                            ),
+                            child: Text(
+                              restaurant.pauseReason,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: t.labelSmall?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.85),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),

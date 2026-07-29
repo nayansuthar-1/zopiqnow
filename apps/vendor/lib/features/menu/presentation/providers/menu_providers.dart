@@ -47,9 +47,14 @@ class MenuController extends Notifier<void> {
   Future<String?> setAvailability({
     required String dishId,
     required bool isAvailable,
+    String reason = '',
   }) async {
     try {
-      await _ds.setAvailability(dishId: dishId, isAvailable: isAvailable);
+      await _ds.setAvailability(
+        dishId: dishId,
+        isAvailable: isAvailable,
+        reason: reason,
+      );
       return null;
     } on MenuWriteFailure catch (e) {
       return e.message;

@@ -90,7 +90,7 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
 
 **Phase 2 is complete.**
 
-## Phase 3 — Menu & availability  🟡 IN PROGRESS
+## Phase 3 — Menu & availability  ✅ DONE
 
 **Slice 1 — Categories management — DONE (migration `0016`):**
 - [x] Sections screen (`ReorderableListView`): drag to reorder, rename, enable/
@@ -102,14 +102,54 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
       customer leans entirely on the RLS). Reorder stamps `category_rank`, rename
       rewrites `category` across the section, both via the existing 0010 update grant.
 
-**Remaining Phase 3 slices:**
-- [ ] Item merchandising extras: bestseller toggle, discounted price, out-of-stock
-      reason, per-item prep time (adds columns to `menu_items` — customer reads them)
-- [ ] Variants (Half/Full, sizes) and add-on groups (min/max/required) — net-new tables
-- [ ] Quick out-of-stock without opening the editor  *(already exists: the dish availability toggle)*
-- [ ] Item availability schedules (breakfast/lunch/dinner)
-- [ ] Restaurant hours + pause-with-reason (kitchen open/close exists via `0011`)
-- **Backend:** further migrations `0017`+ (item extras, variants/add-ons, schedules, hours).
+**Slice 2 — Variants & add-ons — DONE (migration `0048`).**
+- [x] One idea, not two: a group with (min 1, max 1) *is* a variant, anything else
+      is add-ons — no `type` column deciding behaviour. `set_menu_item_options`
+      swaps a dish's whole customisation in one transaction; `place_order` prices
+      `base + Σ price_delta` and **fills a required group with its cheapest option**
+      rather than refusing, so an options-unaware client still checks out.
+- [x] Vendor: `DishCustomizationPage` behind the editor's Customisation row.
+      Customer: `dish_options_sheet`, radios for variants, checkboxes for add-ons.
+
+**Slice 3 — Hours — DONE (migrations `0018`, `0036`).**
+- [x] `restaurant_hours` (one row per open day, absence = closed), wholesale
+      `set_restaurant_hours`, `restaurant_is_open_now` as `place_order`'s gate.
+      `0036` widened it to windows that cross midnight. Editor at More → Hours.
+
+**Slice 4 — Merchandising extras, serving windows, pause-with-reason — DONE
+(migration `0068`):**
+- [x] Bestseller toggle (the `is_bestseller` column has existed since 0002; the
+      vendor finally sets it, and the customer tile already rendered the badge).
+- [x] **Struck-through "was" price** (`menu_items.original_price`). **Display
+      only — never charged.** `place_order` prices every line off `price` and does
+      not read the column; the check constraint refuses anything not *above* the
+      live price. Nothing computes it from `price` — the vendor types it, and the
+      editor says under the field who gets charged what. Flagged to the user: a
+      "was" price nobody ever paid is a misleading price claim under the CCPA's
+      2022 guidelines and reads as an MRP claim under Legal Metrology; the
+      exposure is the restaurant's and the platform's.
+- [x] Out-of-stock reason (`unavailable_reason`). Kitchen-facing only — an
+      unavailable dish is already invisible to customers. The availability switch
+      stays **one tap and asks nothing**; the reason is offered *afterwards*, as an
+      "Add reason" row that appears under a sold-out dish, with four presets.
+- [x] Per-item prep time (`prep_minutes`, 1–240). Shown on the vendor row and on
+      the customer's dish tile.
+- [x] **Item serving windows** (`serve_from` / `serve_to`, both-or-neither, zero
+      length refused). Enforced in both places, the shape the rest of the schema
+      uses: customer read RLS hides an out-of-hours dish (zero customer-app work
+      required), and `place_order` refuses it with its own sentence — because RLS
+      is bypassed inside a definer function, and a cart built at 10:55 is still a
+      cart at 11:05. Midnight-crossing windows work, per `0036`'s logic.
+- [x] **Pause-with-reason** (`restaurants.pause_reason`). `set_accepting_orders`
+      gained a `p_reason` arg — the **one-arg signature was dropped**, not left to
+      become an overload. Reopening clears the reason *in Postgres*, so a stale
+      "power cut" cannot outlive the power coming back. Pausing asks why (four
+      presets + "without saying why"); reopening never asks. The customer sees the
+      kitchen's own sentence on the card scrim, the menu banner, and in
+      `place_order`'s refusal.
+- **Known gap, flagged not fixed:** `place_order` has never checked
+  `category_available`, so a stale cart can still order from a section the vendor
+  switched off (0016). Same class as the hole 0068 closes; left alone deliberately.
 - **Deps:** none.
 
 ## Phase 4 — Dashboard / home  ⬜
@@ -240,6 +280,25 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
   Home. Every guard exercised against the real database inside a rolled-back
   transaction, including the negative cases (staff keep orders and menu writes).
   Vendor 58/58 green, analyze clean.
+- **2026-07-30** — Phase 3 closed. Migration `0068` applied and verified against
+  the real database (psql, rolled-back transactions): the five new `menu_items`
+  columns and their constraints, `menu_item_is_servable_now` (normal *and*
+  midnight-crossing windows, both edges), the widened customer read policy (anon
+  sees the dish, loses it outside its window, gets it back inside), `place_order`
+  refusing an out-of-window line by name while an in-window one goes through,
+  `original_price` provably not reaching the charged unit price, the pause refusal
+  carrying the kitchen's own sentence, and `set_accepting_orders` clearing the
+  reason on reopen + truncating at 120 chars. Function list checked for
+  overloads — exactly one signature each. Vendor analyze clean; customer analyze
+  shows only pre-existing warnings in the user's WIP files.
+  - **A note on the "was" price:** the user's decision is that it is a marketing
+    device, not a real former price. Built as a plain vendor-typed column with a
+    display-only guarantee enforced in `place_order`; nothing fabricates or infers
+    the number. The legal exposure (CCPA misleading-advertisement guidelines,
+    Legal Metrology) was raised with the user before building.
+  - **Pre-existing quirk found, not fixed:** two successful `place_order` calls
+    cannot share one transaction — its `_lines` temp table is `on commit drop`.
+    Harmless for real clients (one call per transaction), a trap when testing.
 - **2026-07-17** — Phase 3 Slice 1 (Categories management): new Sections screen —
   reorder (drag), rename, enable/disable a whole section — reached from the Menu app
   bar, optimistic with revert-on-refusal. Migration `0016` applied: `category_available`

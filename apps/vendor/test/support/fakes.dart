@@ -57,6 +57,7 @@ class FakeVendorAuthDataSource implements VendorAuthDataSource {
   /// write should throw — so a test can drive both the happy path and the
   /// revert-on-failure path.
   bool? lastAcceptingOrders;
+  String? lastPauseReason;
   bool failAcceptingOrders = false;
 
   @override
@@ -75,9 +76,10 @@ class FakeVendorAuthDataSource implements VendorAuthDataSource {
   Future<Vendor?> restoreSession() async => signedInAs;
 
   @override
-  Future<void> setAcceptingOrders(bool accepting) async {
+  Future<void> setAcceptingOrders(bool accepting, {String reason = ''}) async {
     if (failAcceptingOrders) throw Exception('offline');
     lastAcceptingOrders = accepting;
+    lastPauseReason = reason;
   }
 
   @override
@@ -281,12 +283,17 @@ class FakeVendorMenuDataSource implements VendorMenuDataSource {
   Future<void> setAvailability({
     required String dishId,
     required bool isAvailable,
+    String reason = '',
   }) async {
     if (writeFailure != null) throw MenuWriteFailure(writeFailure!);
     _dishes = _dishes
         .map(
-          (VendorDish d) =>
-              d.id == dishId ? d.copyWith(isAvailable: isAvailable) : d,
+          (VendorDish d) => d.id == dishId
+              ? d.copyWith(
+                  isAvailable: isAvailable,
+                  unavailableReason: isAvailable ? '' : reason,
+                )
+              : d,
         )
         .toList(growable: false);
   }

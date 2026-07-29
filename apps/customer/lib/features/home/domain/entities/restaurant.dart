@@ -19,6 +19,7 @@ class Restaurant {
     required this.imageUrl,
     this.promoText,
     this.acceptingOrders = true,
+    this.pauseReason = '',
   });
 
   final String id;
@@ -48,6 +49,12 @@ class Restaurant {
   /// Defaults to true: a restaurant that has never touched the switch is open,
   /// and every mock fixture predates it.
   final bool acceptingOrders;
+
+  /// The kitchen's own words for why it paused — "Short on staff". Shown in
+  /// place of the generic "not taking orders" when there is one, and '' when the
+  /// kitchen is open or paused without explaining. Postgres clears it on reopen
+  /// (migration 0068), so it can never outlive the pause it belonged to.
+  final String pauseReason;
 
   @override
   bool operator ==(Object other) =>

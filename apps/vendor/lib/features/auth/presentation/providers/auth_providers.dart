@@ -93,14 +93,24 @@ class VendorAuthController extends Notifier<VendorAuthState> {
   /// "closed" while orders still arrive is the one lie this app must not tell.
   ///
   /// A no-op when not signed in: there is no restaurant to open or close.
-  Future<String?> setAcceptingOrders(bool accepting) async {
+  Future<String?> setAcceptingOrders(bool accepting, {String reason = ''}) async {
     final VendorAuthState current = state;
     if (current is! AuthSignedIn) return null;
     if (current.vendor.acceptingOrders == accepting) return null;
 
-    state = AuthSignedIn(current.vendor.copyWith(acceptingOrders: accepting));
+    // Mirrors what 0068 will write: the reason on the way down, and nothing on
+    // the way back up. Guessing wrong here would leave the banner disagreeing
+    // with the row until the next sign-in.
+    state = AuthSignedIn(
+      current.vendor.copyWith(
+        acceptingOrders: accepting,
+        pauseReason: accepting ? '' : reason,
+      ),
+    );
     try {
-      await ref.read(vendorAuthDataSourceProvider).setAcceptingOrders(accepting);
+      await ref
+          .read(vendorAuthDataSourceProvider)
+          .setAcceptingOrders(accepting, reason: reason);
       return null;
     } on Object {
       state = current;

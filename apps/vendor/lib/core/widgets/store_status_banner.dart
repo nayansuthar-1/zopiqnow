@@ -13,14 +13,92 @@ class StoreStatusBanner extends ConsumerWidget {
 
   final Vendor vendor;
 
+  /// Closing asks why; reopening does not. The asymmetry is the point — a
+  /// kitchen coming back online should never be made to answer a question, and
+  /// a kitchen going offline is about to disappear from every customer's feed,
+  /// which is worth one sentence. The reason is still skippable: it is what the
+  /// customer is shown in place of the platform's generic refusal, not a form.
   Future<void> _toggle(BuildContext context, WidgetRef ref, bool open) async {
+    String reason = '';
+    if (!open) {
+      final String? picked = await _askReason(context);
+      // Dismissed, rather than skipped — the kitchen backed out of pausing at
+      // all, so nothing is written.
+      if (picked == null) return;
+      reason = picked;
+    }
+
+    if (!context.mounted) return;
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final String? error = await ref
         .read(vendorAuthControllerProvider.notifier)
-        .setAcceptingOrders(open);
+        .setAcceptingOrders(open, reason: reason);
     if (error != null) {
       messenger.showSnackBar(SnackBar(content: Text(error)));
     }
+  }
+
+  /// The four reasons a kitchen actually pauses for, plus a way past them.
+  /// Returns the chosen sentence, '' for "don't say", or null if the sheet was
+  /// dismissed — which means the pause itself was called off.
+  Future<String?> _askReason(BuildContext context) {
+    const List<String> presets = <String>[
+      'Kitchen is closed right now',
+      'Too many orders in the queue',
+      'Short on staff',
+      'Equipment is down',
+    ];
+
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ZopiqSpacing.pageGutter,
+                0,
+                ZopiqSpacing.pageGutter,
+                ZopiqSpacing.xs,
+              ),
+              child: Text(
+                'Pause orders',
+                style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ZopiqSpacing.pageGutter,
+                0,
+                ZopiqSpacing.pageGutter,
+                ZopiqSpacing.sm,
+              ),
+              child: Text(
+                'Customers see this on your page while you\'re paused.',
+                style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
+                  color: sheetContext.zc.textMuted,
+                ),
+              ),
+            ),
+            for (final String preset in presets)
+              ListTile(
+                title: Text(preset),
+                onTap: () => Navigator.pop(sheetContext, preset),
+              ),
+            ListTile(
+              title: const Text('Pause without saying why'),
+              onTap: () => Navigator.pop(sheetContext, ''),
+            ),
+            const SizedBox(height: ZopiqSpacing.sm),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -91,6 +169,11 @@ class StoreStatusBanner extends ConsumerWidget {
                 Text(
                   open
                       ? 'Customers can order from you now.'
+                      // The kitchen's own words when it gave any, so the banner
+                      // shows what customers are being told rather than a
+                      // sentence about the app.
+                      : vendor.pauseReason.isNotEmpty
+                      ? '"${vendor.pauseReason}" — shown to customers.'
                       : 'You won\'t receive new orders until you reopen.',
                   style: t.bodySmall?.copyWith(
                     color: zc.textMuted,

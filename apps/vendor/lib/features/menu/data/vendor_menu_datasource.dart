@@ -12,9 +12,14 @@ abstract interface class VendorMenuDataSource {
 
   /// Flip one dish on or off. The single most-used action on the screen, so it
   /// is its own call and not a round-trip through the whole editor.
+  ///
+  /// [reason] is the kitchen's note on *why* it went off, written only when the
+  /// dish is going off — switching a dish back on clears it, because a stale
+  /// "paneer is over" on a dish that is selling again is worse than no note.
   Future<void> setAvailability({
     required String dishId,
     required bool isAvailable,
+    String reason = '',
   });
 
   /// Create ([VendorDish.isNew]) or update a dish. Returns it as the database
@@ -81,7 +86,8 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
 
   static const String _columns =
       'id, name, description, price, is_veg, is_bestseller, category, '
-      'is_available, image_url';
+      'is_available, image_url, original_price, unavailable_reason, '
+      'prep_minutes, serve_from, serve_to';
 
   @override
   Future<List<VendorMenuSection>> fetchMenu(String restaurantId) async {
@@ -125,11 +131,18 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
   Future<void> setAvailability({
     required String dishId,
     required bool isAvailable,
+    String reason = '',
   }) async {
     try {
       await _db
           .from('menu_items')
-          .update(<String, dynamic>{'is_available': isAvailable})
+          .update(<String, dynamic>{
+            'is_available': isAvailable,
+            // Coming back on always clears the note; going off writes whatever
+            // the caller has (often '' — the switch is one tap and does not stop
+            // to ask, so the reason arrives later or not at all).
+            'unavailable_reason': isAvailable ? '' : reason,
+          })
           .eq('id', dishId);
     } on PostgrestException catch (e) {
       throw MenuWriteFailure(e.message);
@@ -152,6 +165,14 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
       'is_bestseller': dish.isBestseller,
       'category': dish.category,
       'image_url': dish.imageUrl,
+      // Nulls are sent, not omitted: clearing a struck-through price or a
+      // serving window has to reach the row, and a key left out of a PostgREST
+      // patch leaves the old value sitting there.
+      'original_price': dish.originalPrice,
+      'prep_minutes': dish.prepMinutes,
+      'serve_from': _toPgTime(dish.serveFromMinutes),
+      'serve_to': _toPgTime(dish.serveToMinutes),
+      'unavailable_reason': dish.unavailableReason,
     };
 
     try {
@@ -305,7 +326,35 @@ class VendorMenuSupabaseDataSource implements VendorMenuDataSource {
     category: row['category'] as String,
     isAvailable: row['is_available'] as bool,
     imageUrl: row['image_url'] as String? ?? '',
+    originalPrice: (row['original_price'] as num?)?.toInt(),
+    unavailableReason: row['unavailable_reason'] as String? ?? '',
+    prepMinutes: (row['prep_minutes'] as num?)?.toInt(),
+    serveFromMinutes: _fromPgTime(row['serve_from']),
+    serveToMinutes: _fromPgTime(row['serve_to']),
   );
+
+  /// Minutes since midnight → the `HH:MM:SS` a Postgres `time` column takes.
+  /// Null passes straight through: no window is the common case and the column
+  /// is nullable for exactly that reason.
+  static String? _toPgTime(int? minutes) {
+    if (minutes == null) return null;
+    final String h = '${minutes ~/ 60}'.padLeft(2, '0');
+    final String m = '${minutes % 60}'.padLeft(2, '0');
+    return '$h:$m:00';
+  }
+
+  /// The other direction. PostgREST hands a `time` back as `HH:MM:SS`, and
+  /// anything it cannot parse is treated as no window rather than a crash — a
+  /// malformed time should cost the vendor a chip on a row, not the screen.
+  static int? _fromPgTime(Object? raw) {
+    if (raw is! String) return null;
+    final List<String> parts = raw.split(':');
+    if (parts.length < 2) return null;
+    final int? h = int.tryParse(parts[0]);
+    final int? m = int.tryParse(parts[1]);
+    if (h == null || m == null) return null;
+    return h * 60 + m;
+  }
 }
 
 class _Placement {

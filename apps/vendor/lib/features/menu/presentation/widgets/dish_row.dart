@@ -27,6 +27,10 @@ class _DishRowState extends ConsumerState<DishRow> {
   /// confirms. Seeded from the row and re-seeded whenever the list re-fetches
   /// (an add or edit rebuilds this widget with fresh data).
   late bool _available = widget.dish.isAvailable;
+
+  /// The sold-out note, held locally for the same reason [_available] is: it is
+  /// written without a re-fetch, so this is the only copy that moves.
+  late String _reason = widget.dish.unavailableReason;
   bool _busy = false;
 
   @override
@@ -35,11 +39,18 @@ class _DishRowState extends ConsumerState<DishRow> {
     if (oldWidget.dish.isAvailable != widget.dish.isAvailable) {
       _available = widget.dish.isAvailable;
     }
+    if (oldWidget.dish.unavailableReason != widget.dish.unavailableReason) {
+      _reason = widget.dish.unavailableReason;
+    }
   }
 
   Future<void> _toggle(bool next) async {
+    // Deliberately does not stop to ask why. The switch is the hot path of a
+    // rush and has to stay one tap; the reason is offered afterwards, on the row
+    // itself, where it costs nothing to skip.
     setState(() {
       _available = next;
+      if (next) _reason = '';
       _busy = true;
     });
     final String? failure = await ref
@@ -50,13 +61,105 @@ class _DishRowState extends ConsumerState<DishRow> {
       _busy = false;
       // Put it back if the write was refused. The list was never re-fetched, so
       // the local reading is the only thing that moved and the only thing to undo.
-      if (failure != null) _available = !next;
+      if (failure != null) {
+        _available = !next;
+        _reason = widget.dish.unavailableReason;
+      }
     });
     if (failure != null) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(failure)));
     }
+  }
+
+  /// Why this dish is off — asked after the fact, never before it. The presets
+  /// are the four answers a kitchen actually gives; "Something else" opens the
+  /// editor, where there is room to type.
+  Future<void> _askReason() async {
+    const List<String> presets = <String>[
+      'Ingredients are over',
+      'Not prepared today',
+      'Equipment is down',
+      'Off the menu for now',
+    ];
+
+    final String? picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ZopiqSpacing.pageGutter,
+                0,
+                ZopiqSpacing.pageGutter,
+                ZopiqSpacing.sm,
+              ),
+              child: Text(
+                'Why is ${widget.dish.name} off?',
+                style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            for (final String preset in presets)
+              ListTile(
+                title: Text(preset),
+                trailing: _reason == preset
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () => Navigator.pop(sheetContext, preset),
+              ),
+            if (_reason.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.close_rounded),
+                title: const Text('Clear the reason'),
+                onTap: () => Navigator.pop(sheetContext, ''),
+              ),
+            const SizedBox(height: ZopiqSpacing.sm),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+
+    final String previous = _reason;
+    setState(() {
+      _reason = picked;
+      _busy = true;
+    });
+    final String? failure = await ref
+        .read(menuControllerProvider.notifier)
+        .setAvailability(
+          dishId: widget.dish.id,
+          isAvailable: false,
+          reason: picked,
+        );
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (failure != null) _reason = previous;
+    });
+    if (failure != null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(failure)));
+    }
+  }
+
+  /// "8:00 AM – 11:00 AM", or "10:00 PM – 2:00 AM +1" when the window runs past
+  /// midnight. Formatted through [TimeOfDay.format], so it follows the device's
+  /// 12/24-hour setting rather than picking one for the kitchen.
+  static String _windowLabel(BuildContext context, VendorDish dish) {
+    String at(int minutes) =>
+        TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60).format(context);
+    final String span =
+        '${at(dish.serveFromMinutes!)} – ${at(dish.serveToMinutes!)}';
+    return dish.windowCrossesMidnight ? '$span +1' : span;
   }
 
   @override
@@ -127,10 +230,52 @@ class _DishRowState extends ConsumerState<DishRow> {
                     ),
                   ),
                   const SizedBox(height: ZopiqSpacing.xxs),
-                  Text(
-                    '₹${dish.price}',
-                    style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                  Row(
+                    children: <Widget>[
+                      Text(
+                        '₹${dish.price}',
+                        style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                      ),
+                      // The struck-through number, when there is one. It sits
+                      // *after* the live price and dimmer than it, so the price
+                      // that will actually be charged is the one read first.
+                      if (dish.originalPrice != null) ...<Widget>[
+                        const SizedBox(width: ZopiqSpacing.xs),
+                        Text(
+                          '₹${dish.originalPrice}',
+                          style: t.bodySmall?.copyWith(
+                            color: zc.textMuted,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                      ],
+                      if (dish.prepMinutes != null) ...<Widget>[
+                        const SizedBox(width: ZopiqSpacing.sm),
+                        Text(
+                          '${dish.prepMinutes} min',
+                          style: t.labelSmall?.copyWith(color: zc.textMuted),
+                        ),
+                      ],
+                    ],
                   ),
+                  if (dish.hasServingWindow) ...<Widget>[
+                    const SizedBox(height: ZopiqSpacing.xxs),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Icon(
+                          Icons.schedule_rounded,
+                          size: 12,
+                          color: zc.textMuted,
+                        ),
+                        const SizedBox(width: ZopiqSpacing.xxs),
+                        Text(
+                          _windowLabel(context, dish),
+                          style: t.labelSmall?.copyWith(color: zc.textMuted),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (dish.description.isNotEmpty) ...<Widget>[
                     const SizedBox(height: ZopiqSpacing.xxs),
                     Text(
@@ -138,6 +283,31 @@ class _DishRowState extends ConsumerState<DishRow> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: t.bodySmall?.copyWith(color: zc.textMuted),
+                    ),
+                  ],
+                  // Only while it is off, because that is the only time it is
+                  // true — and it is a button, not a label, so a kitchen that
+                  // flipped the switch mid-rush can come back and say why in one
+                  // tap, or never, without either being the wrong answer.
+                  if (!_available) ...<Widget>[
+                    const SizedBox(height: ZopiqSpacing.xs),
+                    InkWell(
+                      borderRadius: ZopiqRadii.rSm,
+                      onTap: _busy ? null : _askReason,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: ZopiqSpacing.xxs,
+                        ),
+                        child: Text(
+                          _reason.isEmpty ? 'Add a reason' : _reason,
+                          style: t.labelSmall?.copyWith(
+                            color: _reason.isEmpty ? zc.primary : zc.textMuted,
+                            fontWeight: _reason.isEmpty
+                                ? FontWeight.w600
+                                : null,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ],

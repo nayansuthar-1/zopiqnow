@@ -8,7 +8,8 @@ import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 /// places to forget `promo_text` the day someone adds a column.
 const String restaurantColumns =
     'id, name, cuisines, rating, rating_count, eta_minutes, price_for_two, '
-    'distance_km, is_veg, image_url, promo_text, accepting_orders';
+    'distance_km, is_veg, image_url, promo_text, accepting_orders, '
+    'pause_reason';
 
 /// Postgres row → domain entity. Numeric columns arrive as `num` (int or double
 /// depending on the value), so every one is coerced explicitly.
@@ -27,4 +28,5 @@ Restaurant restaurantFromRow(Map<String, dynamic> row) => Restaurant(
   // A row written before the column existed reads null; treat it as open, the
   // same default the column carries.
   acceptingOrders: row['accepting_orders'] as bool? ?? true,
+  pauseReason: row['pause_reason'] as String? ?? '',
 );

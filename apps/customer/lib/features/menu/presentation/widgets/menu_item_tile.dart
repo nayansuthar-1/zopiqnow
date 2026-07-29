@@ -111,14 +111,45 @@ class MenuItemTile extends ConsumerWidget {
                 const SizedBox(height: ZopiqSpacing.xs),
                 Text(item.name, style: t.titleMedium),
                 const SizedBox(height: ZopiqSpacing.xxs),
-                Text(
-                  // A customisable dish's price is a floor — options add to it.
-                  item.isCustomizable ? '₹${item.price} onwards' : '₹${item.price}',
-                  style: t.titleSmall,
+                Row(
+                  children: <Widget>[
+                    Text(
+                      // A customisable dish's price is a floor — options add to it.
+                      item.isCustomizable
+                          ? '₹${item.price} onwards'
+                          : '₹${item.price}',
+                      style: t.titleSmall,
+                    ),
+                    // The restaurant's stated former price. Struck through and
+                    // muted, after the live price, so the number that is charged
+                    // is the one the eye lands on first.
+                    if (item.originalPrice != null) ...<Widget>[
+                      const SizedBox(width: ZopiqSpacing.xs),
+                      Text(
+                        '₹${item.originalPrice}',
+                        style: t.bodySmall?.copyWith(
+                          color: zc.textMuted,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                if (item.rating != null) ...<Widget>[
+                if (item.rating != null || item.prepMinutes != null) ...<Widget>[
                   const SizedBox(height: ZopiqSpacing.xs),
-                  _ItemRating(rating: item.rating!, color: zc.rating),
+                  Row(
+                    children: <Widget>[
+                      if (item.rating != null)
+                        _ItemRating(rating: item.rating!, color: zc.rating),
+                      if (item.rating != null && item.prepMinutes != null)
+                        const SizedBox(width: ZopiqSpacing.sm),
+                      if (item.prepMinutes != null)
+                        Text(
+                          '${item.prepMinutes} min',
+                          style: t.labelMedium?.copyWith(color: zc.textMuted),
+                        ),
+                    ],
+                  ),
                 ],
                 const SizedBox(height: ZopiqSpacing.sm),
                 Text(

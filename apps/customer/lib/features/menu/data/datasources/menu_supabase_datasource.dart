@@ -22,7 +22,7 @@ class MenuSupabaseDataSource implements MenuDataSource {
         .from('menu_items')
         .select(
           'id, name, description, price, is_veg, is_bestseller, rating, '
-          'image_url, category, '
+          'image_url, category, original_price, prep_minutes, '
           // Variants & add-ons (0048). RLS returns only available options of a
           // visible dish, so nothing sold-out reaches the menu. Ordered in Dart.
           'menu_option_groups(id, name, min_select, max_select, rank, '
@@ -65,6 +65,8 @@ class MenuSupabaseDataSource implements MenuDataSource {
     // Null stays null: "unrated" is not "rated zero".
     rating: (row['rating'] as num?)?.toDouble(),
     imageUrl: row['image_url'] as String,
+    originalPrice: (row['original_price'] as num?)?.toInt(),
+    prepMinutes: (row['prep_minutes'] as num?)?.toInt(),
     optionGroups: _toGroups(row['menu_option_groups']),
   );
 

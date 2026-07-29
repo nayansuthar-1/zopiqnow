@@ -73,7 +73,9 @@ class _MenuBody extends ConsumerWidget {
         // Renders nothing when there is nothing to show.
         SliverToBoxAdapter(child: ReviewWall(restaurantId: restaurant.id)),
         if (!restaurant.acceptingOrders)
-          const SliverToBoxAdapter(child: _ClosedBanner()),
+          SliverToBoxAdapter(
+            child: _ClosedBanner(reason: restaurant.pauseReason),
+          ),
         const SliverToBoxAdapter(child: _VegOnlyToggle()),
         menu.when(
           loading: () => const SliverToBoxAdapter(child: _MenuLoading()),
@@ -139,7 +141,12 @@ class _MenuSection extends StatelessWidget {
 /// every ADD below it is greyed out — without it, a disabled button is just a
 /// bug the customer can see.
 class _ClosedBanner extends StatelessWidget {
-  const _ClosedBanner();
+  const _ClosedBanner({this.reason = ''});
+
+  /// The kitchen's own words, when it gave any (migration 0068). Preferred over
+  /// the platform's sentence because "short on staff" tells a customer whether
+  /// to wait ten minutes or eat somewhere else, and "paused orders" does not.
+  final String reason;
 
   @override
   Widget build(BuildContext context) {
@@ -175,8 +182,11 @@ class _ClosedBanner extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'This restaurant has paused orders. You can browse the '
-                    'menu, but you can\'t order right now.',
+                    reason.isNotEmpty
+                        ? '$reason. You can browse the menu, but you can\'t '
+                              'order right now.'
+                        : 'This restaurant has paused orders. You can browse '
+                              'the menu, but you can\'t order right now.',
                     style: t.bodySmall?.copyWith(color: zc.textMuted),
                   ),
                 ],

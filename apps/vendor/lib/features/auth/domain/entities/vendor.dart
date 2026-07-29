@@ -34,6 +34,7 @@ class Vendor {
     required this.restaurantName,
     required this.acceptingOrders,
     this.role = StaffRole.staff,
+    this.pauseReason = '',
   });
 
   final String email;
@@ -51,11 +52,23 @@ class Vendor {
   /// kitchen's orders.
   final bool acceptingOrders;
 
-  Vendor copyWith({String? restaurantName, bool? acceptingOrders}) => Vendor(
+  /// Why the kitchen is paused, when it said — "Short on staff". Shown to
+  /// customers in place of the platform's generic refusal, and cleared by
+  /// Postgres the moment [acceptingOrders] goes back to true (migration 0068),
+  /// so a stale reason cannot outlive the pause it explained. '' when open, or
+  /// when the kitchen paused without saying why.
+  final String pauseReason;
+
+  Vendor copyWith({
+    String? restaurantName,
+    bool? acceptingOrders,
+    String? pauseReason,
+  }) => Vendor(
     email: email,
     restaurantId: restaurantId,
     restaurantName: restaurantName ?? this.restaurantName,
     acceptingOrders: acceptingOrders ?? this.acceptingOrders,
+    pauseReason: pauseReason ?? this.pauseReason,
     role: role,
   );
 }
