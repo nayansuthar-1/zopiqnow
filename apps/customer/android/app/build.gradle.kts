@@ -31,6 +31,32 @@ val mapsApiKey: String = run {
     properties.getProperty("MAPS_API_KEY") ?: ""
 }
 
+// The release signing key, read from `android/key.properties` — gitignored,
+// alongside the `.jks` it points at.
+//
+// **Why this app stopped being signed with the debug key.** Google enforces a
+// *global* uniqueness rule on the pair (package name, signing certificate): a
+// given pair may be registered to exactly one OAuth client across every Cloud
+// project on earth. Ours was claimed by a project whose owning account is gone,
+// and whose OAuth client Google has since disabled — so native Google sign-in
+// failed with `Invalid key value: <sha1>:com.siteonlab.zopiqnow`, and the pair
+// could not be re-registered anywhere else because the dead project still holds
+// it. A different certificate is a different pair, which is the way out.
+//
+// **The keystore is not recoverable.** Lose the `.jks` or its password and this
+// application id can never be updated on Play again — a new certificate means a
+// new app. It is backed up outside this repo, and it is not in it.
+//
+// Absent on a fresh checkout, and deliberately not fatal: the build falls back
+// to debug signing so someone who clones this can still compile. Such a build
+// simply cannot do Google sign-in, which is the honest consequence.
+val keystoreProperties: Properties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hasReleaseKeystore: Boolean = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+
 android {
     namespace = "com.siteonlab.zopiqnow"
     // compileSdk tracks the pinned Flutter SDK (3.44.5 -> API 36). See ENGINEERING_RULES.md Rule 3.
@@ -62,10 +88,24 @@ android {
         }
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Replace debug signing with a real release keystore before publishing.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
