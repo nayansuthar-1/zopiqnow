@@ -1,6 +1,7 @@
 import 'package:zopiqnow/features/menu/data/datasources/menu_datasource.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_category.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
+import 'package:zopiqnow/features/menu/domain/entities/restaurant_review.dart';
 
 /// In-memory stand-in for the menu API. Returns a plausible categorized menu
 /// after a short delay so the shimmer is exercised.
@@ -17,6 +18,14 @@ class MenuMockDataSource implements MenuDataSource {
 
   final Duration latency;
   final bool shouldFail;
+
+  /// No reviews without a review service. Empty rather than invented: a wall of
+  /// fabricated praise is the one stand-in that would be actively misleading,
+  /// and "nobody has reviewed this yet" is a state the screen has to render
+  /// anyway.
+  @override
+  Future<List<RestaurantReview>> fetchReviews(String restaurantId) async =>
+      const <RestaurantReview>[];
 
   @override
   Future<List<MenuCategory>> fetchMenu(String restaurantId) async {

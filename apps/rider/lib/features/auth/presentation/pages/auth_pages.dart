@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_rider/core/widgets/rider_animations.dart';
+import 'package:zopiq_rider/core/widgets/rider_svg_icons.dart';
 import 'package:zopiq_rider/features/auth/data/rider_auth_datasource.dart';
 import 'package:zopiq_rider/features/auth/presentation/providers/auth_providers.dart';
 
@@ -11,12 +13,65 @@ class SplashPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final Color surfaceColor = Theme.of(context).colorScheme.surface;
+    final TextTheme t = Theme.of(context).textTheme;
+
     return Scaffold(
-      body: Center(
-        child: Icon(
-          Icons.delivery_dining_rounded,
-          size: 64,
-          color: context.zc.primary,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: <Color>[
+              zc.primary.withValues(alpha: 0.12),
+              surfaceColor,
+              surfaceColor,
+            ],
+          ),
+        ),
+        child: Center(
+          child: RiderFadeSlide(
+            offsetY: 20,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                RiderPulseBadge(
+                  enabled: true,
+                  glowColor: zc.primary,
+                  child: Container(
+                    padding: const EdgeInsets.all(ZopiqSpacing.lg),
+                    decoration: BoxDecoration(
+                      color: zc.primary.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: RiderSvgIcon(
+                      type: RiderSvgType.deliveryBike,
+                      size: 56,
+                      color: zc.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: ZopiqSpacing.lg),
+                Text(
+                  'ZOPIQNOW',
+                  style: t.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                    color: zc.primary,
+                  ),
+                ),
+                const SizedBox(height: ZopiqSpacing.xs),
+                Text(
+                  'Partner Delivery Fleet',
+                  style: t.labelLarge?.copyWith(
+                    color: zc.textMuted,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -24,10 +79,6 @@ class SplashPage extends StatelessWidget {
 }
 
 /// Sign in with the address ops onboarded the rider with.
-///
-/// No password, for the reason the vendor app gives: a delivery partner account
-/// is *an address someone wrote into a table*, and the only thing worth proving
-/// is that whoever is holding the phone can read mail sent to it.
 class SignInPage extends ConsumerStatefulWidget {
   const SignInPage({required this.onOtpSent, super.key});
 
@@ -63,14 +114,8 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       await ref.read(riderAuthControllerProvider.notifier).sendEmailOtp(email);
       if (mounted) widget.onOtpSent(email);
     } on RiderAuthFailure catch (e) {
-      // Supabase's own sentence, not ours. "You can only request this after 54
-      // seconds" is something a rider can act on; "please try again" is what
-      // they were told while the real problem went unnamed for four phases.
       if (mounted) setState(() => _error = e.message);
     } on Object {
-      // Anything that is not the auth service talking — no signal, DNS, a dead
-      // socket. There is nothing specific to say, so say the honest general
-      // thing and point at the one cause the rider can actually fix.
       if (mounted) {
         setState(
           () => _error = 'We couldn\'t reach Zopiqnow. Check your connection.',
@@ -88,40 +133,132 @@ class _SignInPageState extends ConsumerState<SignInPage> {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(ZopiqSpacing.xl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const Spacer(),
-              Icon(Icons.delivery_dining_rounded, size: 56, color: zc.primary),
-              const SizedBox(height: ZopiqSpacing.lg),
-              Text('Zopiqnow for partners', style: t.headlineSmall),
-              const SizedBox(height: ZopiqSpacing.xs),
-              Text(
-                'Sign in with the email you were signed up with.',
-                style: t.bodyMedium?.copyWith(color: zc.textMuted),
-              ),
-              const SizedBox(height: ZopiqSpacing.xl),
-              TextField(
-                controller: _email,
-                keyboardType: TextInputType.emailAddress,
-                autocorrect: false,
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  errorText: _error,
+          child: RiderFadeSlide(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const SizedBox(height: ZopiqSpacing.xxl),
+
+                // Brand Header Banner
+                Center(
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: <Color>[
+                          zc.primary,
+                          zc.primary.withValues(alpha: 0.7),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: ZopiqRadii.rXl,
+                      boxShadow: <BoxShadow>[
+                        BoxShadow(
+                          color: zc.primary.withValues(alpha: 0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: RiderSvgIcon(
+                        type: RiderSvgType.deliveryBike,
+                        size: 40,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
-                onSubmitted: (_) => _send(),
-              ),
-              const SizedBox(height: ZopiqSpacing.lg),
-              ZopiqButton(
-                label: 'Send code',
-                variant: ZopiqButtonVariant.cta,
-                isLoading: _sending,
-                onPressed: _send,
-              ),
-              const Spacer(flex: 2),
-            ],
+                const SizedBox(height: ZopiqSpacing.xl),
+
+                Center(
+                  child: Text(
+                    'Partner Sign In',
+                    style: t.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: ZopiqSpacing.xs),
+                Center(
+                  child: Text(
+                    'Welcome back! Enter your registered rider email to access your active shift.',
+                    textAlign: TextAlign.center,
+                    style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                  ),
+                ),
+
+                const SizedBox(height: ZopiqSpacing.xxl),
+
+                // Elevated Input Card
+                ZopiqCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'RIDER ACCOUNT EMAIL',
+                        style: t.labelSmall?.copyWith(
+                          color: zc.primary,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: ZopiqSpacing.sm),
+                      TextField(
+                        controller: _email,
+                        keyboardType: TextInputType.emailAddress,
+                        autocorrect: false,
+                        style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                        decoration: InputDecoration(
+                          hintText: 'rider@zopiqnow.com',
+                          prefixIcon: Icon(
+                            Icons.email_outlined,
+                            color: zc.textMuted,
+                          ),
+                          errorText: _error,
+                          border: OutlineInputBorder(
+                            borderRadius: ZopiqRadii.rMd,
+                          ),
+                        ),
+                        onSubmitted: (_) => _send(),
+                      ),
+                      const SizedBox(height: ZopiqSpacing.lg),
+                      ZopiqButton(
+                        label: 'Send Verification Code',
+                        variant: ZopiqButtonVariant.cta,
+                        isLoading: _sending,
+                        onPressed: _send,
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: ZopiqSpacing.xl),
+
+                Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      RiderSvgIcon(
+                        type: RiderSvgType.verifiedShield,
+                        size: 16,
+                        color: zc.textMuted,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Secure OTP Passwordless Authentication',
+                        style: t.bodySmall?.copyWith(color: zc.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -130,10 +267,6 @@ class _SignInPageState extends ConsumerState<SignInPage> {
 }
 
 /// The six digits mailed to the rider's address.
-///
-/// This screen never navigates itself. Verifying moves the auth state and the
-/// router's redirect is what leaves — either to the board, or to "you don't ride
-/// for us", and this screen neither knows nor cares which.
 class OtpPage extends ConsumerStatefulWidget {
   const OtpPage({required this.email, super.key});
 
@@ -154,10 +287,10 @@ class _OtpPageState extends ConsumerState<OtpPage> {
     super.dispose();
   }
 
-  Future<void> _verify() async {
-    final String code = _code.text.trim();
+  Future<void> _verify([String? otpCode]) async {
+    final String code = otpCode ?? _code.text.trim();
     if (code.length != 6) {
-      setState(() => _error = 'The code is 6 digits.');
+      setState(() => _error = 'The code must be 6 digits.');
       return;
     }
 
@@ -169,7 +302,6 @@ class _OtpPageState extends ConsumerState<OtpPage> {
       await ref
           .read(riderAuthControllerProvider.notifier)
           .verifyEmailOtp(email: widget.email, code: code);
-      // No navigation here, on purpose. See the class doc.
     } on RiderAuthFailure catch (failure) {
       if (mounted) setState(() => _error = failure.message);
     } on Object {
@@ -187,39 +319,97 @@ class _OtpPageState extends ConsumerState<OtpPage> {
     final TextTheme t = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        title: const Text('Verify Code'),
+        centerTitle: true,
+      ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(ZopiqSpacing.xl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text('Enter the code', style: t.headlineSmall),
-              const SizedBox(height: ZopiqSpacing.xs),
-              Text(
-                'We sent it to ${widget.email}.',
-                style: t.bodyMedium?.copyWith(color: zc.textMuted),
-              ),
-              const SizedBox(height: ZopiqSpacing.xl),
-              TextField(
-                controller: _code,
-                keyboardType: TextInputType.number,
-                autofocus: true,
-                maxLength: 6,
-                decoration: InputDecoration(
-                  labelText: '6-digit code',
-                  errorText: _error,
+          child: RiderFadeSlide(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const SizedBox(height: ZopiqSpacing.lg),
+
+                // Icon banner
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(ZopiqSpacing.lg),
+                    decoration: BoxDecoration(
+                      color: zc.primary.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: RiderSvgIcon(
+                      type: RiderSvgType.pickupKey,
+                      size: 40,
+                      color: zc.primary,
+                    ),
+                  ),
                 ),
-                onSubmitted: (_) => _verify(),
-              ),
-              const SizedBox(height: ZopiqSpacing.lg),
-              ZopiqButton(
-                label: 'Verify',
-                variant: ZopiqButtonVariant.cta,
-                isLoading: _verifying,
-                onPressed: _verify,
-              ),
-            ],
+                const SizedBox(height: ZopiqSpacing.lg),
+
+                Center(
+                  child: Text(
+                    'Enter 6-Digit Code',
+                    style: t.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: ZopiqSpacing.xs),
+                Center(
+                  child: RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                      children: <TextSpan>[
+                        const TextSpan(text: 'We sent a verification code to\n'),
+                        TextSpan(
+                          text: widget.email,
+                          style: TextStyle(
+                            color: zc.textStrong,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: ZopiqSpacing.xxl),
+
+                // Pin Input Box
+                Center(
+                  child: RiderPinInput(
+                    length: 6,
+                    controller: _code,
+                    autofocus: true,
+                    errorText: _error,
+                    onCompleted: (String code) => _verify(code),
+                  ),
+                ),
+
+                const SizedBox(height: ZopiqSpacing.xl),
+
+                ZopiqButton(
+                  label: 'Verify & Access Shift',
+                  variant: ZopiqButtonVariant.cta,
+                  isLoading: _verifying,
+                  onPressed: () => _verify(),
+                ),
+
+                const SizedBox(height: ZopiqSpacing.lg),
+
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                    label: const Text('Use a different email address'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -242,28 +432,44 @@ class NotPartnerPage extends ConsumerWidget {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(ZopiqSpacing.xl),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Icon(Icons.no_transfer_rounded, size: 56, color: zc.textMuted),
-              const SizedBox(height: ZopiqSpacing.lg),
-              Text('Not a delivery partner', style: t.titleLarge),
-              const SizedBox(height: ZopiqSpacing.sm),
-              Text(
-                '$email isn\'t signed up to deliver for Zopiqnow. If you think '
-                'that\'s wrong, talk to whoever onboarded you.',
-                textAlign: TextAlign.center,
-                style: t.bodyMedium?.copyWith(color: zc.textMuted),
-              ),
-              const SizedBox(height: ZopiqSpacing.xl),
-              ZopiqButton(
-                label: 'Sign out',
-                variant: ZopiqButtonVariant.outline,
-                expand: false,
-                onPressed: () =>
-                    ref.read(riderAuthControllerProvider.notifier).signOut(),
-              ),
-            ],
+          child: RiderFadeSlide(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Container(
+                  padding: const EdgeInsets.all(ZopiqSpacing.xl),
+                  decoration: BoxDecoration(
+                    color: zc.nonVeg.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: RiderSvgIcon(
+                    type: RiderSvgType.verifiedShield,
+                    size: 56,
+                    color: zc.nonVeg,
+                  ),
+                ),
+                const SizedBox(height: ZopiqSpacing.xl),
+                Text(
+                  'Account Not Onboarded',
+                  style: t.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: ZopiqSpacing.sm),
+                Text(
+                  '$email is not registered in the active delivery roster.\n\n'
+                  'If you were recently hired as a delivery partner, ask your operations coordinator to activate your email.',
+                  textAlign: TextAlign.center,
+                  style: t.bodyMedium?.copyWith(color: zc.textMuted, height: 1.4),
+                ),
+                const SizedBox(height: ZopiqSpacing.xxl),
+                ZopiqButton(
+                  label: 'Sign Out',
+                  variant: ZopiqButtonVariant.outline,
+                  expand: false,
+                  onPressed: () =>
+                      ref.read(riderAuthControllerProvider.notifier).signOut(),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -12,6 +12,7 @@ import 'package:zopiqnow/features/menu/domain/repositories/menu_repository.dart'
 import 'package:zopiqnow/features/menu/presentation/providers/menu_providers.dart';
 import 'package:zopiqnow/features/menu/presentation/widgets/menu_header.dart';
 import 'package:zopiqnow/features/menu/presentation/widgets/menu_item_tile.dart';
+import 'package:zopiqnow/features/menu/presentation/widgets/review_wall.dart';
 
 /// Restaurant detail — vitals plus the categorised menu, with the sticky cart
 /// bar docked at the bottom.
@@ -68,6 +69,9 @@ class _MenuBody extends ConsumerWidget {
       slivers: <Widget>[
         MenuSliverAppBar(restaurant: restaurant),
         SliverToBoxAdapter(child: MenuVitals(restaurant: restaurant)),
+        // What people said (0062), directly under the rating it explains.
+        // Renders nothing when there is nothing to show.
+        SliverToBoxAdapter(child: ReviewWall(restaurantId: restaurant.id)),
         if (!restaurant.acceptingOrders)
           const SliverToBoxAdapter(child: _ClosedBanner()),
         const SliverToBoxAdapter(child: _VegOnlyToggle()),

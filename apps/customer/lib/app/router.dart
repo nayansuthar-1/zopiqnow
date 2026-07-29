@@ -12,6 +12,7 @@ import 'package:zopiqnow/features/auth/presentation/pages/splash_page.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiqnow/features/cart/presentation/pages/cart_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/checkout_page.dart';
+import 'package:zopiqnow/features/checkout/presentation/pages/invoice_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/order_detail_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/order_success_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/orders_page.dart';
@@ -43,6 +44,7 @@ abstract final class Routes {
   static const String orderSuccess = 'orderSuccess';
   static const String orders = 'orders';
   static const String orderDetail = 'orderDetail';
+  static const String invoice = 'invoice';
   static const String favourites = 'favourites';
   static const String addresses = 'addresses';
   static const String addressNew = 'addressNew';
@@ -343,6 +345,17 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             name: Routes.orderDetail,
             builder: (BuildContext context, GoRouterState state) =>
                 OrderDetailPage(orderId: state.pathParameters['id']!),
+            routes: <RouteBase>[
+              // Nested under the order, so `/orders/ZPQ-1042/invoice` is a
+              // link somebody can be sent and Back from it lands on the
+              // receipt rather than on the history list.
+              GoRoute(
+                path: 'invoice',
+                name: Routes.invoice,
+                builder: (BuildContext context, GoRouterState state) =>
+                    InvoicePage(orderId: state.pathParameters['id']!),
+              ),
+            ],
           ),
         ],
       ),

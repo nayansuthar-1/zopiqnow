@@ -247,14 +247,59 @@ behind it. No vendor side of the chat: a kitchen with a headset is a support pro
 
 ---
 
-### B6 — Ratings, reviews, invoice, offers
-- [ ] `reviews` table — one per delivered order, customer-written, immutable after a window
-- [ ] Customer: rate order + restaurant + rider after delivery
-- [ ] Vendor: Reviews room (currently a "coming soon" tile that lies)
-- [ ] Rating recomputation as a trigger, never a client write
-- [ ] **Digital invoice** — GST-shaped, downloadable, from the frozen order lines
-- [ ] Vendor-created offers (needs `restaurant_id` on coupons + `place_order` line pricing
-      + the customer strikethrough)
+### B6 — Ratings, reviews, invoice, offers ✅ **DONE 2026-07-29** (migrations 0062–0065)
+- [x] `reviews` table — keyed by **order id**, not by (customer, restaurant): reviewing is
+      something you do to a *meal*, so ten orders earn ten reviews and one order never
+      earns two. Editable for an hour, frozen by a trigger after that
+- [x] Customer: rate the food and the rider **separately**, from the receipt. Two rows of
+      stars because they are two people's work, and the rider's row is nullable — null is
+      "no opinion", not a zero dragging somebody's average down
+- [x] Vendor: Reviews room, with the histogram and the order id, and **never the customer**
+- [x] Rating recomputation as a trigger on `reviews`, the only writer of either `rating`
+      column. `delivery_partners` gains the two the restaurant has had since 0001
+- [x] **Digital invoice** — GST-shaped, `pdf` + `printing` (an approved Rule 3 request),
+      one series per restaurant per financial year, issued on delivery
+- [x] Vendor-created offers — `coupons.restaurant_id` (null = platform), scope enforced in
+      `validate_coupon`, an Offers room for the owner, the struck-through total for the
+      customer
+
+**No app ever writes a rating.** `restaurants.rating` has been a column since 0001 and a
+*fiction* since 0001 — a number typed into a seed file next to a `rating_count` of 0. The
+fix is not "let the app PATCH it": an aggregate a client can set is not an aggregate, it is
+a claim. `reviews` is the only writable thing, `submit_order_review` the only way to write
+it, and a trigger recomputes the figure from the rows underneath. There is no code path
+anywhere that raises a restaurant's rating without a delivered order behind it.
+
+**The seeded numbers survive until a real one replaces them.** The recompute is guarded by
+`agg.n > 0`, so a kitchen with no reviews keeps what it was seeded with rather than
+dropping to "0.0 ★" — a lie in the opposite direction — and can never get the seed back
+once a real average takes over.
+
+**An invoice is a document, not a view of a row.** So it gets the two things a row has
+never had: a number that is never reused, and the papers of the seller. It is issued on
+`delivered` and not on `placed`, because a statutory series must not have gaps and an order
+that gets cancelled never became a supply. One series per restaurant per financial year —
+the kitchen is the supplier, so the kitchen's series is the one that has to be consecutive.
+Not one figure moves: the tax an order was charged is the tax the invoice states, split
+into halves and labelled. A migration that "corrected" the GST treatment of orders already
+placed would be rewriting receipts.
+
+**The offer's scope is a `where` clause, not a screen.** A code belonging to another kitchen
+is answered with the same "isn't valid" as a code that never existed — a distinct message
+would be a way to enumerate competitors' promotions. `coupons` also lost the default
+insert/update/delete grants it had carried since 0003: RLS with no write policy had been the
+only thing between a stranger and a 100%-off code, and "no policy exists yet" is weaker than
+"no grant exists". The world-readable policy narrowed to platform codes only.
+
+**And 0065, because the grants in 0062–0064 were decorative.** Postgres grants `execute` on
+every new function to `PUBLIC`, so `grant execute … to authenticated` added nothing — the
+function was already callable by `anon` the moment it was created. Read back off the live
+database rather than assumed, exactly as 0061 found the same thing about a table. Everything
+this phase added is now revoked and re-granted to the caller that needs it: the two constants
+and three trigger bodies to nobody, `restaurant_reviews`/`restaurant_offers` to `anon` too
+(browsing has never required an account), the rest to `authenticated`. `anon` can read a
+restaurant's wall and cannot write to it — checked with `has_function_privilege`, not by
+reading the migration back.
 
 ---
 

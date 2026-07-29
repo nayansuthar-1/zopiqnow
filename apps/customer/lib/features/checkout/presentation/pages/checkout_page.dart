@@ -12,6 +12,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/cart/presentation/widgets/bill_summary.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/restaurant_offer.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
 import 'package:zopiqnow/features/checkout/domain/gateways/payment_gateway.dart';
@@ -320,8 +321,8 @@ class _CouponCardState extends ConsumerState<_CouponCard> {
     final TextTheme t = Theme.of(context).textTheme;
     final CheckoutState checkout = ref.watch(checkoutControllerProvider);
     final AppliedCoupon? coupon = checkout.coupon;
-    final List<String> hints =
-        ref.watch(couponHintsProvider).valueOrNull ?? const <String>[];
+    final List<RestaurantOffer> offers =
+        ref.watch(offersProvider).valueOrNull ?? const <RestaurantOffer>[];
 
     if (coupon != null) {
       // An applied coupon is a small win, and it should feel like one: green,
@@ -408,17 +409,99 @@ class _CouponCardState extends ConsumerState<_CouponCard> {
               ),
             ],
           ),
-          const SizedBox(height: ZopiqSpacing.xs),
-          // There is no marketing campaign behind these codes yet, so the screen
-          // is the campaign. Goes away with the promotions service. Silent while
-          // loading or on failure: a missing hint is not worth a spinner, and it
-          // is certainly not worth an error.
-          if (hints.isNotEmpty)
-            Text(
-              'Try ${hints.join('  ·  ')}',
-              style: t.bodySmall?.copyWith(color: zc.textMuted),
+          const SizedBox(height: ZopiqSpacing.sm),
+          // The offers this cart can actually use — Zopiqnow's, and this
+          // kitchen's (0064). Tappable, because a code the customer can see is a
+          // code they should not have to retype. Silent while loading or on
+          // failure: a missing offer is not worth a spinner, and it is certainly
+          // not worth an error.
+          for (final RestaurantOffer offer in offers)
+            _OfferChip(
+              offer: offer,
+              onTap: checkout.isApplyingCoupon
+                  ? null
+                  : () {
+                      _code.text = offer.code;
+                      ref
+                          .read(checkoutControllerProvider.notifier)
+                          .applyCoupon(offer.code);
+                    },
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// One advertised offer, as a row you can tap to apply.
+///
+/// A kitchen's own offer is marked as one. That is the whole point of 0064 from
+/// the customer's side: "only at Paradise Biryani" is why this code is better
+/// than the platform ones above it, and a list where every row looks identical
+/// hides the one thing worth knowing.
+class _OfferChip extends StatelessWidget {
+  const _OfferChip({required this.offer, this.onTap});
+
+  final RestaurantOffer offer;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: ZopiqRadii.rMd,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.sm),
+        child: Row(
+          children: <Widget>[
+            Icon(Icons.local_offer_rounded, size: 16, color: zc.veg),
+            const SizedBox(width: ZopiqSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      Text(
+                        offer.code,
+                        style: t.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                      if (offer.isExclusive) ...<Widget>[
+                        const SizedBox(width: ZopiqSpacing.xs),
+                        Text(
+                          '· only here',
+                          style: t.labelSmall?.copyWith(
+                            color: zc.veg,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Text(
+                    offer.minSubtotal > 0
+                        ? '${offer.label} on orders over ₹${offer.minSubtotal}'
+                        : offer.label,
+                    style: t.bodySmall?.copyWith(color: zc.textMuted),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              'APPLY',
+              style: t.labelMedium?.copyWith(
+                color: zc.primary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

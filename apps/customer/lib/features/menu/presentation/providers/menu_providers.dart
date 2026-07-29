@@ -5,6 +5,7 @@ import 'package:zopiqnow/features/menu/data/datasources/menu_supabase_datasource
 import 'package:zopiqnow/features/menu/data/repositories/menu_repository_impl.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_category.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
+import 'package:zopiqnow/features/menu/domain/entities/restaurant_review.dart';
 import 'package:zopiqnow/features/menu/domain/repositories/menu_repository.dart';
 
 /// Data source binding — Postgres, as of Step 7. Tests override it with
@@ -23,6 +24,18 @@ final AutoDisposeFutureProviderFamily<List<MenuCategory>, String> menuProvider =
     FutureProvider.autoDispose.family<List<MenuCategory>, String>(
       (Ref ref, String restaurantId) =>
           ref.watch(menuRepositoryProvider).getMenu(restaurantId),
+    );
+
+/// The restaurant's public review wall, newest first (migration 0062).
+///
+/// Never in an error state — the repository swallows to an empty list, which is
+/// also what a restaurant nobody has reviewed answers. Both render as no
+/// section, which is the honest outcome either way.
+final AutoDisposeFutureProviderFamily<List<RestaurantReview>, String>
+restaurantReviewsProvider =
+    FutureProvider.autoDispose.family<List<RestaurantReview>, String>(
+      (Ref ref, String restaurantId) =>
+          ref.watch(menuRepositoryProvider).getReviews(restaurantId),
     );
 
 /// The menu screen's "Veg only" switch.

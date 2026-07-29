@@ -2,10 +2,13 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/restaurant_offer.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 
 /// Contract for coupons and order placement (SAD 7.4).
@@ -44,8 +47,10 @@ abstract interface class OrderRepository {
     String? deliveryNotes,
   });
 
-  /// Coupon codes to advertise on the checkout screen.
-  Future<List<String>> getCouponHints();
+  /// The offers a cart from [restaurantId] can use — Zopiqnow's own plus that
+  /// kitchen's. Never throws: checkout works without a hint, so a failed read
+  /// is an empty list, not a broken screen.
+  Future<List<RestaurantOffer>> getOffers(String restaurantId);
 
   /// The signed-in customer's order history, newest first.
   ///
@@ -115,6 +120,59 @@ abstract interface class OrderRepository {
 
   /// Marks the rider's lines seen. Never throws.
   Future<void> markMessagesRead(String orderId);
+
+  /// Whether this order can be reviewed, and whether anyone carried it. Never
+  /// throws: a receipt that cannot answer simply shows no rating prompt, which
+  /// is what an un-reviewable order shows anyway.
+  Future<OrderReviewState> getReviewState(String orderId);
+
+  /// What this customer already said about the order, or null. Never throws,
+  /// for the reason [getReviewState] does not.
+  Future<OrderReview?> getMyReview(String orderId);
+
+  /// Rates the food, and optionally the rider.
+  ///
+  /// Throws [OrderReviewFailure] — always, on any failure. The opposite of
+  /// [getRider] on purpose: a rating that quietly did not save is a customer
+  /// who believes they have been heard.
+  Future<void> submitReview({
+    required String orderId,
+    required int foodRating,
+    int? riderRating,
+    String? comment,
+  });
+
+  /// The tax invoice for a delivered order. Throws [InvoiceFailure] with the
+  /// service's sentence — a document is the whole point of the screen, so
+  /// there is nothing to degrade to.
+  Future<OrderInvoice> getInvoice(String orderId);
+}
+
+/// A review the order service refused, or one that never reached it.
+/// [message] is written for the customer and the sheet shows it verbatim.
+class OrderReviewFailure implements Exception {
+  const OrderReviewFailure([
+    this.message = 'We couldn\'t save your review. Please try again.',
+  ]);
+
+  final String message;
+
+  @override
+  String toString() => 'OrderReviewFailure: $message';
+}
+
+/// An invoice that could not be produced. [message] is the service's own
+/// sentence when it has one — "An invoice is issued once your order has been
+/// delivered." — and the screen shows it verbatim.
+class InvoiceFailure implements Exception {
+  const InvoiceFailure([
+    this.message = 'We couldn\'t load this invoice. Please try again.',
+  ]);
+
+  final String message;
+
+  @override
+  String toString() => 'InvoiceFailure: $message';
 }
 
 /// A message the order service refused, or one that never reached it.

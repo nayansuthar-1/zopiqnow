@@ -12,6 +12,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_outcome.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/restaurant_offer.dart';
 import 'package:zopiqnow/features/checkout/domain/gateways/payment_gateway.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
 import 'package:zopiqnow/features/checkout/presentation/gateways/mock_payment_gateway.dart';
@@ -217,12 +218,24 @@ final NotifierProvider<DeliveryNotesController, String?> deliveryNotesProvider =
       DeliveryNotesController.new,
     );
 
-/// Codes the checkout screen advertises. Empty on failure — a missing hint must
-/// never take checkout down.
-final FutureProvider<List<String>> couponHintsProvider =
-    FutureProvider<List<String>>(
-      (Ref ref) => ref.watch(orderRepositoryProvider).getCouponHints(),
-    );
+/// The offers the checkout screen advertises: Zopiqnow's own, plus any this
+/// kitchen is running (migration 0064).
+///
+/// Keyed off the cart's restaurant rather than fetched once for the session,
+/// because "which offers apply" is now a question about *which restaurant* —
+/// and a code from the last cart shown against this one would be a code the
+/// order service refuses at the only moment that matters.
+///
+/// Empty on failure and on an empty cart: a missing hint must never take
+/// checkout down.
+final AutoDisposeFutureProvider<List<RestaurantOffer>> offersProvider =
+    FutureProvider.autoDispose<List<RestaurantOffer>>((Ref ref) {
+      final String? restaurantId = ref.watch(
+        cartProvider.select((Cart c) => c.restaurantId),
+      );
+      if (restaurantId == null) return const <RestaurantOffer>[];
+      return ref.watch(orderRepositoryProvider).getOffers(restaurantId);
+    });
 
 /// The bill the checkout screen shows: the cart's bill with the applied
 /// coupon's discount folded in.

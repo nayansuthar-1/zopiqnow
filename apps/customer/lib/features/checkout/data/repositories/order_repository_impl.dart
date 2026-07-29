@@ -3,10 +3,13 @@ import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dar
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/restaurant_offer.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 
@@ -192,13 +195,67 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
-  Future<List<String>> getCouponHints() async {
+  Future<List<RestaurantOffer>> getOffers(String restaurantId) async {
     try {
-      return await _dataSource.fetchCouponHints();
+      return await _dataSource.fetchOffers(restaurantId);
     } on Object catch (_) {
       // A missing hint is a missing hint. Checkout still works without it, so
       // this must never take the screen down.
-      return const <String>[];
+      return const <RestaurantOffer>[];
+    }
+  }
+
+  @override
+  Future<OrderReviewState> getReviewState(String orderId) async {
+    try {
+      return await _dataSource.fetchReviewState(orderId);
+    } on Object catch (_) {
+      // Swallowed, like [getRider]: "no prompt" is what an un-reviewable order
+      // already shows, so a failed read costs a prompt and not the receipt.
+      return OrderReviewState.none;
+    }
+  }
+
+  @override
+  Future<OrderReview?> getMyReview(String orderId) async {
+    try {
+      return await _dataSource.fetchMyReview(orderId);
+    } on Object catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> submitReview({
+    required String orderId,
+    required int foodRating,
+    int? riderRating,
+    String? comment,
+  }) async {
+    try {
+      await _dataSource.submitReview(
+        orderId: orderId,
+        foodRating: foodRating,
+        riderRating: riderRating,
+        comment: comment,
+      );
+    } on OrderReviewFailure {
+      // Already carries the service's own sentence. Relabelling it would throw
+      // away the only useful thing in it.
+      rethrow;
+    } on Object catch (_) {
+      throw const OrderReviewFailure();
+    }
+  }
+
+  @override
+  Future<OrderInvoice> getInvoice(String orderId) async {
+    try {
+      return await _dataSource.fetchInvoice(orderId);
+    } on InvoiceFailure {
+      rethrow;
+    } on Object catch (_) {
+      throw const InvoiceFailure();
     }
   }
 }

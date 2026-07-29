@@ -5,10 +5,13 @@ import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dar
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/restaurant_offer.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_option.dart';
@@ -396,21 +399,84 @@ class OrderSupabaseDataSource implements OrderDataSource {
     );
   }
 
+  /// An RPC rather than the select this used to be (migration 0064).
+  ///
+  /// `coupons` is no longer world-readable in full: a restaurant's own offer is
+  /// visible on that restaurant's page and nowhere else, so a customer browsing
+  /// the app cannot pull down every promotion every kitchen is running. The
+  /// function returns this restaurant's offers *and* the platform's, already
+  /// worded, already ordered.
   @override
-  Future<List<String>> fetchCouponHints() async {
-    final List<Map<String, dynamic>> rows = await _db
-        .from('coupons')
-        .select('code, flat_off, percent_off, max_off')
-        // Easiest coupon to qualify for, first. (`ascending: true` — see the
-        // note in RestaurantSupabaseDataSource; the default is descending.)
-        .order('min_subtotal', ascending: true);
+  Future<List<RestaurantOffer>> fetchOffers(String restaurantId) async {
+    final List<dynamic> rows = await _db.rpc<List<dynamic>>(
+      'restaurant_offers',
+      params: <String, dynamic>{'p_restaurant_id': restaurantId},
+    );
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map(RestaurantOffer.fromJson)
+        .toList(growable: false);
+  }
 
-    return rows.map((Map<String, dynamic> r) {
-      final String code = r['code'] as String;
-      final num? flatOff = r['flat_off'] as num?;
-      return flatOff != null
-          ? '$code · ₹$flatOff off'
-          : '$code · ${r['percent_off']}% off up to ₹${r['max_off']}';
-    }).toList(growable: false);
+  @override
+  Future<OrderReviewState> fetchReviewState(String orderId) async {
+    final List<dynamic> rows = await _db.rpc<List<dynamic>>(
+      'order_review_state',
+      params: <String, dynamic>{'p_order_id': orderId},
+    );
+    // No row is a real answer and the commonest one: the order is still open,
+    // or belongs to somebody else. Both mean there is nothing to rate.
+    if (rows.isEmpty) return OrderReviewState.none;
+    return OrderReviewState.fromJson(rows.first as Map<String, dynamic>);
+  }
+
+  @override
+  Future<OrderReview?> fetchMyReview(String orderId) async {
+    final List<dynamic> rows = await _db.rpc<List<dynamic>>(
+      'my_order_review',
+      params: <String, dynamic>{'p_order_id': orderId},
+    );
+    if (rows.isEmpty) return null;
+    return OrderReview.fromJson(rows.first as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> submitReview({
+    required String orderId,
+    required int foodRating,
+    int? riderRating,
+    String? comment,
+  }) async {
+    try {
+      await _db.rpc<void>(
+        'submit_order_review',
+        params: <String, dynamic>{
+          'p_order_id': orderId,
+          'p_food_rating': foodRating,
+          'p_rider_rating': riderRating,
+          'p_comment': comment,
+        },
+      );
+    } on PostgrestException catch (e) {
+      // "This review can no longer be changed." / "This order is too old to
+      // review." — rules we wrote, phrased for the customer, and the only
+      // useful thing to say at that moment.
+      if (e.code == _businessRuleErrorCode) throw OrderReviewFailure(e.message);
+      throw const OrderReviewFailure();
+    }
+  }
+
+  @override
+  Future<OrderInvoice> fetchInvoice(String orderId) async {
+    try {
+      final Map<String, dynamic> doc = await _db.rpc<Map<String, dynamic>>(
+        'order_invoice',
+        params: <String, dynamic>{'p_order_id': orderId},
+      );
+      return OrderInvoice.fromJson(doc);
+    } on PostgrestException catch (e) {
+      if (e.code == _businessRuleErrorCode) throw InvoiceFailure(e.message);
+      throw const InvoiceFailure();
+    }
   }
 }

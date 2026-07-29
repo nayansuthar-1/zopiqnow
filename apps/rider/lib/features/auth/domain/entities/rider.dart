@@ -15,9 +15,24 @@ class Rider {
     required this.email,
     required this.name,
     required this.phone,
+    this.rating = 0,
+    this.ratingCount = 0,
   });
 
   final String email;
   final String name;
   final String phone;
+
+  /// What customers have made of this rider's deliveries (migration 0062).
+  ///
+  /// Recomputed by a trigger from the reviews underneath it — no app writes it,
+  /// including this one. A rating a client could set is not a rating.
+  final double rating;
+
+  /// How many customers rated a delivery. Zero means **not rated yet**, which
+  /// the profile shows as a dash rather than as 0.0 — a new partner has no
+  /// score, not the worst possible one.
+  final int ratingCount;
+
+  bool get isRated => ratingCount > 0;
 }

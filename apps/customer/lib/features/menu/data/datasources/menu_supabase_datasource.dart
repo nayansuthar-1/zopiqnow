@@ -4,6 +4,7 @@ import 'package:zopiqnow/features/menu/data/datasources/menu_datasource.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_category.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_option.dart';
+import 'package:zopiqnow/features/menu/domain/entities/restaurant_review.dart';
 
 /// The real menu: `public.menu_items` over PostgREST.
 ///
@@ -66,6 +67,21 @@ class MenuSupabaseDataSource implements MenuDataSource {
     imageUrl: row['image_url'] as String,
     optionGroups: _toGroups(row['menu_option_groups']),
   );
+
+  /// An RPC and not a select: `reviews` has RLS on with no select policy at all
+  /// (0062), so there is nothing to read from. `restaurant_reviews` returns four
+  /// columns and a first name, and cannot leak a fifth.
+  @override
+  Future<List<RestaurantReview>> fetchReviews(String restaurantId) async {
+    final List<dynamic> rows = await _db.rpc<List<dynamic>>(
+      'restaurant_reviews',
+      params: <String, dynamic>{'p_restaurant_id': restaurantId},
+    );
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map(RestaurantReview.fromJson)
+        .toList(growable: false);
+  }
 
   /// The dish's option groups, ranked, with any group left empty by RLS (all its
   /// options sold out) dropped — a group with no answers is one the customer

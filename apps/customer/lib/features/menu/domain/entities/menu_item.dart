@@ -40,6 +40,28 @@ class MenuItem {
 
   bool get isCustomizable => optionGroups.isNotEmpty;
 
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'name': name,
+        'description': description,
+        'price': price,
+        'is_veg': isVeg,
+        'is_bestseller': isBestseller,
+        'rating': rating,
+        'image_url': imageUrl,
+      };
+
+  factory MenuItem.fromJson(Map<String, dynamic> json) => MenuItem(
+        id: json['id'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        description: json['description'] as String? ?? '',
+        price: (json['price'] as num?)?.toInt() ?? 0,
+        isVeg: json['is_veg'] as bool? ?? true,
+        isBestseller: json['is_bestseller'] as bool? ?? false,
+        rating: (json['rating'] as num?)?.toDouble(),
+        imageUrl: json['image_url'] as String? ?? '',
+      );
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) || (other is MenuItem && other.id == id);

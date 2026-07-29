@@ -19,10 +19,16 @@ class MenuOption {
   final int priceDelta;
 
   factory MenuOption.fromJson(Map<String, dynamic> json) => MenuOption(
-    id: json['id'] as String,
-    name: json['name'] as String,
-    priceDelta: (json['price_delta'] as num?)?.toInt() ?? 0,
-  );
+        id: json['id'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        priceDelta: (json['price_delta'] as num?)?.toInt() ?? 0,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'name': name,
+        'price_delta': priceDelta,
+      };
 
   @override
   bool operator ==(Object other) =>

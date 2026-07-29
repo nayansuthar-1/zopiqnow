@@ -13,6 +13,8 @@ import 'package:zopiq_vendor/features/menu/presentation/pages/manage_categories_
 import 'package:zopiq_vendor/features/menu/presentation/pages/menu_page.dart';
 import 'package:zopiq_vendor/features/more/presentation/pages/more_page.dart';
 import 'package:zopiq_vendor/features/notifications/presentation/pages/notifications_page.dart';
+import 'package:zopiq_vendor/features/offers/presentation/pages/offers_page.dart';
+import 'package:zopiq_vendor/features/reviews/presentation/pages/reviews_page.dart';
 import 'package:zopiq_vendor/features/analytics/presentation/pages/analytics_page.dart';
 import 'package:zopiq_vendor/features/orders/presentation/pages/history_page.dart';
 import 'package:zopiq_vendor/features/orders/presentation/pages/queue_page.dart';
@@ -38,6 +40,8 @@ abstract final class Routes {
   static const String notifications = 'notifications';
   static const String support = 'support';
   static const String staff = 'staff';
+  static const String reviews = 'reviews';
+  static const String offers = 'offers';
   static const String profile = 'profile';
   static const String profileEdit = 'profileEdit';
   static const String splash = 'splash';
@@ -212,6 +216,16 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                     path: 'staff',
                     name: Routes.staff,
                     builder: (_, _) => const StaffPage(),
+                  ),
+                  GoRoute(
+                    path: 'reviews',
+                    name: Routes.reviews,
+                    builder: (_, _) => const ReviewsPage(),
+                  ),
+                  GoRoute(
+                    path: 'offers',
+                    name: Routes.offers,
+                    builder: (_, _) => const OffersPage(),
                   ),
                   GoRoute(
                     path: 'payments',

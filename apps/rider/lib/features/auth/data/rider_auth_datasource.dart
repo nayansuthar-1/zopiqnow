@@ -110,7 +110,10 @@ class RiderAuthSupabaseDataSource implements RiderAuthDataSource {
 
     final Map<String, dynamic>? row = await _client
         .from('delivery_partners')
-        .select('email, name, phone')
+        // The two rating columns ride along on the read that was already being
+        // made (0062). They need no policy of their own — the row is the
+        // rider's, and this is the rider.
+        .select('email, name, phone, rating, rating_count')
         .eq('is_active', true)
         .maybeSingle();
 
@@ -121,6 +124,8 @@ class RiderAuthSupabaseDataSource implements RiderAuthDataSource {
       email: row['email'] as String? ?? email,
       name: row['name'] as String? ?? 'Partner',
       phone: row['phone'] as String? ?? '',
+      rating: (row['rating'] as num?)?.toDouble() ?? 0,
+      ratingCount: (row['rating_count'] as num?)?.toInt() ?? 0,
     );
   }
 }

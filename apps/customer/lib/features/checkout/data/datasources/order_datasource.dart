@@ -2,10 +2,13 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/restaurant_offer.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 
 /// The order contract, implemented by the mock and by Supabase.
@@ -37,9 +40,10 @@ abstract interface class OrderDataSource {
     String? deliveryNotes,
   });
 
-  /// Codes to advertise on the checkout screen, e.g. `WELCOME50 · ₹50 off`.
-  /// Advertising a coupon is not honouring one — that is `applyCoupon`'s job.
-  Future<List<String>> fetchCouponHints();
+  /// The offers a cart from [restaurantId] can actually use: Zopiqnow's own,
+  /// plus that kitchen's (migration 0064). Advertising a coupon is not
+  /// honouring one — that is `applyCoupon`'s job, and it re-checks the scope.
+  Future<List<RestaurantOffer>> fetchOffers(String restaurantId);
 
   /// The signed-in customer's orders, newest first.
   ///
@@ -132,4 +136,32 @@ abstract interface class OrderDataSource {
   /// Marks the rider's lines seen. Never throws: a read receipt that failed to
   /// register is not worth interrupting a conversation for.
   Future<void> markMessagesRead(String orderId);
+
+  /// Whether this order can be reviewed, and whether anyone carried it
+  /// (migration 0062). The three rules behind "can" — delivered, mine, inside
+  /// the fortnight — are answered by the database, not re-implemented here.
+  Future<OrderReviewState> fetchReviewState(String orderId);
+
+  /// What this customer already said about the order, or null if nothing yet.
+  Future<OrderReview?> fetchMyReview(String orderId);
+
+  /// Rates the food, and optionally the rider who brought it.
+  ///
+  /// Idempotent by order: a second call inside the edit window replaces the
+  /// first, and one after it is refused by the row itself. Throws
+  /// [OrderReviewFailure] with the service's own sentence — "This review can no
+  /// longer be changed." is the answer, not an error to bury.
+  Future<void> submitReview({
+    required String orderId,
+    required int foodRating,
+    int? riderRating,
+    String? comment,
+  });
+
+  /// The tax invoice for a delivered order (migration 0063).
+  ///
+  /// Throws [InvoiceFailure] with the service's sentence when there is no
+  /// document yet — an invoice is issued on delivery, and "your order hasn't
+  /// arrived" is a better answer than an empty page.
+  Future<OrderInvoice> fetchInvoice(String orderId);
 }

@@ -6,10 +6,13 @@ import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dar
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/restaurant_offer.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 
@@ -40,9 +43,79 @@ class OrderMockDataSource implements OrderDataSource {
   /// without a network.
   final List<CustomerOrder> _history = <CustomerOrder>[];
 
+  /// The mock has no restaurant-scoped offers — every code in its book is a
+  /// platform one, which is exactly what `restaurant_offers` returns for a
+  /// kitchen that has created none. So the argument is accepted and ignored.
   @override
-  Future<List<String>> fetchCouponHints() async =>
-      coupons.map((CouponRule r) => r.summary).toList(growable: false);
+  Future<List<RestaurantOffer>> fetchOffers(String restaurantId) async =>
+      coupons
+          .map(
+            (CouponRule r) => RestaurantOffer(
+              code: r.code,
+              label: r.label,
+              minSubtotal: r.minSubtotal,
+              isExclusive: false,
+            ),
+          )
+          .toList(growable: false);
+
+  /// Reviews the mock has taken, keyed by order. Enough to exercise the two
+  /// states the screen actually has — "not rated" and "rated, still editable" —
+  /// without pretending to enforce a window nothing here can advance the clock
+  /// past.
+  final Map<String, OrderReview> _reviews = <String, OrderReview>{};
+
+  @override
+  Future<OrderReviewState> fetchReviewState(String orderId) async {
+    await Future<void>.delayed(latency);
+    for (final CustomerOrder o in _history) {
+      if (o.id == orderId) {
+        return OrderReviewState(
+          canReview: o.status == OrderStatus.delivered,
+          hasRider: o.status == OrderStatus.delivered,
+          riderName: 'Imran',
+        );
+      }
+    }
+    return OrderReviewState.none;
+  }
+
+  @override
+  Future<OrderReview?> fetchMyReview(String orderId) async {
+    await Future<void>.delayed(latency);
+    return _reviews[orderId];
+  }
+
+  @override
+  Future<void> submitReview({
+    required String orderId,
+    required int foodRating,
+    int? riderRating,
+    String? comment,
+  }) async {
+    await Future<void>.delayed(latency);
+    final DateTime now = DateTime.now();
+    _reviews[orderId] = OrderReview(
+      foodRating: foodRating,
+      riderRating: riderRating,
+      comment: comment,
+      createdAt: _reviews[orderId]?.createdAt ?? now,
+      editableUntil:
+          _reviews[orderId]?.editableUntil ?? now.add(const Duration(hours: 1)),
+    );
+  }
+
+  /// No invoice without an order service to issue the number. Refused with the
+  /// service's own sentence rather than faked: an invoice with a made-up serial
+  /// on it is worse than no invoice, and this is the one screen where a
+  /// plausible stand-in would be actively misleading.
+  @override
+  Future<OrderInvoice> fetchInvoice(String orderId) async {
+    await Future<void>.delayed(latency);
+    throw const InvoiceFailure(
+      'An invoice is issued once your order has been delivered.',
+    );
+  }
 
   @override
   Future<List<CustomerOrder>> fetchOrders() async {
@@ -292,8 +365,11 @@ class CouponRule {
   int discountOn(int subtotal) =>
       flatOff ?? math.min((subtotal * percentOff! / 100).round(), maxOff!);
 
+  /// The rule in words, e.g. `₹50 off` — the half of [summary] that is not the
+  /// code, and the same sentence `restaurant_offers` builds server-side.
+  String get label =>
+      flatOff != null ? '₹$flatOff off' : '$percentOff% off up to ₹$maxOff';
+
   /// What the checkout screen's hint shows, e.g. `WELCOME50 · ₹50 off`.
-  String get summary => flatOff != null
-      ? '$code · ₹$flatOff off'
-      : '$code · $percentOff% off up to ₹$maxOff';
+  String get summary => '$code · $label';
 }

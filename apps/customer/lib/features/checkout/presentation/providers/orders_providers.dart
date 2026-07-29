@@ -6,7 +6,9 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
@@ -197,6 +199,89 @@ class OrderMessageController extends Notifier<bool> {
 final NotifierProvider<OrderMessageController, bool>
 orderMessageControllerProvider =
     NotifierProvider<OrderMessageController, bool>(OrderMessageController.new);
+
+/// Whether this order can be rated, and whether there is a rider to rate.
+///
+/// Never in an error state: the repository swallows to [OrderReviewState.none],
+/// which is also what an order that is still cooking answers. A receipt does not
+/// break because a rating prompt could not be asked about.
+final AutoDisposeFutureProviderFamily<OrderReviewState, String>
+orderReviewStateProvider =
+    FutureProvider.autoDispose.family<OrderReviewState, String>((
+      Ref ref,
+      String orderId,
+    ) {
+      return ref.watch(orderRepositoryProvider).getReviewState(orderId);
+    });
+
+/// What this customer already said about the order, or null.
+final AutoDisposeFutureProviderFamily<OrderReview?, String> myOrderReviewProvider =
+    FutureProvider.autoDispose.family<OrderReview?, String>((
+      Ref ref,
+      String orderId,
+    ) {
+      return ref.watch(orderRepositoryProvider).getMyReview(orderId);
+    });
+
+/// The tax invoice for a delivered order (0063).
+///
+/// Left in its error state on purpose, unlike everything else on this screen:
+/// the document *is* the screen. "An invoice is issued once your order has been
+/// delivered." is the answer, and an empty page pretending otherwise is not.
+final AutoDisposeFutureProviderFamily<OrderInvoice, String> orderInvoiceProvider =
+    FutureProvider.autoDispose.family<OrderInvoice, String>((
+      Ref ref,
+      String orderId,
+    ) {
+      return ref.watch(orderRepositoryProvider).getInvoice(orderId);
+    });
+
+/// Saves a rating, and reports what the review service said if it refused.
+///
+/// State is whether a save is in flight — the same shape as
+/// [OrderCancelController], and for the same reason. Returns the refusal rather
+/// than throwing it: "This review can no longer be changed." is the answer when
+/// the hour ran out while the sheet was open, and it is the only useful sentence
+/// on screen at that moment. Null means the rating is in.
+class OrderReviewController extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  Future<String?> submit({
+    required String orderId,
+    required int foodRating,
+    int? riderRating,
+    String? comment,
+  }) async {
+    if (state) return null;
+    state = true;
+    try {
+      await ref
+          .read(orderRepositoryProvider)
+          .submitReview(
+            orderId: orderId,
+            foodRating: foodRating,
+            riderRating: riderRating,
+            comment: comment,
+          );
+      // Both of these read the row this just wrote. The state matters as much
+      // as the review: an edit that lands on the last minute of the window has
+      // to come back with a button that is already gone.
+      ref.invalidate(myOrderReviewProvider(orderId));
+      ref.invalidate(orderReviewStateProvider(orderId));
+      return null;
+    } on OrderReviewFailure catch (failure) {
+      ref.invalidate(myOrderReviewProvider(orderId));
+      return failure.message;
+    } finally {
+      state = false;
+    }
+  }
+}
+
+final NotifierProvider<OrderReviewController, bool>
+orderReviewControllerProvider =
+    NotifierProvider<OrderReviewController, bool>(OrderReviewController.new);
 
 /// Calls an order off, and reports what the order service said if it refused.
 ///

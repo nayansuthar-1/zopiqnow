@@ -111,6 +111,20 @@ dependencies:
   # so this moves the package from transitive to direct and changes no number.
   url_launcher: 6.3.2
 
+  # --- The invoice, as a document (B6, 2026-07-29) ----------------------------
+  # An **approved Rule 3 change request**: two genuinely new packages, and the
+  # only way to hand somebody a tax invoice they can keep. `pdf` lays the page
+  # out; `printing` opens the platform's own share/print sheet, which is what
+  # turns "a screen" into "a file in Downloads or an email to an accountant".
+  # Neither declares a minSdk above our floor of 24, so Rule 1 is unaffected.
+  #
+  # The alternative considered and rejected: a server-rendered HTML page behind
+  # a signed URL. It needs no packages and it puts the document behind a network
+  # round trip and a browser — a receipt should open when the phone is on a lift
+  # with no signal, because that is usually where somebody checks one.
+  pdf: 3.11.3
+  printing: 5.14.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

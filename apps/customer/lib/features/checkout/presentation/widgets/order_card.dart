@@ -87,144 +87,148 @@ class OrderCard extends StatelessWidget {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: ZopiqSpacing.pageGutter,
-        vertical: ZopiqSpacing.xs,
-      ),
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return InkWell(
+      onTap: onTap,
       child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: ZopiqRadii.rLg,
-          border: Border.all(color: zc.divider),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Color(0x08000000),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
+        padding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 16,
         ),
-        clipBehavior: Clip.antiAlias,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.all(ZopiqSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: ZopiqNetworkImage(
+                      url: order.restaurantImageUrl,
+                      fallback: GradientImagePlaceholder(
+                        seed: order.restaurantId,
+                        icon: Icons.restaurant_rounded,
+                        iconSize: 22,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: ZopiqRadii.rMd,
-                          boxShadow: const <BoxShadow>[
-                            BoxShadow(
-                              color: Color(0x11000000),
-                              blurRadius: 4,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
+                      Text(
+                        order.restaurantName,
+                        style: t.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: isDark ? Colors.white : const Color(0xFF111111),
                         ),
-                        child: ClipRRect(
-                          borderRadius: ZopiqRadii.rMd,
-                          child: SizedBox(
-                            width: 56,
-                            height: 56,
-                            child: ZopiqNetworkImage(
-                              url: order.restaurantImageUrl,
-                              fallback: GradientImagePlaceholder(
-                                seed: order.restaurantId,
-                                icon: Icons.restaurant_rounded,
-                                iconSize: 24,
-                              ),
-                            ),
-                          ),
-                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(width: ZopiqSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              order.restaurantName,
-                              style: t.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${order.id} · ${formatOrderTimestamp(order.placedAt)}',
-                              style: t.bodySmall?.copyWith(color: zc.textMuted),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                      const SizedBox(height: 2),
+                      Text(
+                        '${order.id} · ${formatOrderTimestamp(order.placedAt)}',
+                        style: t.bodySmall?.copyWith(
+                          color: isDark ? Colors.white60 : const Color(0xFF777777),
+                          fontSize: 12,
                         ),
-                      ),
-                      const SizedBox(width: ZopiqSpacing.xs),
-                      OrderStatusChip(status: order.status),
-                    ],
-                  ),
-                  const SizedBox(height: ZopiqSpacing.md),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: zc.textMuted.withValues(alpha: 0.04),
-                      borderRadius: ZopiqRadii.rMd,
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Icon(Icons.restaurant_menu_rounded, size: 16, color: zc.textMuted),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            order.itemsLabel,
-                            style: t.bodyMedium?.copyWith(height: 1.3),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: ZopiqSpacing.md),
-                  Divider(height: 1, color: zc.divider),
-                  const SizedBox(height: ZopiqSpacing.md),
-                  Row(
-                    children: <Widget>[
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text('₹${order.total}', style: t.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                          Text(
-                            '${order.itemCount} item${order.itemCount == 1 ? '' : 's'}',
-                            style: t.bodySmall?.copyWith(color: zc.textMuted),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      SizedBox(
-                        height: 36,
-                        child: ZopiqButton(
-                          label: 'Reorder',
-                          variant: ZopiqButtonVariant.outline,
-                          expand: false,
-                          isLoading: isReordering,
-                          onPressed: onReorder,
-                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                OrderStatusChip(status: order.status),
+              ],
             ),
-          ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: ZopiqVegIndicator(isVeg: true, size: 14),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    order.itemsLabel,
+                    style: t.bodyMedium?.copyWith(
+                      color: isDark ? Colors.white70 : const Color(0xFF444444),
+                      fontSize: 13.5,
+                      height: 1.35,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: <Widget>[
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      '₹${order.total}',
+                      style: t.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        color: isDark ? Colors.white : const Color(0xFF111111),
+                      ),
+                    ),
+                    Text(
+                      '${order.itemCount} item${order.itemCount == 1 ? '' : 's'}',
+                      style: t.bodySmall?.copyWith(
+                        color: isDark ? Colors.white54 : const Color(0xFF888888),
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                SizedBox(
+                  height: 38,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: zc.primary,
+                      side: BorderSide(color: zc.primary.withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    icon: isReordering
+                        ? SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: zc.primary,
+                            ),
+                          )
+                        : const Icon(Icons.replay_rounded, size: 16),
+                    label: Text(
+                      isReordering ? 'Loading' : 'Reorder',
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                    ),
+                    onPressed: onReorder,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Divider(height: 1, thickness: 1, color: isDark ? Colors.white12 : const Color(0xFFEEEEEE)),
+          ],
         ),
       ),
     );
