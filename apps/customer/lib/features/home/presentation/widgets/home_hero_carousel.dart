@@ -13,13 +13,25 @@ import 'package:zopiqnow/features/home/domain/entities/hero_slide.dart';
 /// dots and a gentle auto-advance. Each slide's text animates: it lifts and
 /// fades in on first build (entrance) and drifts with a parallax as you swipe.
 ///
-/// **Two kinds of slide, and which one you see.** [slides] is what an admin
-/// published in the console (migration 0053): artwork, copy and a destination,
-/// editable without a build. When it is empty — no campaign running, or the
-/// fetch failed, or the phone is offline — the carousel renders the in-app
-/// composition below instead (gradient + rotating ray bursts + a sheen), which
-/// is what shipped before any of this was content. That fallback is the empty
-/// state on purpose: zero rows must look like the app, not like a blank band.
+/// **Two kinds of slide, and you see both.** [slides] is what an admin published
+/// in the console (migration 0053): artwork, copy and a destination, editable
+/// without a build. The in-app compositions below (gradient + rotating ray
+/// bursts + a sheen) are what shipped before any of this was content.
+///
+/// Published slides come **first**, then the in-app ones. They are appended
+/// rather than replaced so that publishing a single campaign still gives a
+/// carousel rather than one static banner — a real offer leads, and the house
+/// art continues behind it. When nothing is published the house art is the whole
+/// carousel, which is what it was written to be.
+///
+/// **The in-app slides name coupon codes.** `TRYNEW`, `ZOPIQ150` and `SAVE30`
+/// are strings in the const list at the bottom of this file, not rows in
+/// `coupons`, so a customer who reads one and types it at checkout is told the
+/// code isn't valid; `BOOK A TABLE` points at a Dining feature that does not
+/// exist. That was survivable while these were a placeholder nobody saw next to
+/// a real campaign. Now that they always show, the copy in `_slides` is the
+/// thing to fix — either by issuing those codes for real or by rewriting the
+/// slides to promise nothing a customer can be refused.
 ///
 /// Motion budget (DEVELOPMENT_PLAN — Motion & performance standard): every loop
 /// is a transform or a one-shot opacity behind a [RepaintBoundary]; nothing
@@ -65,10 +77,9 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
   DateTime _lastInteract = DateTime.fromMillisecondsSinceEpoch(0);
   bool _reduceMotion = false;
 
-  /// How many distinct slides the carousel is paging through — published ones
-  /// if there are any, otherwise the in-app fallback set.
-  int get _count =>
-      widget.slides.isEmpty ? _slides.length : widget.slides.length;
+  /// How many distinct slides the carousel is paging through: everything the
+  /// admin published, plus the in-app set.
+  int get _count => widget.slides.length + _slides.length;
 
   @override
   void didChangeDependencies() {
@@ -149,27 +160,46 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
                 // incoming slide's own entrance fade covers the swap.
                 PageView.builder(
                   controller: _page,
-                  itemBuilder: (BuildContext context, int i) =>
-                      widget.slides.isEmpty
-                      ? _HeroSlideView(
-                          slide: _slides[i % _slides.length],
-                          index: i,
-                          page: _page,
-                          headlineSize: headlineSize,
-                          topInset: widget.headerInset,
-                          reduceMotion: _reduceMotion,
-                          onTapCta: widget.onTapCta,
-                        )
-                      : _PublishedSlideView(
-                          slide: widget.slides[i % widget.slides.length],
-                          index: i,
-                          page: _page,
-                          headlineSize: headlineSize,
-                          topInset: widget.headerInset,
-                          reduceMotion: _reduceMotion,
-                          onTapCta: widget.onTapCta,
-                          onOpenTarget: widget.onOpenTarget,
-                        ),
+                  // Unbounded on purpose: `itemBuilder` wraps with `i % _count`,
+                  // so the carousel loops for ever in both directions with no
+                  // seam at either end. Locked only in the degenerate case of a
+                  // single slide, where every page would resolve to the same
+                  // artwork and a swipe would slide in an identical copy of what
+                  // the customer is already looking at. Not reachable while
+                  // `_slides` holds six, and cheap insurance if it ever does not
+                  // — `i % 0` is a crash, not a blank screen.
+                  physics: _count < 2
+                      ? const NeverScrollableScrollPhysics()
+                      : null,
+                  itemBuilder: (BuildContext context, int i) {
+                    if (_count == 0) return const SizedBox.shrink();
+                    // Published first, house art after. `index: i` stays the raw
+                    // page number either way — the parallax measures the
+                    // distance from *this page* to the controller's position,
+                    // which has nothing to do with which list the slide is in.
+                    final int at = i % _count;
+                    if (at < widget.slides.length) {
+                      return _PublishedSlideView(
+                        slide: widget.slides[at],
+                        index: i,
+                        page: _page,
+                        headlineSize: headlineSize,
+                        topInset: widget.headerInset,
+                        reduceMotion: _reduceMotion,
+                        onTapCta: widget.onTapCta,
+                        onOpenTarget: widget.onOpenTarget,
+                      );
+                    }
+                    return _HeroSlideView(
+                      slide: _slides[at - widget.slides.length],
+                      index: i,
+                      page: _page,
+                      headlineSize: headlineSize,
+                      topInset: widget.headerInset,
+                      reduceMotion: _reduceMotion,
+                      onTapCta: widget.onTapCta,
+                    );
+                  },
                 ),
                 Positioned(
                   left: 0,
