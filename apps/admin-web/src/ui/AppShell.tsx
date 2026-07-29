@@ -18,6 +18,7 @@ const groups: {
     heading: 'Today',
     links: [
       { to: '/', label: 'Live orders', end: true },
+      { to: '/orders', label: 'All orders', end: false },
       { to: '/analytics', label: 'Platform', end: false },
     ],
   },

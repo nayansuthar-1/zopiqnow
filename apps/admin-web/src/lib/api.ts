@@ -273,6 +273,45 @@ export const api = {
   cancelOrder: (orderId: string, reason: string) =>
     rpc<string>('admin_cancel_order', { p_order_id: orderId, p_reason: reason }),
 
+  /// The whole order book, not just what is open. Every filter is optional and
+  /// omitting one means "don't narrow by it"; the row carries `total_count`, the
+  /// size of the full match, so the pager knows whether there is more.
+  allOrders: (f: {
+    query?: string
+    status?: OrderStatus | null
+    restaurantId?: string | null
+    from?: string | null
+    to?: string | null
+    limit?: number
+    offset?: number
+  }) =>
+    rpc<AllOrderRow[]>('admin_all_orders', {
+      p_query: f.query?.trim() ? f.query.trim() : null,
+      p_status: f.status ?? null,
+      p_restaurant_id: f.restaurantId ?? null,
+      p_from: f.from ?? null,
+      p_to: f.to ?? null,
+      p_limit: f.limit ?? 50,
+      p_offset: f.offset ?? 0,
+    }),
+
+  /// **Destroys the order.** Not a status change and not an archive: the row is
+  /// gone, and seven cascades take its items, its delivery, its messages and the
+  /// customer's review with it. There is no status it refuses — a delivered,
+  /// invoiced order deletes like any other, which is the operator's stated
+  /// decision and which puts a permanent gap in that restaurant's GST invoice
+  /// series. Returns a sentence naming what was destroyed.
+  ///
+  /// Every call writes an `admin_order_deletions` row first, in the same
+  /// transaction. That is the only thing that survives.
+  deleteOrder: (orderId: string, reason: string) =>
+    rpc<string>('admin_delete_order', { p_order_id: orderId, p_reason: reason }),
+
+  /// What has been deleted, newest first. The one way back to an order that no
+  /// longer exists.
+  orderDeletions: (limit = 100) =>
+    rpc<OrderDeletionRow[]>('admin_list_order_deletions', { p_limit: limit }),
+
   listCoupons: () => rpc<CouponRow[]>('admin_list_coupons'),
 
   /// Platform coupons only — it writes `restaurant_id = null` and refuses a code
@@ -375,6 +414,47 @@ export type AdminOrderRow = {
   /// holding it — the dispatcher will not offer an order that has a delivery.
   offer_to: string | null
   offer_expires_at: string | null
+}
+
+/// One order in the whole-book view. Deliberately narrower than
+/// [AdminOrderRow]: this screen is a ledger, not a support console, so it drops
+/// the live machinery (accept deadline, the offer in flight, the ETA and its
+/// reason) and adds the two things only history cares about — the invoice number
+/// and how many lines were on the order.
+export type AllOrderRow = {
+  order_id: string
+  restaurant_id: string
+  restaurant_name: string
+  status: OrderStatus
+  status_reason: string | null
+  placed_at: string
+  total: number
+  payment_method: 'cod' | 'upi'
+  coupon_code: string | null
+  delivery_to: string
+  customer_phone: string
+  route_km: number | null
+  /// Issued on delivery (0063). Null for every order that never got there.
+  invoice_no: string | null
+  rider_name: string | null
+  rider_phone: string | null
+  delivery_state: DeliveryState | null
+  item_count: number
+  /// The size of the full match, repeated on every row — the pager reads it.
+  total_count: number
+}
+
+/// A deletion that happened. The order it names does not exist any more; this
+/// row and its jsonb snapshot are what is left.
+export type OrderDeletionRow = {
+  order_id: string
+  restaurant_id: string
+  deleted_by: string
+  deleted_at: string
+  reason: string
+  order_status: OrderStatus
+  invoice_no: string | null
+  total: number | null
 }
 
 export type OrderStatus =

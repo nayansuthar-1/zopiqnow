@@ -8,6 +8,7 @@ import { RidersPage } from './riders/RidersPage'
 import { HeroSlidesPage } from './content/HeroSlidesPage'
 import { PayoutsPage } from './payouts/PayoutsPage'
 import { SettingsPage } from './settings/SettingsPage'
+import { AllOrdersPage } from './orders/AllOrdersPage'
 import { LiveOrdersPage } from './orders/LiveOrdersPage'
 import { AnalyticsPage } from './analytics/AnalyticsPage'
 import { CouponsPage } from './coupons/CouponsPage'
@@ -37,6 +38,7 @@ export default function App() {
               so B7 moved the landing screen to the live board and left
               Restaurants where it was, one click away. */}
           <Route path="/" element={<LiveOrdersPage />} />
+          <Route path="/orders" element={<AllOrdersPage />} />
           <Route path="/restaurants" element={<RestaurantsPage />} />
           {/* Keyed so switching from an existing restaurant to /new remounts the
               wizard — otherwise React keeps the old form state and the new draft

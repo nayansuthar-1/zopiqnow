@@ -1,0 +1,489 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { api, DELIVERY_LABEL, STATUS_LABEL } from '../lib/api'
+import type { AllOrderRow, OrderStatus, RestaurantRow } from '../lib/api'
+import { PageHeader } from '../ui/AppShell'
+import {
+  Banner,
+  Button,
+  EmptyState,
+  Field,
+  Modal,
+  Pill,
+  SegmentedControl,
+  TableSkeleton,
+} from '../ui/primitives'
+
+/// The whole order book — every order ever placed, not just the open ones.
+///
+/// The live board (`/`) answers "what is happening right now" and deliberately
+/// shows nothing that has ended. This screen is the other question: what
+/// happened. So the defaults are opposite — newest first, every status, and a
+/// pager, because unlike the floor this list grows without bound.
+///
+/// It does not poll. A history does not change while you read it, and a
+/// fifteen-second refresh that reshuffled the page under a delete confirmation
+/// would be actively hostile.
+
+const PAGE_SIZE = 50
+
+const statusTones: Record<
+  OrderStatus,
+  'live' | 'warn' | 'danger' | 'neutral' | 'brand'
+> = {
+  placed: 'warn',
+  accepted: 'brand',
+  preparing: 'brand',
+  ready_for_pickup: 'brand',
+  out_for_delivery: 'live',
+  delivered: 'live',
+  rejected: 'danger',
+  cancelled: 'neutral',
+}
+
+type Range = 'all' | 'today' | '7d' | '30d'
+
+const rangeOptions: { value: Range; label: string }[] = [
+  { value: 'all', label: 'All time' },
+  { value: 'today', label: 'Today' },
+  { value: '7d', label: '7 days' },
+  { value: '30d', label: '30 days' },
+]
+
+const statusOptions: { value: OrderStatus | 'any'; label: string }[] = [
+  { value: 'any', label: 'Any status' },
+  { value: 'placed', label: STATUS_LABEL.placed },
+  { value: 'preparing', label: STATUS_LABEL.preparing },
+  { value: 'out_for_delivery', label: STATUS_LABEL.out_for_delivery },
+  { value: 'delivered', label: STATUS_LABEL.delivered },
+  { value: 'cancelled', label: STATUS_LABEL.cancelled },
+  { value: 'rejected', label: STATUS_LABEL.rejected },
+]
+
+/// A range as the start instant it means, in the browser's own timezone — the
+/// console is used from one desk in one country, and `toISOString()` hands
+/// Postgres a `timestamptz` it can compare without either side guessing.
+function startOf(range: Range): string | null {
+  if (range === 'all') return null
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  if (range === '7d') d.setDate(d.getDate() - 6)
+  if (range === '30d') d.setDate(d.getDate() - 29)
+  return d.toISOString()
+}
+
+function when(iso: string) {
+  return new Date(iso).toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+export function AllOrdersPage() {
+  const [rows, setRows] = useState<AllOrderRow[] | null>(null)
+  const [restaurants, setRestaurants] = useState<RestaurantRow[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [note, setNote] = useState<string | null>(null)
+
+  // Filters. `query` is what is being typed; it only reaches the database when
+  // the form is submitted, so a half-typed order id does not run four searches.
+  const [query, setQuery] = useState('')
+  const [applied, setApplied] = useState('')
+  const [status, setStatus] = useState<OrderStatus | 'any'>('any')
+  const [range, setRange] = useState<Range>('all')
+  const [restaurantId, setRestaurantId] = useState<string>('')
+  const [page, setPage] = useState(0)
+
+  const [deleting, setDeleting] = useState<AllOrderRow | null>(null)
+  const [reason, setReason] = useState('')
+  const [confirmId, setConfirmId] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(
+    async (opts: {
+      query: string
+      status: OrderStatus | 'any'
+      range: Range
+      restaurantId: string
+      page: number
+    }) => {
+      try {
+        const next = await api.allOrders({
+          query: opts.query,
+          status: opts.status === 'any' ? null : opts.status,
+          restaurantId: opts.restaurantId === '' ? null : opts.restaurantId,
+          from: startOf(opts.range),
+          limit: PAGE_SIZE,
+          offset: opts.page * PAGE_SIZE,
+        })
+        setRows(next)
+        setApplied(opts.query)
+        setError(null)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      }
+    },
+    [],
+  )
+
+  // One effect for every filter, so changing any of them is one round trip and
+  // there is no order in which two of them can disagree about what is on screen.
+  //
+  // It depends on `applied` and never on `query`, which is the whole reason the
+  // two exist separately: typing an order id must not fire a request per
+  // keystroke, and submitting the form is what moves `query` into `applied`.
+  useEffect(() => {
+    void load({ query: applied, status, range, restaurantId, page })
+  }, [load, applied, status, range, restaurantId, page])
+
+  useEffect(() => {
+    api
+      .listRestaurants()
+      .then(setRestaurants)
+      // The dropdown is a convenience; the page works without it, so a failure
+      // here must not take the order list down with it.
+      .catch(() => setRestaurants([]))
+  }, [])
+
+  const total = rows?.[0]?.total_count ?? 0
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const filtered =
+    applied !== '' || status !== 'any' || range !== 'all' || restaurantId !== ''
+
+  const subtitle = useMemo(() => {
+    if (rows === null) return 'Every order ever placed.'
+    if (total === 0) return 'Nothing matches these filters.'
+    const start = page * PAGE_SIZE + 1
+    const end = page * PAGE_SIZE + rows.length
+    return `${start}–${end} of ${total} order${total === 1 ? '' : 's'}`
+  }, [rows, total, page])
+
+  function resetFilters() {
+    setQuery('')
+    setApplied('')
+    setStatus('any')
+    setRange('all')
+    setRestaurantId('')
+    setPage(0)
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return
+    setBusy(true)
+    setError(null)
+    try {
+      const said = await api.deleteOrder(deleting.order_id, reason)
+      setNote(said)
+      setDeleting(null)
+      setReason('')
+      setConfirmId('')
+      await load({ query: applied, status, range, restaurantId, page })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="All orders"
+        subtitle={subtitle}
+        action={
+          <Button
+            variant="secondary"
+            onClick={() =>
+              void load({ query: applied, status, range, restaurantId, page })
+            }
+          >
+            Refresh
+          </Button>
+        }
+      />
+
+      <div className="p-6">
+        {error && (
+          <Banner
+            tone="error"
+            className="mb-4 max-w-2xl"
+            onDismiss={() => setError(null)}
+          >
+            {error}
+          </Banner>
+        )}
+        {note && (
+          <Banner
+            tone="success"
+            className="mb-4 max-w-3xl"
+            onDismiss={() => setNote(null)}
+          >
+            {note}
+          </Banner>
+        )}
+
+        <div className="mb-5 space-y-3">
+          <form
+            className="flex max-w-xl gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              setPage(0)
+              setApplied(query.trim())
+            }}
+          >
+            <input
+              className="h-11 flex-1 rounded-[8px] border border-line bg-white px-3 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Order id or phone number"
+              aria-label="Find an order"
+            />
+            <Button type="submit" variant="secondary">
+              Find
+            </Button>
+          </form>
+
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <SegmentedControl
+              label="Status"
+              value={status}
+              options={statusOptions}
+              onChange={(next) => {
+                setPage(0)
+                setStatus(next)
+              }}
+            />
+            <SegmentedControl
+              label="When"
+              value={range}
+              options={rangeOptions}
+              onChange={(next) => {
+                setPage(0)
+                setRange(next)
+              }}
+            />
+            <select
+              className="h-9 rounded-[8px] border border-line bg-white px-2 text-sm text-ink outline-none focus:border-brand"
+              value={restaurantId}
+              aria-label="Restaurant"
+              onChange={(e) => {
+                setPage(0)
+                setRestaurantId(e.target.value)
+              }}
+            >
+              <option value="">Every restaurant</option>
+              {restaurants.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+            {filtered && (
+              <Button variant="ghost" onClick={resetFilters}>
+                Clear filters
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {rows === null ? (
+          <TableSkeleton rows={6} />
+        ) : rows.length === 0 ? (
+          <EmptyState
+            title={filtered ? 'No match' : 'No orders yet'}
+            body={
+              filtered
+                ? 'Nothing matches these filters. Order ids look like ZPQ-1044; a phone number matches on its last digits, with or without +91.'
+                : 'This fills itself the moment somebody orders.'
+            }
+            action={
+              filtered ? (
+                <Button variant="secondary" onClick={resetFilters}>
+                  Clear filters
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <>
+            <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead>
+                  <tr className="border-b border-line text-left text-xs font-medium tracking-wide text-ink-muted uppercase">
+                    <th className="px-5 py-3">Order</th>
+                    <th className="px-5 py-3">Restaurant</th>
+                    <th className="px-5 py-3">Customer</th>
+                    <th className="px-5 py-3">Rider</th>
+                    <th className="px-5 py-3 text-right">Total</th>
+                    <th className="px-5 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((o) => (
+                    <tr key={o.order_id} className="border-b border-line last:border-b-0">
+                      <td className="px-5 py-4 align-top">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-ink">
+                            {o.order_id}
+                          </span>
+                          <Pill tone={statusTones[o.status]}>
+                            {STATUS_LABEL[o.status]}
+                          </Pill>
+                        </div>
+                        <p className="mt-1 text-xs text-ink-muted">
+                          {when(o.placed_at)} · {o.item_count} item
+                          {o.item_count === 1 ? '' : 's'}
+                        </p>
+                        {/* The invoice number is the fact that makes this row
+                            irreversible, so it is on the row and not only in the
+                            dialog that destroys it. */}
+                        {o.invoice_no && (
+                          <p className="mt-0.5 text-xs text-ink-muted">
+                            {o.invoice_no}
+                          </p>
+                        )}
+                        {o.status_reason && (
+                          <p className="mt-0.5 text-xs text-warn">
+                            {o.status_reason}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 align-top text-ink">
+                        {o.restaurant_name}
+                      </td>
+                      <td className="px-5 py-4 align-top">
+                        <p className="text-ink">{o.customer_phone}</p>
+                        <p className="text-xs text-ink-muted">{o.delivery_to}</p>
+                      </td>
+                      <td className="px-5 py-4 align-top">
+                        {o.rider_name ? (
+                          <>
+                            <p className="text-ink">{o.rider_name}</p>
+                            <p className="text-xs text-ink-muted">
+                              {o.delivery_state
+                                ? DELIVERY_LABEL[o.delivery_state]
+                                : ''}
+                            </p>
+                          </>
+                        ) : (
+                          <span className="text-ink-muted">—</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 text-right align-top">
+                        <p className="font-semibold text-ink">₹{o.total}</p>
+                        <p className="text-xs text-ink-muted">
+                          {o.payment_method === 'upi' ? 'prepaid' : 'cash'}
+                        </p>
+                      </td>
+                      <td className="px-5 py-4 text-right align-top">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setDeleting(o)
+                            setReason('')
+                            setConfirmId('')
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {pages > 1 && (
+              <div className="mt-4 flex items-center justify-between">
+                <Button
+                  variant="secondary"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-ink-muted">
+                  Page {page + 1} of {pages}
+                </span>
+                <Button
+                  variant="secondary"
+                  disabled={page + 1 >= pages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {deleting && (
+        <Modal
+          busy={busy}
+          onClose={() => setDeleting(null)}
+          title={`Delete ${deleting.order_id}?`}
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setDeleting(null)}
+                disabled={busy}
+              >
+                Keep it
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => void confirmDelete()}
+                loading={busy}
+                // Typing the id is not a permission check — the database refuses
+                // nothing here. It is the pause between meaning to delete one
+                // order and deleting the row your mouse happened to be over.
+                disabled={confirmId.trim().toUpperCase() !== deleting.order_id.toUpperCase()}
+              >
+                Delete for good
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm text-ink-muted">
+            The order row is destroyed, along with its {deleting.item_count} item
+            {deleting.item_count === 1 ? '' : 's'}, its delivery record, the
+            messages sent about it, and the customer&rsquo;s review of it. There
+            is no undo.
+          </p>
+
+          {deleting.invoice_no && (
+            <Banner tone="warn" className="mt-4">
+              This order was delivered and carries tax invoice{' '}
+              <strong>{deleting.invoice_no}</strong>. Deleting it destroys that
+              document and leaves a permanent gap in {deleting.restaurant_name}
+              &rsquo;s invoice series — the counter does not roll back. It will
+              also reduce the rider and restaurant earnings this order was
+              counted into.
+            </Banner>
+          )}
+
+          <Field
+            className="mt-5"
+            label="Why"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Test order from staging"
+            hint="Kept in the deletion log with your email. It is the only record that will remain."
+          />
+
+          <Field
+            className="mt-4"
+            label={`Type ${deleting.order_id} to confirm`}
+            value={confirmId}
+            onChange={(e) => setConfirmId(e.target.value)}
+            placeholder={deleting.order_id}
+          />
+        </Modal>
+      )}
+    </>
+  )
+}
