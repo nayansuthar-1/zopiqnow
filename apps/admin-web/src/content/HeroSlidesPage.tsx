@@ -128,15 +128,28 @@ function SlidePreview({
           <div className="h-full w-full bg-gradient-to-br from-brand to-brand-deep" />
         )}
 
-        {/* The loop over the still, in the same order the app stacks them. An
-            animated WebP plays in an <img>, which is the point of the format —
-            what the admin watches here is the same file the phone decodes, so
-            "does it actually move?" is answered before anything is saved rather
-            than on a device afterwards. */}
+        {/* The loop over the still, in the same order the app stacks them. What
+            the admin watches here is byte-for-byte the file the phone decodes, so
+            "does it actually move, and does it look right?" is answered before
+            anything is saved rather than on a device afterwards.
+
+            A `<video>` since 0072 — it used to be an `<img>`, which worked only
+            because the loop was an animated WebP. `key` is the URL so replacing a
+            loop reloads the element: React would otherwise keep the same node and
+            leave the previous clip playing under a new `src`.
+
+            `muted` is what makes `autoPlay` legal — every browser blocks
+            autoplay with sound — and `playsInline` stops iOS Safari taking the
+            preview fullscreen. Deliberately no `controls`: the phone has none, so
+            neither should the thing claiming to show what the phone does. */}
         {motionUrl && (
-          <img
+          <video
+            key={motionUrl}
             src={motionUrl}
-            alt=""
+            autoPlay
+            muted
+            loop
+            playsInline
             className="absolute inset-0 h-full w-full object-fill"
           />
         )}
@@ -310,11 +323,19 @@ function SlideForm({
   const [motionBusy, setMotionBusy] = useState(false)
   const [motionError, setMotionError] = useState<string | null>(null)
 
+  /// Whether the artwork on this form was lifted out of the video rather than
+  /// uploaded. Only ever true within the session that did it — an existing slide
+  /// opens with this false, because by then the poster is simply the slide's
+  /// artwork and there is nothing useful to say about where it came from.
+  const [artFromVideo, setArtFromVideo] = useState(false)
+
   async function pickArt(file: File) {
     setUploading(true)
     setUploadError(null)
     try {
       setImageUrl(await uploadPhoto(file))
+      // Real artwork now, whatever was there before.
+      setArtFromVideo(false)
     } catch (e) {
       setUploadError(
         e instanceof UploadFailure ? e.message : 'That image could not be uploaded.',
@@ -331,6 +352,20 @@ function SlideForm({
       const motion = await uploadMotion(file)
       setMotionUrl(motion.url)
       setMotionBytes(motion.bytes)
+      // **A slide can be just a video, and this is the whole of how.** Artwork is
+      // required of every slide (0053) and all the reasons still hold — the still
+      // is the poster, the reduce-motion fallback, what shows while the video
+      // buffers, and the only thing an older customer build can draw. So the rule
+      // is not relaxed; the missing still is taken from the video's own first
+      // frame, which is the one image certain to match it.
+      //
+      // Only when there is none. An admin who uploaded artwork *and* a video
+      // chose that artwork deliberately, and silently replacing it with a video
+      // frame would be the console overruling them.
+      if (!imageUrl) {
+        setImageUrl(motion.posterUrl)
+        setArtFromVideo(true)
+      }
     } catch (e) {
       setMotionError(
         e instanceof UploadFailure ? e.message : 'That video could not be uploaded.',
@@ -478,6 +513,14 @@ function SlideForm({
               Uploaded to Cloudinary — the database will not accept art from
               anywhere else.
             </p>
+            {artFromVideo && (
+              <p className="mt-1.5 text-sm text-ink-muted">
+                Taken from your video's first frame, so you don't have to upload a
+                separate image. Every slide needs one: it is what shows while the
+                video loads, if it can't play, and when the phone asks for reduced
+                motion. <strong>Upload an image to use your own instead.</strong>
+              </p>
+            )}
             {uploadError && (
               <p className="mt-1.5 text-sm text-non-veg">{uploadError}</p>
             )}
@@ -517,6 +560,15 @@ function SlideForm({
                     setMotionUrl('')
                     setMotionBytes(null)
                     setMotionError(null)
+                    // A poster only existed because of the video, so it goes with
+                    // it — leaving it behind would turn "remove the loop" into a
+                    // still-only slide showing one arbitrary video frame, which is
+                    // not a thing anybody asked for. Artwork the admin uploaded
+                    // themselves is untouched.
+                    if (artFromVideo) {
+                      setImageUrl('')
+                      setArtFromVideo(false)
+                    }
                   }}
                   className="text-sm font-medium text-ink-muted hover:text-non-veg"
                 >
@@ -526,15 +578,22 @@ function SlideForm({
             </div>
 
             <p className="mt-1.5 text-sm text-ink-muted">
-              Silent, and the first 8 seconds is all that is used. Cloudinary
-              turns it into a looping animation at 720px — the phone plays that,
-              not the video.
+              Silent, and the <strong>whole clip</strong> plays on loop — at your
+              clip's own resolution and frame rate, to a 1080px width. The phone
+              plays the video itself, so what you see in the preview is what
+              ships. Length is not capped; the delivered size below is, so a
+              longer film simply costs more and tells you how much.
+            </p>
+            <p className="mt-1 text-sm text-ink-muted">
+              A video on its own is enough — the artwork above fills itself in from
+              the first frame if you haven't uploaded one.
             </p>
 
             {motionBusy && (
               <p className="mt-1.5 text-sm text-ink-muted">
-                Uploading and measuring the delivered loop — this takes a moment
-                on a long clip.
+                Uploading, transcoding and measuring the delivered loop. A long
+                clip can take a minute or two — Cloudinary builds it once, and
+                doing it now means no customer waits for it later.
               </p>
             )}
 

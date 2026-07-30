@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/home/domain/entities/hero_slide.dart';
@@ -634,12 +635,12 @@ class _PublishedSlideViewState extends State<_PublishedSlideView>
 
         // The loop, over the still and under the scrim.
         //
-        // Not mounted at all under reduce-motion, and that is a deliberate
-        // choice over the cheaper one. Flutter *does* pause multi-frame images
-        // when animations are disabled (`image.dart`), but a paused animation
-        // is frozen on its own first frame — an arbitrary video still, not the
-        // artwork an admin chose and composed the headline against. Rule 1 says
-        // every failure path lands on the still, so this one does too.
+        // Not mounted at all under reduce-motion, rather than mounted and
+        // paused. A paused player still shows a frame, and that frame is an
+        // arbitrary video still — not the artwork an admin chose and composed
+        // the headline against. Since 0072 it would also hold a platform codec
+        // open to show it. Rule 1 says every failure path lands on the still, so
+        // this one does too, and it costs nothing to honour.
         if (motion != null && !widget.reduceMotion)
           Positioned.fill(
             child: _SlideMotion(
@@ -804,24 +805,31 @@ class _PublishedSlideViewState extends State<_PublishedSlideView>
   }
 }
 
-/// A slide's looping animation, drawn over its still.
+/// A slide's looping video, drawn over its still.
 ///
-/// **There is no video player here and that is the point.** The admin uploads an
-/// MP4 and Cloudinary delivers it as an animated WebP, which [Image] decodes and
-/// loops natively — so a moving hero costs no new dependency and nothing in
-/// `pubspec.yaml` moves. As far as this widget is concerned it is loading a
-/// picture that happens to have more than one frame.
+/// **This used to be an [Image] and the change is the whole of migration 0072.**
+/// The 0054 design transcoded the admin's clip to an animated WebP so
+/// `Image.network` could decode it and no dependency had to be added; the price
+/// was `w_720,fps_12`, because animated WebP stores every frame as a separate
+/// still and has no interframe compression. Measured on the same eight seconds,
+/// the old 720p twelve-frame loop is 1,137,876 bytes and a silent h.264 MP4 at
+/// the source resolution and frame rate is 599,018 — so full quality costs half
+/// what the compromise did, and the compromise had no remaining argument.
 ///
-/// **Only the slide in front of the customer animates.** An off-screen loop is
-/// battery and CPU spent on something nobody is looking at, and the carousel
-/// keeps several pages alive at once. [TickerMode] is what stops it: Flutter
-/// pauses multi-frame images when the ticker mode is disabled, which parks the
-/// animation *without* tearing the widget down — so swiping back to a slide
-/// resumes it rather than paying to decode it again.
+/// **Exactly one decoder is alive at a time, and this is the important part.**
+/// The controller is created when the slide becomes the current page and
+/// *disposed* when it stops being one — not paused and kept. A
+/// `VideoPlayerController` holds a platform codec; Android devices support only a
+/// handful concurrently and fewer at the Android 10 floor, and an unbounded
+/// [PageView] keeps several pages alive at once. Pausing would be cheaper on a
+/// swipe back and would let a carousel of motion slides exhaust the decoders,
+/// which fails as a hero that silently stops moving.
 ///
-/// The `< 0.5` test means exactly one loop runs at any moment (rule 3). The
-/// consequence, and it is deliberate: a slide swiping into view stays on its
-/// first frame until it passes the halfway point and takes over.
+/// The cost of that choice is a re-buffer when the customer swipes back. It is
+/// small — the file is 0.6–3 MB and already in the HTTP cache — and it lands on
+/// the still artwork underneath, which is rule 1 of the slice: **every failure
+/// and every gap shows the poster, never a hole.** Nothing here ever paints a
+/// background of its own.
 class _SlideMotion extends StatefulWidget {
   const _SlideMotion({
     required this.url,
@@ -838,7 +846,14 @@ class _SlideMotion extends StatefulWidget {
 }
 
 class _SlideMotionState extends State<_SlideMotion> {
+  VideoPlayerController? _controller;
   bool _current = false;
+
+  /// Bumped on every teardown so a slow `initialize()` that resolves after the
+  /// customer has swiped away cannot adopt its controller or call `setState`.
+  /// Without it a fast swipe back and forth leaks a player and can leave two
+  /// clips decoding at once — the exact thing this widget exists to bound.
+  int _generation = 0;
 
   @override
   void initState() {
@@ -852,15 +867,20 @@ class _SlideMotionState extends State<_SlideMotion> {
   @override
   void dispose() {
     widget.page.removeListener(_sync);
+    _teardown();
     super.dispose();
   }
 
   /// Deliberately a listener with its own `setState` rather than an
   /// [AnimatedBuilder] over the controller. The parallax above rebuilds on
   /// every pixel of a swipe because it has a new offset on every pixel; this
-  /// has a new answer perhaps twice per swipe, and rebuilding an [Image]
-  /// subtree sixty times a second to arrive at the same boolean is the kind of
-  /// cost that only shows up on the Android 10 floor.
+  /// has a new answer perhaps twice per swipe, and rebuilding a player subtree
+  /// sixty times a second to arrive at the same boolean is the kind of cost
+  /// that only shows up on the Android 10 floor.
+  ///
+  /// The `< 0.5` test means exactly one slide claims the decoder at any moment
+  /// (rule 3). The consequence, and it is deliberate: a slide swiping into view
+  /// shows its still until it passes the halfway point and takes over.
   void _sync() {
     if (!mounted) return;
     final double page =
@@ -868,49 +888,134 @@ class _SlideMotionState extends State<_SlideMotion> {
         ? (widget.page.page ?? widget.index.toDouble())
         : widget.index.toDouble();
     final bool current = (page - widget.index).abs() < 0.5;
-    if (current != _current) setState(() => _current = current);
+    if (current == _current) return;
+    _current = current;
+    if (current) {
+      _start();
+    } else {
+      _teardown();
+      // Back to the still. `mounted` is guaranteed by the guard above.
+      setState(() {});
+    }
+  }
+
+  Future<void> _start() async {
+    final int generation = _generation;
+    final VideoPlayerController controller =
+        VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    try {
+      await controller.initialize();
+      // Every await above is a chance for the customer to have swiped on, or for
+      // the carousel to have disposed this page. Either way the controller we
+      // just built belongs to nobody, so it is discarded rather than adopted.
+      if (!mounted || generation != _generation) {
+        await controller.dispose();
+        return;
+      }
+      await controller.setLooping(true);
+      // Silent, and belt-and-braces: the Cloudinary transformation already
+      // strips the audio track (`ac_none`), so this is the second of two
+      // independent reasons a home screen never makes a sound.
+      await controller.setVolume(0);
+      await controller.play();
+      if (!mounted || generation != _generation) {
+        await controller.dispose();
+        return;
+      }
+      setState(() => _controller = controller);
+      // Watch for a failure *after* a successful start — the network dropping
+      // mid-loop, which is the ordinary case on mobile data. Without this the
+      // player keeps its last decoded frame on screen: an arbitrary video still
+      // sitting over the artwork the headline was composed against, which is
+      // precisely the state rule 1 exists to prevent. Falling back to the still
+      // is the same recovery a failed `initialize()` gets.
+      //
+      // Attached *after* the assignment above, and there is no `await` between
+      // the two: the listener reads `_controller`, so registering it first would
+      // leave a window where a notification found the field still null and threw
+      // the error away. A callback cannot run in a gap with no suspension point.
+      controller.addListener(_watchForFailure);
+    } catch (_) {
+      // A codec the device cannot handle, a dead network, a 404 on the derived
+      // asset. Rule 1: say nothing, show the still, and do not retry — a hero
+      // decoration is not worth a loop of failing requests on mobile data.
+      await controller.dispose();
+    }
+  }
+
+  /// Attached only once a clip is playing, and cheap on purpose: this fires on
+  /// every position update, so it reads one boolean and returns.
+  void _watchForFailure() {
+    if (!mounted || _controller?.value.hasError != true) return;
+    // **Deferred, and it has to be.** [_teardown] disposes the controller, and
+    // this runs inside that controller's own `notifyListeners` — a
+    // [ChangeNotifier] disposed while its listener list is being walked throws,
+    // which would turn a dropped connection into a crash on the home screen.
+    // A microtask puts the teardown after the notification has unwound.
+    scheduleMicrotask(() {
+      // Several position updates can carry the same error before this runs, so
+      // the null check is what makes the second and third ones no-ops rather
+      // than repeat teardowns.
+      if (!mounted || _controller == null) return;
+      _teardown();
+      setState(() {});
+    });
+  }
+
+  void _teardown() {
+    _generation++;
+    // Read into a local before clearing, so the field is null for anything that
+    // rebuilds while the platform side is still shutting down.
+    final VideoPlayerController? controller = _controller;
+    _controller = null;
+    controller?.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final VideoPlayerController? controller = _controller;
+    // Nothing yet — or nothing ever, if the clip failed. The still underneath is
+    // already painted, so an empty box is the correct thing to draw over it.
+    if (controller == null) return const SizedBox.shrink();
+
+    // `BoxFit.fill` to match the still underneath it (0067). Two different fits
+    // on two layers of the same slide would put the video out of register with
+    // the artwork it is animating.
+    //
+    // A [VideoPlayer] fills its parent and ignores the clip's aspect ratio, which
+    // *is* `fill` — so the [FittedBox] is only needed to give the fit a natural
+    // size to work from, and is skipped when the platform reports no size yet
+    // (a zero-width [SizedBox] would collapse the video to nothing).
+    final Size size = controller.value.size;
+    final Widget video = size.isEmpty
+        ? VideoPlayer(controller)
+        : FittedBox(
+            fit: BoxFit.fill,
+            child: SizedBox(
+              width: size.width,
+              height: size.height,
+              child: VideoPlayer(controller),
+            ),
+          );
+
     return RepaintBoundary(
-      child: TickerMode(
-        enabled: _current,
-        child: Image.network(
-          widget.url,
-          // Matches the still underneath it (0067). Two different fits on two
-          // layers of the same slide would make the loop jump out of register
-          // with the artwork it is supposed to be animating.
-          fit: BoxFit.fill,
-          // No `cacheWidth`, unlike every still in the app. The loop is already
-          // delivered at 720px by the Cloudinary transformation that built it,
-          // which is the memory bound; asking for the phone's own width on top
-          // of that would be asking to *upscale*, and `ResizeImage` asserts on
-          // exactly that in debug.
-          //
-          // Frames are decoded one at a time as the animation plays, so what
-          // sits in memory is the current frame and the encoded bytes — not the
-          // whole loop.
-          errorBuilder: (_, _, _) => const SizedBox.shrink(),
-          frameBuilder:
-              (
-                BuildContext context,
-                Widget child,
-                int? frame,
-                bool wasSynchronouslyLoaded,
-              ) {
-                // Rule 1, restated as a fade: the still is already painted
-                // underneath, so the loop appears over it rather than replacing
-                // it, and there is never a blank frame between the two.
-                if (wasSynchronouslyLoaded) return child;
-                return AnimatedOpacity(
-                  opacity: frame == null ? 0 : 1,
-                  duration: ZopiqDurations.base,
-                  curve: ZopiqCurves.emphasized,
-                  child: child,
-                );
-              },
-        ),
+      // Rule 1, restated as a fade: the still is already on screen, so the video
+      // appears *over* it rather than replacing it and there is never a blank
+      // frame between the two.
+      //
+      // [TweenAnimationBuilder] and not [AnimatedOpacity], which was the first
+      // attempt and does nothing here: an implicit animation interpolates when
+      // its target *changes*, and this subtree is only ever built once the
+      // controller is ready — so a constant `opacity: 1` would have been a hard
+      // cut dressed up as a fade. A tween with a non-null `begin` runs on first
+      // build, which is exactly the one transition there is.
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 0, end: 1),
+        duration: ZopiqDurations.base,
+        curve: ZopiqCurves.emphasized,
+        builder: (BuildContext context, double opacity, Widget? child) =>
+            Opacity(opacity: opacity, child: child),
+        child: video,
       ),
     );
   }

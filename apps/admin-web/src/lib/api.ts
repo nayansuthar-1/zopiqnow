@@ -616,9 +616,10 @@ export type HeroSlideRow = {
   cta_label: string
   cta_target: string | null
   image_url: string
-  /// The looping animated WebP over the still (0054). Null is the ordinary
-  /// case — most slides are a photograph — and the still is what shows when it
-  /// is absent, still downloading, or the phone has asked for reduced motion.
+  /// The silent looping MP4 played over the still (0072 — an animated WebP until
+  /// then). Null is the ordinary case — most slides are a photograph — and the
+  /// still is what shows when it is absent, still buffering, or the phone has
+  /// asked for reduced motion.
   motion_url: string | null
   sort_order: number
   is_active: boolean

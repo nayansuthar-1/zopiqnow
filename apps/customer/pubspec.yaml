@@ -125,6 +125,45 @@ dependencies:
   pdf: 3.11.3
   printing: 5.14.2
 
+  # --- The customer's own photo (2026-07-30) ----------------------------------
+  # **Not new versions** (Rule 3): the vendor app has pinned both since its Phase
+  # 1 and this is a single-lockfile workspace, so `pubspec.lock` already resolved
+  # image_picker at 1.1.2 and http at 1.6.0. This moves them from transitive to
+  # direct for this app and changes no number — the same move `url_launcher` made
+  # in B5. Neither declares a minSdk above our floor of 24.
+  #
+  # `image_picker` because a profile picture has to come off the phone somehow;
+  # `http` because the upload is a multipart POST to Cloudinary and Supabase's
+  # client cannot make one. On Android 13+ the gallery path goes through the
+  # system Photo Picker, which needs no storage permission at all.
+  image_picker: 1.1.2
+  http: 1.6.0
+
+  # --- The hero plays its own video (migration 0072, 2026-07-30) ---------------
+  # An **approved Rule 3 change request**, and the one the 0054 hero loop was
+  # written specifically to avoid. That design transcoded the admin's clip to an
+  # animated WebP so `Image.network` could decode it and nothing here had to move;
+  # it cost `w_720,fps_12`, because animated WebP has no interframe compression
+  # and every frame is a separate still image.
+  #
+  # The measurements are what reversed the decision. Eight seconds of the same
+  # clip: the old 720p twelve-frame WebP is 1,137,876 bytes, and a silent h.264
+  # MP4 at the source resolution and the source frame rate is 599,018. Full
+  # quality is **half the size** of the compromise, so the no-dependency route was
+  # not a cheap way to get motion — it was an expensive way to get bad motion.
+  #
+  # Resolves at the version below without moving a single existing pin (checked
+  # with `flutter pub add --dry-run`, and the lockfile diff is 40 added lines and
+  # no removed ones: five new packages, nothing else touched).
+  #
+  # **minSdk, and it is worth reading.** `video_player_android` is
+  # ExoPlayer/media3 and declares `minSdk = 24` — not *under* our floor of 24 like
+  # every other package here, but exactly *on* it. Rule 1 (Android 10 → latest) is
+  # unaffected and the build is fine, but this is the first dependency that would
+  # break the moment the floor moved down, so the floor is now load-bearing rather
+  # than a preference.
+  video_player: 2.13.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

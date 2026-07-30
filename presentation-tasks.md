@@ -551,13 +551,95 @@ The admin uploads an MP4; the phone receives a looping animated WebP through the
 A hero loop is silent, short, and decorative. **Recommend animated WebP.** Revisit
 `video_player` only if you later want sound or a clip over ~10 seconds.
 
-**Built 2026-07-27.** Migration 0054 applied and verified against the live database;
-console upload path and customer wiring land with it. `pubspec.lock` is unchanged, so the
-freeze held. The one thing not proven is the same thing P1, P2 and P3 have outstanding —
-nothing that happens on a phone screen. Manual steps below.
+**Built 2026-07-27** on animated WebP. Migration 0054 applied, console upload path and
+customer wiring with it, `pubspec.lock` unchanged.
 
-- [x] **Decided: animated WebP, no new dependency** — confirmed 2026-07-27. Everything
-      below is built on it
+### Reversed 2026-07-30 (migration 0072): `video_player` after all
+
+The table above is sound reasoning from one wrong assumption — that the no-dependency route
+was the *cheap* one. It is not, and the reason is in the format: **animated WebP has no
+interframe compression.** Every frame is a separate still image, so quality costs bytes
+linearly, which is why the shipped transformation had to be `w_720,fps_12` to fit a 1.5 MB
+budget. Measured on the same eight seconds of `demo/video/upload/dog` (2026-07-30):
+
+| Transformation | Delivered |
+|---|---|
+| `f_webp,fl_animated,fl_awebp,w_720,q_auto:eco,du_8,fps_12` (0054) | 1,137,876 B |
+| `f_webp,fl_animated,fl_awebp,q_auto:good,du_8,fps_24` | 3,252,700 B |
+| `f_webp,fl_animated,fl_awebp,q_90,du_8,fps_30` | 9,085,966 B |
+| `f_mp4,vc_h264,ac_none,w_1080,c_limit,q_auto:best,du_8` (0072) | **599,018 B** |
+
+Read the first and last rows together. **Real video at the source resolution and the source
+frame rate is a little over half the size of the downscaled twelve-frame WebP it replaces.**
+h.264 spends bytes on what changed between frames, which is precisely what a hero loop
+mostly does not. So the no-dependency route was not a cheap way to get motion; it was an
+expensive way to get bad motion, and every row of the comparison table that favoured it was
+measuring the wrong axis.
+
+What the table got right, and what it therefore costs to reverse: there *is* a controller
+lifecycle per slide now, and it is the one genuinely delicate part of this slice — see the
+decoder-budget box below. `video_player: 2.13.0` resolved without moving a single existing
+pin (lockfile diff: 40 added lines, none removed), so the freeze still holds in the sense
+that matters.
+
+A 1920×1080**60** source at `q_auto:best` measures 2,890,332 B for eight seconds.
+
+### And then the 8-second cap came off too (same day)
+
+0054 truncated every loop with `du_8`, and 0072 kept it. **Removed 2026-07-30** on the same
+request that drove the quality change: the whole clip now plays and loops. The cap was never
+a fact about hero loops — it was a property of the format it was written for. Animated WebP
+paid for length linearly, in bytes the phone had to download *before it could show a single
+frame*, so eight seconds was the point where a decorative loop stopped being worth it. Under
+h.264 length is far cheaper per second, and `video_player` **streams** — the first buffered
+chunk starts playing and the tail is only pulled if somebody is still watching. So length
+stopped being latency and became data spent while a customer looks at it.
+
+The same 13.4-second source, whole, delivers **1,128,474 B** — still inside even the old
+1.5 MB target.
+
+**The budget had to move with it**, and this is the part worth knowing. At `q_auto:best` an
+854×480 source runs ~84 KB/s and a busy 1080p60 one ~360 KB/s, so a 30-second film lands
+between roughly 4 and 11 MB. The old 4 MB hard refusal was sized for a guaranteed-8-second
+loop and would have refused most real clips — the feature failing, not the budget working.
+Now **5 MB advisory target, 25 MB hard refusal** (source cap unchanged at 100 MB). Both are
+one-line constants in `uploads.ts` and the console still shows the measured number in green
+or amber, so length is a cost an admin can see rather than a rule imposed on them.
+
+### A slide can be **just a video** (same day)
+
+`admin_upsert_hero_slide` refused a slide with no artwork — "A slide needs artwork. Upload an
+image first." — which is what an admin uploading only a clip hit. **The rule was not relaxed,
+and should not be.** Every reason for it still holds: the still is the poster, the
+reduce-motion fallback, what shows while the video buffers, where every failure path lands,
+and the only thing a customer build older than 0072 can draw at all. A video-only slide does
+not need the invariant weakened — it needs a still, and the video already contains one.
+
+So the console derives it: `so_0,w_1080,c_limit,q_auto:best` off the same uploaded asset, as a
+`.jpg` (~25 KB measured). `so_0` is the **first** frame and not `so_auto` ("most interesting")
+because the video starts at zero — frame zero is the one image guaranteed to be in register
+with the moment playback begins, where a frame from the middle would visibly jump as the loop
+started. The `w_1080,c_limit` half is copied from the video transform so the two are the same
+framing at the same width. `.jpg` explicitly rather than `f_auto`, for the reason 0054 learnt
+with `f_auto:animated`: Flutter sends no useful `Accept` header.
+
+**No migration, and none wanted.** The poster is a `https://res.cloudinary.com/…` URL, so it
+satisfies 0067's artwork check unchanged (verified against the live database), and it is
+correctly *refused* by `assert_hero_motion` — the two columns cannot be confused. It fills in
+**only when the admin uploaded no artwork**; someone who uploaded both chose their artwork
+deliberately, and overwriting it would be the console overruling them. Removing the loop also
+clears a derived poster, since it only ever existed because of the video.
+
+⚠️ **`423 Locked` became reachable, and is handled.** While Cloudinary builds a derived video
+it answers 423 instead of the file. A 13-second clip transcodes inside the synchronous window
+(3.6s measured); a minute-long one need not. `measureDelivered()` polls 423 every 3s for up to
+two minutes rather than reporting it as a failure — which would have shown "couldn't transcode
+it" for precisely the long clips this change allows, and *intermittently*, since a retry on the
+warmed asset succeeds.
+
+- [x] ~~**Decided: animated WebP, no new dependency**~~ — **superseded 2026-07-30.** The
+      column now holds an `.mp4` and the phone plays it with `video_player` (0072). Items
+      below are marked where the reversal changed them
 - [x] `hero_slides` grows `motion_url` (nullable) beside `image_url`, and the still stays
       **required** — it is the poster, the reduce-motion fallback, and what shows while
       the loop downloads. There is deliberately no "a slide with a loop must also have a
@@ -566,36 +648,55 @@ nothing that happens on a phone screen. Manual steps below.
 - [x] **`uploads.ts` grew a video path.** `uploadMotion()` posts to Cloudinary's
       `/video/upload` with the same unsigned preset, caps the *source* at 100 MB, then
       builds the delivery URL and **fetches it to measure what it actually weighs**
-- [x] **The column stores the derived WebP URL, not the uploaded MP4.** So the size an
-      admin is shown before saving is the size a customer downloads — the same bytes from
-      the same URL — rather than an estimate of it. It also keeps Cloudinary's grammar out
-      of the phone: `motion_url` is a URL to an image, exactly like `image_url`
-- [x] Console: upload the MP4, **the transcoded loop plays in the same live preview** (an
-      animated WebP plays in an `<img>`, so what the admin watches is the file the phone
-      decodes), and the delivered size is stated — green under the target, amber over it
-- [x] Carousel: still first, loop faded in over it when decoded. Never a blank frame,
-      because the still is never removed — the loop is a layer above it, not a replacement
-- [x] **Only the visible slide animates**, via `TickerMode`. Flutter pauses multi-frame
-      images when the ticker mode is off, which parks an off-screen loop *without* tearing
-      it down — so swiping back resumes it instead of paying to decode it again. The
-      `< 0.5` page test means exactly one loop runs at any moment (rule 3)
-- [x] **Respect reduce-motion** — and by *not mounting the loop at all*, which is the
-      more expensive of the two options and the right one. Flutter already pauses animated
-      images under `disableAnimations`, but a paused animation is frozen on its own first
-      frame: an arbitrary video still, not the artwork the admin composed the headline
-      against. Rule 1 says every failure path lands on the still, so this one does
+- [x] **The column stores the derived delivery URL, not the uploaded original.** So the
+      size an admin is shown before saving is the size a customer downloads — the same bytes
+      from the same URL — rather than an estimate of it. (0072 changed *which* derived URL:
+      an `.mp4` rather than an animated `.webp`. The argument for storing the derived one is
+      unchanged, and the fetch-to-measure step doubles as warming Cloudinary's transcode so
+      the first customer does not pay for it)
+- [x] Console: upload the MP4, **the transcoded loop plays in the same live preview**, and
+      the delivered size is stated — green under the target, amber over it. Since 0072 the
+      preview is a muted autoplaying `<video>` rather than an `<img>`; what the admin
+      watches is still byte-for-byte the file the phone plays
+- [x] Carousel: still first, video faded in over it once playing. Never a blank frame,
+      because the still is never removed — the loop is a layer above it, not a replacement.
+      The fade is a `TweenAnimationBuilder` with a non-null `begin`, **not** an
+      `AnimatedOpacity`: an implicit animation only interpolates when its target *changes*,
+      and this subtree is built once the controller is already ready, so a constant
+      `opacity: 1` would have been a hard cut dressed up as a fade
+- [x] **Only the visible slide plays**, on the same `< 0.5` page test as before (rule 3).
+      **What changed in 0072 is that leaving a slide now *disposes* the controller rather
+      than parking it**, and that is a decoder-budget decision, not a tidiness one: a
+      `VideoPlayerController` holds a platform codec, Android supports only a handful
+      concurrently and fewer at the Android 10 floor, and an unbounded `PageView` keeps
+      several pages alive. Pausing would be cheaper on a swipe back and would let a carousel
+      of motion slides exhaust the decoders — which fails as a hero that silently stops
+      moving. A generation counter makes a slow `initialize()` that resolves after the
+      customer has swiped away discard its controller instead of adopting it
+- [x] **Respect reduce-motion** — and by *not mounting the loop at all*, which remains the
+      right call for the same reason and one more since 0072. A paused player still shows a
+      frame, and that frame is an arbitrary video still rather than the artwork the admin
+      composed the headline against; it would also hold a codec open to show it. Rule 1 says
+      every failure path lands on the still, so this one does
 - [~] **Low battery / data saver — considered, not built.** Both need a plugin
       (`battery_plus`, `connectivity_plus`); neither is in `pubspec.yaml` and adding one
       is a freeze item ⚠️ for a decorative loop already bounded to ~1 MB and already
       paused whenever it is off-screen. Filed here rather than done, and it is the one
       unchecked box in this slice
-- [x] Budget and enforce a cap — **≤ 1.5 MB target, 4 MB hard refusal.** Over the target
-      the console says the number in amber and still lets an admin ship it deliberately;
-      over the cap `uploadMotion()` refuses and the slide never reaches the database
-- [ ] Profile on the **Android 10 floor** specifically. Animated WebP decode is not free,
-      and the hero is the first thing on the first screen
+- [x] Budget and enforce a cap — ~~≤ 1.5 MB target, 4 MB hard refusal~~ **≤ 5 MB target,
+      25 MB hard refusal** since the duration cap came off (see above). Over the target the
+      console says the number in amber and still lets an admin ship it deliberately; over the
+      cap `uploadMotion()` refuses and the slide never reaches the database
+- [ ] Profile on the **Android 10 floor** specifically. Now a hardware video decoder rather
+      than a WebP decode, which is cheaper per frame and scarcer as a resource — the thing to
+      watch is a carousel of several motion slides swiped quickly, not one loop playing
 
-### The transformation, and the flag that silently breaks it
+### The 0054 transformation, kept for the record
+
+Superseded by 0072 — the live transformation is
+`f_mp4,vc_h264,ac_none,w_1080,c_limit,q_auto:best` (no `du_`), and the two boxes above are why.
+Everything below documents the animated-WebP design that shipped between 2026-07-27 and
+2026-07-30, including the one check whose loss is worth understanding.
 
 `f_webp,fl_animated,fl_awebp,w_720,q_auto:eco,du_8,fps_12`
 
@@ -628,36 +729,66 @@ uploads a thirty-second film gets its opening instead of an error.
 That worst case — a busy, full-motion clip — lands at 1.14 MB, under the target. Food film
 is usually calmer than a running dog, so real loops should sit well below it.
 
+**Why losing the `fl_awebp` check in 0072 is safe.** It was the best check in the file, and
+the failure it caught does not survive the format change: a `.mp4` that will not play does
+not render *either*, so it lands on the still by the ordinary route. There is no video
+equivalent of "HTTP 200, correct content type, one frame, looks right, does not move".
+0072's `assert_hero_motion` keeps the Cloudinary-host and `/video/upload/` checks, swaps the
+extension test to `.mp4`, and names the stale-`.webp` case separately so an old URL pasted in
+gets told what actually changed rather than "not an mp4".
+
 ### Verifying P4 on a device ([[zopiqnow-no-test-files]] — manual, by hand)
 
-Proven without a phone: `assert_hero_motion` accepts the real delivery URL and refuses all
-four ways of getting it wrong (not Cloudinary, the raw `.mp4`, an `/image/upload/` URL, and
-`fl_awebp` missing); the RPC refuses a bad loop **without disturbing the loop already
-stored**; clearing a loop is an ordinary save; and, read as `anon` inside a transaction,
-the slide is invisible while switched off and returns `motion_url` once published. The
-console typechecks and builds, `flutter analyze` is clean on all three changed Dart files,
-and `git diff` on every `pubspec.yaml` and `pubspec.lock` is empty.
+Proven without a phone, after 0072: `assert_hero_motion` accepts the real `.mp4` delivery URL
+and refuses every way of getting it wrong (not Cloudinary, an `/image/upload/` URL, a `.mov`,
+and a stale 0054 `.webp` URL with its own sentence) — exercised against the live database
+2026-07-30. The console typechecks and lints clean; `flutter analyze` reports nothing on
+either changed Dart file; `flutter build apk --debug` succeeds with the new plugin; and the
+`pubspec.lock` diff is 40 added lines with none removed, so no existing pin moved.
 
-1. Console → **Home hero** → edit a slide → **Upload MP4**. Watch the preview: the loop
-   must actually *move*. A still frame here is the `fl_awebp` failure above, and this
-   preview is the cheapest place in the whole system to catch it.
-2. Read the size line. Upload something deliberately awful — a 40 MB phone video — and
-   confirm it is **refused with the number in the sentence**, not accepted quietly.
-3. Save and publish. On the phone, pull to refresh Home: the still appears first and the
-   loop fades in over it. **There must be no blank frame and no flash of white** between
+Also worth knowing before a device pass: `hero_slides` held **zero rows** when 0072 was
+applied, so nothing published changed shape and there is no legacy `.webp` URL anywhere. A
+customer build older than 0072 hands the `.mp4` to `Image.network`, fails, and shows the
+still — degradation by design rather than by luck.
+
+1. Console → **Home hero** → edit a slide → **Upload MP4**. Watch the preview: the loop must
+   actually move, and now at the clip's own resolution — this preview is the cheapest place
+   in the system to catch a bad clip.
+2. Read the size line. Green under 5 MB, amber over it, **refused with the number in the
+   sentence** over 25 MB — so the clip that proves the refusal now has to be a genuinely large
+   one (a long 4K phone video), not the 40 MB source the 4 MB cap used to catch.
+3. **Upload something longer than 8 seconds** — 30 seconds or a minute. Confirm the whole
+   thing plays and then loops, rather than stopping at 8s, and that the console waits for the
+   transcode instead of erroring. This is the `423` path: if it reports "couldn't transcode
+   it" on a long clip and then succeeds on a retry, the polling is not working.
+4. **Add a slide with a video and no image at all.** It must save — the artwork fills itself
+   in from the first frame and says so. Then upload a real image over it and confirm the note
+   disappears; then remove the loop and confirm a *derived* poster goes with it while an
+   uploaded image would not. ⚠️ Watch the shape here: the hero is near-square and the app uses
+   `BoxFit.fill`, so a **16:9 clip arrives visibly stretched**. That is 0067's deliberate
+   choice (fill rather than crop, so nothing a designer put near an edge is cut off) and it
+   now applies to video — a squarish clip is the one that lands untouched.
+5. Save and publish. On the phone, pull to refresh Home: the still appears first and the
+   video fades in over it. **There must be no blank frame and no flash of white** between
    the two.
-4. Add a second slide **without** a loop and publish both. Swipe between them: the loop
+6. Add a second slide **without** a loop and publish both. Swipe between them: the video
    plays on the slide in front of you and the still-only slide is unchanged.
-5. Add a *third* slide with its own loop. Now the rule that matters: **only one loop runs
-   at a time.** Swipe slowly — the incoming loop stays on its first frame until it passes
-   the halfway point, then takes over as the outgoing one parks.
-6. Swipe away from a loop and back. It must **resume**, not restart with a re-download —
-   that is `TickerMode` parking it rather than the widget being torn down.
-7. Turn on **reduce motion** in the OS and cold-start. Every slide shows its **still** —
+7. Add a *third* slide with its own loop. Now the rule that matters: **only one plays at a
+   time.** Swipe slowly — the incoming slide shows its still until it passes the halfway
+   point, then takes over as the outgoing one is torn down.
+8. Swipe away from a loop and back. Since 0072 it **restarts** rather than resuming, and
+   that is correct: the controller is disposed on leaving so only one platform codec is ever
+   open. What to check is that the restart lands on the **still**, with no black frame and no
+   visible stall — swipe back and forth quickly several times, which is the case the
+   generation counter exists for.
+9. Turn on **reduce motion** in the OS and cold-start. Every slide shows its **still** —
    specifically the admin's artwork, not a frozen video frame. This is the check that
    distinguishes "not mounted" from "paused", and they look different.
-8. Kill the network mid-scroll and cold-start: stills only, no error, no spinner in the
+10. Kill the network mid-scroll and cold-start: stills only, no error, no spinner in the
    hero, no gap where a loop would have been.
+11. **Volume up, and listen.** The clip must be silent with the phone at full volume — the
+   audio track is stripped by `ac_none` at delivery *and* the player is set to zero, so
+   hearing anything at all means neither is in force.
 9. Watch memory and jank on the **Android 10 floor** ([[zopiqnow-android-compat]]) with
    three published loops. Frames decode one at a time, so what sits in RAM is the current
    frame plus the encoded bytes — but decode cost is per frame, per second, on the first
@@ -703,10 +834,12 @@ Android 16 half compiles against the `compileSdk 36` the app already had.
 
 ## Decisions needed from you before any of this starts
 
-1. ~~**P4:** animated WebP (no new dependency) or `video_player` ⚠️?~~ **Answered
-   2026-07-27: animated WebP**, and built. Nothing in `pubspec.yaml` moved. Revisit
-   `video_player` only if a hero loop ever needs sound or more than ~10 seconds — neither
-   of which rule 2 or rule 4 of that slice currently allows.
+1. ~~**P4:** animated WebP (no new dependency) or `video_player` ⚠️?~~ **Answered twice.**
+   Animated WebP 2026-07-27; **reversed to `video_player` 2026-07-30** (migration 0072) when
+   the 720p/12fps quality complaint sent us back to the measurements. Real video at full
+   resolution and full frame rate turned out to be *half* the bytes of the compromise, so the
+   dependency bought quality and saved data at once — see the reversal box in P4. Approved as
+   a Rule 3 exception; `pubspec.lock` gained five packages and moved no existing pin.
 2. **P1 Tier 2:** ~~approve `targetSdk 35 → 36` ⚠️, or park the Android 16 chip?~~
    **Mostly answered by building it.** The segmented tracker needed no bump and now runs
    on every Android; the Android 16 branch compiles against the existing `compileSdk 36`

@@ -42,16 +42,22 @@ class HeroSlide {
   /// Cloudinary-hosted artwork. Never empty: the table requires it.
   final String imageUrl;
 
-  /// An optional looping animation to play over [imageUrl] (migration 0054).
+  /// An optional silent looping video to play over [imageUrl] (migration 0072).
   ///
-  /// This is a *still image URL* despite what it holds — Cloudinary delivers
-  /// the admin's uploaded MP4 as an animated WebP, which Flutter's own [Image]
-  /// decodes and loops with no video player involved. Nothing on the device
-  /// knows a video was ever uploaded.
+  /// A Cloudinary `/video/upload/` URL ending `.mp4` — h.264, the admin's own
+  /// resolution and frame rate to a 1080px width, no audio track, and the **whole
+  /// clip**, which loops. Played by `video_player`, which streams it rather than
+  /// waiting for the file, so length costs data while somebody watches rather than
+  /// latency before anything appears.
+  ///
+  /// Until 0072 this held an *animated WebP* that `Image` decoded and looped, so
+  /// that a moving hero cost no new dependency. That bought `w_720,fps_12`: WebP
+  /// stores every frame as a separate still, so the compromise was both lower
+  /// quality *and* about twice the bytes of the video that replaced it.
   ///
   /// Null is the ordinary case. [imageUrl] is what shows when it is null, while
-  /// it downloads, if it fails, and whenever the phone has asked for reduced
-  /// motion — so a slide never depends on this arriving.
+  /// it buffers, if it fails to play at all, and whenever the phone has asked for
+  /// reduced motion — so a slide never depends on this arriving.
   final String? motionUrl;
 
   /// Where the button goes — an in-app path the database has already validated
