@@ -26,6 +26,7 @@ class Settlement {
     required this.periodEnd,
     required this.orderCount,
     required this.grossSales,
+    required this.vendorFundedDiscount,
     required this.commission,
     required this.netPayable,
     required this.status,
@@ -42,6 +43,14 @@ class Settlement {
 
   final int orderCount;
   final int grossSales;
+
+  /// The part of this week's discounts the restaurant issued itself, through its
+  /// own offers. Deducted from [grossSales] *before* commission, so the platform
+  /// charges its cut on what the kitchen actually earned rather than on the
+  /// pre-discount menu price. Platform-funded coupons are not in here — those
+  /// come out of the platform's promotional spend and never touch a payout.
+  final int vendorFundedDiscount;
+
   final int commission;
   final int netPayable;
 
@@ -58,6 +67,7 @@ class Settlement {
     periodEnd: DateTime.parse(json['period_end'] as String),
     orderCount: (json['order_count'] as num).toInt(),
     grossSales: (json['gross_sales'] as num).toInt(),
+    vendorFundedDiscount: (json['vendor_funded_discount'] as num?)?.toInt() ?? 0,
     commission: (json['commission'] as num).toInt(),
     netPayable: (json['net_payable'] as num).toInt(),
     status: SettlementStatus.fromWire(json['status'] as String),

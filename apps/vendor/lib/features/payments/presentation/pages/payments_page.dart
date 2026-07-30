@@ -5,17 +5,15 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_vendor/app/router.dart';
 import 'package:zopiq_vendor/core/formatting/formatters.dart';
+import 'package:zopiq_vendor/core/widgets/vendor_animations.dart';
 import 'package:zopiq_vendor/core/widgets/vendor_message.dart';
+import 'package:zopiq_vendor/core/widgets/vendor_svg_icons.dart';
 import 'package:zopiq_vendor/features/payments/domain/entities/earnings_summary.dart';
 import 'package:zopiq_vendor/features/payments/domain/entities/settlement.dart';
 import 'package:zopiq_vendor/features/payments/presentation/providers/payments_providers.dart';
 import 'package:zopiq_vendor/features/payments/presentation/widgets/earnings_bar_chart.dart';
 
-/// The money screen: what the kitchen has earned, and the payouts that clear it.
-///
-/// Two questions, in the order a restaurant asks them. First "how am I doing" —
-/// the earnings summary and its trend, live and settled-or-not. Then "when do I
-/// get paid" — the weekly settlements, each a statement you can open to the order.
+/// The money screen: revenue dashboard and weekly payouts.
 class PaymentsPage extends ConsumerWidget {
   const PaymentsPage({super.key});
 
@@ -41,14 +39,12 @@ class PaymentsPage extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.only(bottom: ZopiqSpacing.xxl),
             children: <Widget>[
-              // ── Custom Header ──
-              const ZopiqReveal(
-                index: 0,
+              const VendorFadeSlide(
                 child: _Header(),
               ),
 
-              ZopiqReveal(
-                index: 1,
+              VendorFadeSlide(
+                delay: const Duration(milliseconds: 50),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.pageGutter),
                   child: _RangeSelector(
@@ -60,8 +56,8 @@ class PaymentsPage extends ConsumerWidget {
               ),
               const SizedBox(height: ZopiqSpacing.lg),
 
-              ZopiqReveal(
-                index: 2,
+              VendorFadeSlide(
+                delay: const Duration(milliseconds: 100),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.pageGutter),
                   child: earnings.when(
@@ -79,17 +75,17 @@ class PaymentsPage extends ConsumerWidget {
               ),
               const SizedBox(height: ZopiqSpacing.xl),
               
-              ZopiqReveal(
-                index: 3,
+              VendorFadeSlide(
+                delay: const Duration(milliseconds: 150),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.pageGutter),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        'Settlements',
+                        'Weekly Settlements',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: ZopiqSpacing.xs),
@@ -134,8 +130,8 @@ class PaymentsPage extends ConsumerWidget {
                     return Column(
                       children: <Widget>[
                         for (int i = 0; i < list.length; i++)
-                          ZopiqReveal(
-                            index: 4 + i,
+                          VendorFadeSlide(
+                            delay: Duration(milliseconds: 200 + i * 50),
                             child: _SettlementTile(settlement: list[i]),
                           ),
                       ],
@@ -173,7 +169,7 @@ class _Header extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  'Payments & Earnings',
+                  'Payments & Revenue',
                   style: t.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: zc.textStrong,
@@ -182,10 +178,22 @@ class _Header extends StatelessWidget {
                 ),
                 const SizedBox(height: ZopiqSpacing.xxs),
                 Text(
-                  'Track your revenue and weekly payouts',
+                  'Track sales performance and settlement payouts',
                   style: t.bodyMedium?.copyWith(color: zc.textMuted),
                 ),
               ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(ZopiqSpacing.sm),
+            decoration: BoxDecoration(
+              color: zc.primary.withValues(alpha: 0.1),
+              borderRadius: ZopiqRadii.rMd,
+            ),
+            child: VendorSvgIcon(
+              type: VendorSvgType.earningsChart,
+              size: 24,
+              color: zc.primary,
             ),
           ),
         ],
@@ -214,8 +222,6 @@ class _RangeSelector extends StatelessWidget {
   }
 }
 
-/// The headline: net earnings, big, with the gross-and-commission arithmetic
-/// underneath so the deduction is shown, never implied.
 class _EarningsCard extends StatelessWidget {
   const _EarningsCard({required this.summary});
 
@@ -231,11 +237,10 @@ class _EarningsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          // Top Accent Bar
           Container(
-            height: 3,
+            height: 4,
             decoration: BoxDecoration(
-              color: zc.primary.withValues(alpha: 0.6),
+              color: zc.primary,
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(ZopiqRadii.lg),
               ),
@@ -255,16 +260,21 @@ class _EarningsCard extends StatelessWidget {
                         color: zc.primary.withValues(alpha: 0.10),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
-                        Icons.account_balance_wallet_rounded,
-                        size: 16,
-                        color: zc.primary,
+                      child: Center(
+                        child: VendorSvgIcon(
+                          type: VendorSvgType.earningsChart,
+                          size: 18,
+                          color: zc.primary,
+                        ),
                       ),
                     ),
                     const SizedBox(width: ZopiqSpacing.md),
                     Text(
-                      'Net earnings',
-                      style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                      'Net Kitchen Earnings',
+                      style: t.bodyMedium?.copyWith(
+                        color: zc.textMuted,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -292,9 +302,18 @@ class _EarningsCard extends StatelessWidget {
                 ],
                 const Divider(height: 1),
                 const SizedBox(height: ZopiqSpacing.md),
-                _Line(label: 'Gross sales', value: summary.grossSales),
+                _Line(label: 'Gross Sales Value', value: summary.grossSales),
+                // Only when there is something to explain. A kitchen that runs
+                // no offers of its own should not be shown a zero it has to
+                // work out the meaning of.
+                if (summary.vendorFundedDiscount > 0)
+                  _Line(
+                    label: 'Your Own Offers',
+                    value: -summary.vendorFundedDiscount,
+                    muted: true,
+                  ),
                 _Line(
-                  label: 'Commission (${summary.commissionPercent.toStringAsFixed(0)}%)',
+                  label: 'Platform Commission (${summary.commissionPercent.toStringAsFixed(0)}%)',
                   value: -summary.commission,
                   muted: true,
                 ),
@@ -327,7 +346,7 @@ class _Line extends StatelessWidget {
           Text(
             formatRupees(value),
             style: t.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.bold,
               color: muted ? zc.textMuted : zc.textStrong,
             ),
           ),
@@ -347,7 +366,7 @@ class _SettlementTile extends StatelessWidget {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
     final bool paid = settlement.status == SettlementStatus.paid;
-    final Color accent = paid ? zc.veg : const Color(0xFFF59E0B); // Amber for pending
+    final Color accent = paid ? zc.veg : const Color(0xFFF59E0B);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: ZopiqSpacing.sm),
@@ -372,7 +391,6 @@ class _SettlementTile extends StatelessWidget {
           child: IntrinsicHeight(
             child: Row(
               children: <Widget>[
-                // Left accent strip
                 Container(
                   width: 4,
                   decoration: BoxDecoration(
@@ -393,7 +411,7 @@ class _SettlementTile extends StatelessWidget {
                             children: <Widget>[
                               Text(
                                 periodLabel(settlement.periodStart, settlement.periodEnd),
-                                style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                                style: t.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: ZopiqSpacing.xxs),
                               Text(
@@ -428,7 +446,7 @@ class _SettlementTile extends StatelessWidget {
                                 settlement.status.label,
                                 style: t.labelSmall?.copyWith(
                                   color: accent,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
@@ -463,8 +481,6 @@ class _EarningsSkeleton extends StatelessWidget {
   }
 }
 
-/// `6–12 Jul`, `30 Jun – 6 Jul`. A settlement's week, read the way a statement
-/// names one — by hand, because `intl` is not a dependency this app has.
 String periodLabel(DateTime start, DateTime end) {
   const List<String> months = <String>[
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',

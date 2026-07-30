@@ -140,6 +140,41 @@ class FakeVendorOrderDataSource implements VendorOrderDataSource {
     _controller.add(_orders);
   }
 
+  /// Somebody else moved the order, and the kitchen finds out because the row
+  /// changed under it.
+  ///
+  /// The mirror of [arrive], and necessary for the same reason: since migration
+  /// 0050 the vendor's ladder stops at `ready_for_pickup`, so `out_for_delivery`
+  /// and `delivered` are not states this app can produce. They arrive from the
+  /// rider, through `confirm_pickup` and `confirm_delivered`, as an update on
+  /// the stream. [setStatus] cannot rehearse that — it is the vendor's own
+  /// action — so a test that wants to see the queue react to a completed
+  /// delivery has to say it happened elsewhere. Which is the truth.
+  void advance(String orderId, OrderStatus status) {
+    _orders = _orders
+        .map(
+          (VendorOrder o) => o.id == orderId
+              ? VendorOrder(
+                  id: o.id,
+                  status: status,
+                  placedAt: o.placedAt,
+                  customerPhone: o.customerPhone,
+                  deliveryTo: o.deliveryTo,
+                  subtotal: o.subtotal,
+                  deliveryFee: o.deliveryFee,
+                  taxes: o.taxes,
+                  discount: o.discount,
+                  total: o.total,
+                  paymentMethod: o.paymentMethod,
+                  etaMinutes: o.etaMinutes,
+                  readyBy: o.readyBy,
+                )
+              : o,
+        )
+        .toList(growable: false);
+    _controller.add(_orders);
+  }
+
   @override
   Future<List<OrderLine>> fetchLines(String orderId) async => lines;
 
@@ -399,6 +434,7 @@ class FakePaymentsDataSource implements PaymentsDataSource {
         commissionBps: 2000,
         orderCount: 0,
         grossSales: 0,
+        vendorFundedDiscount: 0,
         commission: 0,
         netEarnings: 0,
         daily: const <DailyEarning>[],

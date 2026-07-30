@@ -534,6 +534,24 @@ class _OfferSheetState extends State<_OfferSheet> {
             ],
 
             const SizedBox(height: ZopiqSpacing.lg),
+            // Said before the button, not after the payout. An offer a
+            // restaurant creates is funded by that restaurant — it comes off
+            // the weekly statement, and commission is charged on what is left.
+            // A vendor finding that out from a smaller bank transfer is how a
+            // partner stops being one.
+            Container(
+              padding: const EdgeInsets.all(ZopiqSpacing.md),
+              decoration: BoxDecoration(
+                color: zc.textMuted.withValues(alpha: 0.06),
+                borderRadius: ZopiqRadii.rMd,
+              ),
+              child: Text(
+                'You fund this offer. The discount is deducted from your weekly '
+                'payout, and commission is charged on the amount left after it.',
+                style: t.bodySmall?.copyWith(color: zc.textMuted, height: 1.4),
+              ),
+            ),
+            const SizedBox(height: ZopiqSpacing.lg),
             SizedBox(
               width: double.infinity,
               height: 48,

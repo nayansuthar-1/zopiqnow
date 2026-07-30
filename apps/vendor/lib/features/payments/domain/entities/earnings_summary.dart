@@ -34,6 +34,7 @@ class EarningsSummary {
     required this.commissionBps,
     required this.orderCount,
     required this.grossSales,
+    required this.vendorFundedDiscount,
     required this.commission,
     required this.netEarnings,
     required this.daily,
@@ -48,6 +49,13 @@ class EarningsSummary {
 
   final int orderCount;
   final int grossSales;
+
+  /// What this restaurant's own offers cost it in the window. Comes off
+  /// [grossSales] before commission, and is the same figure the weekly statement
+  /// carries — a vendor comparing this screen to their payout should find the
+  /// same number under the same words.
+  final int vendorFundedDiscount;
+
   final int commission;
   final int netEarnings;
 
@@ -65,6 +73,8 @@ class EarningsSummary {
       commissionBps: (json['commission_bps'] as num).toInt(),
       orderCount: (json['order_count'] as num).toInt(),
       grossSales: (json['gross_sales'] as num).toInt(),
+      vendorFundedDiscount:
+          (json['vendor_funded_discount'] as num?)?.toInt() ?? 0,
       commission: (json['commission'] as num).toInt(),
       netEarnings: (json['net_earnings'] as num).toInt(),
       daily: days

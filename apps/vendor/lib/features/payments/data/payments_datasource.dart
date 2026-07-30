@@ -56,7 +56,8 @@ class PaymentsSupabaseDataSource implements PaymentsDataSource {
         .from('settlements')
         .select(
           'id, period_start, period_end, order_count, gross_sales, '
-          'commission, net_payable, status, reference, created_at, paid_at',
+          'vendor_funded_discount, commission, net_payable, status, reference, '
+          'created_at, paid_at',
         )
         .order('period_end', ascending: false);
 

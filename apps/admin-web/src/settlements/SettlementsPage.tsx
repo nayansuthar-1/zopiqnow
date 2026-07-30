@@ -145,6 +145,7 @@ export function SettlementsPage() {
                   <th className="px-5 py-3 font-medium">Week</th>
                   <th className="px-5 py-3 text-right font-medium">Orders</th>
                   <th className="px-5 py-3 text-right font-medium">Sales</th>
+                  <th className="px-5 py-3 text-right font-medium">Own offers</th>
                   <th className="px-5 py-3 text-right font-medium">Commission</th>
                   <th className="px-5 py-3 text-right font-medium">Payable</th>
                   <th className="px-5 py-3 font-medium">Status</th>
@@ -165,6 +166,14 @@ export function SettlementsPage() {
                     </td>
                     <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
                       ₹{s.gross_sales.toLocaleString('en-IN')}
+                    </td>
+                    {/* A dash, not a zero. Most weeks have no restaurant-funded
+                        offers, and a column of ₹0 is noise the eye has to skip
+                        past to find the week that does. */}
+                    <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
+                      {s.vendor_funded_discount > 0
+                        ? `−₹${s.vendor_funded_discount.toLocaleString('en-IN')}`
+                        : '—'}
                     </td>
                     <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
                       −₹{s.commission.toLocaleString('en-IN')}

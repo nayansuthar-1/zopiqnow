@@ -134,6 +134,15 @@ class _SummaryCard extends StatelessWidget {
           const Divider(height: 1),
           const SizedBox(height: ZopiqSpacing.md),
           _Line(label: 'Gross sales', value: formatRupees(settlement.grossSales)),
+          // The statement has to explain itself, which means naming the two
+          // deductions separately. Commission is charged on what is left after
+          // this one, not on gross — the order of these lines is the maths.
+          if (settlement.vendorFundedDiscount > 0)
+            _Line(
+              label: 'Your own offers',
+              value: formatRupees(-settlement.vendorFundedDiscount),
+              muted: true,
+            ),
           _Line(
             label: 'Commission',
             value: formatRupees(-settlement.commission),

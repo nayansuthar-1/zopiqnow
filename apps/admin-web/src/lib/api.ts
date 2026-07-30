@@ -587,6 +587,10 @@ export type SettlementRow = {
   period_end: string
   order_count: number
   gross_sales: number
+  /// What the restaurant's own offers cost it this week. Comes off gross before
+  /// commission (0074) — a non-zero figure here is a restaurant-funded promotion,
+  /// which is the thing that used to be indistinguishable from a platform one.
+  vendor_funded_discount: number
   commission: number
   net_payable: number
   status: 'pending' | 'paid'

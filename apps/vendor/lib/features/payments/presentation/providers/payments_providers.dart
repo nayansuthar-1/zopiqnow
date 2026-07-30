@@ -52,6 +52,7 @@ final FutureProviderFamily<EarningsSummary, EarningsRange> earningsProvider =
             commissionBps: 0,
             orderCount: 0,
             grossSales: 0,
+            vendorFundedDiscount: 0,
             commission: 0,
             netEarnings: 0,
             daily: const <DailyEarning>[],
