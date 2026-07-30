@@ -54,10 +54,19 @@ push with Accept/Decline is buildable, and the 20s board poll can go.
 Still owed, small:
 - [ ] `supabase functions delete send-order-push` — the superseded function is still
       ACTIVE beside `send-notification`, and a dead endpoint nobody calls is one
-      somebody wires back up
-- [ ] Commit the rider in-app notification inbox (built, analyze-clean, uncommitted —
-      entangled with the current rider UI WIP, which also carries a stray
-      `apps/rider/lib/lib/app/rider_shell.dart` that does not compile)
+      somebody wires back up. Unwired since 0058 dropped `on_new_order_push`, so this
+      is a deployment to remove, not a behaviour to change. **The source folder stays
+      until the deployment goes** — a live function with no source in the repo is the
+      same hazard pointing the other way
+- [x] Commit the rider in-app notification inbox ✅ **DONE 2026-07-30** (`1c8d9e6`).
+      It was worse than "uncommitted": `jobs/home_page.dart` had been importing
+      `notification_bell.dart` and `rider_animations.dart` since `9e45fa8`, so the
+      rider app had not compiled from a clean checkout for two phases. The same
+      commit fixes push registration — 0060 dropped the two-argument
+      `register_device_token` and the committed rider was still calling it, so every
+      rider device registration was failing against the deployed database — and
+      removes the stray `apps/rider/lib/lib/app/rider_shell.dart`, which was the only
+      analyzer *error* in the app
 
 ---
 

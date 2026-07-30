@@ -152,27 +152,33 @@ Restaurant Settings, Staff, Sign out. Notifications also gets an app-bar bell.
   switched off (0016). Same class as the hole 0068 closes; left alone deliberately.
 - **Deps:** none.
 
-## Phase 4 — Dashboard / home  ⬜
+## Phase 4 — Dashboard / home  ✅ DONE
 
-- [ ] New Home tab: KPI tiles (today's orders/revenue/AOV), status breakdown, recent orders
-- [ ] Quick actions, alerts / pending actions, menu-availability summary
-- [ ] Wire bottom nav to 5 items (Home added)
-- **Backend:** mostly derived from existing streams + Phase-1 entity. **Deps:** none.
+- [x] New Home tab: KPI tiles (orders today, revenue today, in the queue, delivered
+      today), weekly earnings card, active-orders card
+- [x] Quick actions (Menu, History, Payments, Analytics)
+- [x] Bottom nav wired to 5 items — Home · Orders · Menu · History · More
+- **Not built, and not missed:** AOV, and the menu-availability summary. Neither
+  earned its tile beside four numbers a kitchen actually reads mid-service.
+- **Backend:** derived from existing streams, as planned. No migration.
 
-## Phase 5 — Payments & settlements  ⬜
+## Phase 5 — Payments & settlements  ✅ DONE
 
-- [ ] Earnings views (today/week/month), deductions, net, pending/completed settlements
-- [ ] Settlement history + detailed breakdown (read-only frontend)
-- **Backend:** migration `0017` (`settlements`, `settlement_orders`; ops/cron writes).
-- **Deps:** `fl_chart` (approval needed).
+- [x] Earnings views, deductions, net, pending/completed settlements
+- [x] Settlement history + detailed breakdown (`settlement_detail_page.dart`),
+      read-only
+- **Backend:** `settlements` / `settlement_orders`, rolled up weekly (see B7).
+- **Deps:** `fl_chart` 1.2.0 — approved and pinned in `apps/vendor/pubspec.yaml`.
 
-## Phase 6 — Offers, analytics, ratings & reviews  ⬜
+## Phase 6 — Offers, analytics, ratings & reviews  ✅ DONE (with B6, migrations `0062`–`0065`)
 
-- [ ] Vendor-scoped offers: view active/upcoming/expired, create/toggle
-- [ ] Analytics: revenue/order trends, top/low items, peak hours, rating trends
-- [ ] Reviews: overall, distribution, recent, food/packaging sub-ratings
-- **Backend:** migrations `0018` (offers), `0019` (reviews + rating aggregate trigger).
-- **Deps:** `fl_chart` (approval needed).
+- [x] Vendor-scoped offers — `coupons.restaurant_id` (null = platform), scope enforced
+      in the database; the `<restaurant id>-…` code prefix is reserved to that kitchen
+- [x] Analytics: revenue/order trends, top/low items, peak hours (`hourly_bar_chart`)
+- [x] Reviews room: overall, distribution histogram, recent, keyed by order id and
+      **never** showing the customer
+- **Backend:** `0062`–`0065`, not the `0018`/`0019` guessed here — reviews are keyed by
+  order, not by (customer, restaurant), because reviewing is a thing you do to a meal.
 
 ## Phase 7 — Notifications & support  🟡 MOSTLY DONE
 
