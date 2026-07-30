@@ -36,7 +36,7 @@ The UI must feel **premium and polished like Swiggy** — generous spacing, cris
 | `primary` (Swiggy Orange) | **#FC8019** | Primary brand, buttons, highlights, active states |
 | `primaryDeep` (CTA Orange) | **#FF5200** | Strong CTAs, "ADD"/checkout emphasis, badges |
 | `textDark` | **#282C3F** | Primary text / headings |
-| `textMuted` | **#7E808C** | Secondary text, captions |
+| `textMuted` | **#5F6470** | Secondary text, captions (Swiggy's #7E808C fails WCAG AA at 3.92:1) |
 | `veg` | **#3D9B6D / #60B246** | Veg indicator, success |
 | `nonVeg` | **#E43B4F** | Non-veg indicator, error |
 | `surface` | **#FFFFFF** | Cards / sheets (light) |

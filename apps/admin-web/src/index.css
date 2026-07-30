@@ -10,7 +10,7 @@
   --color-brand-soft: #fff4ea; /* tinted surface behind brand content */
 
   --color-ink: #282c3f; /* headings / primary text */
-  --color-ink-muted: #7e808c; /* captions / secondary text */
+  --color-ink-muted: #5f6470; /* captions / secondary text — 5.93:1 on white */
   --color-line: #e9e9eb; /* dividers, input borders */
   --color-canvas: #f6f6f7; /* page background behind cards */
 

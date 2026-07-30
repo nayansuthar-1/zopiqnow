@@ -17,7 +17,11 @@ abstract final class ZopiqPalette {
 
   // --- Neutrals (light mode) ---
   static const Color textDark = Color(0xFF282C3F); // headings / primary text
-  static const Color textMuted = Color(0xFF7E808C); // captions / secondary
+  /// Captions / secondary text. Darkened from Swiggy's #7E808C, which measures
+  /// 3.92:1 on white and fails WCAG AA for body text (audit UI-003). This is
+  /// 5.93:1 — the one token change that carries every caption in the product
+  /// over the line. The dark-mode counterpart below already passes.
+  static const Color textMuted = Color(0xFF5F6470);
   static const Color surfaceLight = Color(0xFFFFFFFF); // cards / sheets
   static const Color backgroundLight = Color(0xFFFFFFFF);
   static const Color dividerLight = Color(0xFFE9E9EB);
