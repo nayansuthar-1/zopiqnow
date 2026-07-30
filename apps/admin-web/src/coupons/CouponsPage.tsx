@@ -51,6 +51,15 @@ type Draft = {
   percent_off: string
   max_off: string
   valid_until: string
+  /// Blank means "no limit" for the three numeric caps. `max_per_user` is the
+  /// exception that is pre-filled: 1 is the answer a campaign wants almost
+  /// always, and it is the one the database defaults to, so the form should not
+  /// let it be set by accident either way.
+  max_redemptions: string
+  max_per_user: string
+  budget: string
+  first_order_only: boolean
+  is_public: boolean
 }
 
 const blank: Draft = {
@@ -61,6 +70,11 @@ const blank: Draft = {
   percent_off: '',
   max_off: '',
   valid_until: '',
+  max_redemptions: '',
+  max_per_user: '1',
+  budget: '',
+  first_order_only: false,
+  is_public: true,
 }
 
 export function CouponsPage() {
@@ -100,6 +114,14 @@ export function CouponsPage() {
         valid_until: draft.valid_until
           ? new Date(draft.valid_until).toISOString()
           : null,
+        // Blank is a deliberate "no limit", not a zero — the RPC refuses 0 and
+        // the column reads null as unbounded, so an empty field has to arrive
+        // as null rather than as Number('') === 0.
+        max_redemptions: draft.max_redemptions ? Number(draft.max_redemptions) : null,
+        max_per_user: draft.max_per_user ? Number(draft.max_per_user) : null,
+        budget: draft.budget ? Number(draft.budget) : null,
+        first_order_only: draft.first_order_only,
+        is_public: draft.is_public,
       })
       setDraft(null)
       await load()
@@ -298,6 +320,77 @@ export function CouponsPage() {
                 }
                 hint="Leave empty for no end date."
               />
+
+              {/* The caps (0075). Grouped and separated from the pricing above,
+                  because these are the questions about how far a campaign may
+                  run rather than what it is worth — and because the whole
+                  finding was that there was no answer to them at all. */}
+              <div className="col-span-full mt-2 border-t border-line pt-4 text-xs font-medium tracking-wide text-ink-muted uppercase">
+                Limits
+              </div>
+
+              <Field
+                label="Per customer"
+                type="number"
+                value={draft.max_per_user}
+                onChange={(e) =>
+                  setDraft({ ...draft, max_per_user: e.target.value })
+                }
+                hint="How many times one person may use it. Empty means no limit."
+              />
+
+              <Field
+                label="Total redemptions"
+                type="number"
+                value={draft.max_redemptions}
+                onChange={(e) =>
+                  setDraft({ ...draft, max_redemptions: e.target.value })
+                }
+                hint="Across everybody. Empty means no limit."
+              />
+
+              <Field
+                label="Budget (₹)"
+                type="number"
+                value={draft.budget}
+                onChange={(e) => setDraft({ ...draft, budget: e.target.value })}
+                hint="Total discount this code may give away before it stops. Empty means no ceiling."
+              />
+
+              <label className="flex items-start gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={draft.first_order_only}
+                  onChange={(e) =>
+                    setDraft({ ...draft, first_order_only: e.target.checked })
+                  }
+                />
+                <span>
+                  First order only
+                  <span className="block text-xs text-ink-muted">
+                    Refused for anyone who has ordered before.
+                  </span>
+                </span>
+              </label>
+
+              <label className="flex items-start gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={draft.is_public}
+                  onChange={(e) =>
+                    setDraft({ ...draft, is_public: e.target.checked })
+                  }
+                />
+                <span>
+                  Listed publicly
+                  <span className="block text-xs text-ink-muted">
+                    Uncheck for a targeted or win-back code. It still works when
+                    typed — it just stops being readable by everyone.
+                  </span>
+                </span>
+              </label>
           </div>
         </Modal>
       )}

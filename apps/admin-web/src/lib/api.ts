@@ -323,6 +323,15 @@ export const api = {
     percent_off: number | null
     max_off: number | null
     valid_until: string | null
+    /// The caps (0075). Null is "no limit" for all three numeric ones — and for
+    /// max_per_user that has to be said explicitly, because the column defaults
+    /// to 1 and a campaign meant to be reusable would otherwise quietly become
+    /// once-per-customer.
+    max_redemptions: number | null
+    max_per_user: number | null
+    budget: number | null
+    first_order_only: boolean
+    is_public: boolean
   }) =>
     rpc<string>('admin_save_coupon', {
       p_code: c.code,
@@ -331,6 +340,11 @@ export const api = {
       p_percent_off: c.percent_off,
       p_max_off: c.max_off,
       p_valid_until: c.valid_until,
+      p_max_redemptions: c.max_redemptions,
+      p_max_per_user: c.max_per_user,
+      p_budget: c.budget,
+      p_first_order_only: c.first_order_only,
+      p_is_public: c.is_public,
     }),
 
   /// A restaurant's own code can be switched off from here, and only off.
@@ -509,9 +523,19 @@ export type CouponRow = {
   flat_off: number | null
   percent_off: number | null
   max_off: number | null
+  valid_from: string | null
   valid_until: string | null
   is_active: boolean
   created_at: string
+  /// The caps (0075). Null means unlimited in all three cases.
+  max_redemptions: number | null
+  max_per_user: number | null
+  budget: number | null
+  first_order_only: boolean
+  is_public: boolean
+  /// Whose money the discount is (0074). Restaurant-funded codes come off that
+  /// restaurant's settlement; platform ones come off promotional spend.
+  funded_by: 'platform' | 'restaurant'
   redeemed: number
   discount_given: number
 }
