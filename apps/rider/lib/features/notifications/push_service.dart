@@ -104,7 +104,14 @@ class PushService {
     try {
       await Supabase.instance.client.rpc<void>(
         'register_device_token',
-        params: <String, dynamic>{'p_token': token, 'p_platform': 'android'},
+        params: <String, dynamic>{
+          'p_token': token,
+          'p_platform': 'android',
+          // Stated, not inferred — see 0060. A rider who is also staff of a
+          // restaurant would otherwise have had this phone filed as a
+          // restaurant device.
+          'p_audience': 'rider',
+        },
       );
     } on Object catch (e) {
       debugPrint('Could not register push token: $e.');

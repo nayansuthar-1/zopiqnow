@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiq_rider/app/rider_shell.dart';
 import 'package:zopiq_rider/features/auth/presentation/pages/auth_pages.dart';
 import 'package:zopiq_rider/features/auth/presentation/providers/auth_providers.dart';
+import 'package:zopiq_rider/features/notifications/presentation/pages/notifications_page.dart';
 
 abstract final class Routes {
   static const String home = 'home';
@@ -12,12 +13,14 @@ abstract final class Routes {
   static const String login = 'login';
   static const String otp = 'otp';
   static const String notPartner = 'notPartner';
+  static const String notifications = 'notifications';
 }
 
 const String _homePath = '/jobs';
 const String _splashPath = '/splash';
 const String _loginPath = '/login';
 const String _notPartnerPath = '/not-a-partner';
+const String _notificationsPath = '/notifications';
 
 /// Bridges Riverpod's auth state to the [Listenable] GoRouter wants.
 ///
@@ -71,6 +74,15 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: _splashPath,
         name: Routes.splash,
         builder: (_, _) => const SplashPage(),
+      ),
+      // Pushed on top of the shell from the Jobs bell. A signed-in rider reaches
+      // it freely (the redirect only ever sends them *to* the board, never away
+      // from a screen like this); a signed-out one is bounced to login by the
+      // guard above, like every other screen in this app.
+      GoRoute(
+        path: _notificationsPath,
+        name: Routes.notifications,
+        builder: (_, _) => const NotificationsPage(),
       ),
       GoRoute(
         path: _notPartnerPath,
