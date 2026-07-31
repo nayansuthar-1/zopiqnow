@@ -5,6 +5,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 import 'package:zopiq_rider/core/widgets/rider_animations.dart';
 import 'package:zopiq_rider/core/widgets/rider_svg_icons.dart';
 import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
+import 'package:zopiq_rider/features/auth/domain/entities/rider_kyc.dart';
 import 'package:zopiq_rider/features/auth/presentation/providers/auth_providers.dart';
 
 /// Who the rider is, and the way out.
@@ -47,6 +48,11 @@ class ProfilePage extends ConsumerWidget {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
 
+    // Null while the first read is in flight. The badge draws a neutral
+    // "Checking…" for it rather than guessing either way — a green shield that
+    // turns red a second later is worse than a second of nothing.
+    final RiderKyc? kyc = ref.watch(kycProvider).valueOrNull;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Partner Profile'),
@@ -85,35 +91,11 @@ class ProfilePage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
 
-                    // Active Partner Badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: zc.veg.withValues(alpha: 0.12),
-                        borderRadius: ZopiqRadii.rPill,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          RiderSvgIcon(
-                            type: RiderSvgType.verifiedShield,
-                            size: 14,
-                            color: zc.veg,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Active Fleet Partner',
-                            style: t.labelSmall?.copyWith(
-                              color: zc.veg,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    // The badge told every rider they were an "Active Fleet
+                    // Partner" whether or not anybody had ever looked at their
+                    // papers. Since 0080 that is a claim the platform can
+                    // actually make or withhold, so it says which (RID-002).
+                    _VerificationBadge(kyc: kyc),
 
                     const SizedBox(height: ZopiqSpacing.lg),
                     Divider(height: 1, color: zc.divider),
@@ -166,6 +148,18 @@ class ProfilePage extends ConsumerWidget {
               ),
             ),
 
+            // Only when there is something to say. A verified rider with months
+            // left on both papers does not need a card telling them so — the
+            // badge above already does, and a permanent panel about documents
+            // is a permanent suggestion that something is wrong.
+            if (kyc != null && (!kyc.canWork || kyc.expiringSoon)) ...<Widget>[
+              const SizedBox(height: ZopiqSpacing.lg),
+              RiderFadeSlide(
+                delay: const Duration(milliseconds: 80),
+                child: _VerificationCard(kyc: kyc),
+              ),
+            ],
+
             const SizedBox(height: ZopiqSpacing.lg),
 
             RiderFadeSlide(
@@ -208,6 +202,129 @@ class ProfilePage extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Verified, or not, and never a shield the platform has not earned the right to
+/// draw (0080, audit RID-002).
+class _VerificationBadge extends StatelessWidget {
+  const _VerificationBadge({required this.kyc});
+
+  final RiderKyc? kyc;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    final (Color colour, String label) = switch (kyc) {
+      null => (zc.textMuted, 'Checking…'),
+      final RiderKyc k when k.canWork => (zc.veg, 'Verified Fleet Partner'),
+      final RiderKyc k when k.status == 'rejected' => (
+        zc.nonVeg,
+        'Documents not accepted',
+      ),
+      _ => (zc.rating, 'Verification pending'),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: colour.withValues(alpha: 0.12),
+        borderRadius: ZopiqRadii.rPill,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          RiderSvgIcon(
+            type: RiderSvgType.verifiedShield,
+            size: 14,
+            color: colour,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: t.labelSmall?.copyWith(
+              color: colour,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The sentence, when there is one.
+///
+/// The wording comes from the database — `rider_work_block` writes it, including
+/// the admin's own reason for a rejection — so the rider reads the same sentence
+/// the board and the Go-online button would refuse them with, rather than a
+/// second app-side paraphrase that can drift out of step with it.
+class _VerificationCard extends StatelessWidget {
+  const _VerificationCard({required this.kyc});
+
+  final RiderKyc kyc;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    final bool warning = kyc.canWork;
+    final Color colour = warning ? zc.rating : zc.nonVeg;
+
+    final String body = switch (kyc) {
+      final RiderKyc k when k.expiringSoon && k.daysToExpiry! <= 0 =>
+        'Your papers run out today.',
+      final RiderKyc k when k.expiringSoon =>
+        'Your licence or insurance runs out in ${k.daysToExpiry} '
+            'day${k.daysToExpiry == 1 ? '' : 's'}. Send the renewed copy to '
+            'Fleet Operations before then so you are not stopped mid-shift.',
+      final RiderKyc k when k.nothingFiled =>
+        'Fleet Operations has not filed your documents yet. Take your licence, '
+            'insurance, ID and RC to them to start taking deliveries.',
+      _ => kyc.blockedReason ?? '',
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(ZopiqSpacing.md),
+      decoration: BoxDecoration(
+        color: colour.withValues(alpha: 0.08),
+        borderRadius: ZopiqRadii.rMd,
+        border: Border.all(color: colour.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(
+            warning ? Icons.schedule_rounded : Icons.gpp_maybe_rounded,
+            size: 20,
+            color: colour,
+          ),
+          const SizedBox(width: ZopiqSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  warning ? 'Renew soon' : 'You cannot take deliveries yet',
+                  style: t.labelLarge?.copyWith(
+                    color: colour,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  style: t.bodySmall?.copyWith(color: zc.textStrong),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

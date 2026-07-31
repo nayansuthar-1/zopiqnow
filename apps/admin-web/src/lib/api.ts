@@ -226,6 +226,25 @@ export const api = {
   setRiderBank: (email: string, bank: Record<string, unknown>) =>
     rpc<void>('admin_set_rider_bank', { p_email: email, p_bank: bank }),
 
+  getRiderKyc: (email: string) =>
+    rpc<RiderKyc[]>('admin_get_rider_kyc', { p_email: email }),
+
+  /// Saving anything here sends the rider back to `pending`, including a typo
+  /// fix. Deliberate (0080): "verified" has to mean that what is on file *now*
+  /// was read by somebody, not that something once was.
+  setRiderKyc: (email: string, kyc: Record<string, unknown>) =>
+    rpc<void>('admin_set_rider_kyc', { p_email: email, p_kyc: kyc }),
+
+  /// The database refuses to verify an incomplete or already-expired file, and
+  /// refuses to reject without a reason. Both messages are written for the admin
+  /// reading them and are passed straight through.
+  reviewRiderKyc: (email: string, verified: boolean, reason?: string) =>
+    rpc<void>('admin_review_rider_kyc', {
+      p_email: email,
+      p_verified: verified,
+      p_reason: reason ?? null,
+    }),
+
   setRiderPayRates: (baseFee: number, perKmFee: number) =>
     rpc<void>('admin_set_rider_pay_rates', {
       p_base_fee: baseFee,
@@ -901,4 +920,35 @@ export type RiderRow = {
   created_at: string
   live_order_id: string | null
   delivered_count: number
+  kyc_status: KycStatus
+  /// Not the same question as `kyc_status !== 'verified'`. A rider verified in
+  /// March whose insurance lapsed last night is still 'verified' and is still
+  /// blocked — the expiry is recomputed on every read (0080).
+  kyc_blocked: boolean
+}
+
+export type KycStatus = 'pending' | 'verified' | 'rejected'
+
+/// What Zopiqnow holds on file about a rider. Never leaves the console: the
+/// table has no RLS policy for anybody and the scans are in a private bucket, so
+/// the rider's own app can see their *status* and nothing else (0080).
+export type RiderKyc = {
+  partner_email: string
+  vehicle: Vehicle
+  licence_number: string | null
+  licence_expiry: string | null
+  licence_doc_path: string | null
+  insurance_policy: string | null
+  insurance_expiry: string | null
+  insurance_doc_path: string | null
+  id_proof_kind: 'aadhaar' | 'pan' | null
+  id_proof_number: string | null
+  id_proof_doc_path: string | null
+  vehicle_number: string | null
+  rc_doc_path: string | null
+  status: KycStatus
+  rejected_reason: string | null
+  reviewed_at: string | null
+  reviewed_by: string | null
+  blocked_reason: string | null
 }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:zopiq_rider/features/auth/data/rider_auth_datasource.dart';
 import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
+import 'package:zopiq_rider/features/auth/domain/entities/rider_kyc.dart';
 
 /// Data source binding. Overridden in tests, which have no Supabase instance.
 final Provider<RiderAuthDataSource> riderAuthDataSourceProvider =
@@ -100,4 +101,24 @@ riderAuthControllerProvider =
 final Provider<Rider?> riderProvider = Provider<Rider?>((Ref ref) {
   final RiderAuthState state = ref.watch(riderAuthControllerProvider);
   return state is AuthSignedIn ? state.rider : null;
+});
+
+/// Where this rider stands on documents (0080, audit RID-002).
+///
+/// Read rather than watched-live: verification changes when an admin decides
+/// something, which is minutes-to-days, not seconds. Invalidate it after any
+/// refusal that mentions documents and it will be current when it matters.
+final FutureProvider<RiderKyc> kycProvider = FutureProvider<RiderKyc>((Ref ref) {
+  final Rider? rider = ref.watch(riderProvider);
+  if (rider == null) {
+    return Future<RiderKyc>.value(
+      const RiderKyc(
+        status: 'pending',
+        blockedReason: null,
+        daysToExpiry: null,
+        nothingFiled: true,
+      ),
+    );
+  }
+  return ref.watch(riderAuthDataSourceProvider).fetchKyc();
 });

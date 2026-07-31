@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
+import 'package:zopiq_rider/features/auth/domain/entities/rider_kyc.dart';
 
 /// Sign-in, and the question that follows it: *do you ride for us?*
 ///
@@ -25,6 +26,10 @@ abstract interface class RiderAuthDataSource {
   Future<Rider?> verifyEmailOtp({required String email, required String code});
 
   Future<Rider?> restoreSession();
+
+  /// Where this rider stands on documents (0080). Status and a sentence — never
+  /// the documents themselves, which no rider-side screen can reach.
+  Future<RiderKyc> fetchKyc();
 
   Future<void> signOut();
 }
@@ -90,6 +95,30 @@ class RiderAuthSupabaseDataSource implements RiderAuthDataSource {
 
   @override
   Future<void> signOut() => _client.auth.signOut();
+
+  /// `my_kyc` returns a table, so PostgREST sends a one-row array.
+  ///
+  /// A failure reads as "still being checked" rather than propagating. This is a
+  /// status card on a profile screen, and a rider who cannot reach the network
+  /// should see the cautious answer — not a red box, and certainly not an
+  /// optimistic one, since the database is the thing actually enforcing it.
+  @override
+  Future<RiderKyc> fetchKyc() async {
+    try {
+      final List<dynamic> rows = await _client.rpc<List<dynamic>>('my_kyc');
+      if (rows.isEmpty) return _unknown;
+      return RiderKyc.fromJson(rows.first as Map<String, dynamic>);
+    } on Object {
+      return _unknown;
+    }
+  }
+
+  static const RiderKyc _unknown = RiderKyc(
+    status: 'pending',
+    blockedReason: 'We couldn\'t check your documents just now.',
+    daysToExpiry: null,
+    nothingFiled: false,
+  );
 
   /// One round trip, unlike the vendor's three.
   ///

@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
-import type { RiderRow, Vehicle } from '../lib/api'
+import type { RiderKyc, RiderRow, Vehicle } from '../lib/api'
+import {
+  signedRiderDocumentUrl,
+  uploadRiderDocument,
+  UploadFailure,
+} from '../lib/uploads'
+import type { RiderDocKind } from '../lib/uploads'
 import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
@@ -8,6 +14,7 @@ import {
   ConfirmDialog,
   Field,
   Modal,
+  Pill,
   Skeleton,
 } from '../ui/primitives'
 
@@ -126,6 +133,7 @@ export function RidersPage() {
   const [editing, setEditing] = useState<RiderRow | null>(null)
   const [deactivating, setDeactivating] = useState<RiderRow | null>(null)
   const [banking, setBanking] = useState<RiderRow | null>(null)
+  const [verifying, setVerifying] = useState<RiderRow | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -155,6 +163,7 @@ export function RidersPage() {
   }
 
   const active = riders?.filter((r) => r.is_active) ?? []
+  const waiting = riders?.filter((r) => r.kyc_blocked) ?? []
 
   return (
     <>
@@ -178,8 +187,17 @@ export function RidersPage() {
           <p className="mt-1 text-sm text-ink-muted">
             {riders === null
               ? 'Loading…'
-              : `${active.length} active of ${riders.length}. Only active riders are offered jobs.`}
+              : `${active.length} active of ${riders.length}. A rider is offered jobs only once they are active and their documents are verified.`}
           </p>
+
+          {waiting.length > 0 && (
+            <Banner tone="warn" className="mt-4">
+              {waiting.length === 1
+                ? '1 rider cannot take deliveries — their documents are unverified or have expired.'
+                : `${waiting.length} riders cannot take deliveries — their documents are unverified or have expired.`}{' '}
+              Open Documents on each to check them.
+            </Banner>
+          )}
 
           {adding && (
             <RiderForm
@@ -231,6 +249,20 @@ export function RidersPage() {
                           carrying {r.live_order_id}
                         </span>
                       )}
+                      {/* Two facts, not one. `verified` says an admin read the
+                          papers; `blocked` says whether they can work today,
+                          and a lapsed insurance separates them. */}
+                      <span className="ml-2 inline-block align-middle">
+                        {r.kyc_status === 'verified' && !r.kyc_blocked ? (
+                          <Pill tone="live">verified</Pill>
+                        ) : r.kyc_status === 'rejected' ? (
+                          <Pill tone="danger">documents rejected</Pill>
+                        ) : r.kyc_status === 'verified' ? (
+                          <Pill tone="danger">expired</Pill>
+                        ) : (
+                          <Pill tone="warn">documents pending</Pill>
+                        )}
+                      </span>
                     </p>
                     <p className="truncate text-sm text-ink-muted">
                       {r.email} · {r.phone} · {r.vehicle} · {r.delivered_count}{' '}
@@ -248,6 +280,19 @@ export function RidersPage() {
                     className="text-sm font-medium text-ink-muted hover:text-ink disabled:opacity-40"
                   >
                     Edit
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setVerifying(r)}
+                    className={`text-sm font-medium disabled:opacity-40 ${
+                      r.kyc_blocked
+                        ? 'text-brand hover:text-brand-deep'
+                        : 'text-ink-muted hover:text-ink'
+                    }`}
+                  >
+                    Documents
                   </button>
 
                   <button
@@ -300,6 +345,16 @@ export function RidersPage() {
         <BankDialog rider={banking} onClose={() => setBanking(null)} />
       )}
 
+      {verifying && (
+        <KycDialog
+          rider={verifying}
+          onClose={(changed) => {
+            setVerifying(null)
+            if (changed) void load()
+          }}
+        />
+      )}
+
       {deactivating && (
         <ConfirmDialog
           title={`Deactivate ${deactivating.name}?`}
@@ -315,6 +370,446 @@ export function RidersPage() {
         />
       )}
     </>
+  )
+}
+
+/// One document: upload it, open it for five minutes, or take it off the file.
+///
+/// Lifted from the restaurant onboarding wizard's `DocumentField` rather than
+/// shared with it, because the two differ in the only thing that matters — the
+/// bucket — and a single component parameterised by bucket would be one edit
+/// away from writing a rider's Aadhaar into the restaurant bucket's blast
+/// radius.
+function RiderDocField({
+  label,
+  hint,
+  email,
+  kind,
+  path,
+  onChange,
+}: {
+  label: string
+  hint: string
+  email: string
+  kind: RiderDocKind
+  path: string | null
+  onChange: (next: string | null) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function upload(file: File) {
+    setBusy(true)
+    setError(null)
+    try {
+      onChange(await uploadRiderDocument(email, kind, file))
+    } catch (e) {
+      setError(
+        e instanceof UploadFailure ? e.message : 'That file could not be uploaded.',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div>
+      <span className="mb-1.5 block text-sm font-medium text-ink">{label}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex h-10 cursor-pointer items-center rounded-[8px] border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas">
+          {busy ? 'Uploading…' : path ? 'Replace file' : 'Upload file'}
+          <input
+            type="file"
+            accept="application/pdf,image/*"
+            className="hidden"
+            disabled={busy}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) void upload(file)
+            }}
+          />
+        </label>
+        {path && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                void signedRiderDocumentUrl(path)
+                  .then((url) => window.open(url, '_blank', 'noopener'))
+                  .catch(() => setError('That document could not be opened.'))
+              }}
+              className="text-sm font-semibold text-brand hover:text-brand-deep"
+            >
+              View
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange(null)}
+              className="text-sm font-medium text-ink-muted hover:text-non-veg"
+            >
+              Remove
+            </button>
+          </>
+        )}
+      </div>
+      <p className="mt-1.5 text-sm text-ink-muted">{hint}</p>
+      {error && <p className="mt-1.5 text-sm text-non-veg">{error}</p>}
+    </div>
+  )
+}
+
+/// A rider's papers, and the decision about them (0080, audit RID-002).
+///
+/// Everything here is entered by an admin holding the document, never by the
+/// rider — the same rule as the bank dialog below and for a stronger reason: a
+/// fleet that files its own identity documents is a fleet that files whatever it
+/// likes. The rider's app shows them their status and never these fields.
+///
+/// **A bicycle rider is asked for ID and nothing else.** They have no licence to
+/// hold, no insurance to lapse and nothing to register, and the database applies
+/// the same rule — so the three sections simply are not drawn.
+function KycDialog({
+  rider,
+  onClose,
+}: {
+  rider: RiderRow
+  onClose: (changed: boolean) => void
+}) {
+  const [kyc, setKyc] = useState<RiderKyc | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [changed, setChanged] = useState(false)
+  const [rejecting, setRejecting] = useState(false)
+  const [reason, setReason] = useState('')
+
+  const motorised = rider.vehicle !== 'bicycle'
+
+  const [licence, setLicence] = useState('')
+  const [licenceExpiry, setLicenceExpiry] = useState('')
+  const [licenceDoc, setLicenceDoc] = useState<string | null>(null)
+  const [policy, setPolicy] = useState('')
+  const [policyExpiry, setPolicyExpiry] = useState('')
+  const [policyDoc, setPolicyDoc] = useState<string | null>(null)
+  const [idKind, setIdKind] = useState<'aadhaar' | 'pan'>('aadhaar')
+  const [idNumber, setIdNumber] = useState('')
+  const [idDoc, setIdDoc] = useState<string | null>(null)
+  const [plate, setPlate] = useState('')
+  const [rcDoc, setRcDoc] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void api
+      .getRiderKyc(rider.email)
+      .then((rows) => {
+        if (!alive) return
+        const k = rows[0] ?? null
+        if (k) {
+          setLicence(k.licence_number ?? '')
+          setLicenceExpiry(k.licence_expiry ?? '')
+          setLicenceDoc(k.licence_doc_path)
+          setPolicy(k.insurance_policy ?? '')
+          setPolicyExpiry(k.insurance_expiry ?? '')
+          setPolicyDoc(k.insurance_doc_path)
+          setIdKind(k.id_proof_kind ?? 'aadhaar')
+          setIdNumber(k.id_proof_number ?? '')
+          setIdDoc(k.id_proof_doc_path)
+          setPlate(k.vehicle_number ?? '')
+          setRcDoc(k.rc_doc_path)
+        }
+        setKyc(k)
+      })
+      .catch((e: unknown) => {
+        if (alive) setError(e instanceof Error ? e.message : String(e))
+      })
+    return () => {
+      alive = false
+    }
+  }, [rider.email])
+
+  const today = new Date().toISOString().slice(0, 10)
+
+  async function run(action: () => Promise<unknown>) {
+    setBusy(true)
+    setError(null)
+    try {
+      await action()
+      setChanged(true)
+      // Re-read rather than guess: `status` moves on save as well as on review,
+      // and the blocked sentence is computed in the database.
+      const rows = await api.getRiderKyc(rider.email)
+      setKyc(rows[0] ?? null)
+      return true
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const save = () =>
+    run(() =>
+      api.setRiderKyc(rider.email, {
+        licence_number: licence,
+        // An empty date string is no date, not the epoch.
+        licence_expiry: licenceExpiry === '' ? null : licenceExpiry,
+        licence_doc_path: licenceDoc,
+        insurance_policy: policy,
+        insurance_expiry: policyExpiry === '' ? null : policyExpiry,
+        insurance_doc_path: policyDoc,
+        id_proof_kind: idNumber === '' ? null : idKind,
+        id_proof_number: idNumber,
+        id_proof_doc_path: idDoc,
+        vehicle_number: plate,
+        rc_doc_path: rcDoc,
+      }),
+    )
+
+  return (
+    <Modal busy={busy} onClose={() => onClose(changed)} title={`Documents · ${rider.name}`}>
+      <p className="text-sm text-ink-muted">
+        Entered by Zopiqnow from the originals, never by the rider. Until these
+        are verified they cannot go online, see the board, or be offered a job.
+      </p>
+
+      {error && (
+        <Banner tone="error" className="mt-4" onDismiss={() => setError(null)}>
+          {error}
+        </Banner>
+      )}
+
+      {kyc === null && !error ? (
+        <div className="mt-5 space-y-3">
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+        </div>
+      ) : (
+        <>
+          {kyc?.blocked_reason ? (
+            <Banner tone="warn" className="mt-4">
+              {kyc.blocked_reason}
+            </Banner>
+          ) : (
+            <Banner tone="success" className="mt-4">
+              Verified
+              {kyc?.reviewed_by ? ` by ${kyc.reviewed_by}` : ''}
+              {kyc?.reviewed_at
+                ? ` on ${new Date(kyc.reviewed_at).toLocaleDateString()}`
+                : ''}
+              . They can take deliveries.
+            </Banner>
+          )}
+
+          <form
+            className="mt-5 grid gap-5"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void save()
+            }}
+          >
+            {motorised && (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field
+                    label="Driving licence number"
+                    value={licence}
+                    onChange={(e) => setLicence(e.target.value.toUpperCase())}
+                    placeholder="MH0220110149646"
+                    hint="Formats differ by state — copy it exactly as printed."
+                  />
+                  <Field
+                    label="Licence expiry"
+                    type="date"
+                    value={licenceExpiry}
+                    onChange={(e) => setLicenceExpiry(e.target.value)}
+                    error={
+                      licenceExpiry !== '' && licenceExpiry < today
+                        ? 'This licence has already expired.'
+                        : undefined
+                    }
+                    hint="They stop being offered jobs the day this passes."
+                  />
+                </div>
+                <RiderDocField
+                  label="Licence scan"
+                  hint="PDF or photo, up to 10 MB. Stored privately — links expire after five minutes."
+                  email={rider.email}
+                  kind="licence"
+                  path={licenceDoc}
+                  onChange={setLicenceDoc}
+                />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field
+                    label="Insurance policy number"
+                    value={policy}
+                    onChange={(e) => setPolicy(e.target.value.toUpperCase())}
+                    placeholder="POL123456789"
+                    hint="Third-party cover is compulsory for a motorised vehicle."
+                  />
+                  <Field
+                    label="Insurance expiry"
+                    type="date"
+                    value={policyExpiry}
+                    onChange={(e) => setPolicyExpiry(e.target.value)}
+                    error={
+                      policyExpiry !== '' && policyExpiry < today
+                        ? 'This policy has already expired.'
+                        : undefined
+                    }
+                  />
+                </div>
+                <RiderDocField
+                  label="Insurance certificate"
+                  hint="PDF or photo, up to 10 MB."
+                  email={rider.email}
+                  kind="insurance"
+                  path={policyDoc}
+                  onChange={setPolicyDoc}
+                />
+              </>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-ink">
+                  ID proof
+                </span>
+                <select
+                  className="h-11 w-full rounded-[8px] border border-line bg-white px-3 text-sm text-ink outline-none focus:border-brand"
+                  value={idKind}
+                  onChange={(e) => setIdKind(e.target.value as 'aadhaar' | 'pan')}
+                >
+                  <option value="aadhaar">Aadhaar</option>
+                  <option value="pan">PAN</option>
+                </select>
+              </label>
+              <Field
+                label={idKind === 'aadhaar' ? 'Aadhaar number' : 'PAN'}
+                value={idNumber}
+                maxLength={idKind === 'aadhaar' ? 12 : 10}
+                onChange={(e) =>
+                  setIdNumber(
+                    idKind === 'aadhaar'
+                      ? e.target.value.replace(/\D/g, '')
+                      : e.target.value.toUpperCase(),
+                  )
+                }
+                placeholder={idKind === 'aadhaar' ? '123456789012' : 'ABCDE1234F'}
+                hint={idKind === 'aadhaar' ? '12 digits.' : 'Ten characters.'}
+              />
+            </div>
+            <RiderDocField
+              label={idKind === 'aadhaar' ? 'Aadhaar card' : 'PAN card'}
+              hint="Asked of every rider, including bicycles."
+              email={rider.email}
+              kind="id"
+              path={idDoc}
+              onChange={setIdDoc}
+            />
+
+            {motorised && (
+              <>
+                <Field
+                  label="Vehicle registration number"
+                  value={plate}
+                  onChange={(e) => setPlate(e.target.value.toUpperCase())}
+                  placeholder="MH12AB1234"
+                  hint="Spaces and hyphens are stripped on save."
+                />
+                <RiderDocField
+                  label="RC book"
+                  hint="So an incident can be traced to a vehicle and not only to a person."
+                  email={rider.email}
+                  kind="rc"
+                  path={rcDoc}
+                  onChange={setRcDoc}
+                />
+              </>
+            )}
+
+            <p className="text-sm text-ink-muted">
+              Saving sends this rider back to <strong>pending</strong>, including
+              a typo fix — "verified" has to mean somebody read what is on file
+              now.
+            </p>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onClose(changed)}
+                disabled={busy}
+              >
+                Close
+              </Button>
+              <Button type="submit" variant="secondary" loading={busy}>
+                Save
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => setRejecting(true)}
+              >
+                Reject…
+              </Button>
+              <Button
+                type="button"
+                loading={busy}
+                onClick={() => void run(() => api.reviewRiderKyc(rider.email, true))}
+              >
+                Verify
+              </Button>
+            </div>
+          </form>
+        </>
+      )}
+
+      {rejecting && (
+        <Modal busy={busy} onClose={() => setRejecting(false)} title="Reject documents">
+          <p className="text-sm text-ink-muted">
+            The rider is sent this word for word, in the app and as a
+            notification. Say what they need to do.
+          </p>
+          <Field
+            className="mt-4"
+            label="Reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="The licence scan is too blurry to read."
+          />
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setRejecting(false)}
+              disabled={busy}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              loading={busy}
+              onClick={() =>
+                void run(() =>
+                  api.reviewRiderKyc(rider.email, false, reason),
+                ).then((ok) => {
+                  if (ok) {
+                    setRejecting(false)
+                    setReason('')
+                  }
+                })
+              }
+            >
+              Reject
+            </Button>
+          </div>
+        </Modal>
+      )}
+    </Modal>
   )
 }
 

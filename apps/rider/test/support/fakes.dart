@@ -1,6 +1,7 @@
 import 'package:zopiq_rider/core/launcher.dart';
 import 'package:zopiq_rider/features/auth/data/rider_auth_datasource.dart';
 import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
+import 'package:zopiq_rider/features/auth/domain/entities/rider_kyc.dart';
 import 'package:zopiq_rider/features/jobs/data/jobs_datasource.dart';
 import 'package:zopiq_rider/features/jobs/domain/entities/job.dart';
 
@@ -47,6 +48,18 @@ class FakeRiderAuthDataSource implements RiderAuthDataSource {
 
   @override
   Future<Rider?> restoreSession() async => signedInAs;
+
+  /// Verified with nothing expiring, so existing tests see the profile screen
+  /// they were written against. Override it to draw the blocked states.
+  RiderKyc kyc = const RiderKyc(
+    status: 'verified',
+    blockedReason: null,
+    daysToExpiry: 365,
+    nothingFiled: false,
+  );
+
+  @override
+  Future<RiderKyc> fetchKyc() async => kyc;
 
   @override
   Future<void> signOut() async {}

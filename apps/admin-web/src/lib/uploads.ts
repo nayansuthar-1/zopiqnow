@@ -335,3 +335,47 @@ export async function signedDocumentUrl(path: string): Promise<string> {
   if (error || !data) throw new UploadFailure('That document could not be opened.')
   return data.signedUrl
 }
+
+/// The same two functions for a rider's papers, against `rider-docs` (0080).
+///
+/// A separate bucket rather than a folder in `restaurant-docs`, because the
+/// storage policies are per bucket and these two sets of documents have no
+/// reason to ever share a blast radius. Everything else — private, path in the
+/// database, five-minute links — is 0034's argument unchanged.
+export type RiderDocKind = 'licence' | 'insurance' | 'id' | 'rc'
+
+export async function uploadRiderDocument(
+  email: string,
+  kind: RiderDocKind,
+  file: File,
+): Promise<string> {
+  const ok = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+  if (!ok.includes(file.type)) {
+    throw new UploadFailure('Upload a PDF or an image of the document.')
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    throw new UploadFailure('That file is over 10 MB.')
+  }
+
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? 'bin'
+  // The email is the rider's primary key, and `@` and `.` are both legal in a
+  // storage path — but a folder per rider only groups usefully if the name is
+  // stable, so it is used as-is rather than sanitised into something that could
+  // collide with another rider's.
+  const path = `${email}/${kind}-${Date.now()}.${extension}`
+
+  const { error } = await supabase.storage
+    .from('rider-docs')
+    .upload(path, file, { contentType: file.type })
+
+  if (error) throw new UploadFailure(error.message)
+  return path
+}
+
+export async function signedRiderDocumentUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('rider-docs')
+    .createSignedUrl(path, 300)
+  if (error || !data) throw new UploadFailure('That document could not be opened.')
+  return data.signedUrl
+}
