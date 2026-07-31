@@ -73,6 +73,9 @@ class FakeJobsDataSource implements JobsDataSource {
   String deliveryOtp = '4321';
   bool online = true;
 
+  /// The platform's cash ceiling, matching 0076's seeded row.
+  int cashCap = 3000;
+
   // --- Dispatch (0056) and location (0057) ---------------------------------
   // Deliberately thin. Nothing in this suite exercises the offer flow, and a
   // fake that pretended to run a dispatcher would be fixture nobody reads
@@ -326,6 +329,18 @@ class FakeJobsDataSource implements JobsDataSource {
   @override
   Future<List<Payout>> fetchPayouts() async => List<Payout>.unmodifiable(payouts);
 
+  /// Cash in hand, derived the way 0076 derives it rather than stored: the sum
+  /// of the totals of every delivered cash job, against the platform ceiling.
+  /// Deposits are an admin action with no rider-side call, so there is nothing
+  /// here that could subtract.
+  @override
+  Future<CashInHand> fetchCashInHand() async => CashInHand(
+    outstanding: _mine
+        .where((Job j) => j.state == JobState.delivered && j.isCash)
+        .fold(0, (int sum, Job j) => sum + j.total),
+    cap: cashCap,
+  );
+
   /// The thread (0061). Empty and inert: a canned message is a round trip to a
   /// `security definer` function that decides who the caller is, and there is
   /// nothing about that this fake could stand in for honestly. The chat button
@@ -426,6 +441,11 @@ Job job({
   // which is what the navigation fallback exists for.
   double? restaurantLat = 24.6061,
   double? restaurantLng = 72.3283,
+  // Overridable for the same reason, and needed together with the pair above:
+  // `_navigate` falls back to the external launcher only when *neither* end is
+  // mappable, so a test that nulls one end still gets the in-app map.
+  double? deliverLat = 24.5881,
+  double? deliverLng = 72.3163,
   String customerPhone = '+919876543210',
 }) => Job(
   orderId: orderId,
@@ -436,8 +456,8 @@ Job job({
   restaurantLng: restaurantLng,
   restaurantPhone: '9876543210',
   deliverTo: 'Banjara Hills, Hyderabad',
-  deliverLat: 24.5881,
-  deliverLng: 72.3163,
+  deliverLat: deliverLat,
+  deliverLng: deliverLng,
   deliveryNotes: 'Gate 2, blue building. Ring twice.',
   customerPhone: customerPhone,
   total: 720,
@@ -469,6 +489,7 @@ Payout payout({
   DateTime? periodEnd,
   int deliveryCount = 3,
   int amount = 132,
+  int cashWithheld = 0,
   bool isPaid = false,
   String? reference,
 }) => Payout(
@@ -476,6 +497,10 @@ Payout payout({
   periodStart: periodStart ?? DateTime(2026, 7, 13),
   periodEnd: periodEnd ?? DateTime(2026, 7, 19),
   deliveryCount: deliveryCount,
+  // `amount` is what is transferred and the gross is what was earned, so the
+  // two differ by exactly the cash kept back — 0076's own check constraint.
+  grossAmount: amount + cashWithheld,
+  cashWithheld: cashWithheld,
   amount: amount,
   isPaid: isPaid,
   // A paid batch always has a reference and a time — 0045 has a check

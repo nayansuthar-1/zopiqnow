@@ -146,6 +146,14 @@ export function PayoutsPage() {
                     </td>
                     <td className="px-5 py-3 text-right font-semibold tabular-nums text-ink">
                       ₹{r.amount}
+                      {/* A transfer smaller than the week's earnings has to say
+                          why on the row, or the figure looks like an error
+                          (migration 0076). */}
+                      {r.cash_withheld > 0 && (
+                        <p className="text-xs font-normal text-ink-muted">
+                          ₹{r.gross_amount} less ₹{r.cash_withheld} cash
+                        </p>
+                      )}
                     </td>
                     <td className="px-5 py-3">
                       {r.status === 'paid' ? (

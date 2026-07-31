@@ -203,6 +203,17 @@ export function CouponsPage() {
                   valid_until: c.valid_until
                     ? c.valid_until.slice(0, 10)
                     : '',
+                  // Null is "no limit" in the column and blank is how the form
+                  // says it, so the two map onto each other directly. Editing a
+                  // coupon without these would silently reset every cap 0075
+                  // added, because the save sends the whole draft.
+                  max_redemptions:
+                    c.max_redemptions === null ? '' : String(c.max_redemptions),
+                  max_per_user:
+                    c.max_per_user === null ? '' : String(c.max_per_user),
+                  budget: c.budget === null ? '' : String(c.budget),
+                  first_order_only: c.first_order_only,
+                  is_public: c.is_public,
                 })
               }
               onToggle={toggle}

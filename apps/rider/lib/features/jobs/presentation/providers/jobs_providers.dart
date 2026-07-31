@@ -268,6 +268,23 @@ final FutureProvider<List<Payout>> payoutsProvider =
       return ref.watch(jobsDataSourceProvider).fetchPayouts();
     });
 
+/// The platform's cash in this rider's pocket (0076).
+///
+/// Refreshed by every write, because the one that matters — `confirmDelivered`
+/// on a cash order — is the write that moves it, and a chip still reading ₹0
+/// after the rider has just been handed ₹500 is the app disagreeing with the
+/// notes in their hand.
+final FutureProvider<CashInHand> cashInHandProvider =
+    FutureProvider<CashInHand>((Ref ref) {
+      final Rider? rider = ref.watch(riderProvider);
+      if (rider == null) {
+        return Future<CashInHand>.value(
+          const CashInHand(outstanding: 0, cap: 0),
+        );
+      }
+      return ref.watch(jobsDataSourceProvider).fetchCashInHand();
+    });
+
 /// Finished jobs, newest first — the "what have I done" list under the totals.
 final Provider<List<Job>> deliveredJobsProvider = Provider<List<Job>>((Ref ref) {
   return ref
@@ -421,7 +438,11 @@ class JobsController extends Notifier<void> {
         // every write costs one request the rider never waits on and removes
         // the failure mode where a total is stale because the list that feeds
         // it was refreshed and it was not.
-        ..invalidate(earningsProvider);
+        ..invalidate(earningsProvider)
+        // Same reasoning, and one more: a claim that was refused for being over
+        // the cash ceiling is a rider who should immediately see the number that
+        // refused them.
+        ..invalidate(cashInHandProvider);
       return null;
     } on JobFailure catch (e) {
       return e.message;

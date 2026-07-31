@@ -7,6 +7,7 @@ import { WizardPage } from './restaurants/WizardPage'
 import { RidersPage } from './riders/RidersPage'
 import { HeroSlidesPage } from './content/HeroSlidesPage'
 import { PayoutsPage } from './payouts/PayoutsPage'
+import { CashPage } from './payouts/CashPage'
 import { SettingsPage } from './settings/SettingsPage'
 import { AllOrdersPage } from './orders/AllOrdersPage'
 import { LiveOrdersPage } from './orders/LiveOrdersPage'
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/settlements" element={<SettlementsPage />} />
           <Route path="/payouts" element={<PayoutsPage />} />
+          <Route path="/cash" element={<CashPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

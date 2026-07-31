@@ -232,6 +232,39 @@ export const api = {
       p_per_km_fee: perKmFee,
     }),
 
+  /// Every rider and what they are holding, including the ones holding nothing
+  /// (migration 0076). "Everybody is settled" is a thing ops needs to be able to
+  /// see, and a screen that empties when all is well looks broken.
+  listRiderCash: () => rpc<RiderCashRow[]>('admin_rider_cash'),
+
+  riderCashLedger: (email: string) =>
+    rpc<RiderCashEntry[]>('admin_rider_cash_ledger', {
+      p_email: email,
+      p_limit: 100,
+    }),
+
+  /// Positive rupees, the way somebody counting notes says it. The database
+  /// stores it negative and refuses a deposit larger than the balance.
+  recordCashDeposit: (email: string, amount: number, reference: string) =>
+    rpc<void>('admin_record_cash_deposit', {
+      p_email: email,
+      p_amount: amount,
+      p_reference: reference,
+    }),
+
+  /// Signed, and the only way a balance moves without money moving — a write-off
+  /// for a rider who disappeared, or a correction to a mistyped deposit. The
+  /// note is mandatory on the database side.
+  adjustRiderCash: (email: string, amount: number, note: string) =>
+    rpc<void>('admin_adjust_rider_cash', {
+      p_email: email,
+      p_amount: amount,
+      p_note: note,
+    }),
+
+  setRiderCashCap: (cap: number) =>
+    rpc<void>('admin_set_rider_cash_cap', { p_cap: cap }),
+
   /// Every slide, including the ones no customer can see. The table's own read
   /// policy shows only what is live right now, which is exactly the wrong thing
   /// for an editor — the row you go looking for is usually the expired one.
@@ -681,11 +714,52 @@ export type RiderPayoutRow = {
   period_start: string
   period_end: string
   delivery_count: number
+  /// What the week earned, what was kept back against COD cash the rider was
+  /// still holding, and what is actually transferred (migration 0076).
+  /// `amount = gross_amount - cash_withheld`, and the database has a constraint
+  /// saying so.
+  gross_amount: number
+  cash_withheld: number
   amount: number
   status: 'pending' | 'paid'
   reference: string | null
   has_bank: boolean
   paid_at: string | null
+}
+
+/// One rider's cash position (migration 0076). `outstanding` is the sum of the
+/// ledger and is the only number that decides anything; the totals beside it are
+/// there so a figure that looks wrong can be argued with.
+export type RiderCashRow = {
+  partner_email: string
+  partner_name: string
+  phone: string
+  is_active: boolean
+  outstanding: number
+  collected_total: number
+  /// Reported positive, though the ledger stores deposits negative so the
+  /// balance can be a plain sum.
+  deposited_total: number
+  adjusted_total: number
+  collections: number
+  last_collected_at: string | null
+  last_deposit_at: string | null
+  /// The platform-wide ceiling, repeated on every row so the list is one call.
+  cap: number
+}
+
+/// A line of the ledger behind [RiderCashRow.outstanding]. Signed: a collection
+/// is positive, a deposit and a payout netting are negative.
+export type RiderCashEntry = {
+  id: number
+  kind: 'collected' | 'deposited' | 'adjustment'
+  amount: number
+  order_id: string | null
+  payout_id: number | null
+  reference: string | null
+  note: string | null
+  recorded_by: string | null
+  created_at: string
 }
 
 export type RiderBank = {

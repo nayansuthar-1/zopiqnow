@@ -43,6 +43,7 @@ const groups: {
     links: [
       { to: '/settlements', label: 'Restaurant settlements', end: false },
       { to: '/payouts', label: 'Rider payouts', end: false },
+      { to: '/cash', label: 'Rider cash', end: false },
     ],
   },
   {

@@ -80,6 +80,13 @@ abstract interface class JobsDataSource {
   /// This rider's weekly pay batches, newest first.
   Future<List<Payout>> fetchPayouts();
 
+  /// How much of the platform's cash this rider is carrying, and the ceiling
+  /// (0076). An RPC and not a table read, unlike the payouts below: the ledger
+  /// has RLS on and no policy at all, because a rider needs the total and has no
+  /// use for the rows — and the cap lives in a one-row policy table that nobody
+  /// outside the database reads.
+  Future<CashInHand> fetchCashInHand();
+
   /// The sentences this rider may send, in the order to show them (0061).
   ///
   /// The role is not passed: `order_message_menu` derives it from the caller, so
@@ -345,6 +352,19 @@ class JobsSupabaseDataSource implements JobsDataSource {
               .order('period_end', ascending: false),
         );
     return rows.map(Payout.fromJson).toList(growable: false);
+  }
+
+  /// `my_cash_in_hand` returns a table, so PostgREST sends a one-row array. An
+  /// empty one is impossible — the function raises for a non-rider rather than
+  /// returning nothing — but a rider on a bike is not the person to show a cast
+  /// error to, so the empty case reads as nothing owed.
+  @override
+  Future<CashInHand> fetchCashInHand() async {
+    final List<dynamic> rows = await _guard<List<dynamic>>(
+      () => _db.rpc<List<dynamic>>('my_cash_in_hand'),
+    );
+    if (rows.isEmpty) return const CashInHand(outstanding: 0, cap: 0);
+    return CashInHand.fromJson(rows.first as Map<String, dynamic>);
   }
 
   @override

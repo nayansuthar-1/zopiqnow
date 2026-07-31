@@ -287,6 +287,8 @@ class Payout {
     required this.periodStart,
     required this.periodEnd,
     required this.deliveryCount,
+    required this.grossAmount,
+    required this.cashWithheld,
     required this.amount,
     required this.isPaid,
     required this.reference,
@@ -298,6 +300,10 @@ class Payout {
     periodStart: DateTime.parse(json['period_start'] as String),
     periodEnd: DateTime.parse(json['period_end'] as String),
     deliveryCount: json['delivery_count'] as int? ?? 0,
+    // Defaulted to `amount` for the batches struck before 0076 existed, where
+    // the two were the same number by definition.
+    grossAmount: json['gross_amount'] as int? ?? json['amount'] as int? ?? 0,
+    cashWithheld: json['cash_withheld'] as int? ?? 0,
     amount: json['amount'] as int? ?? 0,
     isPaid: json['status'] == 'paid',
     reference: json['reference'] as String?,
@@ -313,6 +319,15 @@ class Payout {
   final DateTime periodEnd;
 
   final int deliveryCount;
+
+  /// What the week's deliveries earned, before COD cash was netted off (0076),
+  /// and [cashWithheld] is how much of it was. Both are shown rather than only
+  /// [amount]: a transfer that is smaller than the week's work without saying
+  /// why is a rider who believes they were short-paid, and they would be right
+  /// to ask.
+  final int grossAmount;
+  final int cashWithheld;
+
   final int amount;
   final bool isPaid;
 
@@ -322,6 +337,35 @@ class Payout {
   final String? reference;
 
   final DateTime? paidAt;
+}
+
+/// The platform's cash, in this rider's pocket right now (migration 0076).
+///
+/// [outstanding] is a sum over a ledger, never a stored balance: every COD
+/// delivery adds the order total, every deposit and every weekly netting takes
+/// it away. [cap] is what the platform is willing to be owed — past it, cash
+/// jobs stop being offered and stop being claimable, so the number is only
+/// useful next to the ceiling it is approaching.
+@immutable
+class CashInHand {
+  const CashInHand({required this.outstanding, required this.cap});
+
+  factory CashInHand.fromJson(Map<String, dynamic> json) => CashInHand(
+    outstanding: json['outstanding'] as int? ?? 0,
+    cap: json['cap'] as int? ?? 0,
+  );
+
+  final int outstanding;
+  final int cap;
+
+  /// How much more cash this rider may take on. Floored at zero — an adjustment
+  /// can put somebody over the line, and "−₹200 of headroom" is not a sentence.
+  int get headroom => outstanding >= cap ? 0 : cap - outstanding;
+
+  /// Whether cash jobs have stopped. The app says so rather than letting the
+  /// board quietly empty: a rider whose offers dried up needs to know it was the
+  /// cash and not the evening.
+  bool get isBlocked => outstanding >= cap;
 }
 
 /// A job this rider is actually carrying.

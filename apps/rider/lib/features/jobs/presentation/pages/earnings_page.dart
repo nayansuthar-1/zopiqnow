@@ -29,7 +29,8 @@ class EarningsPage extends ConsumerWidget {
             ref
               ..invalidate(earningsProvider)
               ..invalidate(myJobsProvider)
-              ..invalidate(payoutsProvider);
+              ..invalidate(payoutsProvider)
+              ..invalidate(cashInHandProvider);
             await Future<void>.delayed(const Duration(milliseconds: 400));
           },
           child: days.hasError
@@ -44,6 +45,7 @@ class EarningsPage extends ConsumerWidget {
                   children: <Widget>[
                     RiderFadeSlide(child: _TotalsCard(summary: summary)),
                     const SizedBox(height: ZopiqSpacing.lg),
+                    const _CashInHand(),
                     const _Payouts(),
                     Text(
                       'Completed Orders History',
@@ -95,6 +97,96 @@ class EarningsPage extends ConsumerWidget {
                           ),
                   ],
                 ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The platform's money, in this rider's pocket (0076).
+///
+/// Shown even at ₹0, and deliberately: this is the number that decides whether
+/// cash jobs keep arriving, and a card that only appears once a rider is already
+/// carrying money is a card they learn about from its absence. The ceiling is
+/// printed beside the balance for the same reason — "₹2,400" is a fact, "₹2,400
+/// of ₹3,000" is a decision about whether to ride past the office.
+class _CashInHand extends ConsumerWidget {
+  const _CashInHand();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final CashInHand? cash = ref
+        .watch(cashInHandProvider)
+        .maybeWhen(data: (CashInHand c) => c, orElse: () => null);
+    // Nothing at all until the first read lands. A skeleton here would be a
+    // shimmer over one line of text.
+    if (cash == null || cash.cap <= 0) return const SizedBox.shrink();
+
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+    final bool blocked = cash.isBlocked;
+    final double filled = (cash.outstanding / cash.cap).clamp(0.0, 1.0);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: ZopiqSpacing.lg),
+      child: RiderFadeSlide(
+        child: ZopiqCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  RiderSvgIcon(
+                    type: RiderSvgType.cashCollect,
+                    size: 20,
+                    color: blocked ? zc.nonVeg : Colors.amber.shade700,
+                  ),
+                  const SizedBox(width: ZopiqSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      'CASH IN HAND',
+                      style: t.labelSmall?.copyWith(
+                        color: zc.textMuted,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ),
+                  ZopiqAnimatedAmount(
+                    amount: cash.outstanding,
+                    style: t.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: blocked ? zc.nonVeg : zc.textStrong,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: ZopiqSpacing.sm),
+              ClipRRect(
+                borderRadius: ZopiqRadii.rPill,
+                child: LinearProgressIndicator(
+                  value: filled,
+                  minHeight: 6,
+                  backgroundColor: zc.divider,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    blocked ? zc.nonVeg : zc.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: ZopiqSpacing.xs),
+              Text(
+                blocked
+                    ? 'Cash orders are paused until you hand this in. Online '
+                          'orders are unaffected.'
+                    : '₹${cash.headroom} more before cash orders pause. '
+                          'Limit ₹${cash.cap}.',
+                style: t.bodySmall?.copyWith(
+                  color: blocked ? zc.nonVeg : zc.textMuted,
+                  fontWeight: blocked ? FontWeight.bold : null,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -209,6 +301,16 @@ class _PayoutCard extends StatelessWidget {
                 ),
               ],
             ),
+            // A transfer smaller than the week's work has to say why on the
+            // same card, or it reads as short pay (0076).
+            if (payout.cashWithheld > 0) ...<Widget>[
+              const SizedBox(height: 4),
+              Text(
+                'Earned ₹${payout.grossAmount} · '
+                '₹${payout.cashWithheld} kept against cash you were holding',
+                style: t.bodySmall?.copyWith(color: zc.textMuted),
+              ),
+            ],
             const SizedBox(height: ZopiqSpacing.xs),
             Row(
               children: <Widget>[
