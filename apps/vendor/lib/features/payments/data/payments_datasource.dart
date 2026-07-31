@@ -21,6 +21,11 @@ abstract interface class PaymentsDataSource {
 
   /// The delivered orders inside one batch — the statement's line items.
   Future<List<SettlementOrder>> fetchSettlementOrders(int settlementId);
+
+  /// The adjustments written against one batch, oldest first. Usually none.
+  Future<List<SettlementAdjustment>> fetchSettlementAdjustments(
+    int settlementId,
+  );
 }
 
 class PaymentsSupabaseDataSource implements PaymentsDataSource {
@@ -55,9 +60,9 @@ class PaymentsSupabaseDataSource implements PaymentsDataSource {
     final List<Map<String, dynamic>> rows = await _db
         .from('settlements')
         .select(
-          'id, period_start, period_end, order_count, gross_sales, '
-          'vendor_funded_discount, commission, net_payable, status, reference, '
-          'created_at, paid_at',
+          'id, period_start, period_end, hold_until, order_count, gross_sales, '
+          'vendor_funded_discount, commission, refunds, adjustments, '
+          'net_payable, status, reference, created_at, paid_at',
         )
         .order('period_end', ascending: false);
 
@@ -84,5 +89,22 @@ class PaymentsSupabaseDataSource implements PaymentsDataSource {
           ),
         )
         .toList(growable: false);
+  }
+
+  @override
+  Future<List<SettlementAdjustment>> fetchSettlementAdjustments(
+    int settlementId,
+  ) async {
+    // The 0079 policy scopes these through the settlement they hang off, so a
+    // guessed id at another restaurant returns an empty list rather than an
+    // error — the same shape as a statement that was never adjusted, which is
+    // most of them.
+    final List<Map<String, dynamic>> rows = await _db
+        .from('settlement_adjustments')
+        .select('id, amount, reason, created_at')
+        .eq('settlement_id', settlementId)
+        .order('created_at', ascending: true);
+
+    return rows.map(SettlementAdjustment.fromJson).toList(growable: false);
   }
 }

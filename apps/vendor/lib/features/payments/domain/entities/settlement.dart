@@ -31,6 +31,9 @@ class Settlement {
     required this.netPayable,
     required this.status,
     required this.createdAt,
+    required this.holdUntil,
+    this.refunds = 0,
+    this.adjustments = 0,
     this.reference,
     this.paidAt,
   });
@@ -52,10 +55,31 @@ class Settlement {
   final int vendorFundedDiscount;
 
   final int commission;
+
+  /// Refunds this restaurant funded, charged to this statement (migration 0077).
+  /// Not week-scoped like the rest of the row: a refund approved during the
+  /// hold lands on the statement its own order is on, and one raised after the
+  /// hold closed lands on the next.
+  final int refunds;
+
+  /// The signed sum of the adjustments an admin has written against this
+  /// statement (migration 0079). Positive is a credit, negative a charge, and
+  /// every one of them has a reason attached — see [SettlementAdjustment].
+  final int adjustments;
+
   final int netPayable;
 
   final SettlementStatus status;
   final DateTime createdAt;
+
+  /// The date on or after which this statement can be paid — the week's end plus
+  /// the platform's hold. Until it passes the figure above is not final: a
+  /// refund or an adjustment can still move it, which is the window in which
+  /// there is any point telephoning about it.
+  final DateTime holdUntil;
+
+  bool get isOnHold =>
+      status == SettlementStatus.pending && DateTime.now().isBefore(holdUntil);
 
   /// The bank's reference (a UTR) once paid; null while pending.
   final String? reference;
@@ -69,14 +93,51 @@ class Settlement {
     grossSales: (json['gross_sales'] as num).toInt(),
     vendorFundedDiscount: (json['vendor_funded_discount'] as num?)?.toInt() ?? 0,
     commission: (json['commission'] as num).toInt(),
+    refunds: (json['refunds'] as num?)?.toInt() ?? 0,
+    adjustments: (json['adjustments'] as num?)?.toInt() ?? 0,
     netPayable: (json['net_payable'] as num).toInt(),
     status: SettlementStatus.fromWire(json['status'] as String),
     createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+    // A plain date, so it is parsed as one and not shifted by a zone. A
+    // statement that says it clears on the 3rd must say the 3rd everywhere.
+    holdUntil: DateTime.parse(json['hold_until'] as String),
     reference: json['reference'] as String?,
     paidAt: json['paid_at'] == null
         ? null
         : DateTime.parse(json['paid_at'] as String).toLocal(),
   );
+}
+
+/// One adjustment an admin wrote against a statement (migration 0079), with the
+/// reason they gave for it.
+///
+/// The reason is the whole point of showing these at all. A statement that says
+/// "adjustments −₹400" and will not say why is worse than one that says nothing:
+/// it tells the kitchen there is a reason and that they are not allowed to see
+/// it.
+@immutable
+class SettlementAdjustment {
+  const SettlementAdjustment({
+    required this.id,
+    required this.amount,
+    required this.reason,
+    required this.createdAt,
+  });
+
+  factory SettlementAdjustment.fromJson(Map<String, dynamic> json) =>
+      SettlementAdjustment(
+        id: (json['id'] as num).toInt(),
+        amount: (json['amount'] as num).toInt(),
+        reason: json['reason'] as String,
+        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+      );
+
+  final int id;
+
+  /// Signed: positive credits the restaurant, negative charges it.
+  final int amount;
+  final String reason;
+  final DateTime createdAt;
 }
 
 /// One delivered order inside a settlement — the per-order breakdown a statement

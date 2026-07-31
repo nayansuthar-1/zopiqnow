@@ -92,3 +92,17 @@ settlementOrdersProvider =
           .watch(paymentsDataSourceProvider)
           .fetchSettlementOrders(settlementId);
     });
+
+/// The adjustments written against one batch. Auto-disposed for the same reason
+/// as the orders above, and usually an empty list — a statement that was never
+/// argued with has nothing here.
+final AutoDisposeFutureProviderFamily<List<SettlementAdjustment>, int>
+settlementAdjustmentsProvider =
+    FutureProvider.autoDispose.family<List<SettlementAdjustment>, int>((
+      Ref ref,
+      int settlementId,
+    ) {
+      return ref
+          .watch(paymentsDataSourceProvider)
+          .fetchSettlementAdjustments(settlementId);
+    });

@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
-import type { RestaurantBank, SettlementRow } from '../lib/api'
+import type {
+  RestaurantBank,
+  SettlementAdjustmentRow,
+  SettlementRow,
+} from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
@@ -17,12 +21,18 @@ import {
 /// `run_settlement_batch` (migration 0017) runs every Monday at 00:30 and turns
 /// last week's delivered orders into one row per restaurant, claiming the orders
 /// it summed so the same sale can never be settled twice. Nothing on this page
-/// creates a settlement; it can only mark one as paid.
+/// creates a settlement; it can only mark one as paid — or move it.
 ///
 /// **This page does not move money** — the same as rider payouts, and for the
 /// same reason. An admin makes the transfer in their banking app and comes back
 /// with the reference, which is why the reference is mandatory: the row is the
 /// only thing tying a restaurant's week to a line on a bank statement.
+///
+/// **A statement is on hold for three days after its week closes** (0079). Mark
+/// paid refuses inside that window, and the whole point of the window is that
+/// the figure can still change in it: a restaurant-funded refund approved during
+/// the hold is charged to *this* statement rather than to the next one, and an
+/// adjustment can be written against it. Once it is paid it is history.
 
 function period(start: string, end: string) {
   const a = new Date(start)
@@ -30,6 +40,19 @@ function period(start: string, end: string) {
   const m = (d: Date) => d.toLocaleDateString('en-IN', { month: 'short' })
   const left = a.getMonth() === b.getMonth() ? `${a.getDate()}` : `${a.getDate()} ${m(a)}`
   return `${left}–${b.getDate()} ${m(b)}`
+}
+
+function day(iso: string) {
+  return new Date(iso).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
+/// Signed, and rendered as such: an adjustment is the one figure on this page
+/// that reads in both directions, so the sign carries the meaning.
+function signed(n: number) {
+  return `${n < 0 ? '−' : '+'}₹${Math.abs(n).toLocaleString('en-IN')}`
 }
 
 export function SettlementsPage() {
@@ -40,6 +63,10 @@ export function SettlementsPage() {
   const [paying, setPaying] = useState<SettlementRow | null>(null)
   const [bank, setBank] = useState<RestaurantBank | null>(null)
   const [reference, setReference] = useState('')
+  const [adjusting, setAdjusting] = useState<SettlementRow | null>(null)
+  const [history, setHistory] = useState<SettlementAdjustmentRow[] | null>(null)
+  const [amount, setAmount] = useState('')
+  const [reason, setReason] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -66,6 +93,37 @@ export function SettlementsPage() {
       setBank(b[0] ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  /// The history comes with the dialog, not with the table. Most statements
+  /// have no adjustments and never will; fetching a row's worth of nothing for
+  /// every line on the page to render a column that is almost always a dash is
+  /// the wrong trade.
+  async function beginAdjustment(s: SettlementRow) {
+    setAdjusting(s)
+    setAmount('')
+    setReason('')
+    setHistory(null)
+    try {
+      setHistory(await api.listSettlementAdjustments(s.id))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  async function saveAdjustment() {
+    if (!adjusting) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api.adjustSettlement(adjusting.id, Number(amount), reason)
+      setAdjusting(null)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -148,6 +206,7 @@ export function SettlementsPage() {
                   <th className="px-5 py-3 text-right font-medium">Own offers</th>
                   <th className="px-5 py-3 text-right font-medium">Commission</th>
                   <th className="px-5 py-3 text-right font-medium">Refunds</th>
+                  <th className="px-5 py-3 text-right font-medium">Adjustments</th>
                   <th className="px-5 py-3 text-right font-medium">Payable</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                   <th className="px-5 py-3" />
@@ -188,12 +247,25 @@ export function SettlementsPage() {
                         ? `−₹${s.refunds.toLocaleString('en-IN')}`
                         : '—'}
                     </td>
+                    {/* Signed, and the same dash rule as the two columns above
+                        it. Most statements are never adjusted, and the ones
+                        that are should stand out of the page rather than sit in
+                        a column of zeroes. */}
+                    <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
+                      {s.adjustments !== 0 ? signed(s.adjustments) : '—'}
+                    </td>
                     <td className="px-5 py-3 text-right font-semibold tabular-nums text-ink">
                       ₹{s.net_payable.toLocaleString('en-IN')}
                     </td>
                     <td className="px-5 py-3">
                       {s.status === 'paid' ? (
                         <span className="text-veg">Paid · {s.reference}</span>
+                      ) : s.on_hold ? (
+                        // The hold is news, not an error: the figure can still
+                        // move, and the date says how long it can move for.
+                        <span className="text-ink-muted">
+                          On hold until {day(s.hold_until)}
+                        </span>
                       ) : s.has_bank ? (
                         <span className="text-ink-muted">Pending</span>
                       ) : (
@@ -203,21 +275,32 @@ export function SettlementsPage() {
                       )}
                     </td>
                     <td className="px-5 py-3">
-                      <div className="flex justify-end">
+                      <div className="flex justify-end gap-2">
                         {s.status === 'pending' && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            disabled={!s.has_bank}
-                            title={
-                              s.has_bank
-                                ? undefined
-                                : 'No account on file for this restaurant. Add it from the restaurant’s Bank step first.'
-                            }
-                            onClick={() => void beginPayment(s)}
-                          >
-                            Mark paid
-                          </Button>
+                          <>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => void beginAdjustment(s)}
+                            >
+                              Adjust
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              disabled={!s.has_bank || s.on_hold}
+                              title={
+                                s.on_hold
+                                  ? `On hold until ${day(s.hold_until)} — a refund or an adjustment raised before then still lands on this statement.`
+                                  : s.has_bank
+                                    ? undefined
+                                    : 'No account on file for this restaurant. Add it from the restaurant’s Bank step first.'
+                              }
+                              onClick={() => void beginPayment(s)}
+                            >
+                              Mark paid
+                            </Button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -228,6 +311,102 @@ export function SettlementsPage() {
           </div>
         )}
       </div>
+
+      {adjusting && (
+        <Modal
+          busy={busy}
+          onClose={() => setAdjusting(null)}
+          title={`Adjust ${adjusting.restaurant_name}, ${period(adjusting.period_start, adjusting.period_end)}`}
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setAdjusting(null)}
+                disabled={busy}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void saveAdjustment()}
+                loading={busy}
+                disabled={
+                  reason.trim() === '' ||
+                  amount.trim() === '' ||
+                  Number.isNaN(Number(amount)) ||
+                  Number(amount) === 0
+                }
+              >
+                Save adjustment
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm text-ink-muted">
+            This moves what the restaurant is owed and records who moved it. The
+            reason is shown to them on their statement, so write it for them
+            rather than for us.
+          </p>
+
+          <div className="mt-4 rounded-[8px] bg-canvas px-4 py-3 text-sm">
+            <p className="text-ink-muted">
+              Currently payable{' '}
+              <span className="font-medium tabular-nums text-ink">
+                ₹{adjusting.net_payable.toLocaleString('en-IN')}
+              </span>
+              {amount.trim() !== '' && !Number.isNaN(Number(amount)) && (
+                <>
+                  {' → '}
+                  <span className="font-medium tabular-nums text-ink">
+                    ₹
+                    {(adjusting.net_payable + Number(amount)).toLocaleString(
+                      'en-IN',
+                    )}
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+
+          <Field
+            className="mt-4"
+            label="Amount"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="-400"
+            hint="Negative charges the restaurant, positive credits it. Whole rupees."
+          />
+          <Field
+            className="mt-4"
+            label="Reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Agreed goodwill on ZPQ-1042"
+          />
+
+          {history !== null && history.length > 0 && (
+            <div className="mt-5">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
+                Already adjusted
+              </p>
+              <ul className="divide-y divide-line rounded-[8px] border border-line">
+                {history.map((a) => (
+                  <li key={a.id} className="px-4 py-2 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <span className="text-ink">{a.reason}</span>
+                      <span className="shrink-0 tabular-nums text-ink">
+                        {signed(a.amount)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-ink-muted">
+                      {a.created_by} · {day(a.created_at)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Modal>
+      )}
 
       {paying && (
         <Modal

@@ -459,6 +459,21 @@ export const api = {
   markSettlementPaid: (id: number, reference: string) =>
     rpc<void>('admin_mark_settlement_paid', { p_id: id, p_reference: reference }),
 
+  /// Moves a pending statement by a signed amount and records why (0079).
+  /// Refused once the statement is paid — the money has gone, and the honest
+  /// place for a correction is the next week.
+  adjustSettlement: (id: number, amount: number, reason: string) =>
+    rpc<number>('admin_adjust_settlement', {
+      p_id: id,
+      p_amount: amount,
+      p_reason: reason,
+    }),
+
+  listSettlementAdjustments: (id: number) =>
+    rpc<SettlementAdjustmentRow[]>('admin_list_settlement_adjustments', {
+      p_id: id,
+    }),
+
   /// The full account number, for whoever is making the transfer.
   /// `getRestaurant` returns the last four and will keep returning the last four.
   getRestaurantBank: (id: string) =>
@@ -711,6 +726,9 @@ export type SettlementRow = {
   restaurant_name: string
   period_start: string
   period_end: string
+  /// The date this statement may be paid on or after — `period_end` plus the
+  /// platform hold (0079). The window a refund or an adjustment has to land in.
+  hold_until: string
   order_count: number
   gross_sales: number
   /// What the restaurant's own offers cost it this week. Comes off gross before
@@ -722,11 +740,29 @@ export type SettlementRow = {
   /// like the rest of the row — a refund raised this week for a month-old order
   /// lands here, because the week it belongs to has already been paid.
   refunds: number
+  /// The signed sum of this statement's adjustments (0079). Positive credits the
+  /// restaurant, negative charges it. Added last, after commission and refunds.
+  adjustments: number
   net_payable: number
   status: 'pending' | 'paid'
   reference: string | null
   has_bank: boolean
+  /// Still inside its hold — pending, and `hold_until` has not arrived.
+  /// `admin_mark_settlement_paid` refuses while this is true, so the button and
+  /// the function are reading the same fact rather than two versions of it.
+  on_hold: boolean
   paid_at: string | null
+}
+
+/// One line of a statement's adjustment history, with the admin who wrote it.
+/// The rollup on [SettlementRow.adjustments] is for the arithmetic; these are
+/// what somebody reads three months later to find out why.
+export type SettlementAdjustmentRow = {
+  id: number
+  amount: number
+  reason: string
+  created_by: string
+  created_at: string
 }
 
 export type RestaurantBank = {

@@ -417,6 +417,7 @@ class FakePaymentsDataSource implements PaymentsDataSource {
   FakePaymentsDataSource({
     this.earnings,
     this.settlements = const <Settlement>[],
+    this.adjustments = const <SettlementAdjustment>[],
   });
 
   final EarningsSummary? earnings;
@@ -446,6 +447,15 @@ class FakePaymentsDataSource implements PaymentsDataSource {
   @override
   Future<List<SettlementOrder>> fetchSettlementOrders(int settlementId) async =>
       const <SettlementOrder>[];
+
+  @override
+  Future<List<SettlementAdjustment>> fetchSettlementAdjustments(
+    int settlementId,
+  ) async => adjustments;
+
+  /// Empty, like almost every real statement. A test about the adjustments
+  /// block passes its own.
+  final List<SettlementAdjustment> adjustments;
 }
 
 /// The inbox, in memory, with a stream that behaves like Postgres does: a write

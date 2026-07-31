@@ -46,6 +46,7 @@ class SettlementDetailPage extends ConsumerWidget {
         padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),
         children: <Widget>[
           if (settlement != null) _SummaryCard(settlement: settlement),
+          if (settlement != null) _Adjustments(settlementId: settlementId),
           const SizedBox(height: ZopiqSpacing.xl),
           Text(
             'Orders in this payout',
@@ -134,9 +135,10 @@ class _SummaryCard extends StatelessWidget {
           const Divider(height: 1),
           const SizedBox(height: ZopiqSpacing.md),
           _Line(label: 'Gross sales', value: formatRupees(settlement.grossSales)),
-          // The statement has to explain itself, which means naming the two
-          // deductions separately. Commission is charged on what is left after
-          // this one, not on gross — the order of these lines is the maths.
+          // The statement has to explain itself, which means naming every
+          // deduction separately and in the order they are applied. Commission
+          // is charged on what is left after the offers, not on gross — the
+          // order of these lines is the maths.
           if (settlement.vendorFundedDiscount > 0)
             _Line(
               label: 'Your own offers',
@@ -148,15 +150,102 @@ class _SummaryCard extends StatelessWidget {
             value: formatRupees(-settlement.commission),
             muted: true,
           ),
+          // Missing here since 0077 added it, which left the lines above unable
+          // to add up to the figure at the top on any week with a refund in it.
+          if (settlement.refunds > 0)
+            _Line(
+              label: 'Refunds',
+              value: formatRupees(-settlement.refunds),
+              muted: true,
+            ),
+          if (settlement.adjustments != 0)
+            _Line(
+              label: 'Adjustments',
+              value: formatRupees(settlement.adjustments),
+              muted: true,
+            ),
           _Line(
             label: 'Orders',
             value: '${settlement.orderCount}',
           ),
+          // Said before the reference and the paid date, because until this
+          // passes there is neither. A window worth knowing about is a window
+          // you are told about while it is still open.
+          if (settlement.isOnHold)
+            _Line(
+              label: 'Clears on',
+              value: formatOrderDate(settlement.holdUntil),
+            ),
           if (paid && settlement.reference != null)
             _Line(label: 'Reference', value: settlement.reference!),
           if (paid && settlement.paidAt != null)
             _Line(label: 'Paid on', value: formatOrderDate(settlement.paidAt!)),
         ],
+      ),
+    );
+  }
+}
+
+/// Why the statement moved, in the words of whoever moved it.
+///
+/// Renders nothing at all when there is nothing to say — which is almost every
+/// statement — including while it is loading and if the read fails. A missing
+/// explanation is a reason to telephone; a spinner or an error banner over a
+/// section that is empty 95% of the time is a reason to distrust the screen.
+class _Adjustments extends ConsumerWidget {
+  const _Adjustments({required this.settlementId});
+
+  final int settlementId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final List<SettlementAdjustment> list =
+        ref.watch(settlementAdjustmentsProvider(settlementId)).valueOrNull ??
+        const <SettlementAdjustment>[];
+    if (list.isEmpty) return const SizedBox.shrink();
+
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: ZopiqSpacing.md),
+      child: ZopiqCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Adjustments',
+              style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: ZopiqSpacing.sm),
+            for (final SettlementAdjustment a in list)
+              Padding(
+                padding: const EdgeInsets.only(bottom: ZopiqSpacing.xs),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(a.reason, style: t.bodyMedium),
+                          Text(
+                            formatOrderDate(a.createdAt),
+                            style: t.bodySmall?.copyWith(color: zc.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: ZopiqSpacing.sm),
+                    Text(
+                      formatRupees(a.amount),
+                      style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
