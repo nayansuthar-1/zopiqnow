@@ -135,7 +135,8 @@ class OrderSupabaseDataSource implements OrderDataSource {
   static const String _orderColumns =
       'id, restaurant_id, restaurant_name, status, status_reason, created_at, '
       'delivery_to, delivery_notes, eta_minutes, payment_method, payment_id, '
-      'subtotal, delivery_fee, taxes, discount, total, coupon_code, '
+      'subtotal, delivery_fee, platform_fee, packaging_fee, surge_fee, '
+      'taxes, discount, total, coupon_code, '
       // The catalog join is for the photo and the kitchen's phone number — the
       // name is on the order, so a delisted restaurant costs us an image and a
       // number, not an identity. `contact_phone` has been world-readable on an
@@ -402,6 +403,9 @@ class OrderSupabaseDataSource implements OrderDataSource {
       paymentId: row['payment_id'] as String?,
       subtotal: (row['subtotal'] as num).toInt(),
       deliveryFee: (row['delivery_fee'] as num).toInt(),
+      platformFee: (row['platform_fee'] as num?)?.toInt() ?? 0,
+      packagingFee: (row['packaging_fee'] as num?)?.toInt() ?? 0,
+      surgeFee: (row['surge_fee'] as num?)?.toInt() ?? 0,
       taxes: (row['taxes'] as num).toInt(),
       discount: (row['discount'] as num).toInt(),
       total: (row['total'] as num).toInt(),

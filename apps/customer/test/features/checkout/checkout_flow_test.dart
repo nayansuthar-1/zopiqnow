@@ -129,6 +129,16 @@ Future<void> _openCheckout(WidgetTester tester) async {
   expect(find.byType(CheckoutPage), findsOneWidget);
 }
 
+/// The coupon field's own APPLY button.
+///
+/// Not `find.text('APPLY')`: since 0064 the checkout screen also lists this
+/// kitchen's offers, and every one of those rows carries its own "APPLY" label.
+/// With the mock's two platform coupons that is three matches and an ambiguous
+/// finder — which is exactly how these two tests broke, silently, at the moment
+/// the offers strip shipped. Scoping to the `TextButton` names the one control
+/// this test means: the offer rows are `InkWell`s.
+final Finder _applyButton = find.widgetWithText(TextButton, 'APPLY');
+
 /// Selects UPI and taps the CTA, leaving the mock gateway's sheet open.
 ///
 /// No `pumpAndSettle` while a payment is in flight: both CTAs spin an
@@ -199,13 +209,15 @@ void main() {
     await _openCheckout(tester);
 
     await tester.enterText(find.byType(TextField), 'WELCOME50');
-    await tester.tap(find.text('APPLY'));
+    await tester.tap(_applyButton);
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('WELCOME50 applied'), findsOneWidget);
     expect(find.text('Coupon discount'), findsOneWidget);
     expect(find.text('-₹50'), findsOneWidget);
-    expect(find.text('Place order · ₹410'), findsOneWidget);
+    // ₹408, not ₹410: the coupon comes off before GST, so the tax falls from
+    // ₹20 to ₹17.50 → ₹18 with it (migration 0078, audit BIZ-005).
+    expect(find.text('Place order · ₹408'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Remove coupon'));
     await tester.pumpAndSettle();
@@ -221,7 +233,7 @@ void main() {
     await _openCheckout(tester);
 
     await tester.enterText(find.byType(TextField), 'FREELUNCH');
-    await tester.tap(find.text('APPLY'));
+    await tester.tap(_applyButton);
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('This code isn\'t valid.'), findsOneWidget);

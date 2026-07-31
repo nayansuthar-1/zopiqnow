@@ -140,6 +140,9 @@ class CustomerOrder {
     required this.discount,
     required this.total,
     required this.lines,
+    this.platformFee = 0,
+    this.packagingFee = 0,
+    this.surgeFee = 0,
     this.restaurantImageUrl = '',
     this.restaurantPhone,
     this.deliveryNotes,
@@ -194,7 +197,19 @@ class CustomerOrder {
   final String? paymentId;
 
   final int subtotal;
+
+  /// The fee stack (migration 0078), each line gross — the GST inside them is
+  /// already there and is never added on top. Everything but the delivery fee
+  /// is 0 on every order placed so far; the rows exist so that the day one is
+  /// switched on, the bill on this screen still adds up to [total] instead of
+  /// silently losing a line.
   final int deliveryFee;
+  final int platformFee;
+  final int packagingFee;
+  final int surgeFee;
+
+  /// GST on the food. Since 0078 it is charged on the discounted value; before
+  /// it, on the full subtotal.
   final int taxes;
   final int discount;
   final int total;

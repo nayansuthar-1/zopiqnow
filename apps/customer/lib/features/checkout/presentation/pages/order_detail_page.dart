@@ -388,6 +388,21 @@ class _OrderBodyState extends ConsumerState<_OrderBody> {
             value: order.deliveryFee == 0 ? 'FREE' : '₹${order.deliveryFee}',
             isGreen: order.deliveryFee == 0,
           ),
+          // Only when charged. All three are 0 on every order to date (0078
+          // models the fee stack, it does not switch it on), and a row of
+          // zeroes is a question the customer should not have to ask.
+          if (order.platformFee > 0) ...<Widget>[
+            const SizedBox(height: 8),
+            _FlatBillRow(label: 'Platform fee', value: '₹${order.platformFee}'),
+          ],
+          if (order.packagingFee > 0) ...<Widget>[
+            const SizedBox(height: 8),
+            _FlatBillRow(label: 'Packaging', value: '₹${order.packagingFee}'),
+          ],
+          if (order.surgeFee > 0) ...<Widget>[
+            const SizedBox(height: 8),
+            _FlatBillRow(label: 'Surge', value: '₹${order.surgeFee}'),
+          ],
           const SizedBox(height: 8),
           _FlatBillRow(label: 'Taxes & restaurant charges', value: '₹${order.taxes}'),
           if (order.discount > 0) ...<Widget>[
@@ -902,6 +917,18 @@ class _BillDetailsCard extends StatelessWidget {
             amount: order.deliveryFee,
             freeWhenZero: true,
           ),
+          if (order.platformFee > 0) ...<Widget>[
+            const SizedBox(height: 8),
+            _BillRow(label: 'Platform fee', amount: order.platformFee),
+          ],
+          if (order.packagingFee > 0) ...<Widget>[
+            const SizedBox(height: 8),
+            _BillRow(label: 'Packaging', amount: order.packagingFee),
+          ],
+          if (order.surgeFee > 0) ...<Widget>[
+            const SizedBox(height: 8),
+            _BillRow(label: 'Surge', amount: order.surgeFee),
+          ],
           const SizedBox(height: 8),
           _BillRow(label: 'Taxes & restaurant charges', amount: order.taxes),
           if (order.discount > 0) ...<Widget>[

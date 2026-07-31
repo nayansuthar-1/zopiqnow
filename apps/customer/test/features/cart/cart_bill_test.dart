@@ -68,7 +68,11 @@ void main() {
 
     expect(bill.subtotal, 400); // discount never rewrites the item total
     expect(bill.discount, 50);
-    expect(bill.total, 410); // 400 + 40 + 20 − 50
+    // 400 + 40 + 18 − 50. The tax is 5% of 350, not of 400: the coupon comes
+    // off before GST is charged, because the taxable value is what the customer
+    // actually pays (migration 0078, audit BIZ-005).
+    expect(bill.taxes, 18);
+    expect(bill.total, 408);
   });
 
   test('an empty cart ignores a discount', () {

@@ -17,6 +17,7 @@ class MenuItem {
     this.optionGroups = const <MenuOptionGroup>[],
     this.originalPrice,
     this.prepMinutes,
+    this.gstRateBps = 500,
   });
 
   final String id;
@@ -37,6 +38,16 @@ class MenuItem {
   /// How long the kitchen says this dish takes, in minutes. Null when unstated,
   /// which is most dishes — the restaurant's own ETA covers those.
   final int? prepMinutes;
+
+  /// The GST slab this dish is taxed at, in basis points — 500 (5%) for
+  /// restaurant food, which is every dish on every menu today (migration 0078).
+  ///
+  /// Carried this far down only so the cart's bill can tax each line the way
+  /// `place_order` will: per line, at the line's own rate, on what is left of it
+  /// after the coupon. A cart that guesses at a flat rate would quote a total
+  /// the server then charges differently, and the number a customer reads
+  /// before they tap Pay is the one they hold us to.
+  final int gstRateBps;
 
   final bool isVeg;
   final bool isBestseller;
@@ -66,6 +77,7 @@ class MenuItem {
         'image_url': imageUrl,
         'original_price': originalPrice,
         'prep_minutes': prepMinutes,
+        'gst_rate_bps': gstRateBps,
       };
 
   factory MenuItem.fromJson(Map<String, dynamic> json) => MenuItem(
@@ -79,6 +91,9 @@ class MenuItem {
         imageUrl: json['image_url'] as String? ?? '',
         originalPrice: (json['original_price'] as num?)?.toInt(),
         prepMinutes: (json['prep_minutes'] as num?)?.toInt(),
+        // A cart persisted before 0078 has no rate in it. 5% is what every one
+        // of those lines was going to be charged anyway.
+        gstRateBps: (json['gst_rate_bps'] as num?)?.toInt() ?? 500,
       );
 
   @override

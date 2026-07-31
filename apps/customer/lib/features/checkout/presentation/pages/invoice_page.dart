@@ -94,10 +94,6 @@ class _InvoiceBodyState extends State<_InvoiceBody> {
     final TextTheme t = Theme.of(context).textTheme;
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final String half = doc.halfRate.toStringAsFixed(
-      doc.halfRate == doc.halfRate.roundToDouble() ? 0 : 1,
-    );
-
     return Column(
       children: <Widget>[
         Expanded(
@@ -179,17 +175,10 @@ class _InvoiceBodyState extends State<_InvoiceBody> {
 
               const SizedBox(height: 8),
               const Divider(height: 24),
-              _Row(label: 'Taxable value', value: '₹${doc.taxableValue}'),
-              _Row(label: 'CGST @ $half%', value: '₹${doc.cgst}'),
-              _Row(label: 'SGST @ $half%', value: '₹${doc.sgst}'),
-              if (doc.deliveryFee > 0)
-                _Row(label: 'Delivery fee', value: '₹${doc.deliveryFee}'),
-              if (doc.discount > 0)
+              for (final InvoiceBillRow row in doc.billRows)
                 _Row(
-                  label: doc.couponCode == null
-                      ? 'Discount'
-                      : 'Discount (${doc.couponCode})',
-                  value: '−₹${doc.discount}',
+                  label: row.label,
+                  value: row.negative ? '−₹${row.amount}' : '₹${row.amount}',
                 ),
               const Divider(height: 24),
               Row(

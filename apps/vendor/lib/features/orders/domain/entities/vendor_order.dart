@@ -187,8 +187,13 @@ class VendorOrder {
   final int discount;
 
   /// What the order came to. On a cash order this is what the rider collects,
-  /// which is the only reason it is on the live ticket. Equals
-  /// `subtotal + deliveryFee + taxes - discount` — the database enforces it.
+  /// which is the only reason it is on the live ticket.
+  ///
+  /// `subtotal + deliveryFee + taxes - discount`, plus the platform, packaging
+  /// and surge fees that migration 0078 added to the order and that this screen
+  /// does not read — every one of them is 0 today, and if one is ever switched
+  /// on this figure will still be right while the rows above it stop adding up
+  /// to it. The database enforces the whole identity.
   final int total;
 
   final PaymentMethod paymentMethod;

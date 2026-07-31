@@ -132,23 +132,44 @@ pw.Widget _parties(OrderInvoice invoice) {
 }
 
 pw.Widget _lines(OrderInvoice invoice) {
+  // Only when the menu has actually been classified. A column of blanks is
+  // worse than no column: it reads as an HSN nobody filled in rather than as a
+  // classification that does not exist yet.
+  final bool hasHsn =
+      invoice.lines.any((InvoiceLine l) => (l.hsn ?? '').isNotEmpty);
+
   return pw.TableHelper.fromTextArray(
     headerStyle: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
     headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
     cellStyle: const pw.TextStyle(fontSize: 9),
     cellHeight: 20,
     headerAlignment: pw.Alignment.centerLeft,
-    cellAlignments: <int, pw.Alignment>{
-      0: pw.Alignment.centerLeft,
-      1: pw.Alignment.center,
-      2: pw.Alignment.centerRight,
-      3: pw.Alignment.centerRight,
-    },
-    headers: <String>['Item', 'Qty', 'Rate', 'Amount'],
+    cellAlignments: hasHsn
+        ? const <int, pw.Alignment>{
+            0: pw.Alignment.centerLeft,
+            1: pw.Alignment.centerLeft,
+            2: pw.Alignment.center,
+            3: pw.Alignment.centerRight,
+            4: pw.Alignment.centerRight,
+          }
+        : const <int, pw.Alignment>{
+            0: pw.Alignment.centerLeft,
+            1: pw.Alignment.center,
+            2: pw.Alignment.centerRight,
+            3: pw.Alignment.centerRight,
+          },
+    headers: <String>[
+      'Item',
+      if (hasHsn) 'HSN',
+      'Qty',
+      'Rate',
+      'Amount',
+    ],
     data: <List<String>>[
       for (final InvoiceLine line in invoice.lines)
         <String>[
           line.description,
+          if (hasHsn) line.hsn ?? '',
           '${line.quantity}',
           _money(line.unitPrice),
           _money(line.lineTotal),
@@ -158,27 +179,19 @@ pw.Widget _lines(OrderInvoice invoice) {
 }
 
 pw.Widget _totals(OrderInvoice invoice) {
-  final String half = invoice.halfRate.toStringAsFixed(
-    invoice.halfRate == invoice.halfRate.roundToDouble() ? 0 : 1,
-  );
-
   return pw.Align(
     alignment: pw.Alignment.centerRight,
     child: pw.SizedBox(
       width: 240,
       child: pw.Column(
         children: <pw.Widget>[
-          _totalRow('Taxable value', _money(invoice.taxableValue)),
-          _totalRow('CGST @ $half%', _money(invoice.cgst)),
-          _totalRow('SGST @ $half%', _money(invoice.sgst)),
-          if (invoice.deliveryFee > 0)
-            _totalRow('Delivery fee', _money(invoice.deliveryFee)),
-          if (invoice.discount > 0)
+          // The same rows the screen shows, from the same list, because a
+          // customer forwarding this to their finance team must be forwarding
+          // what they were shown.
+          for (final InvoiceBillRow row in invoice.billRows)
             _totalRow(
-              invoice.couponCode == null
-                  ? 'Discount'
-                  : 'Discount (${invoice.couponCode})',
-              '- ${_money(invoice.discount)}',
+              row.label,
+              row.negative ? '- ${_money(row.amount)}' : _money(row.amount),
             ),
           pw.Divider(height: 8, thickness: 0.8),
           _totalRow('Total', _money(invoice.total), bold: true),
