@@ -20,6 +20,14 @@ import 'package:zopiq_rider/features/jobs/data/jobs_datasource.dart';
 /// makes the stream itself quiet, and the periodic tick underneath it exists
 /// only so a *moving* rider on a straight road still reports at a predictable
 /// rate rather than in bursts at corners.
+///
+/// **Why a foreground service** (audit RID-001). Navigate hands the rider to
+/// Google Maps, which comes up over this app — and a `whileInUse` app that is no
+/// longer in use gets its location throttled to a few fixes an hour, or on
+/// Android 10+ to none. The designed happy path was therefore also the path that
+/// froze the customer's map for the whole journey. The foreground notification
+/// is what buys the stream the right to keep running; the rider sees it in their
+/// shade for as long as they are carrying and never after.
 class RiderLocationReporter {
   RiderLocationReporter(this._jobs);
 
@@ -60,9 +68,25 @@ class RiderLocationReporter {
     await _stream?.cancel();
     _stream =
         Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
+          locationSettings: AndroidSettings(
             accuracy: LocationAccuracy.high,
             distanceFilter: _metres,
+            // Naming what we are doing and why, in the rider's own notification
+            // shade. `setOngoing` because a location share the rider can swipe
+            // away while it keeps running is the thing this notification exists
+            // to prevent; it clears the moment the stream is cancelled.
+            //
+            // `enableWakeLock` is what stops the fixes arriving in a burst when
+            // the phone next wakes — a partial wake lock held only while
+            // carrying, and released with the service. It is why the manifest
+            // declares WAKE_LOCK.
+            foregroundNotificationConfig: const ForegroundNotificationConfig(
+              notificationTitle: 'On a delivery',
+              notificationText: 'Sharing your location with the customer',
+              notificationChannelName: 'Delivery location',
+              enableWakeLock: true,
+              setOngoing: true,
+            ),
           ),
         ).listen(
           _send,

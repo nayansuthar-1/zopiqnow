@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Keystore-backed storage for secrets — here, the rider's session.
@@ -32,3 +33,13 @@ class FlutterSecureStore implements SecureStore {
   @override
   Future<void> delete(String key) => _storage.delete(key: key);
 }
+
+/// The same store `main` hands to Supabase, for the parts of the app that reach
+/// it through Riverpod rather than through a constructor.
+///
+/// `FlutterSecureStorage` is a handle over a platform channel, not a connection,
+/// so a second instance is not a second anything — it opens the same Keystore
+/// entry the first one does.
+final Provider<SecureStore> secureStoreProvider = Provider<SecureStore>(
+  (Ref ref) => const FlutterSecureStore(FlutterSecureStorage()),
+);

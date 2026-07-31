@@ -21,17 +21,44 @@
 
          COARSE as well as FINE because Android 12+ lets the user grant only the
          approximate one, and an approximate dot on a map is still a better
-         answer than a blank one. Deliberately NOT ACCESS_BACKGROUND_LOCATION:
-         the position is recorded while the rider has the app open on a live job,
-         and asking for the background grant would be asking for a permission
-         this feature does not use and Play would rightly question. -->
+         answer than a blank one. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
+    <!-- The location stream keeps running while the rider is in Google Maps
+         (audit RID-001).
+
+         Without these the app was `whileInUse` and nothing else, and Android
+         throttles a `whileInUse` app's location to a handful of fixes an hour
+         once it leaves the foreground — on Android 10+ usually to none at all.
+         The product's own happy path put it there: accept, tap Navigate, and
+         Maps comes up over us. The customer's map froze for the whole journey
+         and the ETA in `orders.eta_at` (0057) drifted off a stale fix.
+
+         Still deliberately NOT ACCESS_BACKGROUND_LOCATION. That grant is for an
+         app collecting position with nothing on screen and no notification, and
+         it carries a Play review we would rightly lose. A foreground service
+         with a visible ongoing notification is the sanctioned way to do this and
+         needs no background grant at all: the rider can see, for the whole time
+         it runs, that we are sharing their location. FOREGROUND_SERVICE_LOCATION
+         is separately mandatory from Android 14. WAKE_LOCK is what
+         `enableWakeLock` in the reporter's notification config acquires — the
+         geolocator service calls `newWakeLock` unguarded, so the permission is
+         not optional if that flag is on. The service itself is declared by the
+         geolocator plugin's own manifest, already with
+         `foregroundServiceType="location"`. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+
+    <!-- See the customer app's manifest for the reasoning: a Keystore-backed
+         session survives a Drive backup as ciphertext whose key does not, so a
+         restored device would hold bytes nothing can open. -->
     <application
-        android:label="zopiq_rider"
+        android:label="Zopiq Rider"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false">
 
         <!-- The Maps SDK reads its key from here and nowhere else. Substituted
              by Gradle from `android/local.properties`, which is gitignored. -->

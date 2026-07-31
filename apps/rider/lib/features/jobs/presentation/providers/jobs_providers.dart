@@ -167,19 +167,30 @@ final Provider<RiderLocationReporter> locationReporterProvider =
       return reporter;
     });
 
-/// Turns the reporter on and off from the rider's own jobs.
+/// Whether the rider has a bag on the bike right now.
 ///
-/// Watched by the shell, so it is alive for as long as the app is. The condition
-/// is *carrying*, not *has a live job*: a rider riding to a kitchen is not on
+/// *Carrying*, not *has a live job*: a rider riding to a kitchen is not on
 /// anybody's tracking screen, and following them there would be collecting a
 /// position for which there is no reader.
+///
+/// Its own provider because two things key off it — the location stream below,
+/// and the shell's battery-optimisation prompt, which has to fire on the same
+/// edge the tracking does or it asks at a moment that means nothing.
+final Provider<bool> carryingProvider = Provider<bool>(
+  (Ref ref) => ref.watch(activeJobsProvider).any((Job j) => j.isCarrying),
+);
+
+/// Turns the reporter on and off from the rider's own jobs.
+///
+/// Watched by the shell, so it is alive for as long as the app is.
 final Provider<void> locationReportingProvider = Provider<void>((Ref ref) {
-  final bool carrying = ref
-      .watch(activeJobsProvider)
-      .any((Job j) => j.isCarrying);
   // Deliberately not awaited. This provider's job is to notice the change and
   // pass it on; the reporter is idempotent and handles its own failures.
-  unawaited(ref.watch(locationReporterProvider).setCarrying(carrying));
+  unawaited(
+    ref
+        .watch(locationReporterProvider)
+        .setCarrying(ref.watch(carryingProvider)),
+  );
 });
 
 /// The last 30 days of earnings, by day.

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_rider/core/battery_optimisation.dart';
+import 'package:zopiq_rider/core/storage/secure_store.dart';
 import 'package:zopiq_rider/core/widgets/rider_animations.dart';
 import 'package:zopiq_rider/core/widgets/rider_svg_icons.dart';
 import 'package:zopiq_rider/features/auth/presentation/pages/profile_page.dart';
@@ -28,6 +30,15 @@ class _RiderShellState extends ConsumerState<RiderShell> {
   /// one over the first. Cleared when the sheet closes for any reason —
   /// accepted, declined, or run out.
   String? _showing;
+
+  /// Set the first time the battery question is considered, so a rider whose
+  /// carrying state flickers is not asked twice in one shift.
+  bool _batteryConsidered = false;
+
+  /// One key, one answer, kept forever: a rider who has been shown this once has
+  /// been shown it. Nagging somebody about a system setting every time they pick
+  /// up a bag is how an app gets uninstalled.
+  static const String _batteryAskedKey = 'battery_prompt_shown';
 
   /// Puts the sheet up and keeps [_showing] honest for as long as it is there.
   ///
@@ -55,6 +66,59 @@ class _RiderShellState extends ConsumerState<RiderShell> {
     }
   }
 
+  /// Asks the rider to take this app off the battery optimiser's list, once,
+  /// the first time they are actually carrying something (audit RID-001).
+  ///
+  /// **Why here and why then.** The foreground service the reporter now runs is
+  /// what stock Android honours, and on Xiaomi, Oppo, Vivo, Realme and Samsung
+  /// it is not enough on its own — those builds stop an unexempted service
+  /// anyway, screen off, mid-ride. Asked at the moment the rider picks up a bag
+  /// the request explains itself; asked at launch it is one more dialog between
+  /// somebody and their first job.
+  ///
+  /// Skipped outright when the phone already exempts us, which is most stock
+  /// Android and every rider who has already done this once.
+  Future<void> _maybeAskAboutBattery() async {
+    if (_batteryConsidered) return;
+    _batteryConsidered = true;
+
+    final BatteryOptimisation battery = ref.read(batteryOptimisationProvider);
+    if (await battery.isExempt()) return;
+
+    final SecureStore store = ref.read(secureStoreProvider);
+    if (await store.read(_batteryAskedKey) != null) return;
+    if (!mounted) return;
+
+    final bool open =
+        await showDialog<bool>(
+          context: context,
+          builder: (BuildContext c) => AlertDialog(
+            title: const Text('Keep your location running'),
+            content: const Text(
+              "This phone's battery saver can stop Zopiq while you ride, and "
+              'the customer stops seeing where you are. Find Zopiq Rider in '
+              "the list and set it to Don't optimise.",
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('Not now'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('Open settings'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    // Written after the answer, not before it: a rider who was interrupted
+    // before they could answer has not been asked, and should be next time.
+    await store.write(_batteryAskedKey, 'y');
+    if (open) await battery.openSettings();
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<Job> run = ref.watch(activeJobsProvider);
@@ -66,6 +130,12 @@ class _RiderShellState extends ConsumerState<RiderShell> {
     // are looking at their earnings or their profile — a map that blanks
     // because the rider switched tabs is a map nobody trusts.
     ref.watch(locationReportingProvider);
+
+    // The battery question rides on the same edge as the tracking above: the
+    // first time this rider is genuinely carrying, and never on a launch.
+    ref.listen<bool>(carryingProvider, (bool? _, bool carrying) {
+      if (carrying) unawaited(_maybeAskAboutBattery());
+    });
 
     // An offer is a question with a deadline, so it is raised from the shell
     // and not from a screen: whichever tab the rider is on, the sheet comes up.
