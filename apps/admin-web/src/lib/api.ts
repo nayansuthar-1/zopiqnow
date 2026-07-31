@@ -265,6 +265,46 @@ export const api = {
   setRiderCashCap: (cap: number) =>
     rpc<void>('admin_set_rider_cash_cap', { p_cap: cap }),
 
+  /// Every refund, or one status of them (migration 0077). Oldest first, because
+  /// this is a work queue and the thing that has waited longest is the thing
+  /// somebody is chasing.
+  listRefunds: (status?: RefundRow['status']) =>
+    rpc<RefundRow[]>('admin_list_refunds', { p_status: status ?? null }),
+
+  /// A refund raised by hand: the partial the customer is owed for a missing
+  /// dish, and the only way to refund a cash order that was actually delivered.
+  /// Born `requested` — issuing and approving are two acts and both get a name.
+  issueRefund: (
+    orderId: string,
+    amount: number,
+    reason: string,
+    fundedBy: RefundRow['funded_by'],
+  ) =>
+    rpc<number>('admin_issue_refund', {
+      p_order_id: orderId,
+      p_amount: amount,
+      p_reason: reason,
+      p_funded_by: fundedBy,
+    }),
+
+  /// Clears it to be sent, and is the one chance to move who pays for it — the
+  /// database refuses the change once a settlement has absorbed the row.
+  approveRefund: (id: number, fundedBy?: RefundRow['funded_by']) =>
+    rpc<void>('admin_approve_refund', {
+      p_id: id,
+      p_funded_by: fundedBy ?? null,
+    }),
+
+  declineRefund: (id: number, reason: string) =>
+    rpc<void>('admin_decline_refund', { p_id: id, p_reason: reason }),
+
+  /// Records that the money went back — it does not send it. There is no gateway
+  /// yet (PAY-001), so this is a transfer somebody made and came back to log,
+  /// exactly like a settlement or a rider payout. The reference is mandatory for
+  /// the same reason theirs are.
+  markRefundPaid: (id: number, reference: string) =>
+    rpc<void>('admin_mark_refund_paid', { p_id: id, p_reference: reference }),
+
   /// Every slide, including the ones no customer can see. The table's own read
   /// policy shows only what is live right now, which is exactly the wrong thing
   /// for an editor — the row you go looking for is usually the expired one.
@@ -636,6 +676,35 @@ export type TopRestaurant = {
 
 /// One week's trade for one restaurant (migration 0017), rolled up every Monday
 /// by `run_settlement_batch`. Nothing in the console creates one.
+/// Money owed back on one order (migration 0077).
+///
+/// `requested_by` is the whole difference between the two kinds. `'system'` is
+/// the automatic full refund a cancellation, a rejection or the five-minute
+/// expiry raised — already approved, and not declinable. Anything else is an
+/// admin's email, and that one waits for approval.
+export type RefundRow = {
+  id: number
+  order_id: string
+  restaurant_id: string
+  restaurant_name: string
+  user_phone: string
+  order_total: number
+  payment_method: 'cod' | 'upi'
+  amount: number
+  status: 'requested' | 'approved' | 'processing' | 'paid' | 'failed' | 'declined'
+  reason: string
+  funded_by: 'platform' | 'restaurant'
+  requested_by: string
+  approved_by: string | null
+  gateway_refund_id: string | null
+  failure_reason: string | null
+  /// The date the customer was promised, frozen when the refund was raised.
+  expected_by: string
+  settlement_id: number | null
+  created_at: string
+  paid_at: string | null
+}
+
 export type SettlementRow = {
   id: number
   restaurant_id: string
@@ -649,6 +718,10 @@ export type SettlementRow = {
   /// which is the thing that used to be indistinguishable from a platform one.
   vendor_funded_discount: number
   commission: number
+  /// Restaurant-funded refunds charged to this statement (0077). Not week-scoped
+  /// like the rest of the row — a refund raised this week for a month-old order
+  /// lands here, because the week it belongs to has already been paid.
+  refunds: number
   net_payable: number
   status: 'pending' | 'paid'
   reference: string | null

@@ -12,6 +12,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/cancel_order_sheet.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_card.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/order_refund_section.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_review_section.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_tracking_card.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_image.dart'
@@ -233,6 +234,15 @@ class _OrderBodyState extends ConsumerState<_OrderBody> {
           const SizedBox(height: 16),
           Divider(height: 1, thickness: 1, color: isDark ? Colors.white12 : const Color(0xFFEEEEEE)),
           const SizedBox(height: 16),
+
+          // 1b. What happened to the money (0077).
+          //
+          // Above the status banner, not below the bill, because on a cancelled
+          // order this *is* the news — the customer opened this screen to find
+          // out where their ₹565 went, and burying the answer under the itemised
+          // list is how that becomes a phone call. Renders nothing on the
+          // overwhelming majority of orders, which have no refund.
+          OrderRefundSection(orderId: order.id),
 
           // 2. Tracking Card or Status Banner
           if (isOpen) ...<Widget>[

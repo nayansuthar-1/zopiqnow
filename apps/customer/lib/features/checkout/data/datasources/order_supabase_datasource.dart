@@ -7,6 +7,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
@@ -35,11 +36,21 @@ class OrderSupabaseDataSource implements OrderDataSource {
   Future<AppliedCoupon> applyCoupon({
     required String code,
     required int subtotal,
+    required String restaurantId,
   }) async {
     try {
+      // All three arguments, every time. `p_restaurant_id` is defaulted in the
+      // database so that an old build still binds to this signature — which is
+      // what kept a restaurant's own offer failing here silently rather than
+      // erroring. `place_order` has always passed it; the preview had not, so
+      // the two disagreed about what a valid code was.
       final dynamic discount = await _db.rpc<dynamic>(
         'validate_coupon',
-        params: <String, dynamic>{'p_code': code, 'p_subtotal': subtotal},
+        params: <String, dynamic>{
+          'p_code': code,
+          'p_subtotal': subtotal,
+          'p_restaurant_id': restaurantId,
+        },
       );
       return AppliedCoupon(
         code: code.trim().toUpperCase(),
@@ -428,6 +439,18 @@ class OrderSupabaseDataSource implements OrderDataSource {
     // or belongs to somebody else. Both mean there is nothing to rate.
     if (rows.isEmpty) return OrderReviewState.none;
     return OrderReviewState.fromJson(rows.first as Map<String, dynamic>);
+  }
+
+  @override
+  Future<List<OrderRefund>> fetchRefunds(String orderId) async {
+    final List<dynamic> rows = await _db.rpc<List<dynamic>>(
+      'my_order_refund',
+      params: <String, dynamic>{'p_order_id': orderId},
+    );
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map(OrderRefund.fromJson)
+        .toList(growable: false);
   }
 
   @override

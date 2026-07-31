@@ -4,6 +4,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
@@ -13,13 +14,17 @@ import 'package:zopiqnow/features/location/domain/entities/address.dart';
 
 /// Contract for coupons and order placement (SAD 7.4).
 abstract interface class OrderRepository {
-  /// Validates [code] against the cart's [subtotal].
+  /// Validates [code] against the cart's [subtotal] at [restaurantId].
   ///
   /// Throws [CouponFailure] with a human-readable reason when the code is
-  /// unknown or the cart doesn't meet the coupon's minimum.
+  /// unknown, out of scope for this kitchen, or the cart doesn't meet the
+  /// coupon's minimum. A code belonging to another restaurant is refused with
+  /// the same sentence as one that does not exist — deliberately, so this is
+  /// not a way to enumerate other kitchens' promotions.
   Future<AppliedCoupon> applyCoupon({
     required String code,
     required int subtotal,
+    required String restaurantId,
   });
 
   /// Places the order and returns the receipt.
@@ -129,6 +134,11 @@ abstract interface class OrderRepository {
   /// What this customer already said about the order, or null. Never throws,
   /// for the reason [getReviewState] does not.
   Future<OrderReview?> getMyReview(String orderId);
+
+  /// Money going back on this order, oldest first, and empty for almost every
+  /// order. Never throws: a read that failed shows no refund line, which is what
+  /// the overwhelming majority of receipts show anyway.
+  Future<List<OrderRefund>> getRefunds(String orderId);
 
   /// Rates the food, and optionally the rider.
   ///

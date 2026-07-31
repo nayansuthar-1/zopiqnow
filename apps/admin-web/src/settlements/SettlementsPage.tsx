@@ -138,7 +138,7 @@ export function SettlementsPage() {
           />
         ) : (
           <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
-            <table className="w-full min-w-[880px] text-sm">
+            <table className="w-full min-w-[980px] text-sm">
               <thead className="border-b border-line text-left text-ink-muted">
                 <tr>
                   <th className="px-5 py-3 font-medium">Restaurant</th>
@@ -147,6 +147,7 @@ export function SettlementsPage() {
                   <th className="px-5 py-3 text-right font-medium">Sales</th>
                   <th className="px-5 py-3 text-right font-medium">Own offers</th>
                   <th className="px-5 py-3 text-right font-medium">Commission</th>
+                  <th className="px-5 py-3 text-right font-medium">Refunds</th>
                   <th className="px-5 py-3 text-right font-medium">Payable</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                   <th className="px-5 py-3" />
@@ -177,6 +178,15 @@ export function SettlementsPage() {
                     </td>
                     <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
                       −₹{s.commission.toLocaleString('en-IN')}
+                    </td>
+                    {/* Same dash rule, and the same reason (0077). Unlike the
+                        other columns this one is not week-scoped: a refund
+                        raised this week for a month-old order is charged here,
+                        because the week it belongs to has already been paid. */}
+                    <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
+                      {s.refunds > 0
+                        ? `−₹${s.refunds.toLocaleString('en-IN')}`
+                        : '—'}
                     </td>
                     <td className="px-5 py-3 text-right font-semibold tabular-nums text-ink">
                       ₹{s.net_payable.toLocaleString('en-IN')}

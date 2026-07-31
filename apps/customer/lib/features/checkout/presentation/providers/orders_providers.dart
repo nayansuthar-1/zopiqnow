@@ -8,6 +8,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
@@ -221,6 +222,19 @@ final AutoDisposeFutureProviderFamily<OrderReview?, String> myOrderReviewProvide
       String orderId,
     ) {
       return ref.watch(orderRepositoryProvider).getMyReview(orderId);
+    });
+
+/// Money going back on this order (0077), oldest first.
+///
+/// Empty for almost every order, and the widget renders nothing when it is —
+/// including while the read is in flight, so a receipt does not jump.
+final AutoDisposeFutureProviderFamily<List<OrderRefund>, String>
+orderRefundsProvider =
+    FutureProvider.autoDispose.family<List<OrderRefund>, String>((
+      Ref ref,
+      String orderId,
+    ) {
+      return ref.watch(orderRepositoryProvider).getRefunds(orderId);
     });
 
 /// The tax invoice for a delivered order (0063).

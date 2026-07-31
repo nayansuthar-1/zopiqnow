@@ -5,6 +5,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
@@ -24,9 +25,14 @@ class OrderRepositoryImpl implements OrderRepository {
   Future<AppliedCoupon> applyCoupon({
     required String code,
     required int subtotal,
+    required String restaurantId,
   }) {
     // CouponFailure passes through untouched — it *is* the domain answer.
-    return _dataSource.applyCoupon(code: code, subtotal: subtotal);
+    return _dataSource.applyCoupon(
+      code: code,
+      subtotal: subtotal,
+      restaurantId: restaurantId,
+    );
   }
 
   @override
@@ -222,6 +228,15 @@ class OrderRepositoryImpl implements OrderRepository {
       return await _dataSource.fetchMyReview(orderId);
     } on Object catch (_) {
       return null;
+    }
+  }
+
+  @override
+  Future<List<OrderRefund>> getRefunds(String orderId) async {
+    try {
+      return await _dataSource.fetchRefunds(orderId);
+    } on Object catch (_) {
+      return const <OrderRefund>[];
     }
   }
 

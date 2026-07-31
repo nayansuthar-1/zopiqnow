@@ -8,6 +8,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
@@ -84,6 +85,30 @@ class OrderMockDataSource implements OrderDataSource {
   Future<OrderReview?> fetchMyReview(String orderId) async {
     await Future<void>.delayed(latency);
     return _reviews[orderId];
+  }
+
+  @override
+  Future<List<OrderRefund>> fetchRefunds(String orderId) async {
+    await Future<void>.delayed(latency);
+    // The same rule the trigger in 0077 applies: an order that ended without
+    // being delivered owes its total back, and only if it was prepaid.
+    for (final CustomerOrder o in _history) {
+      if (o.id != orderId) continue;
+      final bool ended =
+          o.status == OrderStatus.cancelled || o.status == OrderStatus.rejected;
+      if (!ended || o.paymentMethod != PaymentMethod.upi) break;
+      return <OrderRefund>[
+        OrderRefund(
+          id: 1,
+          amount: o.total,
+          status: RefundStatus.approved,
+          reason: 'This order was cancelled',
+          expectedBy: DateTime.now().add(const Duration(days: 5)),
+          isPartial: false,
+        ),
+      ];
+    }
+    return const <OrderRefund>[];
   }
 
   @override
@@ -249,6 +274,11 @@ class OrderMockDataSource implements OrderDataSource {
   Future<AppliedCoupon> applyCoupon({
     required String code,
     required int subtotal,
+    // Accepted and unused: every fixture coupon below is platform-scope, so
+    // there is no kitchen for one of them to belong to. The parameter is here so
+    // the mock and the real datasource answer the same question — a stand-in
+    // with a narrower signature is a stand-in that hides a caller's mistake.
+    required String restaurantId,
   }) async {
     await Future<void>.delayed(latency);
 
@@ -288,7 +318,11 @@ class OrderMockDataSource implements OrderDataSource {
     final int subtotal = cart.subtotal;
     final int discount = couponCode == null || couponCode.trim().isEmpty
         ? 0
-        : (await applyCoupon(code: couponCode, subtotal: subtotal)).discount;
+        : (await applyCoupon(
+            code: couponCode,
+            subtotal: subtotal,
+            restaurantId: cart.restaurantId ?? '',
+          )).discount;
     final CartBill bill = CartBill.of(cart, discount: discount);
 
     _orderSeq++;

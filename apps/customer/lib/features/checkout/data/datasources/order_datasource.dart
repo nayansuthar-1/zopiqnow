@@ -4,6 +4,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
@@ -17,9 +18,18 @@ import 'package:zopiqnow/features/location/domain/entities/address.dart';
 /// and the order service prices them. The client cannot quote a total even if it
 /// wanted to, and a client that cannot quote a total cannot get one wrong.
 abstract interface class OrderDataSource {
+  /// Validates [code] against a cart of [subtotal] at [restaurantId].
+  ///
+  /// [restaurantId] is not optional and not decoration: since migration 0064 a
+  /// coupon may belong to one kitchen, and `validate_coupon` refuses a code that
+  /// is not in scope. Omitting it defaults the argument to null server-side,
+  /// which matches platform coupons *only* — so every restaurant's own offer,
+  /// advertised on its own checkout screen, was answered "This code isn't
+  /// valid." The scope has to travel with the code from here.
   Future<AppliedCoupon> applyCoupon({
     required String code,
     required int subtotal,
+    required String restaurantId,
   });
 
   /// No user id: `place_order` reads it from the caller's JWT (`auth.uid()`).
@@ -144,6 +154,12 @@ abstract interface class OrderDataSource {
 
   /// What this customer already said about the order, or null if nothing yet.
   Future<OrderReview?> fetchMyReview(String orderId);
+
+  /// Money going back on this order (migration 0077), oldest first.
+  ///
+  /// Empty for almost every order, and empty is the answer for a cash order that
+  /// was cancelled — nothing was collected, so nothing goes back.
+  Future<List<OrderRefund>> fetchRefunds(String orderId);
 
   /// Rates the food, and optionally the rider who brought it.
   ///

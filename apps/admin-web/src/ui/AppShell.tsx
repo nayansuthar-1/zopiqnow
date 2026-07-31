@@ -41,6 +41,7 @@ const groups: {
   {
     heading: 'Money',
     links: [
+      { to: '/refunds', label: 'Refunds', end: false },
       { to: '/settlements', label: 'Restaurant settlements', end: false },
       { to: '/payouts', label: 'Rider payouts', end: false },
       { to: '/cash', label: 'Rider cash', end: false },
