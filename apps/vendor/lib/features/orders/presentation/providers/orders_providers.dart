@@ -11,7 +11,7 @@ final Provider<VendorOrderDataSource> vendorOrderDataSourceProvider =
       (Ref ref) => const VendorOrderSupabaseDataSource(),
     );
 
-/// Every order at this restaurant, live.
+/// This restaurant's recent orders, live — a bounded window, not the book.
 ///
 /// Empty when nobody is signed in — not an error, and not a stream that throws:
 /// the router will not show this screen to a signed-out user anyway, and a
@@ -31,9 +31,9 @@ final StreamProvider<List<VendorOrder>> ordersProvider =
 
 /// The queue: what the kitchen still has to do, oldest first.
 ///
-/// Derived, not a second subscription. The stream already carries every order at
-/// the restaurant, and an order leaving the queue is the *same event* as an order
-/// being delivered — one socket, two readings.
+/// Derived, not a second subscription. The live window carries every order that
+/// is still moving, and an order leaving the queue is the *same event* as an
+/// order being delivered — one socket, two readings.
 final Provider<List<VendorOrder>> queueProvider = Provider<List<VendorOrder>>((
   Ref ref,
 ) {
@@ -43,22 +43,6 @@ final Provider<List<VendorOrder>> queueProvider = Provider<List<VendorOrder>>((
       .where((VendorOrder o) => o.status.isOpen)
       .toList(growable: false);
 });
-
-/// The book: orders that are finished — delivered or cancelled — newest first.
-///
-/// The other reading of the same stream `queueProvider` filters. The queue is
-/// oldest-first because a queue starves its oldest ticket; history is
-/// newest-first because the thing you just did is the thing you look up.
-final Provider<List<VendorOrder>> orderHistoryProvider =
-    Provider<List<VendorOrder>>((Ref ref) {
-      final List<VendorOrder> orders =
-          ref.watch(ordersProvider).valueOrNull ?? <VendorOrder>[];
-      final List<VendorOrder> past = orders
-          .where((VendorOrder o) => !o.status.isOpen)
-          .toList();
-      past.sort((VendorOrder a, VendorOrder b) => b.placedAt.compareTo(a.placedAt));
-      return past;
-    });
 
 /// Orders that need someone to look up *right now* — the new ones. What the
 /// count badge counts.

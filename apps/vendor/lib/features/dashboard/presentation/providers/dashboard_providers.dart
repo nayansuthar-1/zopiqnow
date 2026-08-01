@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:zopiq_vendor/features/auth/domain/entities/vendor.dart';
+import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 
@@ -42,11 +44,50 @@ class TodayStats {
   );
 }
 
-/// Today's snapshot, derived from the one order stream the app already holds — no
-/// second subscription. "Today" is the local calendar day: the kitchen's day,
-/// not UTC's.
+/// Today's finished orders — a one-shot read, not a subscription.
+///
+/// The live stream is a bounded window now, so the day's takings can no longer
+/// be counted off it: a restaurant busier than the window would under-report its
+/// own revenue by evening, and quietly. This asks the database the question
+/// directly instead, over the same `fetchHistory` the History screen uses.
+///
+/// Re-read whenever the stream ticks, because an order finishing *is* an event
+/// on the stream — so the figures stay live without a second socket, and go
+/// quiet the moment the kitchen does. Riverpod keeps the previous value while it
+/// refreshes, so the tiles do not blink between reads.
+///
+/// "Today" is the local calendar day: the kitchen's day, not UTC's.
+final FutureProvider<List<VendorOrder>> todayFinishedProvider =
+    FutureProvider<List<VendorOrder>>((Ref ref) {
+      final Vendor? vendor = ref.watch(vendorProvider);
+      if (vendor == null) return Future<List<VendorOrder>>.value(<VendorOrder>[]);
+
+      ref.watch(ordersProvider);
+
+      final DateTime now = DateTime.now();
+      return ref
+          .watch(vendorOrderDataSourceProvider)
+          .fetchHistory(
+            restaurantId: vendor.restaurantId,
+            from: DateTime(now.year, now.month, now.day),
+            to: now,
+            // A day, and a backstop rather than a bound: no kitchen reaches it,
+            // and one that did would be reading a number it can survive being
+            // approximate for one evening.
+            limit: 1000,
+          );
+    });
+
+/// Today's snapshot, from the day's finished orders and the live queue.
+///
+/// Two sources because they answer two questions — how the day went, and what is
+/// happening right now — and they cannot overlap: `fetchHistory` returns only
+/// finished orders, so an order placed today and still cooking is counted once,
+/// on the queue side.
 final Provider<TodayStats> todayStatsProvider = Provider<TodayStats>((Ref ref) {
-  final List<VendorOrder> orders =
+  final List<VendorOrder> finished =
+      ref.watch(todayFinishedProvider).valueOrNull ?? <VendorOrder>[];
+  final List<VendorOrder> live =
       ref.watch(ordersProvider).valueOrNull ?? <VendorOrder>[];
 
   final DateTime now = DateTime.now();
@@ -59,17 +100,22 @@ final Provider<TodayStats> todayStatsProvider = Provider<TodayStats>((Ref ref) {
   int inQueue = 0;
   int newOrders = 0;
 
-  for (final VendorOrder o in orders) {
-    final bool today = isToday(o.placedAt);
-    if (today) todayCount++;
-    if (today && o.status == OrderStatus.delivered) {
+  // How the day went. Already bounded to today by the query, so every row counts.
+  for (final VendorOrder o in finished) {
+    todayCount++;
+    if (o.status == OrderStatus.delivered) {
       delivered++;
       revenue += o.total;
     }
-    if (o.status.isOpen) {
-      inQueue++;
-      if (o.status == OrderStatus.placed) newOrders++;
-    }
+  }
+
+  // What is still going on. The whole queue, not just today's — a ticket placed
+  // at 11pm is still work at 12:05am.
+  for (final VendorOrder o in live) {
+    if (!o.status.isOpen) continue;
+    inQueue++;
+    if (o.status == OrderStatus.placed) newOrders++;
+    if (isToday(o.placedAt)) todayCount++;
   }
 
   return TodayStats(

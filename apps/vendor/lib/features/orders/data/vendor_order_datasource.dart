@@ -4,11 +4,14 @@ import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 
 /// The kitchen's view of the order book.
 abstract interface class VendorOrderDataSource {
-  /// Every order at this restaurant, live, oldest first.
+  /// This restaurant's *recent* orders, live, oldest first.
   ///
-  /// Includes finished ones — filtering happens above, because "the queue" and
-  /// "today's orders" are two readings of the same stream and one subscription
-  /// is cheaper than two.
+  /// Recent, not all. A `.stream()` fetches its whole filtered set on every app
+  /// launch and holds it in memory for the life of the session, so an unbounded
+  /// one is a tablet that gets slower every week it stays in service and
+  /// eventually stops starting at all. What the kitchen needs live is the work
+  /// that is still moving; the book is looked up, not watched, and that is
+  /// [fetchHistory]'s job.
   Stream<List<VendorOrder>> watchOrders(String restaurantId);
 
   /// The finished orders — delivered or cancelled — placed in a date window,
@@ -68,6 +71,21 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
   /// a human. Any other code is a bug or an outage.
   static const String _businessRuleErrorCode = 'P0001';
 
+  /// How many orders the live stream carries.
+  ///
+  /// A row count rather than the date bound the queue really wants, because
+  /// `.stream()` takes **exactly one** filter — a single `PostgresChangeFilter`
+  /// is what the socket subscribes with — and that one has to be
+  /// `restaurant_id`, or every kitchen on the platform pushes its orders down
+  /// this wire. `.limit()` is the only other bound on offer.
+  ///
+  /// Two hundred is a busy restaurant's whole day, so in practice the window
+  /// holds everything `created_at >= now() - 24 hours` would have and then some.
+  /// It has to comfortably exceed the live queue, which is the one thing that
+  /// must never fall out of it: an open ticket outside the window is a ticket
+  /// the kitchen stops seeing.
+  static const int _liveWindow = 200;
+
   /// The order columns the app reads. The live `.stream()` returns whole rows so
   /// it needs no list; `fetchHistory`'s explicit `.select()` does.
   static const String _orderColumns =
@@ -85,14 +103,24 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
         .from('orders')
         .stream(primaryKey: const <String>['id'])
         .eq('restaurant_id', restaurantId)
-        // Oldest first. A queue is a queue: the ticket that has been waiting
-        // longest is the one that needs a person, and putting the newest on top
-        // is how the oldest one starves.
-        .order('created_at', ascending: true)
-        .map(
-          (List<Map<String, dynamic>> rows) =>
-              rows.map(_orderFrom).toList(growable: false),
-        );
+        // Newest first *on the wire*, which is the opposite of how the queue
+        // reads and is not a mistake. The SDK sorts the rows it is holding and
+        // then keeps the first `_liveWindow` of them, so the direction here is
+        // what decides which end of the book the window sits on: ascending
+        // would pin it to the two hundred oldest orders the restaurant ever
+        // took, and the kitchen would watch a queue from last March.
+        .order('created_at', ascending: false)
+        .limit(_liveWindow)
+        .map((List<Map<String, dynamic>> rows) {
+          final Iterable<VendorOrder> orders = rows.map(_orderFrom);
+          // And back to oldest first for the caller. A queue is a queue: the
+          // ticket that has been waiting longest is the one that needs a
+          // person, and putting the newest on top is how the oldest starves.
+          return List<VendorOrder>.of(
+            orders.toList().reversed,
+            growable: false,
+          );
+        });
   }
 
   @override

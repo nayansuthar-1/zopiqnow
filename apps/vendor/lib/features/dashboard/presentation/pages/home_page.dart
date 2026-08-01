@@ -30,6 +30,9 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final Vendor? vendor = ref.watch(vendorProvider);
     final AsyncValue<List<VendorOrder>> ordersAsync = ref.watch(ordersProvider);
+    final AsyncValue<List<VendorOrder>> todayAsync = ref.watch(
+      todayFinishedProvider,
+    );
     final TodayStats stats = ref.watch(todayStatsProvider);
     final bool isOwner = vendor?.role.isOwner ?? false;
 
@@ -84,16 +87,21 @@ class HomePage extends ConsumerWidget {
                 child: _SectionHeader(title: "Today's Performance"),
               ),
               const SizedBox(height: ZopiqSpacing.md),
-              ordersAsync.when(
-                loading: () => const SizedBox(
+              // Both sources, because the grid reads from both: the day's
+              // takings come from the one-shot read and the queue counts from
+              // the live window. A grid drawn on whichever arrives first shows
+              // zeroes for as long as the other is in flight. Invalidating the
+              // stream re-runs the read too — the read watches it — so one
+              // retry still covers both.
+              if (ordersAsync.hasError || todayAsync.hasError)
+                _TodayError(onRetry: () => ref.invalidate(ordersProvider))
+              else if (!ordersAsync.hasValue || !todayAsync.hasValue)
+                const SizedBox(
                   height: 140,
                   child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (Object _, StackTrace _) => _TodayError(
-                  onRetry: () => ref.invalidate(ordersProvider),
-                ),
-                data: (_) => _TodayGrid(stats: stats),
-              ),
+                )
+              else
+                _TodayGrid(stats: stats),
               const SizedBox(height: ZopiqSpacing.xl),
 
               // ── 4. Weekly Earnings ── owner's, like the Payments screen it
