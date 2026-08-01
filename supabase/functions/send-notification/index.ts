@@ -19,6 +19,24 @@
 // An audience with no service account (neither its own nor the default) is
 // skipped, not an error — push for it is simply not configured yet.
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by the platform.
+//
+// **Who may call this (SEC-001).** The function is deployed `--no-verify-jwt`,
+// because a database webhook carries no user JWT to verify. That is not a licence
+// to trust the caller: without a check of its own the URL — which is derived from
+// the project ref, and the project ref ships inside every APK — was an open
+// endpoint that would push any title and body to any recipient named in the
+// request. Two things close it, and the second matters more than the first:
+//
+//   1. `NOTIFY_WEBHOOK_SECRET`, a function secret, must arrive as the
+//      `x-notify-secret` header. Set it with
+//      `supabase secrets set NOTIFY_WEBHOOK_SECRET=…` and add the same header to
+//      the notifications-INSERT webhook. Compared in constant time, because a
+//      naive `!==` leaks the secret's prefix to anyone willing to time it.
+//   2. **Only the row id is taken from the body.** The record is re-read from the
+//      database with the service key, so the payload cannot describe a
+//      notification that was never written. A leaked secret then buys an attacker
+//      the ability to *re-send* a real notification, not to compose one — which is
+//      the difference between a nuisance and a phishing channel.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -46,10 +64,13 @@ interface NotificationRecord {
 // alerting shape 0047 shipped.
 const SILENT_KINDS = new Set(["order_live"]);
 
+// What the webhook posts. Supabase sends the whole row, but the type says `id`
+// and nothing else on purpose: the rest is re-read from the table, and a field
+// that is never read should not be nameable here. See SEC-001 in the header.
 interface WebhookPayload {
   type: "INSERT" | "UPDATE" | "DELETE";
   table: string;
-  record: NotificationRecord | null;
+  record: { id: number } | null;
 }
 
 interface ServiceAccount {
@@ -140,9 +161,38 @@ function serviceAccountFor(audience: Audience): ServiceAccount | null {
   return raw ? JSON.parse(raw) as ServiceAccount : null;
 }
 
+// Constant-time string comparison. `a !== b` returns on the first differing
+// byte, so the time it takes says how much of the secret was right — enough, over
+// enough requests, to recover it a character at a time. This one always walks the
+// whole string.
+function secretMatches(given: string | null, expected: string): boolean {
+  if (given === null) return false;
+  const a = new TextEncoder().encode(given);
+  const b = new TextEncoder().encode(expected);
+  // Length is not itself secret — the XOR below cannot compare unequal lengths,
+  // and padding to hide it would leak the same fact through the allocation.
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
 // --- The function ---
 
 Deno.serve(async (req) => {
+  // The gate, before anything else is read or parsed. A caller who cannot prove
+  // it is the webhook gets one word and no information about why.
+  const expectedSecret = Deno.env.get("NOTIFY_WEBHOOK_SECRET");
+  if (!expectedSecret) {
+    // Fail closed. An unset secret is a misconfiguration, and the safe reading of
+    // a misconfiguration on an endpoint like this one is "send nothing".
+    console.error("NOTIFY_WEBHOOK_SECRET is not set — refusing every request.");
+    return new Response("Forbidden", { status: 403 });
+  }
+  if (!secretMatches(req.headers.get("x-notify-secret"), expectedSecret)) {
+    return new Response("Forbidden", { status: 403 });
+  }
+
   let payload: WebhookPayload;
   try {
     payload = await req.json();
@@ -150,10 +200,46 @@ Deno.serve(async (req) => {
     return new Response("Bad request", { status: 400 });
   }
 
-  const n = payload.record;
-  if (payload.type !== "INSERT" || payload.table !== "notifications" || !n) {
+  const claimed = payload.record;
+  if (payload.type !== "INSERT" || payload.table !== "notifications" || !claimed) {
     return new Response("Ignored", { status: 200 });
   }
+
+  // `id` is a bigserial. Anything that is not a whole number would reach
+  // PostgREST as a malformed bigint and come back as a 500 that reads like an
+  // outage; refusing it here keeps a bad request looking like a bad request.
+  const id = Number(claimed.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return new Response("Bad request", { status: 400 });
+  }
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  // The id is the only thing the body is believed about. Everything the push
+  // actually says — the audience, the recipient, the title, the body — comes back
+  // out of the table, so a request cannot invent a notification.
+  const { data: row, error: rowError } = await supabase
+    .from("notifications")
+    .select(
+      "id, audience, restaurant_id, user_id, partner_email, kind, title, body, order_id, data",
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (rowError) {
+    console.error("Notification read failed:", rowError.message);
+    return new Response("Notification read failed", { status: 500 });
+  }
+  if (!row) {
+    // No such row. Either it was deleted between the insert and this call, or the
+    // caller made the id up. Neither is worth a retry.
+    return new Response("No such notification", { status: 200 });
+  }
+
+  const n = row as NotificationRecord;
 
   const sa = serviceAccountFor(n.audience);
   if (!sa) {
@@ -161,11 +247,6 @@ Deno.serve(async (req) => {
     // exists — this is a missing channel, not a failure.
     return new Response(`Push not configured for ${n.audience}`, { status: 200 });
   }
-
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
 
   // Find the devices this row is addressed to, by the recipient column its
   // audience uses.
@@ -218,9 +299,40 @@ Deno.serve(async (req) => {
   // and even then Android may hold it if the app is dozing. That is the honest
   // ceiling of the live card below Android 16 and it is the same for every
   // sender — nothing here can raise it.
+  // The APNs half, and it is not decoration: iOS drops a data-only message that
+  // does not carry `content-available`, so before this block existed the live
+  // card could not have worked on an iPhone at all — the app was never woken to
+  // draw it. Android needs no such declaration, which is why the omission was
+  // invisible for as long as Android was the only platform.
+  //
+  //   * `apns-push-type` is mandatory from iOS 13 and the send is rejected
+  //     outright without it.
+  //   * priority 5 for a silent push because Apple *requires* 5 for
+  //     `background`; sending 10 gets the message throttled or dropped, not
+  //     delivered faster.
+  //   * `content-available: 1` is the wake itself.
+  //
+  // What this buys is a few seconds of runtime, not a guarantee. iOS budgets
+  // background wakes and will delay or skip them on a low battery — the honest
+  // ceiling of the live card on iOS, and the reason a push-to-start token is the
+  // eventual upgrade (see IOS_HANDOVER.md). It is the same *kind* of ceiling
+  // Android has with Doze, and neither is something this function can raise.
+  const apns: Record<string, unknown> = silent
+    ? {
+      headers: { "apns-push-type": "background", "apns-priority": "5" },
+      payload: { aps: { "content-available": 1 } },
+    }
+    : {
+      headers: { "apns-push-type": "alert", "apns-priority": "10" },
+      // `sound` here is the counterpart of the Android channel's importance:
+      // iOS has no channels, so the alerting behaviour rides on each message.
+      payload: { aps: { sound: "default" } },
+    };
+
   const message: Record<string, unknown> = silent
     ? {
       android: { priority: "high" },
+      apns,
       data,
     }
     : {
@@ -229,6 +341,7 @@ Deno.serve(async (req) => {
         priority: "high",
         notification: { channel_id: CHANNEL[n.audience] },
       },
+      apns,
       data,
     };
 

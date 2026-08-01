@@ -1,0 +1,351 @@
+# iOS handover — what was built on Windows, and what needs a Mac
+
+**Written 2026-08-01.** Read this whole file before touching Xcode.
+
+You are picking up a piece of work that was done on a Windows machine, which
+means **not one line of the iOS code in this repo has ever been compiled.**
+Everything here is written and analysed but unverified. `flutter analyze` is
+clean (26 pre-existing warnings, none in the changed files), and that says
+nothing about Swift, CocoaPods, or code signing.
+
+Treat every item under "Do this on the Mac" as unproven until you have watched
+it work. Where something is likely to be wrong, this file says so.
+
+---
+
+## 1. What the app is
+
+Three Flutter apps in a pub workspace, sharing one root `pubspec.lock`:
+
+| App | Path | Bundle id | Android id |
+|---|---|---|---|
+| Customer | `apps/customer` | `com.siteonlab.zopiqnow` | `com.siteonlab.zopiqnow` |
+| Rider | `apps/rider` | `com.siteonlab.zopiqRider` | `com.siteonlab.zopiq_rider` |
+| Vendor | `apps/vendor` | `com.siteonlab.zopiqVendor` | `com.siteonlab.zopiq_vendor` |
+
+The rider and vendor bundle ids differ from their Android ids because Apple
+forbids underscores. They are camelCase because that is what Flutter's own
+generator produces from the project name, so a future `flutter create` will not
+fight you. This was chosen deliberately; do not "tidy" it to lowercase, because
+the ids are about to be registered in Firebase and App Store Connect.
+
+Backend is Supabase. Push is FCM. Maps are Google tiles with Ola routing.
+
+**Two rules from `ENGINEERING_RULES.md` that will bite you:**
+
+- **Rule 3 — the version freeze.** Every dependency is pinned exactly and the
+  root `pubspec.lock` is authoritative. Do **not** run `flutter pub upgrade`, do
+  not bump a plugin to fix a build error, and do not let CocoaPods resolve a
+  Firebase version other than what the pinned plugins ask for. If an iOS build
+  genuinely requires a version change, that is a separate approved task — stop
+  and say so rather than doing it.
+- **No test files.** This project does not keep Flutter tests. `flutter create`
+  generates `test/widget_test.dart`; both were deleted. If you regenerate a
+  platform, delete it again.
+
+---
+
+## 2. What was already true before this work
+
+Worth knowing so you do not go hunting for bugs that are not yours:
+
+- `apps/customer/ios/` existed but was a bare `flutter create` shell — no
+  Firebase config, no permission strings, no Maps key, no signing. Nobody had
+  ever built it.
+- `apps/rider/ios/` and `apps/vendor/ios/` did not exist at all.
+- The app icons on **both** platforms are still Flutter's default (the Android
+  `ic_launcher.png` files are the untouched 442-byte originals). iOS is not
+  behind here; branding is a shared to-do for another day.
+- The launch screen on Android is Flutter's plain white default, so iOS's
+  default `LaunchScreen.storyboard` is already at parity.
+
+---
+
+## 3. What was changed, and why
+
+### 3.1 Scaffolding
+
+- `flutter create --platforms=ios --org com.siteonlab --no-pub` for rider and
+  vendor. `--no-pub` because of the version freeze.
+- **`.metadata` was hand-repaired in both.** `flutter create` *replaced* the
+  `android` platform entry with `ios` instead of adding it. Both platforms are
+  now listed, matching the customer app. If you regenerate, check this again.
+- Deployment target raised **13.0 → 14.0** in all three `project.pbxproj`
+  files. This is forced, not chosen: `google_maps_flutter_ios` declares
+  `platform :ios, '14.0'` and everything else in the pinned set is ≤ 13.0. The
+  customer app's existing 13.0 could never have built.
+
+### 3.2 Secrets, mirroring `android/local.properties`
+
+`ios/Flutter/Secrets.xcconfig` — **gitignored**, with a committed
+`Secrets.xcconfig.example` next to it documenting every key. Pulled into
+`Debug.xcconfig` and `Release.xcconfig` with `#include?` (optional include), so a
+missing file leaves the values empty and the build still runs. That mirrors the
+Gradle side's `?: ""` fallback exactly.
+
+Customer needs `MAPS_API_KEY`, `GOOGLE_IOS_CLIENT_ID`, `GOOGLE_IOS_URL_SCHEME`.
+Rider needs `MAPS_API_KEY`. Vendor needs none and has no such file.
+
+`GoogleService-Info.plist` is **not** gitignored, because the Android
+`google-services.json` files are committed and the repo has already decided
+these are not secrets. Match that.
+
+### 3.3 Info.plist — the counterpart of AndroidManifest.xml
+
+Each app's plist now carries the iOS half of its manifest, commented to be read
+side by side with it. Highlights:
+
+- **Customer**: location when-in-use only (it resolves an address and never
+  tracks — the same reason Android omits `ACCESS_BACKGROUND_LOCATION`), camera +
+  photo library for the profile photo, `remote-notification` background mode,
+  `tel` in `LSApplicationQueriesSchemes`, `NSSupportsLiveActivities`, the Maps
+  key, and the Google Sign-In client + URL scheme.
+- **Rider**: location when-in-use, `location` **and** `remote-notification`
+  background modes, `comgooglemaps`/`maps`/`tel` query schemes, the Maps key.
+- **Vendor**: camera + photo library, `remote-notification`. Nothing else — a
+  kitchen screen has no map.
+
+**Read the note in the rider's plist about "Always".** It deliberately does
+*not* declare `NSLocationAlwaysAndWhenInUseUsageDescription`. WhenInUse plus the
+`location` background mode already keeps fixes arriving while Google Maps is on
+screen, which is the whole of what audit RID-001 asked for. Declaring the Always
+key would make `geolocator` call `requestAlwaysAuthorization` and put a much
+more alarming prompt in front of a rider in exchange for capability this app
+never uses. If someone later reports "background location does not work", check
+the flags in `location_reporter.dart` before reaching for the Always key.
+
+### 3.4 AppDelegate
+
+All three register for remote notifications (without this, no APNs token, and
+every push is silently dropped). Customer and rider also key the Maps SDK from
+the `GMSApiKey` Info.plist entry, **skipping the call when the key is empty** —
+`provideAPIKey("")` throws, and a missing key should cost you a map, not the
+whole launch.
+
+### 3.5 Dart fixes — real bugs, not scaffolding
+
+These would have shipped broken:
+
+1. **`apps/rider/lib/core/launcher.dart`** — Navigate fired a `geo:` URI, which
+   is an Android convention with **no iOS handler at all**. Every Navigate tap on
+   an iPhone would have done nothing. Now branches: Google Maps if installed
+   (`comgooglemaps:`), else an `https://maps.apple.com` link that cannot fail to
+   resolve. Android path is byte-identical.
+2. **All three `push_service.dart`** — `InitializationSettings` and
+   `NotificationDetails` carried only `android:`. On iOS the calls succeed and
+   draw *nothing*. Both now carry Darwin equivalents. All three permission
+   request flags are `false` in the Darwin init because
+   `messaging.requestPermission()` is the single place each app asks; leaving
+   them true shows the system dialog twice.
+3. **All three `push_service.dart`** — `p_platform` was the hardcoded string
+   `'android'`. `device_tokens.platform` has accepted `'ios'` since migration
+   0020 and it is what the sender reads, so an iPhone filed as Android is not
+   cosmetic. Now sends the real platform.
+4. **`apps/rider/.../location_reporter.dart`** — passed `AndroidSettings`
+   unconditionally, so on iOS the background-location flags were never set and
+   RID-001 would have regressed on a platform that never had the fix. Now
+   returns `AppleSettings` with `allowBackgroundLocationUpdates: true`,
+   `pauseLocationUpdatesAutomatically: false` (the default is `true` and iOS
+   would pause a rider waiting at a kitchen and never resume), and
+   `showBackgroundLocationIndicator: true` — the blue status bar being the
+   honesty counterpart of Android's ongoing notification.
+5. **All three `secure_store.dart`** — default Keychain options let the session
+   sync to iCloud Keychain and ride along in a device backup, which is precisely
+   the leak the Android manifest's `allowBackup="false"` exists to prevent. Now
+   `KeychainAccessibility.first_unlock_this_device`.
+
+### 3.6 The server — `supabase/functions/send-notification/index.ts`
+
+The FCM message had an `android:` block and **no `apns:` block**. iOS drops a
+data-only message that does not carry `content-available`, so before this the
+live card could not have worked on an iPhone at all — the app was never woken to
+draw it. Added, with `apns-push-type` (mandatory from iOS 13; the send is
+rejected without it) and priority 5 for background pushes, which Apple requires.
+
+**This function is deployed but not redeployed by anything automatic.** See §5.
+
+### 3.7 Live Activities
+
+`zopiq_live_card` was Android-only by design. It now declares an iOS platform:
+
+- `packages/zopiq_live_card/ios/zopiq_live_card.podspec`
+- `packages/zopiq_live_card/ios/Classes/ZopiqLiveCardPlugin.swift` — same
+  channel name and same four methods as the Java class, so the Dart API needs no
+  branch.
+- `packages/zopiq_live_card/ios/Classes/ZopiqLiveCardAttributes.swift` — the
+  shared contract.
+- `apps/customer/ios/ZopiqLiveActivity/` — the widget extension (SwiftUI view,
+  bundle, Info.plist).
+
+`ZopiqLiveCard.isSupported` now returns true on iOS too; the Swift side checks
+iOS 16.1 and `areActivitiesEnabled` and returns quietly when the answer is no,
+the same way Android returns quietly on a phone that cannot draw a promoted card.
+
+**The honest limitation.** The activity is started by the app when a
+`content-available` push wakes it. That is a few seconds of runtime, not a
+guarantee: iOS budgets background wakes and will delay or skip them. The
+stronger mechanism is a **push-to-start token** (iOS 17.2+), which lets APNs
+create the activity with the app not running at all. It is deliberately not
+built, because Live Activity tokens are APNs tokens and **FCM cannot send to
+them** — it would need a direct APNs sender in the edge function (ES256 JWT
+signing with a `.p8` key), which is a real piece of work that should not be
+written blind on a machine that cannot test it. See §6.
+
+---
+
+## 4. Do this on the Mac — in this order
+
+Nothing below has been run. Expect friction.
+
+### Step 1 — resolve and generate
+
+```bash
+cd /path/to/zopiqnow
+flutter --version          # must be 3.44.5; the lockfile is pinned to it
+flutter pub get            # NOT `upgrade` — see Rule 3
+```
+
+### Step 2 — the Podfile
+
+There is **no Podfile in any of the three apps**, and none was written on
+purpose. Flutter generates one on first iOS build, and a hand-written one risks
+drifting from the `flutter_additional_ios_build_settings` hook the pinned
+Flutter version expects. Let it generate:
+
+```bash
+cd apps/customer && flutter build ios --config-only --no-codesign
+```
+
+Then confirm `apps/customer/ios/Podfile` appeared and says `platform :ios, '14.0'`
+(or nothing, in which case it inherits 14.0 from the project — also fine). Repeat
+for `apps/rider` and `apps/vendor`.
+
+If CocoaPods tries to install a Firebase version that conflicts, **stop**. Do not
+bump plugin versions. Report what it wanted.
+
+### Step 3 — Firebase, three apps
+
+In the Firebase console, add an **iOS app** to the project each Android app
+already lives in — note the vendor app has its **own** Firebase project (see the
+header of `send-notification/index.ts`). Register these bundle ids:
+
+- `com.siteonlab.zopiqnow`
+- `com.siteonlab.zopiqRider`
+- `com.siteonlab.zopiqVendor`
+
+Download each `GoogleService-Info.plist` and place it at
+`apps/<app>/ios/Runner/GoogleService-Info.plist`, then **add it to the Runner
+target in Xcode** — dropping it in the folder is not enough; it must be in
+"Copy Bundle Resources" or `Firebase.initializeApp()` fails at runtime with a
+message that does not mention the file.
+
+Commit them. They are not gitignored, matching the Android convention.
+
+### Step 4 — APNs, or push does not work
+
+In the Apple Developer portal create an **APNs Auth Key (.p8)**, then upload it
+in Firebase → Project Settings → Cloud Messaging → iOS app configuration. You
+need the key file, the Key ID, and your Team ID.
+
+Without this, FCM has no way to reach any iPhone and every push fails silently.
+This is the single most common reason "push works on Android but not iOS".
+
+Also enable the **Push Notifications** capability on each Runner target in Xcode
+(Signing & Capabilities → + Capability), plus **Background Modes** with "Remote
+notifications" (and "Location updates" on the rider). The plists declare the
+background modes, but the entitlement is a separate thing Xcode owns.
+
+### Step 5 — the Live Activity target
+
+This is the one part that **cannot** be done from a file drop, because an app
+extension is an Xcode target and `project.pbxproj` was deliberately not
+hand-edited (hand-writing target UUIDs is a reliable way to corrupt a project).
+
+In Xcode, with `apps/customer/ios/Runner.xcworkspace` open:
+
+1. **File → New → Target → Widget Extension**. Name it exactly
+   **`ZopiqLiveActivity`**. Tick "Include Live Activity". Untick "Include
+   Configuration Intent". Embed in `Runner`.
+2. Xcode generates template files — **delete them** and instead add the ones
+   already written at `apps/customer/ios/ZopiqLiveActivity/`:
+   `ZopiqLiveActivity.swift`, `ZopiqLiveActivityBundle.swift`, `Info.plist`.
+   (Point the target's `INFOPLIST_FILE` at the provided plist.)
+3. **The critical checkbox.** Add
+   `packages/zopiq_live_card/ios/Classes/ZopiqLiveCardAttributes.swift` to the
+   `ZopiqLiveActivity` target's membership *as a reference*, not a copy. Both the
+   app and the extension must compile the **same** file. Two copies compile fine
+   and then silently fail to match at runtime — the activity starts and renders
+   nothing, which is a much worse afternoon than a compile error.
+4. Set the extension's deployment target to **14.0** to match the app, and
+   confirm its bundle id is `com.siteonlab.zopiqnow.ZopiqLiveActivity`.
+5. The extension's `CFBundleShortVersionString` / `CFBundleVersion` are wired to
+   `$(FLUTTER_BUILD_NAME)` / `$(FLUTTER_BUILD_NUMBER)`. iOS refuses to install an
+   extension whose version does not match its container app, and the error names
+   neither — if install fails mysteriously, check this first.
+
+### Step 6 — keys
+
+Copy each `Secrets.xcconfig.example` to `Secrets.xcconfig` and fill in:
+
+- Two **new** iOS Maps keys from Cloud project `789936942272`, restricted to
+  `com.siteonlab.zopiqnow` and `com.siteonlab.zopiqRider`. Android keys will not
+  work — Google restricts Android keys by (package, signing cert) and iOS keys by
+  bundle id. **"Maps SDK for iOS" must be enabled on the project**; it is a
+  different API from the Android one and is off by default.
+- A **new iOS OAuth client** for Google Sign-In, bundle id
+  `com.siteonlab.zopiqnow`. `Env.googleWebClientId` in Dart stays exactly as it
+  is — that is the `serverClientId` Supabase verifies against and it is
+  platform-independent. Copy the "iOS URL scheme" value Google shows rather than
+  reversing the id by hand.
+
+### Step 7 — build and run
+
+```bash
+cd apps/customer && flutter run -d <device>
+cd apps/rider    && flutter run -d <device>
+cd apps/vendor   && flutter run -d <device>
+```
+
+Live Activities **do not work in the simulator** in any useful way. Test on a
+real device with an eSIM-era iPhone if you want the Dynamic Island.
+
+---
+
+## 5. Redeploy the edge function
+
+The `apns` block only takes effect once redeployed:
+
+```bash
+supabase functions deploy send-notification
+```
+
+Nothing does this automatically. Until it runs, iOS pushes will not arrive even
+with everything else correct.
+
+---
+
+## 6. Known gaps — not bugs, decisions
+
+1. **Push-to-start Live Activities.** Not built; reasoning in §3.7. The upgrade
+   needs a direct APNs sender (ES256 JWT, `.p8`) in the edge function plus a
+   column to hold the push-to-start token. Worth doing once someone can test it.
+2. **App icons** are Flutter's default on both platforms. Pre-existing.
+3. **Razorpay on iOS** is untested. `razorpay_flutter` 1.4.5 uses the standard
+   webview checkout, which needs no `LSApplicationQueriesSchemes` entries, but
+   nobody has put a real payment through it on an iPhone.
+4. **`apps/vendor` has no Maps and no Google Sign-In**, so it has no
+   `Secrets.xcconfig` at all. That is correct, not an omission.
+
+---
+
+## 7. If you are a Claude session picking this up
+
+Read `CLAUDE.md` and `ENGINEERING_RULES.md` first — the version freeze (Rule 3)
+and "no test files" are the two that catch people out, and both are easy to
+violate while fixing an iOS build error.
+
+The highest-value thing you can do is **run the builds and report exactly what
+breaks**, rather than pre-emptively refactoring. Every file here is unverified,
+so a real error message is worth more than any amount of reasoning about what
+might be wrong. When something does break, prefer fixing the iOS side over
+changing shared Dart — the Android apps are live and working.

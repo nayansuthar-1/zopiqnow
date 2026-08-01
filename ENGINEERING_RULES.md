@@ -4,8 +4,15 @@
 
 ---
 
-## RULE 1 — Android Compatibility (runs smoothly on new AND older devices)
-The app **must install and run smoothly from Android 7.0 up to the latest Android**, with **Android 10 (API 29) treated as a first-class, explicitly-tested target**.
+## RULE 1 — Device Compatibility (runs smoothly on new AND older devices)
+The apps **must install and run smoothly from Android 7.0 up to the latest Android**, with **Android 10 (API 29) treated as a first-class, explicitly-tested target**, and **from iOS 14 up to the latest iOS**.
+
+**Both platforms are first-class from 2026-08-01.** Every feature from that date
+ships for Android *and* iOS, or ships with an explicit, written note saying why
+one platform gets a lesser version — the way the live order card is a custom
+notification on Android and an ActivityKit Live Activity on iOS. "Android only"
+is no longer a default anyone may assume; it is a decision that has to be argued
+for in a comment.
 
 | Setting | Value | Reason |
 |---|---|---|
@@ -13,15 +20,16 @@ The app **must install and run smoothly from Android 7.0 up to the latest Androi
 | `targetSdkVersion` | **35** (Android 15) | Required by Google Play in 2026 |
 | `compileSdkVersion` | **35** | Compile against latest |
 | NDK / arch | arm64-v8a + armeabi-v7a | Old + new hardware |
+| `IPHONEOS_DEPLOYMENT_TARGET` | **14.0** | Forced, not chosen: `google_maps_flutter_ios` declares `platform :ios, '14.0'` and every other pinned plugin is ≤ 13.0. Raising it further needs a Rule 3 change request |
 
 **Compatibility guardrails (do not violate):**
-1. **No API used without a version guard.** Any API added above `minSdk` must be gated (`Build.VERSION.SDK_INT` on native side; capability checks on Dart side) with a graceful fallback.
+1. **No API used without a version guard.** Any API added above `minSdk` must be gated (`Build.VERSION.SDK_INT` on native side; capability checks on Dart side) with a graceful fallback. The same on iOS: anything above the deployment target goes behind `if #available(...)` with a fallback that is a real experience, not a crash — see `ZopiqLiveCardPlugin.swift`, which compiles at 14.0 and refuses politely below 16.1.
 2. **Use AndroidX + Jetpack compat** libraries only — never legacy support libs.
-3. **Test matrix is mandatory** before every release: emulator + real device on **Android 10**, plus one older (Android 8/9) and one latest. A build is not "done" until it runs on Android 10.
+3. **Test matrix is mandatory** before every release: emulator + real device on **Android 10**, plus one older (Android 8/9) and one latest. A build is not "done" until it runs on Android 10. On iOS, a real device on the oldest supported major and one on the latest — the simulator does not count for push, location, or Live Activities, none of which it implements usefully.
 4. **Keep the app lightweight for old hardware:** APK/AAB kept lean (split ABIs, `--split-per-abi`), avoid heavy startup work, lazy-init, cap animations to 60fps, no jank on mid-range 3GB-RAM devices.
 5. **Enable code shrinking + resource shrinking (R8)** for release, with a tested, checked-in `proguard-rules.pro` (keep rules for reflection-based libs). Verify obfuscated release build on Android 10 before shipping.
 6. **Graceful degradation:** features requiring newer OS/hardware (e.g., certain notification, biometrics, or exact-alarm behaviors) must degrade, never crash.
-7. **Handle runtime permissions correctly across versions** (scoped storage, notification permission on 13+, background location rules) — behavior branch per OS version, tested.
+7. **Handle runtime permissions correctly across versions** (scoped storage, notification permission on 13+, background location rules) — behavior branch per OS version, tested. On iOS every permission needs its `NS…UsageDescription` string in `Info.plist`: an absent or empty one is not a silent default but an immediate crash the moment the API is touched, and an App Store rejection before that. Ask for no more than the Android side asks for — the rider app declines `NSLocationAlwaysAndWhenInUseUsageDescription` for the same reason it declines `ACCESS_BACKGROUND_LOCATION`.
 8. **Minimum device profile target:** 3GB RAM, mid-tier CPU, slow 3G/4G. Design and test to this floor.
 
 ---

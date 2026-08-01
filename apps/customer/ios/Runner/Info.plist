@@ -6,8 +6,11 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<!-- The name under the icon. "Zopiq", not "Zopiqnow", to match
+	     `android:label` in AndroidManifest.xml — the home screen is the one
+	     place the two platforms are read side by side. -->
 	<key>CFBundleDisplayName</key>
-	<string>Zopiqnow</string>
+	<string>Zopiq</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -66,5 +69,100 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+
+	<!-- ===================================================================
+	     Everything below is the iOS counterpart of AndroidManifest.xml.
+	     Read the two together: where Android declares a <uses-permission>,
+	     iOS declares the *sentence shown in the dialog*, and an absent or
+	     empty string is not a silent default — it is an immediate crash the
+	     moment the API is touched, and an App Store rejection before that.
+	     =================================================================== -->
+
+	<!-- ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION, foreground only.
+	     Deliberately only the "when in use" key: the customer app resolves an
+	     address while the picker is open and never tracks. Adding
+	     NSLocationAlwaysAndWhenInUseUsageDescription would put an "Always"
+	     option in the dialog for a capability we do not have — the same reason
+	     ACCESS_BACKGROUND_LOCATION is absent on the Android side. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Zopiq uses your location to find your delivery address and show restaurants that deliver to you.</string>
+
+	<!-- image_picker, the profile photo's two paths. Both strings are required
+	     even though the user only ever takes one of the routes: iOS resolves
+	     the key when the picker is constructed, not when the source is chosen.
+
+	     Note what is deliberately *not* here: NSPhotoLibraryAddUsageDescription.
+	     We read a photo, we never write one back to the library. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Zopiq needs the camera so you can take a profile photo.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Zopiq needs your photo library so you can choose a profile photo.</string>
+
+	<!-- POST_NOTIFICATIONS has no plist counterpart — on iOS the prompt is a
+	     runtime call, which `PushService.start` already makes. What *is*
+	     declared here is the background mode, and it is the half that has no
+	     Android analogue at all: without `remote-notification` iOS delivers a
+	     data-only FCM message to a suspended app never, rather than late. The
+	     order-status pushes that redraw the tracking screen are exactly that
+	     kind of message. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+
+	<!-- The Live Activity — the iOS half of `zopiq_live_card`. Android draws a
+	     custom notification; iOS runs a widget extension on the Lock Screen and
+	     in the Dynamic Island. Without this key the extension builds, installs,
+	     and silently refuses to start an activity. -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<!-- Lets the server push a *new* activity into existence, rather than only
+	     updating one the app started while open. This is what makes the card
+	     appear for an order placed and then backgrounded. -->
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
+
+	<!-- The <queries> block's counterpart. iOS hides other apps behind the same
+	     kind of declaration Android 11 introduced: without `tel` here,
+	     `canLaunchUrl` returns false on every device and the Call buttons
+	     silently do nothing — a failure that looks like a bug in our code and
+	     is not one. Exactly the note the Android manifest carries. -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tel</string>
+	</array>
+
+	<!-- The Maps SDK key. Android reads it from a manifest meta-data element
+	     that Gradle substitutes from `local.properties`; iOS has no such
+	     mechanism, so the value arrives from `Flutter/Secrets.xcconfig` (also
+	     gitignored) and AppDelegate.swift reads it back out of here. Empty when
+	     unset, which renders Google's "authorization failure" tile rather than
+	     crashing — the same failure mode as Android. -->
+	<key>GMSApiKey</key>
+	<string>$(MAPS_API_KEY)</string>
+
+	<!-- Native Google sign-in. `GIDClientID` is the *iOS* OAuth client; the web
+	     client in `Env.googleWebClientId` is the `serverClientId` and stays
+	     where it is. The URL scheme is that same id reversed, and is how Safari
+	     hands the result back to the app. Both come from Secrets.xcconfig. -->
+	<key>GIDClientID</key>
+	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_IOS_URL_SCHEME)</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- We use only HTTPS and the platform's own crypto, which is exempt. Saying
+	     so here turns an export-compliance questionnaire on *every* TestFlight
+	     upload into no questionnaire at all. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

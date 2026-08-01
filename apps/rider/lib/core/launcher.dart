@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -31,18 +33,64 @@ class UrlLauncher implements Launcher {
   /// alone centres the map at a point and drops no pin; `?q=lat,lng(Label)` is
   /// what puts a named marker there, which is what a rider needs to press
   /// "directions" against.
+  ///
+  /// **iOS has no `geo:` handler**, and that is not a gap to be worked around —
+  /// the scheme is an Android convention and nothing on an iPhone claims it, so
+  /// this used to fail closed and the Navigate button did nothing at all. iOS
+  /// also has no notion of a *default* maps app to defer to, so the choice has
+  /// to be made here: Google Maps when the rider has it, Apple Maps when they
+  /// do not. That ordering is deliberate for this fleet rather than a
+  /// preference about the apps.
   @override
   Future<bool> navigate({
     double? lat,
     double? lng,
     required String label,
   }) async {
-    final Uri uri = (lat != null && lng != null)
+    final bool hasPoint = lat != null && lng != null;
+    if (Platform.isIOS) return _navigateIos(lat, lng, label, hasPoint);
+
+    final Uri uri = hasPoint
         ? Uri.parse('geo:$lat,$lng?q=$lat,$lng(${Uri.encodeComponent(label)})')
         // No coordinates on file — the kitchen has no map location (0042). A
         // text search is worse than a pin and much better than nothing.
         : Uri.parse('geo:0,0?q=${Uri.encodeComponent(label)}');
     return launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  /// Google Maps if it is installed, Apple Maps otherwise.
+  ///
+  /// `canLaunchUrl` on `comgooglemaps:` is only truthful because the scheme is
+  /// declared in `LSApplicationQueriesSchemes` — without that entry iOS returns
+  /// false for an app that is plainly installed, which is the same trap the
+  /// Android `<queries>` block exists to avoid.
+  ///
+  /// The Apple Maps fallback is the **https** form rather than `maps:`, and that
+  /// is the point of it: an https link cannot fail to resolve, so the button
+  /// always does something even on a phone with every maps app deleted.
+  Future<bool> _navigateIos(
+    double? lat,
+    double? lng,
+    String label,
+    bool hasPoint,
+  ) async {
+    final String q = Uri.encodeComponent(label);
+    if (await canLaunchUrl(Uri.parse('comgooglemaps://'))) {
+      // `q=lat,lng(Label)` is Google's own syntax on iOS too, so the pin is
+      // named here exactly as it is on Android.
+      final Uri gmaps = hasPoint
+          ? Uri.parse('comgooglemaps://?q=$lat,$lng($q)&center=$lat,$lng')
+          : Uri.parse('comgooglemaps://?q=$q');
+      if (await launchUrl(gmaps, mode: LaunchMode.externalApplication)) {
+        return true;
+      }
+    }
+    // Apple Maps. `ll` centres, `q` names the pin — the two halves the `geo:`
+    // URI carries as one string.
+    final Uri apple = hasPoint
+        ? Uri.parse('https://maps.apple.com/?ll=$lat,$lng&q=$q')
+        : Uri.parse('https://maps.apple.com/?q=$q');
+    return launchUrl(apple, mode: LaunchMode.externalApplication);
   }
 
   /// `tel:` opens the dialler with the number ready, and does **not** place the

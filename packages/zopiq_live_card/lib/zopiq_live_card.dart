@@ -10,6 +10,12 @@ import 'package:flutter/services.dart';
 /// two different ways, `LiveCardSpec.java` for how two instants become a bar
 /// position, and `LiveCardService.java` for what moves it between pushes.
 ///
+/// On iOS the same three questions are answered by far less code:
+/// `ZopiqLiveCardPlugin.swift` starts and updates an ActivityKit activity, and
+/// `ZopiqLiveActivity.swift` in the app's widget extension draws it. Nothing
+/// there moves the bar between pushes, because a SwiftUI `ProgressView` given
+/// two dates fills itself.
+///
 /// Safe to call from the FCM background isolate: the plugin is registered on
 /// every engine in the process, including the one `firebase_messaging` creates
 /// to run a message that arrived with the app killed.
@@ -20,12 +26,18 @@ class ZopiqLiveCard {
     'com.siteonlab.zopiq_live_card',
   );
 
-  /// Android only, and not a placeholder for anything.
+  /// Both phones, and nothing else.
   ///
-  /// iOS has no notification that looks like this; the equivalent is a Live
-  /// Activity, which is a Swift widget extension rather than a notification —
-  /// P1 Tier 3, a different feature wearing the same screenshot.
-  static bool get isSupported => !kIsWeb && Platform.isAndroid;
+  /// Deliberately coarse. iOS draws the card as an ActivityKit Live Activity,
+  /// which needs iOS 16.1 and a user who has not switched Live Activities off —
+  /// neither of which Dart can see, and neither of which belongs here. The
+  /// platform side checks both and returns quietly when the answer is no, the
+  /// same way the Android side returns quietly on a phone that cannot draw a
+  /// promoted card. A caller cannot distinguish "drawn" from "declined" on
+  /// either platform, and does not need to: the ordinary push notification is
+  /// the fallback in both cases.
+  static bool get isSupported =>
+      !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
   /// Post or redraw the card, and keep it ticking. Reusing an [id] redraws in
   /// place.

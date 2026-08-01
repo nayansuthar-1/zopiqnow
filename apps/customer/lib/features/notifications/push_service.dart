@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -110,8 +112,18 @@ class PushService {
   static Future<void> _initLocalNotifications() async {
     const AndroidInitializationSettings android =
         AndroidInitializationSettings('@mipmap/ic_launcher');
+    // iOS asks for its own permission through this plugin as well as through
+    // `firebase_messaging`, and asking twice would show the system dialog twice.
+    // All three request flags are false here: `messaging.requestPermission()`
+    // below is the one place this app asks, on both platforms, and the OS
+    // remembers the answer for whichever caller comes second.
+    const DarwinInitializationSettings darwin = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
     await _local.initialize(
-      const InitializationSettings(android: android),
+      const InitializationSettings(android: android, iOS: darwin),
       onDidReceiveNotificationResponse: _onLocalTap,
     );
 
@@ -151,7 +163,23 @@ class PushService {
     try {
       await Supabase.instance.client.rpc<void>(
         'register_device_token',
-        params: <String, dynamic>{'p_token': token, 'p_platform': 'android'},
+        params: <String, dynamic>{
+          'p_token': token,
+          // The real platform, not the constant `'android'` this sent until
+          // iOS existed. `device_tokens.platform` has accepted `'ios'` since
+          // 0020 and the column is what `send-notification` reads to decide
+          // whether a payload needs an APNs block — so a mislabelled iPhone is
+          // not cosmetic, it is a push that arrives shaped for the wrong OS.
+          'p_platform': Platform.isIOS ? 'ios' : 'android',
+          // This is the customer app, and it says so rather than letting the
+          // database work it out. Until 0060 the audience was inferred from the
+          // signed-in *person*, so a customer who also happened to be staff of
+          // a restaurant had this phone filed as a restaurant device: customer
+          // pushes went to a bucket it was not in, and it quietly received that
+          // restaurant's order traffic instead. A token belongs to an app, and
+          // only the app knows which one it is.
+          'p_audience': 'customer',
+        },
       );
     } on Object catch (e) {
       debugPrint('Could not register push token: $e.');
@@ -190,6 +218,14 @@ class PushService {
           _channelName,
           importance: Importance.high,
           priority: Priority.high,
+        ),
+        // iOS has no channels — importance and sound are decided per
+        // notification, here, rather than once when a channel is created.
+        // Without this block the call still succeeds and draws nothing at all.
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+          presentBanner: true,
         ),
       ),
       payload: message.data['order_id'] as String?,

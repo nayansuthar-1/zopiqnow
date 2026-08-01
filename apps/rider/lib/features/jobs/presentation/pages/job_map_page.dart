@@ -191,9 +191,11 @@ class _Details extends ConsumerWidget {
     );
   }
 
-  /// The escape hatch. A `geo:` URI rather than any vendor's https link, for the
-  /// reason [UrlLauncher.navigate] gives: it opens whatever the rider has
-  /// already chosen and already has their traffic settings in.
+  /// The escape hatch. Hands off to the rider's own maps app rather than any
+  /// vendor's https link, for the reason [UrlLauncher.navigate] gives: it opens
+  /// whatever they have already chosen and already have their traffic settings
+  /// in. A `geo:` URI on Android; on iOS, which has no such scheme and no
+  /// default maps app, whichever of Google or Apple Maps is there.
   Future<void> _openExternal(BuildContext context, WidgetRef ref) async {
     final bool ok = await ref
         .read(launcherProvider)

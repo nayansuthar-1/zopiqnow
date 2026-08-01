@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Zopiq Rider</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>zopiq_rider</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>UIWindowScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>flutter</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+
+	<!-- ===================================================================
+	     The iOS counterpart of AndroidManifest.xml. Read the two together.
+	     =================================================================== -->
+
+	<!-- The rider's position, and the one place the two platforms solve the same
+	     problem by opposite means.
+
+	     Android buys "keep reporting while the rider is in Google Maps" with a
+	     foreground service and a visible ongoing notification (audit RID-001),
+	     and deliberately never asks for ACCESS_BACKGROUND_LOCATION. iOS buys it
+	     with the `location` background mode below plus
+	     `allowsBackgroundLocationUpdates` on the location manager — which
+	     `LocationReporter._settings` sets.
+
+	     **Only the WhenInUse key, and that is the whole point.** WhenInUse plus
+	     the background mode is already enough to keep fixes arriving while
+	     another app is on screen, which is the entire RID-001 scenario. "Always"
+	     buys two further things — relaunch after termination, and geofencing —
+	     and this app does neither. Declaring
+	     NSLocationAlwaysAndWhenInUseUsageDescription would make `geolocator`
+	     call `requestAlwaysAuthorization` and put a markedly more alarming
+	     prompt in front of a rider, in exchange for capability we would not use.
+	     That is the same trade the Android manifest refuses, refused the same
+	     way.
+
+	     The honesty half is shared. Android shows a persistent notification for
+	     the whole run; iOS shows the blue status bar for exactly as long as we
+	     hold the stream, and `showBackgroundLocationIndicator` keeps it visible
+	     rather than suppressed. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Zopiq Rider shares your location with the customer while you are on a delivery, so they can watch their order arrive. It stops the moment you finish.</string>
+
+	<!-- `location` is RID-001's fix; `remote-notification` is what wakes the app
+	     for a new-job push that carries data rather than a banner. The Android
+	     app declares FOREGROUND_SERVICE_LOCATION and WAKE_LOCK for the first and
+	     nothing for the second — iOS needs both named here. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>remote-notification</string>
+	</array>
+
+	<!-- The <queries> block's counterpart: `geo:` for the map, `tel:` for the
+	     dialler. Without these `canLaunchUrl` returns false and the Navigate and
+	     Call buttons silently do nothing.
+
+	     `comgooglemaps` as well, because iOS has no `geo:` handler at all — that
+	     scheme is an Android convention. Google Maps registers `comgooglemaps:`
+	     and Apple Maps answers `maps:`; see `navigation.dart` for which is tried
+	     first and why there is an https fallback that always works. -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+		<string>maps</string>
+		<string>tel</string>
+	</array>
+
+	<!-- The Maps SDK key, from `Flutter/Secrets.xcconfig` (gitignored) and read
+	     back by AppDelegate.swift. Restricted to this app's own bundle id, not
+	     shared with the customer app. Empty when unset, which renders Google's
+	     "authorization failure" tile rather than crashing. -->
+	<key>GMSApiKey</key>
+	<string>$(MAPS_API_KEY)</string>
+
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+</dict>
+</plist>

@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -74,8 +76,16 @@ class PushService {
   static Future<void> _initLocalNotifications() async {
     const AndroidInitializationSettings android =
         AndroidInitializationSettings('@mipmap/ic_launcher');
+    // All three request flags false: `messaging.requestPermission()` is the one
+    // place this app asks, on both platforms. Leaving them true would show the
+    // system dialog a second time.
+    const DarwinInitializationSettings darwin = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
     await _local.initialize(
-      const InitializationSettings(android: android),
+      const InitializationSettings(android: android, iOS: darwin),
     );
 
     // The channel a new-job notification lands on. Must match the id named in
@@ -106,7 +116,11 @@ class PushService {
         'register_device_token',
         params: <String, dynamic>{
           'p_token': token,
-          'p_platform': 'android',
+          // The real platform, not the constant this sent until iOS existed.
+          // `device_tokens.platform` has accepted `'ios'` since 0020, and it is
+          // what `send-notification` reads to decide whether a payload needs an
+          // APNs block.
+          'p_platform': Platform.isIOS ? 'ios' : 'android',
           // Stated, not inferred — see 0060. A rider who is also staff of a
           // restaurant would otherwise have had this phone filed as a
           // restaurant device.
@@ -144,6 +158,14 @@ class PushService {
           _channelName,
           importance: Importance.high,
           priority: Priority.high,
+        ),
+        // iOS has no channels — importance and sound are decided per
+        // notification rather than once when a channel is created. Without this
+        // block the call succeeds and draws nothing.
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+          presentBanner: true,
         ),
       ),
     );

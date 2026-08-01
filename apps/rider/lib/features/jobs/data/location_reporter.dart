@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:geolocator/geolocator.dart';
 
@@ -68,26 +69,7 @@ class RiderLocationReporter {
     await _stream?.cancel();
     _stream =
         Geolocator.getPositionStream(
-          locationSettings: AndroidSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: _metres,
-            // Naming what we are doing and why, in the rider's own notification
-            // shade. `setOngoing` because a location share the rider can swipe
-            // away while it keeps running is the thing this notification exists
-            // to prevent; it clears the moment the stream is cancelled.
-            //
-            // `enableWakeLock` is what stops the fixes arriving in a burst when
-            // the phone next wakes — a partial wake lock held only while
-            // carrying, and released with the service. It is why the manifest
-            // declares WAKE_LOCK.
-            foregroundNotificationConfig: const ForegroundNotificationConfig(
-              notificationTitle: 'On a delivery',
-              notificationText: 'Sharing your location with the customer',
-              notificationChannelName: 'Delivery location',
-              enableWakeLock: true,
-              setOngoing: true,
-            ),
-          ),
+          locationSettings: _settings(),
         ).listen(
           _send,
           // A GPS stream that errors — airplane mode, a revoked permission
@@ -105,6 +87,64 @@ class RiderLocationReporter {
         // Same reasoning as onError above.
       }
     });
+  }
+
+  /// The same intent, expressed twice, because the two platforms buy the right
+  /// to keep reporting in completely different currencies.
+  ///
+  /// Android buys it with a **foreground service**: a visible ongoing
+  /// notification, and no background-location grant at all. iOS has no such
+  /// thing — it buys the same right with the `location` background mode in
+  /// Info.plist and the flag below. Notably *not* with an "Always" grant:
+  /// WhenInUse plus the background mode already keeps fixes arriving while
+  /// Google Maps is on screen, so the rider's Info.plist asks for no more than
+  /// the customer's does. See the note there.
+  ///
+  /// The two iOS flags that are not optional:
+  ///
+  /// * `allowBackgroundLocationUpdates` is the switch itself. Without it iOS
+  ///   suspends the stream the instant another app covers this one, which is
+  ///   RID-001 all over again on a platform that never had the fix.
+  /// * `pauseLocationUpdatesAutomatically: false`, because the default is true
+  ///   and iOS decides "stopped moving" on its own — a rider waiting ten minutes
+  ///   for a kitchen would have the stream paused *and never resumed*, since iOS
+  ///   only resumes on significant motion it may not detect on a scooter.
+  ///
+  /// `showBackgroundLocationIndicator` is the honesty half, and the direct
+  /// counterpart of Android's ongoing notification: the status bar stays blue
+  /// for exactly as long as we hold the stream. Both platforms tell the rider,
+  /// continuously, that they are being located.
+  LocationSettings _settings() {
+    if (Platform.isIOS) {
+      return AppleSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: _metres,
+        activityType: ActivityType.automotiveNavigation,
+        allowBackgroundLocationUpdates: true,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+      );
+    }
+    return AndroidSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: _metres,
+      // Naming what we are doing and why, in the rider's own notification
+      // shade. `setOngoing` because a location share the rider can swipe
+      // away while it keeps running is the thing this notification exists
+      // to prevent; it clears the moment the stream is cancelled.
+      //
+      // `enableWakeLock` is what stops the fixes arriving in a burst when
+      // the phone next wakes — a partial wake lock held only while
+      // carrying, and released with the service. It is why the manifest
+      // declares WAKE_LOCK.
+      foregroundNotificationConfig: const ForegroundNotificationConfig(
+        notificationTitle: 'On a delivery',
+        notificationText: 'Sharing your location with the customer',
+        notificationChannelName: 'Delivery location',
+        enableWakeLock: true,
+        setOngoing: true,
+      ),
+    );
   }
 
   Future<Position> _current() => Geolocator.getCurrentPosition(

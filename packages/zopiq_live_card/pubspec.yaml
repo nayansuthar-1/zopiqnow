@@ -17,20 +17,35 @@ dependencies:
 dev_dependencies:
   flutter_lints: 6.0.0
 
-# A federated-in-name-only plugin: Android is the only platform that has a
-# notification worth drawing this way. There is no iOS implementation and there
-# is deliberately no stub for one — iOS is Tier 3 (ActivityKit), a different
-# feature wearing the same screenshot.
+# A federated-in-name-only plugin. Both platforms draw a live order card, and
+# neither draws it the way the other does: Android builds a custom notification
+# with a RemoteViews layout and a foreground service to tick it, iOS runs an
+# ActivityKit Live Activity — a SwiftUI view in a separate process that animates
+# its own bar between two dates and needs nothing pushed to do it.
+#
+# The Dart API is one API regardless, and deliberately so. `show` takes the same
+# window it has taken since 0055 and each platform honours it with whatever
+# machinery it needs; `zopiq_live_card.dart` has no `Platform` branch beyond the
+# support check.
 #
 # **Why this is a package and not Kotlin in `apps/customer/android/app`.** The
 # card is drawn from the FCM background isolate, which runs in a `FlutterEngine`
 # the messaging plugin creates itself and populates from
 # `GeneratedPluginRegistrant`. Only real plugin packages land in that file, so
 # only a real plugin package can answer a method channel with the app killed —
-# which is the entire situation the live card exists for.
+# which is the entire situation the live card exists for. The same argument holds
+# on iOS, where the equivalent registrant is `GeneratedPluginRegistrant.m`.
+#
+# The Live Activity's *widget extension* is not here and cannot be: an app
+# extension is a target of the app, not of a pod. It lives in
+# `apps/customer/ios/ZopiqLiveActivity/`, and shares exactly one file with this
+# package — `ZopiqLiveCardAttributes.swift`, by target membership rather than by
+# copy.
 flutter:
   plugin:
     platforms:
       android:
         package: com.siteonlab.zopiq_live_card
+        pluginClass: ZopiqLiveCardPlugin
+      ios:
         pluginClass: ZopiqLiveCardPlugin

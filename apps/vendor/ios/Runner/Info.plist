@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<!-- "Partner", not "Vendor", to match `android:label` in AndroidManifest.xml.
+	     The restaurant sees this word on their own home screen; the repo calls
+	     the app `zopiq_vendor` internally and always has. -->
+	<key>CFBundleDisplayName</key>
+	<string>Zopiq Partner</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>zopiq_vendor</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>UIWindowScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>flutter</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+
+	<!-- ===================================================================
+	     The iOS counterpart of AndroidManifest.xml — and the shortest of the
+	     three, because this app's manifest is the shortest too. No location,
+	     no maps, no Google sign-in: a kitchen screen takes orders and uploads
+	     photographs of food.
+	     =================================================================== -->
+
+	<!-- image_picker, for dish and restaurant photos. Both keys are required
+	     even though the vendor takes only one of the two routes: iOS resolves
+	     them when the picker is constructed, not when the source is chosen.
+	     NSPhotoLibraryAddUsageDescription is deliberately absent — we read a
+	     photo and never write one back. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Zopiq Partner needs the camera so you can photograph your dishes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Zopiq Partner needs your photo library so you can choose dish and restaurant photos.</string>
+
+	<!-- POST_NOTIFICATIONS has no plist counterpart; the prompt is a runtime
+	     call the app already makes. This is the half with no Android analogue:
+	     without `remote-notification` a data-only FCM message never reaches a
+	     suspended app, and a new order landing in a pocket is exactly that. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+</dict>
+</plist>
