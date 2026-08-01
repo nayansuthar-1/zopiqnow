@@ -1,8 +1,11 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/auth/domain/repositories/auth_repository.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
 
@@ -187,6 +190,44 @@ class _EmailPageState extends ConsumerState<EmailPage> {
                     borderRadius: ZopiqRadii.rMd,
                   ),
                 ),
+              ),
+              const SizedBox(height: ZopiqSpacing.xl),
+
+              // Consent, at the point of consenting. This screen is where an
+              // account is created — an unknown address is signed up, not
+              // rejected — so this is the only honest place to say what that
+              // agrees to, and both documents are one tap away rather than
+              // named and left unfindable.
+              Text.rich(
+                TextSpan(
+                  style: t.bodySmall?.copyWith(color: zc.textMuted, height: 1.4),
+                  children: <InlineSpan>[
+                    const TextSpan(text: 'By continuing you agree to our '),
+                    TextSpan(
+                      text: 'Terms of Service',
+                      style: TextStyle(color: zc.primary),
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = () => context.pushNamed(
+                          Routes.legal,
+                          pathParameters: const <String, String>{'doc': 'terms'},
+                        ),
+                    ),
+                    const TextSpan(text: ' and '),
+                    TextSpan(
+                      text: 'Privacy Policy',
+                      style: TextStyle(color: zc.primary),
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = () => context.pushNamed(
+                          Routes.legal,
+                          pathParameters: const <String, String>{
+                            'doc': 'privacy',
+                          },
+                        ),
+                    ),
+                    const TextSpan(text: '.'),
+                  ],
+                ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),

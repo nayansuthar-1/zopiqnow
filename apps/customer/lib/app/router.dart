@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiqnow/app/app_shell.dart';
 import 'package:zopiqnow/features/about/presentation/licenses_page.dart';
 import 'package:zopiqnow/features/account/presentation/pages/account_page.dart';
+import 'package:zopiqnow/features/account/presentation/pages/delete_account_page.dart';
+import 'package:zopiqnow/features/account/presentation/pages/legal_page.dart';
 import 'package:zopiqnow/features/account/presentation/pages/profile_details_page.dart';
 import 'package:zopiqnow/features/auth/presentation/pages/email_page.dart';
 import 'package:zopiqnow/features/auth/presentation/pages/otp_page.dart';
@@ -52,6 +54,8 @@ abstract final class Routes {
   static const String licenses = 'licenses';
   static const String account = 'account';
   static const String profile = 'profile';
+  static const String deleteAccount = 'deleteAccount';
+  static const String legal = 'legal';
   static const String notifications = 'notifications';
   static const String splash = 'splash';
   static const String login = 'login';
@@ -397,6 +401,19 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             path: 'profile',
             name: Routes.profile,
             builder: (_, _) => const ProfileDetailsPage(),
+          ),
+          GoRoute(
+            path: 'delete',
+            name: Routes.deleteAccount,
+            builder: (_, _) => const DeleteAccountPage(),
+          ),
+          // `:doc` is 'privacy' or 'terms' — one screen, two documents, because
+          // they differ only in which text they render.
+          GoRoute(
+            path: 'legal/:doc',
+            name: Routes.legal,
+            builder: (BuildContext context, GoRouterState state) =>
+                LegalPage(document: state.pathParameters['doc'] ?? 'privacy'),
           ),
         ],
       ),

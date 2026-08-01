@@ -23,6 +23,22 @@ class AuthSupabaseDataSource implements AuthDataSource {
   /// Where the delivery number lives — see [AuthRepository.setPhone].
   static const String phoneMetadataKey = 'delivery_phone';
 
+  /// The profile keys, all namespaced, and that prefix is load-bearing.
+  ///
+  /// Google's claims land in this same `raw_user_meta_data` under `name`,
+  /// `full_name`, `avatar_url` and `picture`, and gotrue merges them in at
+  /// sign-in. Writing the customer's own name to `full_name` would put it in a
+  /// field the provider believes it owns — so a customer who renamed themselves
+  /// and then signed in with Google again could be silently renamed back. These
+  /// four keys no provider writes, and every read below prefers them: **the
+  /// provider's value is a default, the customer's is an answer.** Migration
+  /// 0070 applies the same ordering to `restaurant_reviews`, the only place in
+  /// the database that reads a customer's name.
+  static const String nameMetadataKey = 'zopiq_full_name';
+  static const String avatarMetadataKey = 'zopiq_avatar_url';
+  static const String dobMetadataKey = 'zopiq_dob';
+  static const String genderMetadataKey = 'zopiq_gender';
+
   /// `GoogleSignIn.initialize` must run once before anything else, and only
   /// once. It is deliberately *not* called from `main`: nobody should pay a
   /// plugin round-trip on every cold start for a button most users never press.
@@ -115,9 +131,37 @@ class AuthSupabaseDataSource implements AuthDataSource {
   }
 
   @override
-  Future<AuthUser> setPhone(String phone) async {
+  Future<AuthUser> saveProfile({
+    String? fullName,
+    String? phone,
+    String? avatarUrl,
+    DateTime? dateOfBirth,
+    Gender? gender,
+  }) async {
+    // Only the named fields go in the map. `updateUser` merges rather than
+    // replaces, so an absent key leaves whatever was there — which is exactly
+    // the "a field left out is left alone" contract, obtained for free instead
+    // of by reading the old metadata back and re-sending it.
+    final Map<String, dynamic> data = <String, dynamic>{
+      nameMetadataKey: ?fullName,
+      phoneMetadataKey: ?phone,
+      avatarMetadataKey: ?avatarUrl,
+      // Date only. `toIso8601String` would carry a midnight local time that
+      // means nothing and reads differently either side of a timezone.
+      if (dateOfBirth != null) dobMetadataKey: _formatDate(dateOfBirth),
+      if (gender != null) genderMetadataKey: gender.name,
+    };
+
+    if (data.isEmpty) {
+      // Nothing to write is not a round trip. Also stops an empty `updateUser`
+      // from bumping the user row for no reason.
+      final User? user = _auth.currentUser;
+      if (user == null) throw const NotSignedIn();
+      return _toDomain(user);
+    }
+
     final UserResponse response = await _auth.updateUser(
-      UserAttributes(data: <String, dynamic>{phoneMetadataKey: phone}),
+      UserAttributes(data: data),
     );
     // `updateUser` either throws or returns the updated user.
     return _toDomain(response.user!);
@@ -126,13 +170,87 @@ class AuthSupabaseDataSource implements AuthDataSource {
   @override
   Future<void> signOut() => _auth.signOut();
 
-  static AuthUser _toDomain(User user) => AuthUser(
-    id: user.id,
-    // A user who signed in with an email always has one. The field is nullable
-    // because Supabase also allows phone-only and anonymous users.
-    email: user.email ?? '',
-    phone: user.userMetadata?[phoneMetadataKey] as String?,
-  );
+  @override
+  Future<void> deleteAccount() async {
+    try {
+      await Supabase.instance.client.rpc<void>('delete_my_account');
+    } on PostgrestException catch (e) {
+      // `P0001` is a rule we wrote, and its message was written for the person
+      // reading it. Anything else is a bug or an outage and gets the generic
+      // apology, because whatever Postgres says about it is not for them.
+      if (e.code == _businessRuleErrorCode) throw AccountDeletionRefused(e.message);
+      throw const AccountDeletionRefused();
+    }
+
+    // The account is gone; the session on this device is not, until we say so.
+    // Signing out after the fact rather than before, because a sign-out first
+    // would take away the credential the RPC authenticates with.
+    //
+    // Deliberately not awaited into failure: gotrue's sign-out revokes a token
+    // that no longer has a user behind it, and an error there would be reported
+    // to somebody whose account was in fact deleted successfully. Clearing what
+    // is on this device is what matters, and that happens either way.
+    try {
+      await _auth.signOut();
+    } on Object {
+      // Nothing to do and nothing to say.
+    }
+  }
+
+  /// Postgres raises `P0001` for the rules we wrote, with a message written for
+  /// a human. Any other code is a bug or an outage.
+  static const String _businessRuleErrorCode = 'P0001';
+
+  static String _formatDate(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
+  static AuthUser _toDomain(User user) {
+    final Map<String, dynamic> meta =
+        user.userMetadata ?? const <String, dynamic>{};
+
+    // Ours first, the identity provider's second, at every field it also
+    // supplies. See the key declarations above for why that order is not a
+    // preference.
+    final String? name = _firstNonEmpty(<Object?>[
+      meta[nameMetadataKey],
+      meta['full_name'],
+      meta['name'],
+    ]);
+    final String? avatar = _firstNonEmpty(<Object?>[
+      meta[avatarMetadataKey],
+      meta['avatar_url'],
+      meta['picture'],
+    ]);
+
+    return AuthUser(
+      id: user.id,
+      // A user who signed in with an email always has one. The field is
+      // nullable because Supabase also allows phone-only and anonymous users.
+      email: user.email ?? '',
+      phone: meta[phoneMetadataKey] as String?,
+      fullName: name,
+      avatarUrl: avatar,
+      // `tryParse`, not `parse`: this is free-form JSON on a row the user can
+      // write, and an unparseable date should cost the field, not the session.
+      dateOfBirth: DateTime.tryParse(
+        _firstNonEmpty(<Object?>[meta[dobMetadataKey]]) ?? '',
+      ),
+      gender: Gender.fromWire(
+        _firstNonEmpty(<Object?>[meta[genderMetadataKey]]),
+      ),
+    );
+  }
+
+  /// The first value that is a non-blank string. Metadata is untyped JSON, so a
+  /// number or a null in any of these slots is a value to skip, not to cast.
+  static String? _firstNonEmpty(List<Object?> candidates) {
+    for (final Object? c in candidates) {
+      if (c is String && c.trim().isNotEmpty) return c.trim();
+    }
+    return null;
+  }
 
   /// Supabase's own message ("Error sending confirmation email") describes our
   /// SMTP, not the user's problem, so only the rate limit is worth relaying.

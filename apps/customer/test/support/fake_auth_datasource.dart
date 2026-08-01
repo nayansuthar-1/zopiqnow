@@ -75,11 +75,38 @@ class FakeAuthDataSource implements AuthDataSource {
   }
 
   @override
-  Future<AuthUser> setPhone(String phone) async =>
-      _user = _user!.copyWith(phone: phone);
+  Future<AuthUser> saveProfile({
+    String? fullName,
+    String? phone,
+    String? avatarUrl,
+    DateTime? dateOfBirth,
+    Gender? gender,
+  }) async {
+    // Same merge rule as the real one: a field left out is left alone, which is
+    // exactly what `copyWith`'s `?? this` does.
+    return _user = _user!.copyWith(
+      fullName: fullName,
+      phone: phone,
+      avatarUrl: avatarUrl,
+      dateOfBirth: dateOfBirth,
+      gender: gender,
+    );
+  }
 
   @override
   Future<void> signOut() async {
+    _user = null;
+    _challenge = null;
+  }
+
+  /// Set to make the next [deleteAccount] refuse, the way the database refuses
+  /// one — with a sentence written for the person reading it.
+  String? deletionRefusal;
+
+  @override
+  Future<void> deleteAccount() async {
+    final String? refusal = deletionRefusal;
+    if (refusal != null) throw AccountDeletionRefused(refusal);
     _user = null;
     _challenge = null;
   }

@@ -6,24 +6,48 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/app/providers/theme_mode_provider.dart';
+import 'package:zopiqnow/features/auth/domain/entities/auth_user.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
-import 'package:zopiqnow/features/account/presentation/providers/customer_profile_provider.dart';
+import 'package:zopiqnow/features/account/domain/legal_documents.dart';
+import 'package:zopiqnow/features/account/presentation/providers/veg_mode_provider.dart';
+import 'package:zopiqnow/features/account/presentation/widgets/profile_avatar.dart';
 
 /// The customer Account screen, opened from the Home profile button.
 ///
 /// Laid out like Zomato's account: an identity header, then grouped rows for
-/// orders, saved data, and support. The features behind Orders / Favourites /
-/// Payments / Help are not built yet, so those rows are read-only — tapping one
-/// says so rather than opening a dead screen. The rows that *do* have a
-/// destination today (addresses, licenses, sign-out) are live. As each feature
-/// lands, swap its row's `onTap` for the real route.
+/// orders, saved data, and the legal and support routes.
+///
+/// **Every row on this screen goes somewhere.** It used to carry five that
+/// raised a "coming soon" snackbar — Payment Methods, See Recommendation,
+/// Offers, Help & support, Settings — which is an app telling a new customer,
+/// on their first look around, that most of it is not finished. A row that has
+/// nothing behind it is removed until it does; that is cheaper than a row that
+/// apologises, and it reads as a smaller app rather than an abandoned one.
 class AccountPage extends ConsumerWidget {
   const AccountPage({super.key});
 
-  void _comingSoon(BuildContext context, String label) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('$label is coming soon')));
+  /// Support, for now, is an email address — and saying so plainly beats a
+  /// "coming soon". A real ticket queue is a separate piece of work; until it
+  /// exists, a customer with a problem needs somewhere to send it, and the Play
+  /// listing needs the same address to be reachable from inside the app.
+  void _showSupport(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Help & support'),
+        content: const Text(
+          'Email us and a person will answer.\n\n$supportEmail\n\n'
+          'If it is about an order, send the order number — it is on the order '
+          'in My orders.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -39,16 +63,10 @@ class AccountPage extends ConsumerWidget {
           const SizedBox(height: ZopiqSpacing.lg),
 
           const _SectionLabel('My Preferences'),
-          _SectionCard(
+          const _SectionCard(
             children: <Widget>[
-              const _VegModeTile(),
-              const _AppearanceTile(),
-              _AccountTile(
-                icon: Icons.account_balance_wallet_rounded,
-                title: 'Payment Methods',
-                subtitle: 'Cards, UPI, Wallets, Netbanking, Pay on delivery',
-                onTap: () => _comingSoon(context, 'Payment Methods'),
-              ),
+              _VegModeTile(),
+              _AppearanceTile(),
             ],
           ),
 
@@ -75,12 +93,6 @@ class AccountPage extends ConsumerWidget {
                 subtitle: 'Restaurants you saved',
                 onTap: () => context.pushNamed(Routes.favourites),
               ),
-              _AccountTile(
-                icon: Icons.star_rounded,
-                title: 'See Recommendation',
-                comingSoon: true,
-                onTap: () => _comingSoon(context, 'See Recommendation'),
-              ),
             ],
           ),
 
@@ -89,22 +101,26 @@ class AccountPage extends ConsumerWidget {
           _SectionCard(
             children: <Widget>[
               _AccountTile(
-                icon: Icons.local_offer_rounded,
-                title: 'Offers',
-                comingSoon: true,
-                onTap: () => _comingSoon(context, 'Offers'),
-              ),
-              _AccountTile(
                 icon: Icons.headset_mic_rounded,
                 title: 'Help & support',
-                comingSoon: true,
-                onTap: () => _comingSoon(context, 'Help & support'),
+                subtitle: supportEmail,
+                onTap: () => _showSupport(context),
               ),
               _AccountTile(
-                icon: Icons.settings_rounded,
-                title: 'Settings',
-                comingSoon: true,
-                onTap: () => _comingSoon(context, 'Settings'),
+                icon: Icons.shield_outlined,
+                title: 'Privacy policy',
+                onTap: () => context.pushNamed(
+                  Routes.legal,
+                  pathParameters: const <String, String>{'doc': 'privacy'},
+                ),
+              ),
+              _AccountTile(
+                icon: Icons.description_outlined,
+                title: 'Terms of service',
+                onTap: () => context.pushNamed(
+                  Routes.legal,
+                  pathParameters: const <String, String>{'doc': 'terms'},
+                ),
               ),
               _AccountTile(
                 icon: Icons.info_outline_rounded,
@@ -127,6 +143,25 @@ class AccountPage extends ConsumerWidget {
                 await ref.read(authControllerProvider.notifier).signOut();
                 if (context.mounted) context.pop();
               },
+            ),
+            // Below sign-out, and reachable in two taps from the app's main
+            // menu — Play requires the route to be findable, and burying it
+            // three levels down under "Settings" is how apps fail that check.
+            // It is a plain text link rather than a button because it is not an
+            // action anybody should be one mis-tap away from.
+            const SizedBox(height: ZopiqSpacing.md),
+            Center(
+              child: TextButton(
+                onPressed: () => context.pushNamed(Routes.deleteAccount),
+                child: Text(
+                  'Delete account',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: context.zc.textMuted,
+                    decoration: TextDecoration.underline,
+                    decorationColor: context.zc.textMuted,
+                  ),
+                ),
+              ),
             ),
           ],
           const SizedBox(height: ZopiqSpacing.xl),
@@ -183,7 +218,14 @@ class _ProfileCard extends ConsumerWidget {
       );
     }
 
-    final String name = ref.watch(customerProfileProvider).name;
+    final AuthUser user = (auth as AuthSignedIn).user;
+    // Null when they have never set a name and no provider gave us one. The row
+    // then invites them to add one instead of asserting they are 'Zopiq user',
+    // which is what it used to do — and which meant the screen looked filled in
+    // when nothing had been filled in.
+    final String? name = user.fullName?.trim().isEmpty ?? true
+        ? null
+        : user.fullName!.trim();
 
     return Container(
       margin: ZopiqSpacing.pagePadding,
@@ -206,10 +248,10 @@ class _ProfileCard extends ConsumerWidget {
           children: <Widget>[
             Expanded(
               child: Center(
-                child: CircleAvatar(
+                child: ProfileAvatar(
+                  url: user.avatarUrl,
+                  initial: user.initial,
                   radius: 36,
-                  backgroundColor: zc.primary.withValues(alpha: 0.12),
-                  child: Icon(Icons.person_rounded, color: zc.primary, size: 40),
                 ),
               ),
             ),
@@ -231,7 +273,12 @@ class _ProfileCard extends ConsumerWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: <Widget>[
-                    Text(name, style: t.titleLarge),
+                    Text(
+                      name ?? 'Add your name',
+                      style: name == null
+                          ? t.titleLarge?.copyWith(color: zc.textMuted)
+                          : t.titleLarge,
+                    ),
                     Align(
                       alignment: Alignment.centerRight,
                       child: Icon(Icons.chevron_right_rounded, color: zc.textMuted, size: 28),
@@ -247,23 +294,19 @@ class _ProfileCard extends ConsumerWidget {
   }
 }
 
-class _VegModeTile extends StatefulWidget {
+class _VegModeTile extends ConsumerWidget {
   const _VegModeTile();
 
   @override
-  State<_VegModeTile> createState() => _VegModeTileState();
-}
-
-class _VegModeTileState extends State<_VegModeTile> {
-  bool _isVeg = false;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
+    final bool isVeg = ref.watch(vegModeProvider);
+
+    void set(bool v) => ref.read(vegModeProvider.notifier).set(v);
 
     return ListTile(
-      onTap: () => setState(() => _isVeg = !_isVeg),
+      onTap: () => set(!isVeg),
       contentPadding: const EdgeInsets.symmetric(
         horizontal: ZopiqSpacing.pageGutter,
         vertical: ZopiqSpacing.xxs,
@@ -272,13 +315,13 @@ class _VegModeTileState extends State<_VegModeTile> {
       leading: Icon(Icons.eco_rounded, color: zc.veg, size: 20),
       title: Text('100% Veg Mode', style: t.titleSmall),
       subtitle: Text(
-        'Show only vegetarian options',
+        'Show only vegetarian restaurants',
         style: t.bodySmall?.copyWith(color: zc.textMuted),
       ),
       trailing: Switch(
-        value: _isVeg,
-        onChanged: (bool v) => setState(() => _isVeg = v),
-        activeColor: zc.veg,
+        value: isVeg,
+        onChanged: set,
+        activeThumbColor: zc.veg,
       ),
     );
   }
@@ -365,14 +408,12 @@ class _AccountTile extends StatelessWidget {
     required this.title,
     required this.onTap,
     this.subtitle,
-    this.comingSoon = false,
     this.iconColor,
   });
 
   final IconData icon;
   final String title;
   final String? subtitle;
-  final bool comingSoon;
   final VoidCallback onTap;
   final Color? iconColor;
 
@@ -396,22 +437,7 @@ class _AccountTile extends StatelessWidget {
               subtitle!,
               style: t.bodySmall?.copyWith(color: zc.textMuted),
             ),
-      trailing: comingSoon
-          ? Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: ZopiqSpacing.sm,
-                vertical: ZopiqSpacing.xxs,
-              ),
-              decoration: BoxDecoration(
-                color: zc.textMuted.withValues(alpha: 0.12),
-                borderRadius: ZopiqRadii.rPill,
-              ),
-              child: Text(
-                'Soon',
-                style: t.labelSmall?.copyWith(color: zc.textMuted),
-              ),
-            )
-          : Icon(Icons.chevron_right_rounded, color: zc.textMuted),
+      trailing: Icon(Icons.chevron_right_rounded, color: zc.textMuted),
     );
   }
 }

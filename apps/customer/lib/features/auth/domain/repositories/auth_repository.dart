@@ -40,7 +40,36 @@ abstract interface class AuthRepository {
   /// It goes in the user's metadata, not Supabase's `phone` column: that column
   /// is for phone *sign-in*, and writing it starts an SMS verification we have no
   /// provider for. This is a delivery contact, not a credential.
+  ///
+  /// Kept as its own method because checkout's intent really is "record the
+  /// delivery number" and nothing else; it is [saveProfile] underneath, so there
+  /// is still exactly one thing that writes this field.
   Future<AuthUser> setPhone(String phone);
+
+  /// Writes the profile fields the customer edited and returns the updated user.
+  ///
+  /// A field left out is left alone. There is deliberately no way to *clear* a
+  /// field through this method: nothing in the UI offers it, and a null that
+  /// means "erase this" in one call and "don't touch this" in another is how you
+  /// wipe somebody's phone number by saving their date of birth.
+  Future<AuthUser> saveProfile({
+    String? fullName,
+    String? phone,
+    String? avatarUrl,
+    DateTime? dateOfBirth,
+    Gender? gender,
+  });
+
+  /// Closes the account permanently, then ends the session.
+  ///
+  /// There is no undo and no grace period: when this returns, the login, the
+  /// saved addresses, the saved restaurants, the push tokens and the
+  /// notifications are gone, and the orders that had to be kept for tax and for
+  /// the restaurants' settlements no longer name anybody.
+  ///
+  /// Throws [AccountDeletionRefused] when something stands in the way — an order
+  /// still on its way, or a login a restaurant or delivery partner also uses.
+  Future<void> deleteAccount();
 
   /// Ends the session — locally, and server-side where the transport allows.
   Future<void> signOut();
@@ -88,5 +117,26 @@ class GoogleSignInCancelled extends AuthFailure {
 class GoogleSignInFailure extends AuthFailure {
   const GoogleSignInFailure([
     super.message = 'Google sign-in failed. Try again, or use your email.',
+  ]);
+}
+
+/// The database refused to close the account, and said why in its own words.
+///
+/// Every one of its refusals is temporary or resolvable — an order that has to
+/// finish arriving, or a login that support has to unpick from a restaurant's —
+/// so the message is shown as-is rather than being translated into an apology
+/// that says less.
+class AccountDeletionRefused extends AuthFailure {
+  const AccountDeletionRefused([
+    super.message = 'We couldn\'t delete your account. Please try again.',
+  ]);
+}
+
+/// The session went away underneath a screen that needed one — a token that
+/// could not refresh, or a sign-out in another tab of the same account. The
+/// profile screen catches it and says so rather than saving into nothing.
+class NotSignedIn extends AuthFailure {
+  const NotSignedIn([
+    super.message = 'You\'re signed out. Log in again to save this.',
   ]);
 }

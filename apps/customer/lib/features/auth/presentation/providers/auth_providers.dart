@@ -97,8 +97,40 @@ class AuthController extends Notifier<AuthState> {
     state = AuthSignedIn(user);
   }
 
+  /// Saves what the customer edited on the profile screen.
+  ///
+  /// The state it publishes is the user Supabase echoed back after the write —
+  /// not the values that went in. If the server normalised something, or wrote
+  /// less than we sent, the screen shows what is actually stored.
+  Future<void> saveProfile({
+    String? fullName,
+    String? phone,
+    String? avatarUrl,
+    DateTime? dateOfBirth,
+    Gender? gender,
+  }) async {
+    final AuthUser user = await ref
+        .read(authRepositoryProvider)
+        .saveProfile(
+          fullName: fullName,
+          phone: phone,
+          avatarUrl: avatarUrl,
+          dateOfBirth: dateOfBirth,
+          gender: gender,
+        );
+    state = AuthSignedIn(user);
+  }
+
   Future<void> signOut() async {
     await ref.read(authRepositoryProvider).signOut();
+    state = const AuthSignedOut();
+  }
+
+  /// Closes the account. Leaves the app signed out on success, and the state
+  /// untouched on a refusal — the account is still there, and so is the session
+  /// that was about to be told otherwise.
+  Future<void> deleteAccount() async {
+    await ref.read(authRepositoryProvider).deleteAccount();
     state = const AuthSignedOut();
   }
 }

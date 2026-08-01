@@ -35,7 +35,26 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<AuthUser> signInWithGoogle() => _dataSource.signInWithGoogle();
 
   @override
-  Future<AuthUser> setPhone(String phone) => _dataSource.setPhone(phone);
+  Future<AuthUser> setPhone(String phone) =>
+      _dataSource.saveProfile(phone: phone);
+
+  @override
+  Future<AuthUser> saveProfile({
+    String? fullName,
+    String? phone,
+    String? avatarUrl,
+    DateTime? dateOfBirth,
+    Gender? gender,
+  }) => _dataSource.saveProfile(
+    fullName: fullName,
+    phone: phone,
+    avatarUrl: avatarUrl,
+    dateOfBirth: dateOfBirth,
+    gender: gender,
+  );
+
+  @override
+  Future<void> deleteAccount() => _dataSource.deleteAccount();
 
   @override
   Future<void> signOut() => _dataSource.signOut();
