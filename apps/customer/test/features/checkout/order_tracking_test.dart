@@ -135,7 +135,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Ravi Kumar'), findsOneWidget);
-      expect(find.text('9876500011'), findsOneWidget);
+      // The number is no longer printed on the card. B5 turned it into an
+      // action: a call button that dials it, so the customer reaches the rider
+      // without the number ever being on screen to be screenshotted. The
+      // assertion follows the intent — the customer can reach this rider — to
+      // where the intent now lives.
+      expect(find.byTooltip('Call Ravi Kumar'), findsOneWidget);
       expect(find.text('On a scooter'), findsOneWidget);
       // Two scooter icons now: the headline's, and the rider strip's.
       expect(find.byIcon(Icons.delivery_dining_rounded), findsNWidgets(2));

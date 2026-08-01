@@ -220,9 +220,11 @@ void main() {
       // ₹0 delivery is something the customer was *given*, not something that
       // failed to happen.
       expect(find.text('FREE'), findsOneWidget);
-      // Not "Total paid": the order was placed a moment ago, it is cash on
-      // delivery, and nobody has paid anybody yet.
-      expect(find.text('Total'), findsOneWidget);
+      // Future tense, and that is the assertion. The order was placed a moment
+      // ago, it is cash on delivery, and nobody has paid anybody yet — so the
+      // line may not say "paid". (The receipt redesign renamed this from
+      // "Total" to "To pay"; the rule it encodes is unchanged.)
+      expect(find.text('To pay'), findsOneWidget);
       expect(find.text('Cash on delivery'), findsOneWidget);
     });
 
@@ -277,7 +279,9 @@ void main() {
 
       expect(find.byType(OrderTrackingCard), findsNothing);
       expect(find.byType(OrderStatusChip), findsOneWidget);
-      expect(find.text('Total paid'), findsOneWidget);
+      // Past tense on a delivered order — the mirror of the "To pay" assertion
+      // above. Renamed from "Total paid" by the receipt redesign.
+      expect(find.text('Grand Total Paid'), findsOneWidget);
       expect(find.textContaining('Delivered to'), findsOneWidget);
     });
   });
