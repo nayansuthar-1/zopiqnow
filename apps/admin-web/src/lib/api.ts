@@ -245,6 +245,29 @@ export const api = {
       p_reason: reason ?? null,
     }),
 
+  /// Lets a rider work without the documents on file, or takes that away again.
+  ///
+  /// Not a way of verifying somebody: it is stored separately, it leaves the
+  /// document status exactly where it was, and switching it off puts the rider
+  /// straight back to whatever their papers say (0083). The database insists on
+  /// a reason and refuses an expiry date that has already passed.
+  ///
+  /// `until` is an ISO date or null for no expiry. Null is a real choice, not a
+  /// default — an override that never ends is how the KYC gate quietly stops
+  /// existing.
+  overrideRiderKyc: (
+    email: string,
+    on: boolean,
+    reason?: string,
+    until?: string | null,
+  ) =>
+    rpc<void>('admin_override_rider_kyc', {
+      p_email: email,
+      p_on: on,
+      p_reason: reason ?? null,
+      p_until: until ?? null,
+    }),
+
   setRiderPayRates: (baseFee: number, perKmFee: number) =>
     rpc<void>('admin_set_rider_pay_rates', {
       p_base_fee: baseFee,
@@ -925,6 +948,10 @@ export type RiderRow = {
   /// March whose insurance lapsed last night is still 'verified' and is still
   /// blocked — the expiry is recomputed on every read (0080).
   kyc_blocked: boolean
+  /// A third question again, and not a fourth way of saying the other two: this
+  /// rider is working because an admin vouched for them, not because anybody
+  /// read their documents (0083). Never render it as "verified".
+  kyc_overridden: boolean
 }
 
 export type KycStatus = 'pending' | 'verified' | 'rejected'
@@ -951,4 +978,15 @@ export type RiderKyc = {
   reviewed_at: string | null
   reviewed_by: string | null
   blocked_reason: string | null
+  /// The override (0083). Separate from `status` on purpose — `status` keeps
+  /// meaning "somebody read the documents", and these say "somebody decided to
+  /// do without them". A rider can be `pending` here and still working.
+  override_reason: string | null
+  override_by: string | null
+  override_at: string | null
+  /// Last day it applies. Null means it does not run out on its own.
+  override_until: string | null
+  /// Whether it is in force *today* — a reason plus an unexpired date. Read this
+  /// rather than testing `override_reason` yourself.
+  override_active: boolean
 }

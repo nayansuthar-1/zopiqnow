@@ -164,6 +164,10 @@ export function RidersPage() {
 
   const active = riders?.filter((r) => r.is_active) ?? []
   const waiting = riders?.filter((r) => r.kyc_blocked) ?? []
+  // Deliberately surfaced as its own count rather than folded into the happy
+  // total. A fleet quietly running on overrides is the failure mode this feature
+  // has, and the only defence against it is a number somebody sees every day.
+  const cleared = riders?.filter((r) => r.kyc_overridden) ?? []
 
   return (
     <>
@@ -196,6 +200,15 @@ export function RidersPage() {
                 ? '1 rider cannot take deliveries — their documents are unverified or have expired.'
                 : `${waiting.length} riders cannot take deliveries — their documents are unverified or have expired.`}{' '}
               Open Documents on each to check them.
+            </Banner>
+          )}
+
+          {cleared.length > 0 && (
+            <Banner tone="warn" className="mt-4">
+              {cleared.length === 1
+                ? '1 rider is working without verified documents, because an admin cleared them.'
+                : `${cleared.length} riders are working without verified documents, because an admin cleared them.`}{' '}
+              Open Documents to see who allowed it and why.
             </Banner>
           )}
 
@@ -249,11 +262,18 @@ export function RidersPage() {
                           carrying {r.live_order_id}
                         </span>
                       )}
-                      {/* Two facts, not one. `verified` says an admin read the
+                      {/* Three facts, not one. `verified` says an admin read the
                           papers; `blocked` says whether they can work today,
-                          and a lapsed insurance separates them. */}
+                          and a lapsed insurance separates them; `overridden`
+                          says they are working on somebody's say-so and no
+                          documents at all. The override is checked first and
+                          never renders as "verified" — the whole reason it is
+                          stored apart from the status is so this line can tell
+                          the truth about why a rider is on the road. */}
                       <span className="ml-2 inline-block align-middle">
-                        {r.kyc_status === 'verified' && !r.kyc_blocked ? (
+                        {r.kyc_overridden ? (
+                          <Pill tone="warn">cleared by admin</Pill>
+                        ) : r.kyc_status === 'verified' && !r.kyc_blocked ? (
                           <Pill tone="live">verified</Pill>
                         ) : r.kyc_status === 'rejected' ? (
                           <Pill tone="danger">documents rejected</Pill>
@@ -482,6 +502,9 @@ function KycDialog({
   const [changed, setChanged] = useState(false)
   const [rejecting, setRejecting] = useState(false)
   const [reason, setReason] = useState('')
+  const [clearing, setClearing] = useState(false)
+  const [clearReason, setClearReason] = useState('')
+  const [clearUntil, setClearUntil] = useState('')
 
   const motorised = rider.vehicle !== 'bicycle'
 
@@ -587,7 +610,22 @@ function KycDialog({
         </div>
       ) : (
         <>
-          {kyc?.blocked_reason ? (
+          {/* The override is stated first and in its own words. Falling through
+              to "Verified" here would be the console telling an admin that
+              somebody read the documents when nobody did. */}
+          {kyc?.override_active ? (
+            <Banner tone="warn" className="mt-4">
+              Working without verified documents.
+              {kyc.override_by ? ` Cleared by ${kyc.override_by}` : ' Cleared'}
+              {kyc.override_at
+                ? ` on ${new Date(kyc.override_at).toLocaleDateString()}`
+                : ''}
+              {kyc.override_until
+                ? `, until ${new Date(kyc.override_until).toLocaleDateString()}`
+                : ', with no end date'}
+              . “{kyc.override_reason}”
+            </Banner>
+          ) : kyc?.blocked_reason ? (
             <Banner tone="warn" className="mt-4">
               {kyc.blocked_reason}
             </Banner>
@@ -748,6 +786,27 @@ function KycDialog({
               <Button type="submit" variant="secondary" loading={busy}>
                 Save
               </Button>
+              {kyc?.override_active ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={busy}
+                  onClick={() =>
+                    void run(() => api.overrideRiderKyc(rider.email, false))
+                  }
+                >
+                  End clearance
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => setClearing(true)}
+                >
+                  Let them work anyway…
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="secondary"
@@ -768,8 +827,74 @@ function KycDialog({
         </>
       )}
 
+      {clearing && (
+        <Modal
+          busy={busy}
+          onClose={() => setClearing(false)}
+          title="Let them work without documents"
+        >
+          <p className="text-sm text-ink-muted">
+            This puts the rider on the road now, carrying orders to customers'
+            homes, without anybody having checked their licence, insurance or
+            ID. It does not mark their documents as seen — it records that{' '}
+            <strong>you</strong> decided to do without them.
+          </p>
+          <Field
+            className="mt-4"
+            label="Why"
+            value={clearReason}
+            onChange={(e) => setClearReason(e.target.value)}
+            placeholder="Known to the owner. Bringing the licence on Monday."
+          />
+          <Field
+            className="mt-4"
+            type="date"
+            label="Until (optional)"
+            value={clearUntil}
+            onChange={(e) => setClearUntil(e.target.value)}
+            hint={
+              'Leave it empty and this never ends on its own. Setting a date is ' +
+              'how "bringing it on Monday" actually means Monday.'
+            }
+          />
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setClearing(false)}
+              disabled={busy}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              loading={busy}
+              onClick={() =>
+                void run(() =>
+                  api.overrideRiderKyc(
+                    rider.email,
+                    true,
+                    clearReason,
+                    clearUntil || null,
+                  ),
+                ).then((ok) => {
+                  if (ok) {
+                    setClearing(false)
+                    setClearReason('')
+                    setClearUntil('')
+                  }
+                })
+              }
+            >
+              Let them work
+            </Button>
+          </div>
+        </Modal>
+      )}
+
       {rejecting && (
         <Modal busy={busy} onClose={() => setRejecting(false)} title="Reject documents">
+
           <p className="text-sm text-ink-muted">
             The rider is sent this word for word, in the app and as a
             notification. Say what they need to do.
