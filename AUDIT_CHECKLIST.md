@@ -24,11 +24,11 @@ not because they are codeable.
 
 | | Open | Closed |
 |---|---:|---:|
-| 🔴 **Blocker** — launch gate | 6 | 8 |
+| 🔴 **Blocker** — launch gate | 5 | 9 |
 | 🟠 **Critical** | 28 | 5 |
 | 🟡 **Major** | 46 | 5 |
-| ⚪ **Minor** | 13 | 0 |
-| | **93** | **21** |
+| ⚪ **Minor** | 12 | 1 |
+| | **91** | **23** |
 
 1 finding withdrawn by the auditor. **115 carry an ID of their own.**
 The report's own headline count is 118; the difference is findings folded into
@@ -37,7 +37,11 @@ another's recommendation list rather than registered separately — `UI-002`
 `FUN-005` (double-tap, closed by **FUN-002**'s idempotency key). Neither has a
 severity or an effort of its own to sort by, so neither gets a box here.
 
-**By effort, still open:** XS 8 · S 35 · M 36 · L 11
+**By effort, still open:** XS 7 · S 35 · M 35 · L 11
+
+> **Until 6 August this file is not the queue.** `LAUNCH_PLAN_2026-08-05.md` is —
+> it sorts the same findings by what blocks a Play listing on the 5th rather than
+> by what costs most to leave broken over a year. Come back here afterwards.
 
 ---
 
@@ -46,7 +50,6 @@ severity or an effort of its own to sort by, so neither gets a box here.
 Sorted by effort, cheapest first.
 
 - [ ] **REL-001** — All three release builds are signed with the debug keystore 🔸<br><sub>Cross-cutting · Android build · effort S</sub>
-- [ ] **LEG-001** — No account deletion, no privacy policy, no consent — three hard Play Store gates _(blocks the Play listing)_<br><sub>Customer App · Compliance · effort M</sub>
 - [ ] **OBS-001** — No crash reporting, no analytics, no APM — in any of the four clients<br><sub>Cross-cutting · Observability · effort M</sub>
 - [ ] **ADM-001** — There is no customer management at all.<br><sub>Feature · effort L</sub>
 - [ ] **FEA-001** — There is no geospatial model — "nearby" is a number an admin typed in<br><sub>Customer App · Backend · Home / Checkout · effort L</sub>
@@ -140,7 +143,6 @@ Sorted by effort, cheapest first.
 
 ## ⚪ Minor
 
-- [ ] **ARC-004** — The working tree has ~60 uncommitted modified files and deleted tracked documents at audit time.<br><sub>Repo · Architecture · effort XS</sub>
 - [ ] **UI-006** — Dark surface is pure #000000.<br><sub>Design system · UI · effort XS</sub>
 - [ ] **API-005** — No certificate pinning in any app.<br><sub>Transport · Security · effort S</sub>
 - [ ] **API-006** — No root/jailbreak detection and no tamper checks, with R8 disabled (REL-001) so the binary is trivially readable.<br><sub>Transport · Security · effort S</sub>
@@ -162,13 +164,13 @@ Reference views into the same findings above — tick the boxes there, not here.
 🔴 blocker · 🟠 critical · 🟡 major · ⚪ minor.
 
 ### XS — an afternoon between them
-🟠 SEC-007 · 🟡 API-001 · 🟡 CUS-006 · 🟡 CUS-015 · 🟡 UI-004 · 🟡 VEN-006 · ⚪ ARC-004 · ⚪ UI-006
+🟠 SEC-007 · 🟡 API-001 · 🟡 CUS-006 · 🟡 CUS-015 · 🟡 UI-004 · 🟡 VEN-006 · ⚪ UI-006
 
 ### S — a day or two each
 🔴 REL-001 · 🟠 API-002 · 🟠 CUS-001 · 🟠 CUS-005 · 🟠 DAT-002 · 🟠 DAT-006 · 🟠 RID-005 · 🟠 SEC-004 · 🟠 SEC-008 · 🟡 ADM-006 · 🟡 ADM-007 · 🟡 ADM-008 · 🟡 BIZ-009 · 🟡 CUS-009 · 🟡 CUS-014 · 🟡 CUS-017 · 🟡 CUS-024 · 🟡 CUS-026 · 🟡 DAT-003 · 🟡 DAT-004 · 🟡 RID-009 · 🟡 RID-010 · 🟡 RID-011 · 🟡 VEN-002 · 🟡 VEN-007 · 🟡 VEN-011 · 🟡 VEN-012 · ⚪ API-005 · ⚪ API-006 · ⚪ ARC-003 · ⚪ CUS-010 · ⚪ CUS-023 · ⚪ UI-005 · ⚪ VEN-008 · ⚪ VEN-009
 
 ### M — most of a week each
-🔴 LEG-001 · 🔴 OBS-001 · 🟠 ADM-004 · 🟠 ADM-009 · 🟠 BIZ-006 · 🟠 CUS-002 · 🟠 CUS-003 · 🟠 CUS-027 · 🟠 PERF-002 · 🟠 QA-001 · 🟠 RID-003 · 🟠 RID-008 · 🟠 SEC-003 · 🟠 SEC-005 · 🟠 UX-001 · 🟠 UX-002 · 🟡 ADM-003 · 🟡 ADM-005 · 🟡 API-003 · 🟡 API-004 · 🟡 ARC-001 · 🟡 CUS-004 · 🟡 CUS-008 · 🟡 CUS-013 · 🟡 CUS-016 · 🟡 CUS-019 · 🟡 CUS-025 · 🟡 DAT-005 · 🟡 RID-004 · 🟡 RID-007 · 🟡 RID-014 · 🟡 VEN-003 · 🟡 VEN-004 · 🟡 VEN-005 · ⚪ CUS-020 · ⚪ CUS-021
+🔴 OBS-001 · 🟠 ADM-004 · 🟠 ADM-009 · 🟠 BIZ-006 · 🟠 CUS-002 · 🟠 CUS-003 · 🟠 CUS-027 · 🟠 PERF-002 · 🟠 QA-001 · 🟠 RID-003 · 🟠 RID-008 · 🟠 SEC-003 · 🟠 SEC-005 · 🟠 UX-001 · 🟠 UX-002 · 🟡 ADM-003 · 🟡 ADM-005 · 🟡 API-003 · 🟡 API-004 · 🟡 ARC-001 · 🟡 CUS-004 · 🟡 CUS-008 · 🟡 CUS-013 · 🟡 CUS-016 · 🟡 CUS-019 · 🟡 CUS-025 · 🟡 DAT-005 · 🟡 RID-004 · 🟡 RID-007 · 🟡 RID-014 · 🟡 VEN-003 · 🟡 VEN-004 · 🟡 VEN-005 · ⚪ CUS-020 · ⚪ CUS-021
 
 ### L — a sprint each
 🔴 ADM-001 · 🔴 FEA-001 · 🔴 PAY-001 · 🟠 ADM-002 · 🟠 CUS-011 · 🟠 FUN-002 · 🟠 RID-006 · 🟠 UI-001 · 🟡 CUS-007 · 🟡 CUS-022 · 🟡 UI-007
@@ -233,6 +235,8 @@ analyze and all four suites; there is still no deployment pipeline.
 - [x] **BIZ-007** — No hold period before settlement.<br><sub>Settlement · Business · Major · effort S</sub>
 - [x] **CUS-018** — PushService.start() is awaited before runApp in customer and rider — a Firebase init, a permission prompt and a token registration round trip on the critical path…<br><sub>Splash / startup · Performance · Major · effort XS</sub>
 - [x] **DAT-001** — No index on orders(restaurant_id, …) — the hottest query path in the system is a sequential scan<br><sub>Database · orders · Critical · effort XS</sub>
+- [x] **LEG-001** — No account deletion, no privacy policy, no consent — three hard Play Store gates<br><sub>Customer App · Compliance · Blocker · effort M · items 4 (location rationale) and 6 (FSSAI display) deliberately left</sub>
+- [x] **ARC-004** — The working tree has ~60 uncommitted modified files.<br><sub>Repo · Architecture · Minor · effort XS · main did not compile from a clone; see the report</sub>
 - [x] **PERF-001** — The vendor app streams the restaurant's entire lifetime order history, forever, over a websocket<br><sub>Vendor App · Queue & Dashboard · Blocker · effort S</sub>
 - [x] **FUN-001** — Every vendor-created offer shown at checkout is rejected when tapped — the feature has never worked end to end<br><sub>Customer App · Checkout → Offers strip · Critical · effort XS</sub>
 - [x] **QA-002** — Twenty-seven tests fail on main — across all three apps.<br><sub>Test suite · Functional · effort M</sub>

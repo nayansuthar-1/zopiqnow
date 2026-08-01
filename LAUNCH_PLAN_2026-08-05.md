@@ -102,11 +102,20 @@ left, and it is mine.
 
 | # | What | Who | Time |
 |---|---|---|---|
-| L2 | **In-app account deletion** — an Account screen entry, a confirmation that says what is kept and why, and the RPC behind it. Orders cannot simply vanish (tax records, settlements owed to restaurants), so the account is deleted and its orders are anonymised — migration 0081. | Me | 4 h |
-| L3 | **Web account-deletion page.** Play requires a deletion route reachable *without* installing the app. A page on the same host as the policy. | Me + you to host | 1 h |
-| L4 | **Privacy policy + terms**, written against what the app actually collects: phone, email, name, delivery addresses, coarse and precise location, profile photo, device push token. I will write them from the schema, not from a template. | Me | 2 h |
-| L5 | **Data-safety answers** — the exact table to type into the console, derived from the same audit of what is collected. | Me | 1 h |
-| L6 | In-app links to policy and terms from the Account screen, and consent wording at sign-up. | Me | 1 h |
+| ✅ L2 | **In-app account deletion** — an Account screen entry, a confirmation that says what is kept and why, and the RPC behind it. Orders cannot simply vanish (tax records, settlements owed to restaurants), so the account is deleted and its orders are anonymised — migration 0081. | Me | 4 h |
+| ✅ L3 | **Web account-deletion page.** Play requires a deletion route reachable *without* installing the app. A page on the same host as the policy. | Me + you to host | 1 h |
+| ✅ L4 | **Privacy policy + terms**, written against what the app actually collects: phone, email, name, delivery addresses, coarse and precise location, profile photo, device push token. I will write them from the schema, not from a template. | Me | 2 h |
+| ✅ L5 | **Data-safety answers** — the exact table to type into the console, derived from the same audit of what is collected. | Me | 1 h |
+| ✅ L6 | In-app links to policy and terms from the Account screen, and consent wording at sign-up. | Me | 1 h |
+
+**LEG-001 is closed.** Migration 0081, a deletion screen that says what goes and
+what stays, in-app policy and terms, the consent line on the sign-in screen, the
+generated pages in `legal/`, and `PLAY_DATA_SAFETY.md`.
+
+**What is still yours on this gate:** host `legal/` at a public URL (P1), and
+confirm `support@zopiqnow.com` is a real inbox somebody reads — it is written
+into both documents, the deletion page and the in-app support tile. If it should
+be a different address, say so and it changes in one constant.
 
 ### 2–3 Aug — the app itself
 
@@ -116,7 +125,7 @@ left, and it is mine.
 | C2 | **Razorpay adapter + server-side signature verification + the mock lockout** described above. Ends with everything ready for keys. | Me | 5 h |
 | C3 | **Crash reporting** (audit OBS-001) — Crashlytics in the customer app, and in vendor and rider if time allows. Launching without it means your first bug report is a one-star review. This is the highest-value non-gate item on the list. | Me | 3 h |
 | C4 | **Idempotency on `place_order`** (audit CUS-005). A double-tap or a retry on a flaky connection currently places two orders. With prepaid UPI that is two charges. | Me | 2 h |
-| C5 | **Hide the dead Account tiles** (audit UX-001). Five tiles currently raise a "coming soon" snackbar. Not a policy gate; it is what makes an app feel abandoned on first open. Hiding them is minutes — building them is not on this plan. | Me | 1 h |
+| ✅ C5 | **Hide the dead Account tiles** (audit UX-001). Done alongside LEG-001 — the legal rows went where they were. All five are gone, and Help & support is the support address rather than a snackbar. | Me | 1 h |
 | C6 | **Delivery OTP no longer shown unconditionally** on the tracking card (audit CUS-015). It is the proof-of-delivery code; it should appear when the rider is at the door, not from the moment the order is placed. | Me | 1 h |
 | C7 | **`ola-static` gets caller authentication** (audit API-002). It proxies your Ola Maps key with no auth — anyone who finds the URL spends your quota. | Me | 2 h |
 | C8 | **Release keystores for vendor and rider**, so the closed-track builds are real builds. Customer already has one. | Me + you for the passwords | 1 h |
@@ -134,6 +143,31 @@ left, and it is mine.
 ### 5 Aug
 
 Answer review feedback the same hour it arrives. Promote when Razorpay clears.
+
+---
+
+## Found on the way — `main` did not compile (1 Aug, closed)
+
+Discovered while verifying LEG-001 in a clean worktree, which is the only reason
+it was discovered at all. **The repository could not be built from a clone.**
+
+- The customer app had 9 analyzer errors on `main`; the vendor app had 65.
+- Five vendor screens imported two widget files that had never been added to git.
+- Seven test files described screens that had since changed, so three suites
+  failed — where they compiled at all.
+- **The QA-003 fix, which the audit lists as closed, had never been committed.**
+  The map bug was still live on `main`.
+
+All of it was sitting in the working tree, written and unsaved — audit ARC-004,
+which the report rates *Minor*. It was not minor: R1 builds the release AAB from
+a clean checkout, and it would have failed on 4 August with no time to work out
+why.
+
+Fixed in five commits (`19a654a`…`84dea9a`). A clean checkout now gives **zero
+analyzer errors and three green suites — customer 133, vendor 62, rider 35.**
+
+The lesson for the next three days, and it is now a rule below: verify in a
+worktree, not in the tree you are working in.
 
 ---
 
@@ -214,6 +248,10 @@ Run on a real device, on the signed release build, not a debug build.
   its item.
 - **The release build is the build we test.** R8 changes the binary; a feature
   that works in debug has not been tested.
+- **Verify in a clean worktree, never in the working tree.** `git worktree add`
+  a detached checkout of the commit, run analyze and the suites there, remove it.
+  The working tree passing proves nothing about what you committed — that is
+  exactly how `main` came to be unbuildable without anyone noticing.
 - After each session I will report what closed, what did not, and what that does
   to the date. If the date stops being reachable you will hear it from me on the
   day I know, not on 5 August.
