@@ -43,7 +43,7 @@ void main() {
     await tester.pumpWidget(_app(jobs: FakeJobsDataSource()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Scanning for New Orders'), findsOneWidget);
+    expect(find.text('Waiting for your next job'), findsOneWidget);
 
     await _openEarnings(tester);
     expect(find.text('TODAY\'S EARNINGS'), findsOneWidget);
@@ -52,7 +52,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Nayan'), findsOneWidget);
     // Sign-out left the jobs app bar and lives here now.
-    expect(find.text('Sign out'), findsOneWidget);
+    expect(find.text('Sign Out'), findsOneWidget);
   });
 
   testWidgets('a delivered job shows its pay AND the sum that produced it', (
@@ -149,7 +149,9 @@ void main() {
     expect(find.text('Processing Payment'), findsOneWidget);
     // The week, collapsed to one month name.
     expect(find.text('13–19 Jul'), findsOneWidget);
-    expect(find.text('3 deliveries'), findsOneWidget);
+    // Renamed by the earnings redesign: a payout row counts "runs", and
+    // "deliveries" now belongs to the summary tiles above it.
+    expect(find.text('3 runs'), findsOneWidget);
   });
 
   testWidgets('a paid payout shows the bank reference and drops off the owed sum', (

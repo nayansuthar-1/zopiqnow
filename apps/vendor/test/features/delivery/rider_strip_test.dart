@@ -97,7 +97,10 @@ void main() {
     await _openQueue(tester);
 
     expect(find.text('Asha'), findsOneWidget);
-    expect(find.text('Read the code to hand over'), findsOneWidget);
+    // The caption "Read the code to hand over" is gone — the code is now a bare
+    // pill beside the rider's name, which is the whole instruction on a screen a
+    // cook reads at arm's length. What the test is actually for is that the four
+    // digits reach the counter, and they do.
     expect(find.text('5896'), findsOneWidget);
   });
 

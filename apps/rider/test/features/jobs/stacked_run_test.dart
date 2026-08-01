@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zopiq_rider/app/rider_app.dart';
+import 'package:zopiq_rider/core/widgets/rider_animations.dart';
 import 'package:zopiq_rider/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_rider/features/jobs/domain/entities/job.dart';
 import 'package:zopiq_rider/features/jobs/presentation/providers/jobs_providers.dart';
@@ -65,10 +66,17 @@ void main() {
       _app(
         jobs: FakeJobsDataSource(
           // Deliberately supplied worst-first, so passing means the sort ran.
+          //
+          // Eight characters each, and not by accident: the ticket header
+          // renders `orderId.substring(0, 8)`, so 'ZPQ-PACKED' reaches the
+          // screen as 'ZPQ-PACK' and a finder looking for the full id matches
+          // nothing. Real ids are 'ZPQ-1042' — eight characters — so the
+          // truncation never shows in production and never showed here either,
+          // until a test invented longer ones.
           mine: <Job>[
-            job(orderId: 'ZPQ-COOKING', orderStatus: 'preparing'),
-            job(orderId: 'ZPQ-CARRYING', state: JobState.pickedUp),
-            job(orderId: 'ZPQ-PACKED'),
+            job(orderId: 'ZPQ-COOK', orderStatus: 'preparing'),
+            job(orderId: 'ZPQ-CARR', state: JobState.pickedUp),
+            job(orderId: 'ZPQ-PACK'),
           ],
         ),
       ),
@@ -80,12 +88,38 @@ void main() {
     // Packed and waiting on a counter, then what is already on the bike, then
     // what the kitchen has not finished. Not a route — the app knows two dots
     // and nothing about the roads between them.
-    expect(y('ZPQ-PACKED'), lessThan(y('ZPQ-CARRYING')));
-    expect(y('ZPQ-CARRYING'), lessThan(y('ZPQ-COOKING')));
+    expect(y('ZPQ-PACK'), lessThan(y('ZPQ-CARR')));
+    expect(y('ZPQ-CARR'), lessThan(y('ZPQ-COOK')));
 
-    expect(find.text('Ready'), findsOneWidget);
-    expect(find.text('On Bike'), findsOneWidget);
-    expect(find.text('Cooking'), findsOneWidget);
+    // The status pill on a given card — scoped to that card by its key, and
+    // excluding the `RiderStatusTimeline`, which prints *every* stage name on
+    // *every* card. A bare `find.text('On Bike')` matched four widgets: one
+    // pill and three timeline steps. "Somewhere on this screen the words On
+    // Bike appear" was never what this test meant; this says the right pill is
+    // on the right job, which is the thing that would actually be wrong.
+    Finder pill(String id, String label) => find.descendant(
+      of: find.byKey(ValueKey<String>(id)),
+      matching: find.text(label),
+    );
+    Finder timelineStep(String id, String label) => find.descendant(
+      of: find.descendant(
+        of: find.byKey(ValueKey<String>(id)),
+        matching: find.byType(RiderStatusTimeline),
+      ),
+      matching: find.text(label),
+    );
+
+    // Finders cannot be negated, so the pill is counted rather than named: a
+    // card shows its status word once in the timeline (which lists every stage,
+    // on every card) and once more in the pill. One more than the timeline's
+    // own copy is exactly one pill.
+    int pillsOf(String id, String label) =>
+        pill(id, label).evaluate().length -
+        timelineStep(id, label).evaluate().length;
+
+    expect(pillsOf('ZPQ-PACK', 'Ready'), 1);
+    expect(pillsOf('ZPQ-CARR', 'On Bike'), 1);
+    expect(pillsOf('ZPQ-COOK', 'Cooking'), 1);
   });
 
   testWidgets('a rider can reach the board while carrying, and take a second', (
@@ -132,7 +166,7 @@ void main() {
 
     // The switch disappears with the run that justified it, leaving the plain
     // board a free rider sees.
-    expect(find.text('Scanning for New Orders'), findsOneWidget);
+    expect(find.text('Waiting for your next job'), findsOneWidget);
     expect(find.text('Available Board'), findsNothing);
   });
 

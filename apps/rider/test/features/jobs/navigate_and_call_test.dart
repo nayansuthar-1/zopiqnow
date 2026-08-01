@@ -56,6 +56,17 @@ void main() {
     await tester.tap(find.text('Navigate'));
     await tester.pumpAndSettle();
 
+    // Since B3, a job with coordinates opens the in-app map first; the external
+    // hand-off is a button on that page rather than the whole of Navigate. This
+    // test asserted the old single-step behaviour and so stopped exercising
+    // anything the moment the map landed.
+    await tester.tap(find.text('Open in Maps'));
+    await tester.pumpAndSettle();
+
+    // Unwind the map route before the test ends.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
     // The restaurant's pin, labelled with the restaurant. Sending a rider to
     // the customer's door to collect food would be the whole feature backwards.
     expect(
@@ -81,6 +92,12 @@ void main() {
 
     await tester.tap(find.text('Navigate'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Open in Maps'));
+    await tester.pumpAndSettle();
+
+    // Unwind the map route before the test ends.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     expect(launcher.opened.single, contains('geo:24.5881,72.3163'));
     expect(launcher.opened.single, contains('Banjara%20Hills'));
@@ -93,14 +110,26 @@ void main() {
     final FakeLauncher launcher = FakeLauncher();
     await tester.pumpWidget(
       _app(
+        // *Both* ends unmapped, which is what the fallback actually requires.
+        // Nulling only the restaurant left the customer's pin in place, so the
+        // job was still mappable and this opened the map page instead of falling
+        // back — the assertion below then had nothing to read.
         jobs: FakeJobsDataSource(
-          mine: <Job>[job(restaurantLat: null, restaurantLng: null)],
+          mine: <Job>[
+            job(
+              restaurantLat: null,
+              restaurantLng: null,
+              deliverLat: null,
+              deliverLng: null,
+            ),
+          ],
         ),
         launcher: launcher,
       ),
     );
     await tester.pumpAndSettle();
 
+    // No map to open, so Navigate is the hand-off itself — no intermediate page.
     await tester.tap(find.text('Navigate'));
     await tester.pumpAndSettle();
 
@@ -115,7 +144,12 @@ void main() {
     final FakeLauncher launcher = FakeLauncher();
     await tester.pumpWidget(
       _app(
-        jobs: FakeJobsDataSource(mine: <Job>[job()]),
+        // Carrying, and that is load-bearing. Since B5 the call button rings
+        // whichever end of the ride the rider is on — the kitchen while
+        // collecting, the customer while carrying — so a *claimed* job's button
+        // says "Call Restaurant" and dials the kitchen. This test wants the
+        // customer, so the job has to be one the rider has picked up.
+        jobs: FakeJobsDataSource(mine: <Job>[job(state: JobState.pickedUp)]),
         launcher: launcher,
       ),
     );
@@ -136,12 +170,20 @@ void main() {
     final FakeLauncher launcher = FakeLauncher();
     await tester.pumpWidget(
       _app(
-        jobs: FakeJobsDataSource(mine: <Job>[job(customerPhone: '')]),
+        // Carrying, so the button is aimed at the customer — and the customer
+        // is the end that has no number. While *collecting* the button rings
+        // the kitchen, whose number is always on file, so a claimed job could
+        // never exercise the disabled case this test is named for.
+        jobs: FakeJobsDataSource(
+          mine: <Job>[job(state: JobState.pickedUp, customerPhone: '')],
+        ),
         launcher: launcher,
       ),
     );
     await tester.pumpAndSettle();
 
+    // Disabled, not hidden — so it is still findable, and tapping it is the
+    // point: nothing must happen.
     await tester.tap(find.text('Call Customer'));
     await tester.pumpAndSettle();
 
@@ -155,7 +197,19 @@ void main() {
     final FakeLauncher launcher = FakeLauncher()..succeeds = false;
     await tester.pumpWidget(
       _app(
-        jobs: FakeJobsDataSource(mine: <Job>[job()]),
+        // Unmapped at both ends, so Navigate is the hand-off itself. A job with
+        // coordinates would open the in-app map and never reach the launcher —
+        // which is what made this assertion unreachable.
+        jobs: FakeJobsDataSource(
+          mine: <Job>[
+            job(
+              restaurantLat: null,
+              restaurantLng: null,
+              deliverLat: null,
+              deliverLng: null,
+            ),
+          ],
+        ),
         launcher: launcher,
       ),
     );

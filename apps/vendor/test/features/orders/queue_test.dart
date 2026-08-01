@@ -184,7 +184,13 @@ void main() {
       await tester.tap(find.text('Orders'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Mark delivered'));
+      // Not a tap: since 0050 the kitchen cannot mark anything delivered, so
+      // there is no button here to press. The rider does it, with the
+      // customer's four digits, and the queue finds out because the row
+      // changed underneath it.
+      expect(find.text('ZPQ-1042'), findsOneWidget);
+
+      orders.advance('ZPQ-1042', OrderStatus.delivered);
       await tester.pumpAndSettle();
 
       expect(find.text('All caught up'), findsOneWidget);
@@ -242,7 +248,13 @@ void main() {
       // The food has left the building. That is a refund conversation, not a
       // status change — and `set_order_status` would refuse it anyway.
       expect(find.text('Cancel'), findsNothing);
-      expect(find.text('Mark delivered'), findsOneWidget);
+      // And nothing has replaced it. The ticket stays on the queue carrying the
+      // rider's progress, but the kitchen has no move left to make: 0050 took
+      // "Mark delivered" away precisely so that completing a delivery requires
+      // a rider at a door with the right code. This asserted that button
+      // existed until 2026-07-30.
+      expect(find.text('Mark delivered'), findsNothing);
+      expect(find.text('Hand to rider'), findsNothing);
     });
 
     testWidgets('a prepaid order does not tell the rider to collect cash', (
@@ -287,9 +299,18 @@ void main() {
       await tester.tap(find.byType(Switch));
       await tester.pumpAndSettle();
 
-      // The bar flips optimistically, and the write carried the new value.
+      // Since 0068 the switch does not pause on its own — it asks why first,
+      // because the answer is shown to customers on the restaurant's page. The
+      // sheet is the pause; dismissing it calls the pause off.
+      expect(find.text('Pause orders'), findsOneWidget);
+      await tester.tap(find.text('Short on staff'));
+      await tester.pumpAndSettle();
+
+      // The bar flips optimistically, and the write carried both the new value
+      // and the sentence the customer will read.
       expect(find.text('Orders paused'), findsOneWidget);
       expect(auth.lastAcceptingOrders, isFalse);
+      expect(auth.lastPauseReason, 'Short on staff');
     });
 
     testWidgets('a toggle the database refuses reverts and says so', (
@@ -308,6 +329,10 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+      // Get past 0068's reason sheet; the refusal being rehearsed here is the
+      // database's, not the sheet's.
+      await tester.tap(find.text('Pause without saying why'));
       await tester.pumpAndSettle();
 
       // The write failed, so the bar goes back to open rather than lying that
@@ -378,13 +403,23 @@ void main() {
     });
 
     test('the button offers exactly what set_order_status will accept', () {
-      // Mirrors the transition table in migration 0014. A button that is usually
-      // refused is a button nobody trusts.
+      // Mirrors the transition table in migration **0050**, not 0014. A button
+      // that is usually refused is a button nobody trusts.
+      //
+      // This test asserted 0014's table — `readyForPickup → outForDelivery →
+      // delivered` — until 2026-07-30, which is to say it asserted a contract
+      // the database stopped honouring the day 0050 shipped. Nothing ran it, so
+      // nothing said so. The ladder now **stops at readyForPickup**: past that
+      // the order is the rider's, and `out_for_delivery` and `delivered` are
+      // reached only through `confirm_pickup` and `confirm_delivered`, each of
+      // which demands the rider be present with the right four digits. A "Mark
+      // delivered" button on this screen would be a way to complete a delivery
+      // that never happened — the exact hole 0050 closed.
       expect(OrderStatus.placed.next, OrderStatus.accepted);
       expect(OrderStatus.accepted.next, OrderStatus.preparing);
       expect(OrderStatus.preparing.next, OrderStatus.readyForPickup);
-      expect(OrderStatus.readyForPickup.next, OrderStatus.outForDelivery);
-      expect(OrderStatus.outForDelivery.next, OrderStatus.delivered);
+      expect(OrderStatus.readyForPickup.next, isNull);
+      expect(OrderStatus.outForDelivery.next, isNull);
       expect(OrderStatus.delivered.next, isNull);
       expect(OrderStatus.cancelled.next, isNull);
       expect(OrderStatus.rejected.next, isNull);

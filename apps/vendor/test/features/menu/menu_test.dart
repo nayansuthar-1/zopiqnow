@@ -14,6 +14,21 @@ import 'package:zopiq_vendor/features/notifications/presentation/providers/notif
 
 import '../../support/fakes.dart';
 
+/// The dish editor's field carrying [label], found by its label rather than by
+/// its position in the sheet.
+///
+/// These three tests used `find.byType(TextField).at(0 / 2 / 3)` until
+/// 2026-07-30, and every one of them broke the day the editor gained a "Was
+/// (optional)" strike-through price at index 3. "Starters" was typed into a
+/// price box, the section header never appeared, and the dish saved under a
+/// name the assertions then could not find — three failures, one inserted
+/// widget, no warning. A positional finder is a test coupled to layout order,
+/// which is the one thing about a form guaranteed to change.
+Finder _field(String label) => find.byWidgetPredicate(
+  (Widget w) => w is TextField && w.decoration?.labelText == label,
+  description: 'TextField labelled "$label"',
+);
+
 Widget _app({
   required FakeVendorMenuDataSource menu,
   FakeImageUploader? uploader,
@@ -142,10 +157,9 @@ void main() {
       await tester.tap(find.byType(FloatingActionButton));
       await tester.pumpAndSettle();
 
-      final Finder fields = find.byType(TextField);
-      await tester.enterText(fields.at(0), 'Paneer Tikka'); // name
-      await tester.enterText(fields.at(2), '260'); // price
-      await tester.enterText(fields.at(3), 'Starters'); // section
+      await tester.enterText(_field('Dish name'), 'Paneer Tikka');
+      await tester.enterText(_field('Price'), '260');
+      await tester.enterText(_field('Section'), 'Starters');
       await tester.tap(find.widgetWithText(FilledButton, 'Add dish'));
       await tester.pumpAndSettle();
 
@@ -166,10 +180,9 @@ void main() {
       await tester.tap(find.byType(FloatingActionButton));
       await tester.pumpAndSettle();
 
-      final Finder fields = find.byType(TextField);
-      await tester.enterText(fields.at(0), 'Paneer Tikka');
-      await tester.enterText(fields.at(2), '260');
-      await tester.enterText(fields.at(3), 'Starters');
+      await tester.enterText(_field('Dish name'), 'Paneer Tikka');
+      await tester.enterText(_field('Price'), '260');
+      await tester.enterText(_field('Section'), 'Starters');
       // The bestseller toggle — the customer menu already renders this as a badge.
       await tester.tap(find.text('Bestseller'));
       await tester.pumpAndSettle();
@@ -205,10 +218,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(uploader.calls, 1);
 
-      final Finder fields = find.byType(TextField);
-      await tester.enterText(fields.at(0), 'Paneer Tikka');
-      await tester.enterText(fields.at(2), '260');
-      await tester.enterText(fields.at(3), 'Starters');
+      await tester.enterText(_field('Dish name'), 'Paneer Tikka');
+      await tester.enterText(_field('Price'), '260');
+      await tester.enterText(_field('Section'), 'Starters');
       await tester.tap(find.widgetWithText(FilledButton, 'Add dish'));
       await tester.pumpAndSettle();
 

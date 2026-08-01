@@ -40,7 +40,7 @@ void main() {
     await tester.pumpWidget(_app(jobs: FakeJobsDataSource()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Scanning for New Orders'), findsOneWidget);
+    expect(find.text('Waiting for your next job'), findsOneWidget);
     // The rider is addressed by name — now both in the app-bar greeting and in
     // the empty-state line, so at least once rather than exactly once.
     expect(find.textContaining('Nayan'), findsWidgets);
@@ -78,8 +78,10 @@ void main() {
     expect(jobs.mine.length, 1);
     expect(find.textContaining('Your Run'), findsOneWidget);
     expect(find.text('PICK UP FROM'), findsOneWidget);
-    // Now that it is theirs, the number is there.
-    expect(find.text('+919876543210'), findsOneWidget);
+    // Now that it is theirs, the rider can reach the other end. B5 stopped
+    // printing the number on the card and made it a button instead — this job
+    // is claimed, not carrying, so that end is the kitchen.
+    expect(find.text('Call Restaurant'), findsOneWidget);
     // The board is no longer showing — but it is reachable, which is what
     // changed when stacked deliveries arrived.
     expect(find.text('Claim & Accept Job'), findsNothing);
@@ -220,7 +222,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(jobs.mine.single.state, JobState.delivered);
-    expect(find.text('Scanning for New Orders'), findsOneWidget);
+    expect(find.text('Waiting for your next job'), findsOneWidget);
   });
 
   testWidgets('dropping an unstarted job puts it back on the board', (
