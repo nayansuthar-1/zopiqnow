@@ -216,17 +216,52 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
 
   /// Roughly the interval between two rider fixes, so a pin finishes its glide
   /// about when the next one arrives and the dot never appears to stall.
-  late final AnimationController _mover = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1200),
-  )..addListener(_onMoveTick);
+  ///
+  /// **Constructed in [initState], not inline.** As a `late final` initialiser
+  /// this was built on first *access* — and on a map whose pins never moved,
+  /// the first access was `_mover.dispose()` in [dispose]. So the controller
+  /// was constructed during teardown, and `AnimationController(vsync: this)`
+  /// looks `TickerMode` up through the element tree, which is illegal once the
+  /// element is deactivated: "Looking up a deactivated widget's ancestor is
+  /// unsafe", thrown while finalising the tree. Opening the map and going
+  /// straight back — a rider between two jobs, or anyone who does not wait for
+  /// a position update — hit it every time.
+  late final AnimationController _mover;
+
+  /// The screen's pixel ratio, captured where an inherited widget may legally
+  /// be read.
+  ///
+  /// [_loadImages] used to read `MediaQuery.devicePixelRatioOf(context)` itself,
+  /// which is an inherited-widget *lookup* — and it ran from a post-frame
+  /// callback and from across an `await`. By then the element may be
+  /// deactivated: still `mounted`, because `mounted` only says the state has a
+  /// element, but no longer safe to look an ancestor up through. Flutter
+  /// answers that with "Looking up a deactivated widget's ancestor is unsafe",
+  /// thrown while the tree is being finalised — so it surfaces on a fast
+  /// back-navigation off the map, which is exactly what a rider does between
+  /// two jobs.
+  ///
+  /// [didChangeDependencies] is the sanctioned place for the read, and it
+  /// re-runs whenever the value could change. The async path then only ever
+  /// touches a plain `double`.
+  double _devicePixelRatio = 1;
 
   @override
   void initState() {
     super.initState();
+    _mover = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..addListener(_onMoveTick);
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => unawaited(_loadImages()),
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
   }
 
   @override
@@ -264,7 +299,7 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
   /// Rasterises any marker image this map needs and does not yet have.
   Future<void> _loadImages() async {
     if (!mounted) return;
-    final double dpr = MediaQuery.devicePixelRatioOf(context);
+    final double dpr = _devicePixelRatio;
     bool added = false;
 
     for (final ZopiqMapPin pin in widget.pins) {
