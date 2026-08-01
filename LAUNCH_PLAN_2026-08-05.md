@@ -171,6 +171,34 @@ worktree, not in the tree you are working in.
 
 ---
 
+## Found on the way — nobody could place an order (1 Aug, closed)
+
+Reported from the customer app against Paradise Biryani: *"We couldn't place your
+order."* **It was every restaurant, every cart, every customer, and it had been
+that way since 29 July** — the last order in the book is ZPQ-1044.
+
+Migration 0078, the tax rewrite, added one statement with no `where` clause.
+Supabase loads `pg_safeupdate` for the roles PostgREST switches into, so it
+raised SQLSTATE 21000 for real customers and for nobody testing through `psql`
+as `postgres`. The app only shows database messages for `P0001`, so the actual
+error was never displayed or logged anywhere.
+
+Fixed in **migration 0082**, verified over HTTP with a real user's token on COD,
+multi-line and UPI carts. The rest of the schema was swept for the same shape;
+`place_order` was the only one.
+
+**Two things this changes for the remaining three days:**
+
+1. **An RPC is not proven until it is called over HTTP with a user token.**
+   `psql` as `postgres` bypasses `pg_safeupdate`, RLS, and every grant — three of
+   the things most likely to break a client. This is now on the rules list below.
+2. **C3 (crash reporting) is worth more than its row suggests.** This bug was
+   invisible for three days because nothing anywhere recorded the real error. A
+   product that cannot take an order and cannot tell you why is the exact failure
+   OBS-001 describes, and it has now happened once before launch.
+
+---
+
 ## Explicitly cut — and what we accept by cutting it
 
 These are open audit findings we are choosing not to fix before launch. Each is
@@ -248,6 +276,10 @@ Run on a real device, on the signed release build, not a debug build.
   its item.
 - **The release build is the build we test.** R8 changes the binary; a feature
   that works in debug has not been tested.
+- **An RPC is proven over HTTP, not in `psql`.** Call it against the real URL
+  with a real user's access token. As `postgres` you bypass `pg_safeupdate`, RLS
+  and every grant — which is how a `where`-less `update` shipped and stopped the
+  product taking orders for three days.
 - **Verify in a clean worktree, never in the working tree.** `git worktree add`
   a detached checkout of the commit, run analyze and the suites there, remove it.
   The working tree passing proves nothing about what you committed — that is
