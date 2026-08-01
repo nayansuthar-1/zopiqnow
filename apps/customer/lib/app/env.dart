@@ -47,6 +47,24 @@ abstract final class Env {
     defaultValue:
         '789936942272-82up4pgu8v6in4vmvnogqhiqa8legtl5.apps.googleusercontent.com',
   );
+
+  /// Cloudinary, for the customer's profile photo.
+  ///
+  /// The same cloud and the same **unsigned** preset the vendor app already
+  /// uploads dish photos through — deliberately, because a second preset is a
+  /// second thing to lock down. The cloud name is public (it is in every
+  /// delivery URL) and an unsigned preset carries no secret by design: the API
+  /// key and secret stay in `.env`, where they exist to create and restrict the
+  /// preset, not to ship inside a decompilable binary.
+  static const String cloudinaryCloudName = String.fromEnvironment(
+    'CLOUDINARY_CLOUD_NAME',
+    defaultValue: 'mqppsahn',
+  );
+
+  static const String cloudinaryUploadPreset = String.fromEnvironment(
+    'CLOUDINARY_UPLOAD_PRESET',
+    defaultValue: 'zopiqnow_unsigned',
+  );
 }
 
 // The Maps key is deliberately absent from this file. Google's Maps SDK reads

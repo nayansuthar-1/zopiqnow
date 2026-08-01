@@ -72,6 +72,14 @@ class CheckoutController extends Notifier<CheckoutState> {
 
   Future<void> applyCoupon(String code) async {
     if (code.trim().isEmpty || state.isApplyingCoupon) return;
+
+    // The cart names the kitchen, and the kitchen is half of what makes a code
+    // valid (migration 0064). An empty cart has no restaurant and cannot have a
+    // discount — there is nothing to take a percentage of.
+    final Cart cart = ref.read(cartProvider);
+    final String? restaurantId = cart.restaurantId;
+    if (restaurantId == null) return;
+
     state = CheckoutState(
       paymentMethod: state.paymentMethod,
       isApplyingCoupon: true,
@@ -79,7 +87,11 @@ class CheckoutController extends Notifier<CheckoutState> {
     try {
       final AppliedCoupon coupon = await ref
           .read(orderRepositoryProvider)
-          .applyCoupon(code: code, subtotal: ref.read(cartProvider).subtotal);
+          .applyCoupon(
+            code: code,
+            subtotal: cart.subtotal,
+            restaurantId: restaurantId,
+          );
       state = CheckoutState(
         paymentMethod: state.paymentMethod,
         coupon: coupon,

@@ -46,6 +46,7 @@ void main() {
       final AppliedCoupon coupon = await _repo().applyCoupon(
         code: 'WELCOME50',
         subtotal: 199,
+        restaurantId: 'r1',
       );
 
       expect(coupon.code, 'WELCOME50');
@@ -54,7 +55,11 @@ void main() {
 
     test('rejects a cart below the coupon minimum, saying how far off', () {
       expect(
-        () => _repo().applyCoupon(code: 'WELCOME50', subtotal: 150),
+        () => _repo().applyCoupon(
+          code: 'WELCOME50',
+          subtotal: 150,
+          restaurantId: 'r1',
+        ),
         throwsA(
           isA<CouponFailure>().having(
             (CouponFailure f) => f.message,
@@ -67,7 +72,11 @@ void main() {
 
     test('rejects an unknown code', () {
       expect(
-        () => _repo().applyCoupon(code: 'FREELUNCH', subtotal: 999),
+        () => _repo().applyCoupon(
+          code: 'FREELUNCH',
+          subtotal: 999,
+          restaurantId: 'r1',
+        ),
         throwsA(isA<CouponFailure>()),
       );
     });
@@ -76,6 +85,7 @@ void main() {
       final AppliedCoupon coupon = await _repo().applyCoupon(
         code: '  welcome50 ',
         subtotal: 300,
+        restaurantId: 'r1',
       );
 
       expect(coupon.code, 'WELCOME50');
@@ -85,6 +95,7 @@ void main() {
       final AppliedCoupon coupon = await _repo().applyCoupon(
         code: 'ZOPIQ20',
         subtotal: 300,
+        restaurantId: 'r1',
       );
 
       expect(coupon.discount, 60);
@@ -94,6 +105,7 @@ void main() {
       final AppliedCoupon coupon = await _repo().applyCoupon(
         code: 'ZOPIQ20',
         subtotal: 900,
+        restaurantId: 'r1',
       );
 
       expect(coupon.discount, 100);
