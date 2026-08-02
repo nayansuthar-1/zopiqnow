@@ -175,6 +175,11 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  # Six of this app's plugins ship CocoaPods podspecs only, so Swift Package
+  # Manager cannot resolve the whole graph -- `firebase_core` via SPM beside
+  # `firebase_messaging` via CocoaPods is a hard conflict. Pods for everything.
+  config:
+    enable-swift-package-manager: false
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

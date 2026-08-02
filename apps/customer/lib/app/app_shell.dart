@@ -20,12 +20,27 @@ class AppShell extends StatelessWidget {
 
   final StatefulNavigationShell navigationShell;
 
+  /// The Cart branch's index. It sits after the four left-pill tabs
+  /// (Delivery, Dining, Grocery, Gifts), and is reached from the separate Cart
+  /// pill rather than the pill row.
+  static const int cartBranchIndex = 4;
+
   @override
   Widget build(BuildContext context) {
+    // The cart carries its own bottom bar — the total and "Proceed to
+    // checkout" — so the pills are not drawn over it, and (because
+    // `extendBody` hands their height to the body as padding) do not reserve
+    // space under it either. That reserved band was the ~115pt of empty screen
+    // below the checkout button whenever the pills happened to be in their
+    // hidden state, which is how they arrive here from a scrolled Home.
+    final bool onCart = navigationShell.currentIndex == cartBranchIndex;
+
     return Scaffold(
       extendBody: true,
       body: navigationShell,
-      bottomNavigationBar: _ShellNavBar(navigationShell: navigationShell),
+      bottomNavigationBar: onCart
+          ? null
+          : _ShellNavBar(navigationShell: navigationShell),
     );
   }
 }
@@ -35,10 +50,22 @@ class _ShellNavBar extends ConsumerWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  /// The Cart branch's index. It sits after the four left-pill tabs
-  /// (Delivery, Dining, Grocery, Gifts), and is reached from the separate Cart
-  /// pill rather than the pill row.
-  static const int _cartIndex = 4;
+  /// The height of both pills. Named because the hide animation measures itself
+  /// against it: [AnimatedSlide]'s offset is a multiple of the child's own size,
+  /// not a distance in pixels.
+  static const double _pillHeight = 57.0;
+
+  /// The gap under the pills when the bar is showing.
+  ///
+  /// Android draws its system bar outside the Flutter view, so `padding.bottom`
+  /// is 0 there and this is the whole margin — the value the design was tuned
+  /// against. iOS always reserves 34 for the home indicator, and a `SafeArea`
+  /// *plus* that margin used to stack into a 57pt gap that left the bar
+  /// stranded mid-screen with cards showing underneath it. Taking the larger of
+  /// the two keeps Android exactly as it was and clears the home indicator by a
+  /// deliberate 8 rather than by accident.
+  static double _bottomGap(double systemInset) =>
+      systemInset + 8.0 > 23.0 ? systemInset + 8.0 : 23.0;
 
   void _onTap(int index) {
     navigationShell.goBranch(
@@ -54,13 +81,25 @@ class _ShellNavBar extends ConsumerWidget {
     final ZopiqColors zc = context.zc;
 
     final int currentIndex = navigationShell.currentIndex;
-    // The four pill tabs are indices 0–3; Cart is _cartIndex. When Cart is the
-    // selected branch, the sliding indicator has no pill to sit under, so it
-    // falls back to the first tab rather than sliding off the row.
-    final int leftIndex = currentIndex < _cartIndex ? currentIndex : 0;
+    // The four pill tabs are indices 0–3; Cart is the one after them. When Cart
+    // is the selected branch, the sliding indicator has no pill to sit under, so
+    // it falls back to the first tab rather than sliding off the row.
+    final int leftIndex =
+        currentIndex < AppShell.cartBranchIndex ? currentIndex : 0;
 
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final Color glowColor = isDark ? Colors.black : Colors.white;
+
+    final double bottomGap = _bottomGap(MediaQuery.paddingOf(context).bottom);
+    // Far enough to clear the pill, the gap beneath it, and the shadow's blur,
+    // which reaches past the pill's own box and would otherwise leave a soft
+    // grey line resting on the bottom edge. The old constant 1.5 was 85pt
+    // against the 114 it had to travel, which is why the bar stopped half-drawn
+    // along the bottom of the screen instead of leaving it.
+    final Offset hidden = Offset(
+      0,
+      (_pillHeight + bottomGap + 12.0) / _pillHeight,
+    );
 
     return Stack(
       children: [
@@ -88,12 +127,17 @@ class _ShellNavBar extends ConsumerWidget {
         ),
         // Foreground Pills
         SafeArea(
+          // The bottom inset is spent by `bottomGap` instead, so that the pill
+          // clears the home indicator once rather than twice. Horizontal insets
+          // still apply, for a notch in landscape.
+          top: false,
+          bottom: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsets.fromLTRB(
               ZopiqSpacing.md,
               16.0,
               0, // No right padding, stick to edge
-              23.0, // Pushed down by 8px (from 31 to 23)
+              bottomGap,
             ),
             child: Row(
               children: [
@@ -101,9 +145,9 @@ class _ShellNavBar extends ConsumerWidget {
                   child: AnimatedSlide(
                     duration: const Duration(milliseconds: 800),
                     curve: Curves.easeInOutCubic,
-                    offset: isVisible ? Offset.zero : const Offset(0, 1.5), // Slide down
+                    offset: isVisible ? Offset.zero : hidden, // Slide clear of the bottom edge
                     child: Container(
-                      height: 57,
+                      height: _pillHeight,
                       decoration: BoxDecoration(
                         color: Theme.of(context).brightness == Brightness.dark 
                             ? Colors.black 
@@ -195,9 +239,9 @@ class _ShellNavBar extends ConsumerWidget {
                   curve: Curves.easeInOutCubic,
                   offset: isVisible ? Offset.zero : const Offset(1.5, 0), // Slide right
                   child: GestureDetector(
-                    onTap: () => _onTap(_cartIndex),
+                    onTap: () => _onTap(AppShell.cartBranchIndex),
                     child: Container(
-                      height: 57,
+                      height: _pillHeight,
                       padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.lg),
                       decoration: BoxDecoration(
                         color: zc.primaryDeep,

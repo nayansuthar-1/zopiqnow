@@ -48,7 +48,7 @@ public class ZopiqLiveCardPlugin: NSObject, FlutterPlugin {
       name: channelName, binaryMessenger: registrar.messenger())
     let instance = ZopiqLiveCardPlugin()
     instance.channel = channel
-    registrar.addMethodCallDelegate(instance, on: channel)
+    registrar.addMethodCallDelegate(instance, channel: channel)
     registrar.addApplicationDelegate(instance)
   }
 

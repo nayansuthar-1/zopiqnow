@@ -16,15 +16,21 @@ import UIKit
     // `GMSApiKey` entry in Info.plist -> here. Both platforms therefore keep the
     // key out of the repository and out of Dart.
     //
-    // The empty-key branch matters. `provideAPIKey("")` throws, which would turn
-    // a missing key into a launch crash — on Android the same omission renders
-    // Google's "authorization failure" tile and the rest of the app keeps
-    // working. Skipping the call reproduces that: the map fails, nothing else
-    // does. A fresh clone with no Secrets.xcconfig must still run.
-    if let key = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String,
-       !key.isEmpty {
-      GMSServices.provideAPIKey(key)
-    }
+    // The missing-key branch matters, and *not* calling this is the wrong way
+    // to handle it. `provideAPIKey("")` throws, so an empty key cannot be passed
+    // through — but skipping the call entirely only moves the crash: the SDK
+    // raises an uncaught `NSException` from `+[GMSServices
+    // checkServicePreconditions]` the first time a map view is built, which on
+    // the order screen killed the app outright.
+    //
+    // Handing it a placeholder initialises the SDK, so the map view constructs
+    // and then fails authorisation the way Android's does — a dead tile on one
+    // screen instead of a dead app. A fresh clone with no Secrets.xcconfig must
+    // still run, and now it does past the first map.
+    let key = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String
+    GMSServices.provideAPIKey(
+      (key?.isEmpty ?? true) ? "MISSING_GMS_API_KEY" : key!
+    )
 
     // APNs, which is what `firebase_messaging` sits on top of. Without this the
     // app never receives a device token, FCM has nothing to map its own token

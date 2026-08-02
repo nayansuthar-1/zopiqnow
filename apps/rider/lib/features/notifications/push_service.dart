@@ -104,10 +104,31 @@ class PushService {
 
   /// Register only if there is a signed-in session; the RPC is scoped to the
   /// caller, so a token with no session behind it would be refused anyway.
+  ///
+  /// The iOS branch is not defensive padding. FCM cannot mint a token until
+  /// APNs has answered `registerForRemoteNotifications` with a device token,
+  /// and asked before that, `getToken()` does not wait or return null — it
+  /// **throws** ("APNS token has not been set yet"). At cold start that is the
+  /// ordinary case: AppDelegate's registration is asynchronous and `main`
+  /// reaches here within milliseconds of it. The throw would escape `start()`,
+  /// and since `main` awaits `start()` *before* `runApp`, it would take the
+  /// launch with it — a blank app, over a notification token.
+  ///
+  /// So iOS asks APNs first and simply leaves if the answer has not arrived.
+  /// Nothing is lost by leaving: `onTokenRefresh` above fires when the token is
+  /// first minted, and that is the path a first launch actually registers on.
   static Future<void> _syncTokenToSession() async {
     if (Supabase.instance.client.auth.currentSession == null) return;
-    final String? token = await FirebaseMessaging.instance.getToken();
-    if (token != null) await _registerToken(token);
+    try {
+      if (Platform.isIOS &&
+          await FirebaseMessaging.instance.getAPNSToken() == null) {
+        return;
+      }
+      final String? token = await FirebaseMessaging.instance.getToken();
+      if (token != null) await _registerToken(token);
+    } on Object catch (e) {
+      debugPrint('Could not read push token: $e.');
+    }
   }
 
   static Future<void> _registerToken(String token) async {

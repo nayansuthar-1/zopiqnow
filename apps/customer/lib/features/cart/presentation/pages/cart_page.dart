@@ -28,6 +28,12 @@ class CartPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        // The cart is a shell *branch root*, so its own Navigator has nothing
+        // to pop and `AppBar` draws no leading at all. That was survivable
+        // while the shell's pills were on screen underneath; now that the cart
+        // hides them to give the checkout bar the bottom of the screen, this
+        // arrow is the only way off a non-empty cart.
+        leading: BackButton(onPressed: onBrowse),
         title: const Text('Your cart'),
         actions: <Widget>[
           if (cart.isNotEmpty)

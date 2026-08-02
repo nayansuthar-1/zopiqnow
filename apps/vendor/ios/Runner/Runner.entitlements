@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The counterpart of Info.plist's `remote-notification` background mode.
+	     The plist declares that the app wants to be woken by a push; this
+	     entitlement is what actually makes APNs issue a device token. Without
+	     it `registerForRemoteNotifications` fails and every push is dropped
+	     with no error the app can see.
+
+	     `development` is correct for debug builds and TestFlight alike — Xcode
+	     rewrites it to `production` when it exports for the App Store, so this
+	     value does not need a second file. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>
