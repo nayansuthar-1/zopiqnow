@@ -439,9 +439,16 @@ with everything else correct.
    needs a direct APNs sender (ES256 JWT, `.p8`) in the edge function plus a
    column to hold the push-to-start token. Worth doing once someone can test it.
 2. **App icons** are Flutter's default on both platforms. Pre-existing.
-3. **Razorpay on iOS** is untested. `razorpay_flutter` 1.4.5 uses the standard
-   webview checkout, which needs no `LSApplicationQueriesSchemes` entries, but
-   nobody has put a real payment through it on an iPhone.
+3. **Razorpay on iOS** is untested, and this entry used to say something now
+   wrong: that `razorpay_flutter` 1.4.5 "needs no `LSApplicationQueriesSchemes`
+   entries". True of card and netbanking, which are drawn in a webview. Not true
+   of **UPI intent**, where the SDK calls `canOpenURL` to decide which UPI apps
+   to offer and iOS answers "not installed" for anything not in that key. Since
+   launch C1 made UPI the only method the customer app offers, an empty intent
+   list is not a degraded path — it is most of the payment screen. The schemes
+   are now declared in the customer's `Info.plist`; **confirm the set against
+   Razorpay's current iOS guidance** when C2's adapter is first tested on a
+   device. Nobody has put a real payment through it on an iPhone.
 4. **`apps/vendor` has no Maps and no Google Sign-In**, so it has no
    `Secrets.xcconfig` at all. That is correct, not an omission.
 

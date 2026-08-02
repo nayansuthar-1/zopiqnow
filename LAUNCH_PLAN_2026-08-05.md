@@ -16,6 +16,7 @@ Scope, as decided:
 | **Vendor app** | Closed track / direct APK to onboarded restaurants | debug — **needs a keystore** |
 | **Rider app** | Closed track / direct APK to onboarded riders | debug — **needs a keystore** |
 | **Admin console** | Already a private web app | n/a |
+| **iOS, all three** | **Not on 5 August.** TestFlight from ~8 August | none — no Apple account yet |
 
 Payments: **UPI only, no cash on delivery.** The mock gateway stays wired until
 the real Razorpay keys arrive.
@@ -152,6 +153,67 @@ not a check constraint.
 ### 5 Aug
 
 Answer review feedback the same hour it arrives. Promote when Razorpay clears.
+
+---
+
+## iOS — why it is not in the 5 August date, and what it is in instead
+
+This plan was written Android-only and did not say so. It says so now.
+
+**iOS cannot ship on 5 August at any speed, and the reason is not code.** There
+is no Apple Developer Program membership. Enrolment is a paid application that
+takes 24–48 hours to approve for an individual and longer for an organisation
+(D-U-N-S lookup), and *every* remaining iOS item is downstream of the signing
+certificate that membership issues. Even with the certificate in hand on 5
+August, TestFlight needs a build, and the App Store needs review.
+
+So the honest target is: **enrol now, TestFlight the week of 6 August, App Store
+when the Android launch has stopped needing hands.** Nothing on the Android
+critical path moves to make that happen.
+
+### Where iOS actually stands — better than "not started"
+
+The three apps are **written, and compiled for a real iPhone** on a Mac on 2
+August: customer 208.9 MB, rider 39.8 MB, vendor 22.7 MB, arm64, with all three
+suites green (133 / 35 / 62). The Dart layer is one codebase, so **iOS is at
+feature parity by construction and stays there** — every fix on this list,
+including C1 today, lands on both platforms at once. Info.plists mirror the
+manifests, Firebase config is confirmed inside the built `.app`, the deployment
+target is 14.0, secrets substitute correctly, and five iOS-specific Dart bugs
+were found and fixed before any of it ran.
+
+Read `IOS_HANDOVER.md` §0 before touching any of this. It is the only trustworthy
+account of what is proven versus what is merely written down.
+
+### I0–I3 — do not need the Apple account, do them whenever
+
+| # | What | Who | Time |
+|---|---|---|---|
+| ✅ I0 | **Redeploy `send-notification`.** The `apns` block written 1 Aug had never been deployed, so iOS push could not have arrived even with everything else right. Done 2 Aug — and it carried more than APNs: the same commit added webhook-secret verification, so deploying it blind could have killed *Android* push. The trigger's `x-notify-secret`, `.env`, and the deployed secret's digest were checked to match first. Smoke-tested: wrong secret 403, no secret 403, valid secret with an impossible id 200 and nothing sent. | Me | ✅ |
+| ✅ I1 | **UPI intent schemes in the customer `Info.plist`.** C1 made UPI the only way to pay, and on iOS Razorpay's SDK uses `canOpenURL` to decide which UPI apps to offer — undeclared schemes read as "not installed" and the intent list comes back empty. The handover said these were unnecessary; that was true of webview checkout and is no longer true of ours. **The set is unverified** — confirm against Razorpay's iOS guidance when C2 is tested on a device. | Me | ✅ |
+| I2 | **Apple Developer Program enrolment.** $99/yr. Individual is faster; organisation needs a D-U-N-S number and is worth it only if the listing should read "Zopiq" rather than your own name. **This is the gate. Start it the moment the Android submission is out of your hands.** | You | 30 min + 1–2 days |
+| I3 | **Reserve the three bundle ids** in App Store Connect once I2 clears: `com.siteonlab.zopiqnow`, `com.siteonlab.zopiqRider`, `com.siteonlab.zopiqVendor`. Free, and it stops someone else taking the name. | You | 15 min |
+
+### I4–I9 — need the account, and a Mac
+
+Ordered by what blocks what. None of it is on the 5 August path.
+
+| # | What | Who | Time |
+|---|---|---|---|
+| I4 | **Signing.** Create the distribution certificate, set `DEVELOPMENT_TEAM` in all three Xcode projects (it is set in none of them today), let Xcode manage profiles. Everything below is downstream. `flutter build ios --debug` currently fails with *"No valid code signing certificates were found."* | You + me | 1 h |
+| I5 | **APNs auth key.** Create a `.p8` in the developer portal, upload it to Firebase → Cloud Messaging with the Key ID and Team ID. **One upload covers all three apps** — they share the `zopiq-de276` project, contrary to what the handover's Step 3 originally claimed. Without this, FCM has no route to any iPhone and every push fails silently. | You | 30 min |
+| I6 | **Run all three on a device**, then work the push chain in order rather than guessing: APNs token → FCM token → a `device_tokens` row with `platform='ios'` → webhook fired → function logs. I0 has already cleared the last link. | You + me | 2 h |
+| I7 | **The Live Activity target.** `ZopiqLiveActivity` appears **zero times** in the customer's `project.pbxproj` — the Swift sources, the extension `Info.plist` and `NSSupportsLiveActivities` all exist, but the Xcode target does not, so the live order card is Android-only in practice. Must be done in the Xcode GUI: hand-writing target UUIDs into a `.pbxproj` is a reliable way to corrupt the project. Recipe is `IOS_HANDOVER.md` §4 Step 5 — including the one checkbox that matters, adding `ZopiqLiveCardAttributes.swift` to the extension **as a reference, not a copy**. | Me at the keyboard | 2 h |
+| I8 | **Razorpay on a real iPhone** — the first actual payment through the iOS SDK, and the check that I1's scheme list is right. Downstream of C2 and of live keys. | Me + you | 1 h |
+| I9 | **TestFlight build and internal test.** Then the App Store listing, which reuses everything R3/R4 produced for Play — the privacy policy URL, the data-safety answers become Apple's privacy nutrition labels, the same screenshots at Apple's sizes. **Apple requires in-app account deletion too**, and LEG-001 already built it. | You + me | 4 h |
+
+### What is *not* an iOS gap, so nobody goes hunting
+
+- **App icons** are Flutter's default on **both** platforms. Equally behind, not an iOS omission — and a Play blocker in its own right (R3).
+- **The vendor app has no `Secrets.xcconfig`.** Correct: it has no map and no Google sign-in, so it has no keys.
+- **The rider declines `NSLocationAlwaysAndWhenInUseUsageDescription`** on purpose. WhenInUse plus the `location` background mode is all RID-001 asked for; Always would buy a far more alarming prompt for capability the app never uses.
+- **The rider needs no camera strings.** It has no `image_picker` dependency — rider KYC documents are not captured in the app.
+- **Push-to-start Live Activities** are deliberately not built. FCM cannot send to a Live Activity token; it needs a direct APNs sender in the edge function, which should not be written blind.
 
 ---
 

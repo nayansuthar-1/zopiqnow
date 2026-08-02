@@ -130,6 +130,27 @@
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>tel</string>
+
+		<!-- The UPI apps Razorpay's checkout hands the payment off to. This list
+		     is not about launching them ourselves — it is what iOS requires
+		     before `canOpenURL` will admit an app is installed, and Razorpay's
+		     SDK uses exactly that call to decide which UPI apps to draw. Without
+		     these the intent list comes back empty and the customer is silently
+		     dropped to typing a VPA by hand, on a launch where UPI is the only
+		     way to pay at all (launch C1).
+
+		     An unused entry costs nothing — this key is an allowlist for a query,
+		     not a capability. A missing one costs a payment method.
+
+		     **Not verified.** Written on a machine with no iOS toolchain and no
+		     Razorpay keys; confirm the set against Razorpay's current iOS UPI
+		     guidance when C2's adapter is tested on a device. -->
+		<string>tez</string>
+		<string>phonepe</string>
+		<string>paytmmp</string>
+		<string>bhim</string>
+		<string>credpay</string>
+		<string>upi</string>
 	</array>
 
 	<!-- The Maps SDK key. Android reads it from a manifest meta-data element
