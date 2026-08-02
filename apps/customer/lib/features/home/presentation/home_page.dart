@@ -19,6 +19,7 @@ import 'package:zopiqnow/features/home/presentation/widgets/top_chains_rail.dart
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 import 'package:zopiqnow/features/location/presentation/widgets/address_picker_sheet.dart';
+import 'package:zopiqnow/features/search/presentation/providers/search_providers.dart';
 
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/app/providers/bottom_nav_provider.dart';
@@ -116,6 +117,28 @@ class _HomePageState extends ConsumerState<HomePage>
     }
   }
 
+  /// A tap on the "What's on your mind?" rail. Every tile in it — including the
+  /// trailing "View More" — was wired to an empty callback, so the whole rail
+  /// was decoration: pressing one gave the ink ripple and then nothing.
+  ///
+  /// Search is the destination because it already answers the question the tile
+  /// asks. `searchRestaurants` matches name *or cuisine*, so seeding the query
+  /// with the tile's label ("Biryani") is a real dish search, not a name match
+  /// that happens to work. "View More" seeds nothing and lands on the empty
+  /// search screen, which is the browse-everything screen.
+  ///
+  /// Pushed, not `go`: search sits outside the shell, so a `go` would leave it
+  /// with no bottom bar and no back arrow — a screen with no way out.
+  void _openCategory(FoodCategory category) {
+    final SearchQueryNotifier query = ref.read(searchQueryProvider.notifier);
+    if (category.id == 'view_more') {
+      query.clear();
+    } else {
+      query.set(category.label);
+    }
+    context.pushNamed(Routes.search);
+  }
+
   /// The hero's "Order now": advance the feed by roughly one viewport, which
   /// lands at the restaurant list without hardcoding any section heights.
   void _scrollTowardsRestaurants() {
@@ -183,7 +206,7 @@ class _HomePageState extends ConsumerState<HomePage>
             ),
             SliverPersistentHeader(
               pinned: true,
-              delegate: _FoodCategoryRailDelegate(categories),
+              delegate: _FoodCategoryRailDelegate(categories, _openCategory),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: ZopiqSpacing.lg)),
             AnimatedBuilder(
@@ -293,8 +316,9 @@ class _RestaurantListSection extends ConsumerWidget {
 }
 
 class _FoodCategoryRailDelegate extends SliverPersistentHeaderDelegate {
-  _FoodCategoryRailDelegate(this.categories);
+  _FoodCategoryRailDelegate(this.categories, this.onTapCategory);
   final List<FoodCategory> categories;
+  final ValueChanged<FoodCategory> onTapCategory;
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
@@ -302,7 +326,7 @@ class _FoodCategoryRailDelegate extends SliverPersistentHeaderDelegate {
       color: Theme.of(context).colorScheme.surface,
       child: FoodCategoryRail(
         categories: categories,
-        onTapCategory: (FoodCategory _) {},
+        onTapCategory: onTapCategory,
       ),
     );
   }
