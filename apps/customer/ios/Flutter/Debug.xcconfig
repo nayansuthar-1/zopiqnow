@@ -1,2 +1,14 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"
 #include? "Secrets.xcconfig"
+
+// `RazorpayStandard.xcframework` carries an arm64-only simulator slice, so
+// CocoaPods excludes x86_64 in `Pods-Runner.debug.xcconfig` -- and
+// `Generated.xcconfig`, included after it, overwrites that with its own `i386`.
+// Restating it last is what actually makes it stick. Without it Xcode plans an
+// x86_64 slice it cannot resolve, silently drops `Pods_Runner.framework` from
+// the dependency graph, and the link fails with `framework 'Pods_Runner' not
+// found` -- an error that names neither Razorpay nor the architecture.
+// The cost is that the simulator needs an Apple Silicon Mac, which Razorpay
+// shipping no x86_64 slice had already decided for us.
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = i386 x86_64

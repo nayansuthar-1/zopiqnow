@@ -1,2 +1,7 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
 #include "Generated.xcconfig"
 #include? "Secrets.xcconfig"
+
+// See the note in `Debug.xcconfig`: Razorpay ships no x86_64 simulator slice,
+// and `Generated.xcconfig` overwrites the exclusion CocoaPods writes for it.
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = i386 x86_64

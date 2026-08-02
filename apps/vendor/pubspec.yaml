@@ -61,4 +61,9 @@ dev_dependencies:
   flutter_lints: 6.0.0
 
 flutter:
+  # `firebase_messaging` and `flutter_local_notifications` are CocoaPods-only,
+  # so SPM cannot resolve the graph. Pods for everything.
+  config:
+    enable-swift-package-manager: false
+
   uses-material-design: true

@@ -14,13 +14,14 @@ import UIKit
     // `local.properties`. It is restricted to this app's own bundle id and is
     // not the customer app's key.
     //
-    // Skipping the call on an empty key rather than passing it through:
-    // `provideAPIKey("")` throws, and a missing key should cost a map, not the
-    // whole launch. See the customer app's AppDelegate for the longer note.
-    if let key = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String,
-       !key.isEmpty {
-      GMSServices.provideAPIKey(key)
-    }
+    // A placeholder rather than skipping the call on an empty key:
+    // `provideAPIKey("")` throws, but leaving the SDK uninitialised only defers
+    // the crash to the first map view, which on the job map is the whole screen.
+    // See the customer app's AppDelegate for the longer note.
+    let key = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String
+    GMSServices.provideAPIKey(
+      (key?.isEmpty ?? true) ? "MISSING_GMS_API_KEY" : key!
+    )
 
     // APNs, which `firebase_messaging` sits on top of. Without it the app never
     // gets a device token, FCM has nothing to map its own token onto, and a
