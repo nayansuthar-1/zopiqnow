@@ -121,7 +121,7 @@ be a different address, say so and it changes in one constant.
 
 | # | What | Who | Time |
 |---|---|---|---|
-| C1 | **Remove cash on delivery from checkout.** UPI becomes the only method offered. Server and vendor/rider apps keep the ability to handle a cash order — that is data that already exists — but no new one can be created. | Me | 1 h |
+| ✅ C1 | **Remove cash on delivery from checkout.** UPI becomes the only method offered. Server and vendor/rider apps keep the ability to handle a cash order — that is data that already exists — but no new one can be created. | Me | 1 h |
 | C2 | **Razorpay adapter + server-side signature verification + the mock lockout** described above. Ends with everything ready for keys. | Me | 5 h |
 | C3 | **Crash reporting** (audit OBS-001) — Crashlytics in the customer app, and in vendor and rider if time allows. Launching without it means your first bug report is a one-star review. This is the highest-value non-gate item on the list. | Me | 3 h |
 | C4 | **Idempotency on `place_order`** (audit CUS-005). A double-tap or a retry on a flaky connection currently places two orders. With prepaid UPI that is two charges. | Me | 2 h |
@@ -129,6 +129,15 @@ be a different address, say so and it changes in one constant.
 | C6 | **Delivery OTP no longer shown unconditionally** on the tracking card (audit CUS-015). It is the proof-of-delivery code; it should appear when the rider is at the door, not from the moment the order is placed. | Me | 1 h |
 | C7 | **`ola-static` gets caller authentication** (audit API-002). It proxies your Ola Maps key with no auth — anyone who finds the URL spends your quota. | Me | 2 h |
 | C8 | **Release keystores for vendor and rider**, so the closed-track builds are real builds. Customer already has one. | Me + you for the passwords | 1 h |
+
+**C1 is closed.** The payment card offers UPI and nothing else — cash was removed
+rather than disabled, because a greyed-out row invites the question of when it
+comes back. Migration 0084 is the half that makes it true rather than displayed:
+a `before insert` trigger on `orders` refuses a new `cod` row, so an old build
+with the old screen in it cannot create one either. Existing cash orders are
+untouched and every screen that renders them still does — verified against all
+34 of them in a rolled-back transaction, which is also why this is a trigger and
+not a check constraint.
 
 ### 4 Aug — build, test, submit
 

@@ -139,13 +139,12 @@ Future<void> _openCheckout(WidgetTester tester) async {
 /// this test means: the offer rows are `InkWell`s.
 final Finder _applyButton = find.widgetWithText(TextButton, 'APPLY');
 
-/// Selects UPI and taps the CTA, leaving the mock gateway's sheet open.
+/// Taps the CTA, leaving the mock gateway's sheet open. UPI is the only method
+/// checkout offers, so there is nothing to select first (launch C1).
 ///
 /// No `pumpAndSettle` while a payment is in flight: both CTAs spin an
 /// indeterminate progress indicator, which never settles. Pump explicitly.
 Future<void> _openPaymentSheet(WidgetTester tester) async {
-  await tester.tap(find.text('UPI'));
-  await tester.pumpAndSettle();
   await tester.tap(find.text('Pay ₹460'));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400)); // Sheet slides in.
@@ -162,7 +161,7 @@ Future<void> _drainPayment(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('checkout shows the address, order recap, and live COD total', (
+  testWidgets('checkout shows the address, order recap, and live total', (
     WidgetTester tester,
   ) async {
     _useTallSurface(tester);
@@ -174,24 +173,27 @@ void main() {
     expect(find.text('diner@example.com'), findsOneWidget);
     expect(find.text('+919876543210'), findsOneWidget);
     expect(find.text('1 × Paneer Butter Masala'), findsOneWidget);
-    expect(find.text('Cash on delivery'), findsOneWidget);
-    expect(find.text('Place order · ₹460'), findsOneWidget);
+    // UPI is the only method offered, and cash is not offered at all — not
+    // greyed out, not "coming soon", absent (launch C1).
+    expect(find.text('UPI'), findsOneWidget);
+    expect(find.text('Cash on delivery'), findsNothing);
+    expect(find.text('Pay ₹460'), findsOneWidget);
   });
 
-  testWidgets('placing a COD order reaches the confirmation and empties the '
+  testWidgets('placing an order reaches the confirmation and empties the '
       'cart', (WidgetTester tester) async {
     _useTallSurface(tester);
     await tester.pumpWidget(_app());
     await _openCheckout(tester);
+    await _openPaymentSheet(tester);
 
-    await tester.tap(find.text('Place order · ₹460'));
-    await tester.pump(const Duration(milliseconds: 50));
-    await tester.pumpAndSettle();
+    // The sheet's own CTA, above the checkout screen's.
+    await tester.tap(find.text('Pay ₹460').last);
+    await _drainPayment(tester);
 
     expect(find.byType(OrderSuccessPage), findsOneWidget);
     expect(find.text('Order placed!'), findsOneWidget);
     expect(find.textContaining('ZPQ-'), findsOneWidget);
-    expect(find.text('Pay ₹460 in cash on delivery'), findsOneWidget);
 
     await tester.tap(find.text('Back to home'));
     await tester.pumpAndSettle();
@@ -217,12 +219,12 @@ void main() {
     expect(find.text('-₹50'), findsOneWidget);
     // ₹408, not ₹410: the coupon comes off before GST, so the tax falls from
     // ₹20 to ₹17.50 → ₹18 with it (migration 0078, audit BIZ-005).
-    expect(find.text('Place order · ₹408'), findsOneWidget);
+    expect(find.text('Pay ₹408'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Remove coupon'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Place order · ₹460'), findsOneWidget);
+    expect(find.text('Pay ₹460'), findsOneWidget);
   });
 
   testWidgets('an unknown coupon shows the service\'s reason', (
@@ -237,7 +239,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('This code isn\'t valid.'), findsOneWidget);
-    expect(find.text('Place order · ₹460'), findsOneWidget);
+    expect(find.text('Pay ₹460'), findsOneWidget);
   });
 
   testWidgets('paying by UPI settles on the mock gateway and the receipt shows '
@@ -334,6 +336,6 @@ void main() {
 
     // The number is on the account, and the CTA will now place an order.
     expect(find.text('+919876543210'), findsOneWidget);
-    expect(find.text('Place order · ₹460'), findsOneWidget);
+    expect(find.text('Pay ₹460'), findsOneWidget);
   });
 }

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/app/zopiq_app.dart';
 import 'package:zopiqnow/features/auth/domain/entities/auth_user.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
@@ -13,6 +14,7 @@ import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dar
 import 'package:zopiqnow/features/checkout/data/datasources/order_mock_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
+import 'package:zopiqnow/features/checkout/presentation/gateways/mock_payment_gateway.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/order_detail_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/orders_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
@@ -97,6 +99,15 @@ List<Override> _overrides({required bool seedCart}) => <Override>[
   orderDataSourceProvider.overrideWithValue(
     OrderMockDataSource(latency: _latency),
   ),
+  // Every order goes through the gateway now that UPI is the only method
+  // (launch C1), so the sheet is on the path even for a test about history.
+  // Overridden only to shorten its 900ms "contacting your bank" pause.
+  paymentGatewayProvider.overrideWith(
+    (Ref ref) => MockPaymentGateway(
+      navigatorKey: ref.watch(rootNavigatorKeyProvider),
+      latency: _latency,
+    ),
+  ),
   if (seedCart) cartProvider.overrideWith(_SeededCartNotifier.new),
 ];
 
@@ -124,15 +135,25 @@ Future<void> _openOrders(WidgetTester tester) async {
   expect(find.byType(OrdersPage), findsOneWidget);
 }
 
-/// Cart tab → checkout → place a COD order → back to Home.
-Future<void> _placeCodOrder(WidgetTester tester) async {
+/// Cart tab → checkout → pay ₹609 on the mock gateway → back to Home.
+///
+/// No `pumpAndSettle` while the payment is in flight: both CTAs spin an
+/// indeterminate progress indicator, which never settles. Pump explicitly.
+Future<void> _placeOrder(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 50));
   await tester.tap(find.text('Cart'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Proceed to checkout'));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Place order · ₹609'));
-  await tester.pump(const Duration(milliseconds: 50));
+  await tester.tap(find.text('Pay ₹609'));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400)); // Sheet slides in.
+  // The sheet's own CTA, above the checkout screen's.
+  await tester.tap(find.text('Pay ₹609').last);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 50)); // Gateway settles.
+  await tester.pump(const Duration(milliseconds: 400)); // Sheet slides out.
+  await tester.pump(const Duration(milliseconds: 50)); // Order is placed.
   await tester.pumpAndSettle();
   await tester.tap(find.text('Back to home'));
   await tester.pumpAndSettle();
@@ -176,7 +197,7 @@ void main() {
       _useTallSurface(tester);
       await tester.pumpWidget(_app());
 
-      await _placeCodOrder(tester);
+      await _placeOrder(tester);
       await _openOrders(tester);
 
       expect(find.textContaining('ZPQ-'), findsOneWidget);
@@ -209,7 +230,7 @@ void main() {
       _useTallSurface(tester);
       await tester.pumpWidget(_app());
 
-      await _placeCodOrder(tester);
+      await _placeOrder(tester);
       await _openOrders(tester);
       await tester.tap(find.text('Test Kitchen'));
       await tester.pumpAndSettle();
@@ -220,12 +241,16 @@ void main() {
       // ₹0 delivery is something the customer was *given*, not something that
       // failed to happen.
       expect(find.text('FREE'), findsOneWidget);
-      // Future tense, and that is the assertion. The order was placed a moment
-      // ago, it is cash on delivery, and nobody has paid anybody yet — so the
-      // line may not say "paid". (The receipt redesign renamed this from
-      // "Total" to "To pay"; the rule it encodes is unchanged.)
+      // "To pay" rather than "Grand Total Paid": the order is still open, and
+      // the receipt total is a number that can still move — a refund, a
+      // cancellation — until it is delivered. (The receipt redesign renamed
+      // this from "Total"; the rule it encodes is unchanged.)
       expect(find.text('To pay'), findsOneWidget);
-      expect(find.text('Cash on delivery'), findsOneWidget);
+      // The money is already gone: UPI is the only method checkout offers
+      // (launch C1), and it is charged before the order exists. The gateway's
+      // reference is carried through to the receipt, which is what makes a
+      // dispute answerable.
+      expect(find.textContaining('Paid online · pay_mock_'), findsOneWidget);
     });
 
     testWidgets('an order still on its way is tracked, not receipted', (
@@ -234,7 +259,7 @@ void main() {
       _useTallSurface(tester);
       await tester.pumpWidget(_app());
 
-      await _placeCodOrder(tester);
+      await _placeOrder(tester);
       await _openOrders(tester);
       await tester.tap(find.text('Test Kitchen'));
       await tester.pumpAndSettle();

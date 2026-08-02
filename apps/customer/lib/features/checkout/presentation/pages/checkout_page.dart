@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
@@ -13,7 +12,6 @@ import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dar
 import 'package:zopiqnow/features/cart/presentation/widgets/bill_summary.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/restaurant_offer.dart';
-import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
 import 'package:zopiqnow/features/checkout/domain/gateways/payment_gateway.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
@@ -150,15 +148,7 @@ class CheckoutPage extends ConsumerWidget {
             const SizedBox(height: ZopiqSpacing.md),
             ZopiqReveal(index: 3, child: BillSummary(bill: bill)),
             const SizedBox(height: ZopiqSpacing.md),
-            ZopiqReveal(
-              index: 4,
-              child: _PaymentMethods(
-                selected: checkout.paymentMethod,
-                onSelect: (PaymentMethod m) => ref
-                    .read(checkoutControllerProvider.notifier)
-                    .selectPaymentMethod(m),
-              ),
-            ),
+            const ZopiqReveal(index: 4, child: _PaymentMethods()),
           ],
         ),
       ),
@@ -170,12 +160,9 @@ class CheckoutPage extends ConsumerWidget {
             ? 'Select delivery address'
             : needsPhone
             ? 'Add a delivery number'
-            : checkout.paymentMethod == PaymentMethod.upi
-            ? 'Pay ₹${bill.total}'
-            : 'Place order · ₹${bill.total}',
-        caption: checkout.paymentMethod == PaymentMethod.cod
-            ? 'Pay ₹${bill.total} in cash when your order arrives.'
-            : 'Test gateway — no money moves until the Razorpay keys are live.',
+            : 'Pay ₹${bill.total}',
+        caption:
+            'Test gateway — no money moves until the Razorpay keys are live.',
         isLoading: checkout.isPlacingOrder,
         // The route is auth-guarded, so `auth` is AuthSignedIn here. The pattern
         // match is what proves it rather than a `!`.
@@ -507,14 +494,20 @@ class _OfferChip extends StatelessWidget {
   }
 }
 
+/// How the order is paid. There is one answer and it is not a choice: UPI, up
+/// front, through the gateway (launch C1). Cash on delivery was removed rather
+/// than disabled — a greyed-out row is an invitation to ask when it is coming
+/// back, and the answer is that it is not.
+///
+/// The card stays even though it decides nothing. What the customer is about to
+/// be charged through, and that it is a test gateway, are both things checkout
+/// owes them before the button rather than after it.
 class _PaymentMethods extends StatelessWidget {
-  const _PaymentMethods({required this.selected, required this.onSelect});
-
-  final PaymentMethod selected;
-  final ValueChanged<PaymentMethod> onSelect;
+  const _PaymentMethods();
 
   @override
   Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
 
     return ZopiqCard(
@@ -523,116 +516,40 @@ class _PaymentMethods extends StatelessWidget {
         children: <Widget>[
           Text('Pay with', style: t.titleMedium),
           const SizedBox(height: ZopiqSpacing.sm),
-          _PaymentTile(
-            method: PaymentMethod.cod,
-            icon: Icons.payments_outlined,
-            title: 'Cash on delivery',
-            subtitle: 'Pay when your food arrives',
-            selected: selected == PaymentMethod.cod,
-            onSelect: onSelect,
-          ),
-          _PaymentTile(
-            method: PaymentMethod.upi,
-            icon: Icons.qr_code_rounded,
-            title: 'UPI',
-            subtitle: 'Test gateway · no real money',
-            selected: selected == PaymentMethod.upi,
-            onSelect: onSelect,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PaymentTile extends StatelessWidget {
-  const _PaymentTile({
-    required this.method,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final PaymentMethod method;
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool selected;
-
-  /// Null renders the tile disabled (method not available yet).
-  final ValueChanged<PaymentMethod>? onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final ZopiqColors zc = context.zc;
-    final TextTheme t = Theme.of(context).textTheme;
-    final bool enabled = onSelect != null;
-    final Color textColor = enabled ? zc.textStrong : zc.textMuted;
-
-    return Padding(
-      padding: const EdgeInsets.only(top: ZopiqSpacing.sm),
-      child: InkWell(
-        onTap: enabled
-            ? () {
-                HapticFeedback.selectionClick();
-                onSelect!(method);
-              }
-            : null,
-        borderRadius: ZopiqRadii.rMd,
-        // The selected method is the one the customer's money goes through, so
-        // it gets a filled, bordered state rather than a radio dot they have to
-        // squint at. Colors only — no size or padding changes — so switching
-        // methods cannot reflow the card underneath the finger that tapped it.
-        child: AnimatedContainer(
-          duration: ZopiqDurations.fast,
-          curve: ZopiqCurves.standard,
-          padding: const EdgeInsets.all(ZopiqSpacing.md),
-          decoration: BoxDecoration(
-            color: selected
-                ? zc.primary.withValues(alpha: 0.06)
-                : Colors.transparent,
-            borderRadius: ZopiqRadii.rMd,
-            border: Border.all(
-              color: selected ? zc.primary : zc.divider,
-              width: selected ? 1.5 : 1,
+          Container(
+            padding: const EdgeInsets.all(ZopiqSpacing.md),
+            decoration: BoxDecoration(
+              color: zc.primary.withValues(alpha: 0.06),
+              borderRadius: ZopiqRadii.rMd,
+              border: Border.all(color: zc.primary, width: 1.5),
+            ),
+            child: Row(
+              children: <Widget>[
+                Icon(Icons.qr_code_rounded, size: 22, color: zc.textStrong),
+                const SizedBox(width: ZopiqSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'UPI',
+                        style: t.titleSmall?.copyWith(
+                          color: zc.textStrong,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'Test gateway · no real money',
+                        style: t.bodySmall?.copyWith(color: zc.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.check_circle_rounded, size: 22, color: zc.primary),
+              ],
             ),
           ),
-          child: Row(
-            children: <Widget>[
-              Icon(icon, size: 22, color: enabled ? zc.textStrong : zc.textMuted),
-              const SizedBox(width: ZopiqSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      title,
-                      style: t.titleSmall?.copyWith(
-                        color: textColor,
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      subtitle,
-                      style: t.bodySmall?.copyWith(color: zc.textMuted),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                selected
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_off_rounded,
-                size: 22,
-                color: selected ? zc.primary : zc.textMuted,
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }

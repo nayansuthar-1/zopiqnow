@@ -44,7 +44,6 @@ class CheckoutState {
     this.coupon,
     this.couponError,
     this.isApplyingCoupon = false,
-    this.paymentMethod = PaymentMethod.cod,
     this.isPlacingOrder = false,
   });
 
@@ -54,7 +53,6 @@ class CheckoutState {
   final String? couponError;
 
   final bool isApplyingCoupon;
-  final PaymentMethod paymentMethod;
   final bool isPlacingOrder;
 }
 
@@ -80,10 +78,7 @@ class CheckoutController extends Notifier<CheckoutState> {
     final String? restaurantId = cart.restaurantId;
     if (restaurantId == null) return;
 
-    state = CheckoutState(
-      paymentMethod: state.paymentMethod,
-      isApplyingCoupon: true,
-    );
+    state = const CheckoutState(isApplyingCoupon: true);
     try {
       final AppliedCoupon coupon = await ref
           .read(orderRepositoryProvider)
@@ -92,31 +87,22 @@ class CheckoutController extends Notifier<CheckoutState> {
             subtotal: cart.subtotal,
             restaurantId: restaurantId,
           );
-      state = CheckoutState(
-        paymentMethod: state.paymentMethod,
-        coupon: coupon,
-      );
+      state = CheckoutState(coupon: coupon);
     } on CouponFailure catch (failure) {
-      state = CheckoutState(
-        paymentMethod: state.paymentMethod,
-        couponError: failure.message,
-      );
+      state = CheckoutState(couponError: failure.message);
     }
   }
 
-  void removeCoupon() =>
-      state = CheckoutState(paymentMethod: state.paymentMethod);
-
-  void selectPaymentMethod(PaymentMethod method) =>
-      state = CheckoutState(coupon: state.coupon, paymentMethod: method);
+  void removeCoupon() => state = const CheckoutState();
 
   /// Places the order, records it for the confirmation screen, and clears the
   /// cart.
   ///
-  /// Prepaid methods go through the gateway first. Returns null when the
-  /// customer dismissed the payment sheet — nothing was charged and nothing was
-  /// ordered, so there is nothing to say. Throws [PaymentFailure] on a decline
-  /// and [OrderPlacementFailure] on a transport error; the caller surfaces both.
+  /// Every order is prepaid and goes through the gateway first — UPI is the only
+  /// method checkout offers (launch C1). Returns null when the customer
+  /// dismissed the payment sheet — nothing was charged and nothing was ordered,
+  /// so there is nothing to say. Throws [PaymentFailure] on a decline and
+  /// [OrderPlacementFailure] on a transport error; the caller surfaces both.
   ///
   /// Pay-then-order is still the shape here. Verifying the payment with Razorpay
   /// server-side inverts it (create payment order → settle → verify signature),
@@ -140,32 +126,23 @@ class CheckoutController extends Notifier<CheckoutState> {
       cart,
       discount: state.coupon?.discount ?? 0,
     );
-    state = CheckoutState(
-      coupon: state.coupon,
-      paymentMethod: state.paymentMethod,
-      isPlacingOrder: true,
-    );
+    state = CheckoutState(coupon: state.coupon, isPlacingOrder: true);
     try {
-      String? paymentId;
-      if (state.paymentMethod == PaymentMethod.upi) {
-        final PaymentOutcome outcome = await ref
-            .read(paymentGatewayProvider)
-            .pay(
-              amount: bill.total,
-              description: cart.restaurantName ?? 'Zopiq order',
-            );
-        switch (outcome) {
-          case PaymentSucceeded(paymentId: final String id):
-            paymentId = id;
-          case PaymentFailed(message: final String message):
-            throw PaymentFailure(message);
-          case PaymentCancelled():
-            state = CheckoutState(
-              coupon: state.coupon,
-              paymentMethod: state.paymentMethod,
-            );
-            return null;
-        }
+      final String paymentId;
+      final PaymentOutcome outcome = await ref
+          .read(paymentGatewayProvider)
+          .pay(
+            amount: bill.total,
+            description: cart.restaurantName ?? 'Zopiq order',
+          );
+      switch (outcome) {
+        case PaymentSucceeded(paymentId: final String id):
+          paymentId = id;
+        case PaymentFailed(message: final String message):
+          throw PaymentFailure(message);
+        case PaymentCancelled():
+          state = CheckoutState(coupon: state.coupon);
+          return null;
       }
 
       final PlacedOrder order = await ref
@@ -173,7 +150,7 @@ class CheckoutController extends Notifier<CheckoutState> {
           .placeOrder(
             cart: cart,
             deliveryAddress: deliveryAddress,
-            paymentMethod: state.paymentMethod,
+            paymentMethod: PaymentMethod.upi,
             userPhone: userPhone,
             // The code, not the discount. What it is worth is the service's
             // call, made again against the subtotal the service computes.
@@ -188,10 +165,7 @@ class CheckoutController extends Notifier<CheckoutState> {
       ref.read(cartProvider.notifier).clear();
       return order;
     } on Object {
-      state = CheckoutState(
-        coupon: state.coupon,
-        paymentMethod: state.paymentMethod,
-      );
+      state = CheckoutState(coupon: state.coupon);
       rethrow;
     }
   }
