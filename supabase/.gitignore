@@ -1,0 +1,12 @@
+# The Supabase CLI's local scratch directory. Machine-specific by nature — it
+# caches the CLI version, the linked project, the pooler URL and the versions of
+# the services that project is currently running.
+#
+# Committing it is actively harmful once more than one machine is in play: two
+# developers on two CLI versions produce two different `cli-latest` files and a
+# merge conflict over a cache nobody reads. This is the ignore file `supabase
+# init` normally writes; it was missing here, and the directory had started to
+# be tracked as a result.
+.temp
+.branches
+.env

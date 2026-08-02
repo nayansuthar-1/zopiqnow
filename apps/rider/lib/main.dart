@@ -30,9 +30,15 @@ Future<void> main() async {
     ),
   );
 
-  // Wire push after Supabase is up so a token can register against the restored
-  // session. Guarded internally: no Firebase config means a no-op, app runs on.
-  await PushService.start();
-
   runApp(const ProviderScope(child: RiderApp()));
+
+  // After the first frame, not before — the vendor app has always done it this
+  // way and this one had not. `PushService.start()` brings up Firebase, asks the
+  // notification permission and registers a token against the restored session:
+  // three round trips, all of them on the critical path to first paint while it
+  // was awaited above. A rider opening the app at the start of a shift was
+  // looking at a blank screen for the duration. It still runs after Supabase is
+  // up, which is the only ordering that actually matters, and it is still
+  // guarded internally — no Firebase config means a no-op and the app runs on.
+  await PushService.start();
 }

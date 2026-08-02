@@ -2,26 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_vendor/core/widgets/vendor_animations.dart';
+import 'package:zopiq_vendor/core/widgets/vendor_svg_icons.dart';
 import 'package:zopiq_vendor/features/auth/domain/entities/vendor.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_vendor/features/staff/domain/entities/staff_member.dart';
 import 'package:zopiq_vendor/features/staff/presentation/providers/staff_providers.dart';
 
-/// Who can sign in to this kitchen, and as what.
-///
-/// The owner's screen, and only the owner's — the More hub does not offer the
-/// row to anyone else, and every RPC behind it refuses a non-owner anyway (0024).
-/// Two things are worth knowing while reading it:
-///
-/// The list is *not* optimistic, unlike the sections screen. Access is not a
-/// switch to be flipped and put back — showing someone as removed a beat before
-/// the database agrees is the one lie this screen must not tell — so each write
-/// waits, then refreshes.
-///
-/// And the owner's own row is inert: no menu, no role chip to change. The
-/// database refuses a self-demote and a self-removal (that one rule is what
-/// guarantees a restaurant can never be left with no owner at all), so offering
-/// the buttons would only be a way to be told no.
+/// Who can sign in to this kitchen team.
 class StaffPage extends ConsumerStatefulWidget {
   const StaffPage({super.key});
 
@@ -30,9 +18,6 @@ class StaffPage extends ConsumerStatefulWidget {
 }
 
 class _StaffPageState extends ConsumerState<StaffPage> {
-  /// Blocks the whole screen while a write is in flight. One flag and not a
-  /// per-row set, because these are rare, deliberate actions — unlike the order
-  /// queue, where two tickets are genuinely moved at once.
   bool _busy = false;
 
   @override
@@ -41,8 +26,13 @@ class _StaffPageState extends ConsumerState<StaffPage> {
     final String? me = ref.watch(vendorProvider)?.email.toLowerCase();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Team')),
+      appBar: AppBar(
+        title: const Text('Team'),
+        centerTitle: true,
+      ),
       floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: context.zc.primary,
+        foregroundColor: Colors.white,
         onPressed: _busy ? null : _add,
         icon: const Icon(Icons.person_add_alt_rounded),
         label: const Text('Add'),
@@ -57,17 +47,19 @@ class _StaffPageState extends ConsumerState<StaffPage> {
           child: ListView(
             padding: const EdgeInsets.only(
               top: ZopiqSpacing.sm,
-              // Clear of the FAB, so the last row is never trapped under it.
               bottom: ZopiqSpacing.xxl * 2,
             ),
             children: <Widget>[
-              const _Explainer(),
-              for (final StaffMember m in members)
-                _MemberTile(
-                  member: m,
-                  isMe: m.email.toLowerCase() == me,
-                  onChangeRole: () => _changeRole(m),
-                  onRemove: () => _remove(m),
+              const VendorFadeSlide(child: _Explainer()),
+              for (int i = 0; i < members.length; i++)
+                VendorFadeSlide(
+                  delay: Duration(milliseconds: 50 + i * 50),
+                  child: _MemberTile(
+                    member: members[i],
+                    isMe: members[i].email.toLowerCase() == me,
+                    onChangeRole: () => _changeRole(members[i]),
+                    onRemove: () => _remove(members[i]),
+                  ),
                 ),
             ],
           ),
@@ -92,16 +84,12 @@ class _StaffPageState extends ConsumerState<StaffPage> {
   }
 
   Future<void> _changeRole(StaffMember member) async {
-    // The only move available: two roles, so "change" is unambiguous and a
-    // picker would be a menu of one.
     final StaffRole to = member.role.isOwner ? StaffRole.staff : StaffRole.owner;
     final bool ok = await _confirm(
       title: to.isOwner ? 'Make an owner?' : 'Remove owner access?',
       body: to.isOwner
-          ? '${member.email} will also be able to see earnings and settlements, '
-                'and manage the team.'
-          : '${member.email} will keep working here, but will no longer see '
-                'earnings and settlements or manage the team.',
+          ? '${member.email} will be able to see revenue earnings, settlements, and manage staff access.'
+          : '${member.email} will keep working here, but will no longer see earnings or manage team members.',
       confirm: to.isOwner ? 'Make owner' : 'Change',
     );
     if (!ok) return;
@@ -111,16 +99,15 @@ class _StaffPageState extends ConsumerState<StaffPage> {
           .read(staffControllerProvider.notifier)
           .setRole(email: member.email, role: to),
       to.isOwner
-          ? '${member.email} is now an owner.'
-          : '${member.email} is now staff.',
+          ? '${member.email} is now an Owner.'
+          : '${member.email} is now Staff.',
     );
   }
 
   Future<void> _remove(StaffMember member) async {
     final bool ok = await _confirm(
       title: 'Remove from the team?',
-      body: '${member.email} will be signed out of this restaurant and won\'t '
-          'be able to sign back in. Their past orders are unaffected.',
+      body: '${member.email} will be signed out of this store and won\'t be able to log back in.',
       confirm: 'Remove',
       destructive: true,
     );
@@ -128,11 +115,10 @@ class _StaffPageState extends ConsumerState<StaffPage> {
 
     await _run(
       () => ref.read(staffControllerProvider.notifier).remove(member.email),
-      '${member.email} was removed.',
+      '${member.email} was removed from team.',
     );
   }
 
-  /// Run a write with the screen blocked, then say what happened either way.
   Future<void> _run(Future<String?> Function() write, String success) async {
     setState(() => _busy = true);
     final String? failure = await write();
@@ -179,8 +165,6 @@ class _StaffPageState extends ConsumerState<StaffPage> {
   }
 }
 
-/// What the two roles mean, said once at the top rather than repeated on every
-/// row. An owner adding their first colleague has no other way to find out.
 class _Explainer extends StatelessWidget {
   const _Explainer();
 
@@ -196,10 +180,30 @@ class _Explainer extends StatelessWidget {
         ZopiqSpacing.pageGutter,
         ZopiqSpacing.md,
       ),
-      child: Text(
+      child: Container(
+        padding: const EdgeInsets.all(ZopiqSpacing.md),
+        decoration: BoxDecoration(
+          color: zc.primary.withValues(alpha: 0.06),
+          borderRadius: ZopiqRadii.rMd,
+          border: Border.all(color: zc.primary.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: <Widget>[
+            VendorSvgIcon(
+              type: VendorSvgType.staffRoster,
+              size: 20,
+              color: zc.primary,
+            ),
+            const SizedBox(width: ZopiqSpacing.md),
+            Expanded(
+              child: Text(
         'Everyone here can take orders and manage the menu. Only owners see '
         'earnings and settlements, or change who is on the team.',
-        style: t.bodySmall?.copyWith(color: zc.textMuted),
+                style: t.bodySmall?.copyWith(color: zc.textStrong),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -214,10 +218,7 @@ class _MemberTile extends StatelessWidget {
   });
 
   final StaffMember member;
-
-  /// The signed-in owner's own row — shown, but with nothing to press.
   final bool isMe;
-
   final VoidCallback onChangeRole;
   final VoidCallback onRemove;
 
@@ -235,18 +236,18 @@ class _MemberTile extends StatelessWidget {
         child: Row(
           children: <Widget>[
             Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: zc.primary.withValues(alpha: 0.10),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                member.role.isOwner
-                    ? Icons.workspace_premium_rounded
-                    : Icons.person_rounded,
-                color: zc.primary,
-                size: 20,
+              child: Center(
+                child: VendorSvgIcon(
+                  type: VendorSvgType.staffRoster,
+                  size: 22,
+                  color: zc.primary,
+                ),
               ),
             ),
             const SizedBox(width: ZopiqSpacing.md),
@@ -257,18 +258,34 @@ class _MemberTile extends StatelessWidget {
                   Text(
                     member.email,
                     style: t.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.bold,
                       color: zc.textStrong,
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    isMe
-                        ? '${member.role.isOwner ? 'Owner' : 'Staff'} · you'
-                        : member.role.isOwner
-                        ? 'Owner'
-                        : 'Staff',
-                    style: t.bodySmall?.copyWith(color: zc.textMuted),
+                  Row(
+                    children: <Widget>[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: member.role.isOwner
+                              ? zc.primary.withValues(alpha: 0.12)
+                              : zc.divider.withValues(alpha: 0.5),
+                          borderRadius: ZopiqRadii.rPill,
+                        ),
+                        child: Text(
+                          isMe
+                              ? '${member.role.isOwner ? 'Owner' : 'Staff'} · you'
+                              : member.role.isOwner
+                              ? 'Owner'
+                              : 'Staff',
+                          style: t.labelSmall?.copyWith(
+                            color: member.role.isOwner ? zc.primary : zc.textMuted,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -302,7 +319,6 @@ class _MemberTile extends StatelessWidget {
 
 enum _MemberAction { changeRole, remove }
 
-/// What [_AddDialog] hands back.
 class _NewMember {
   const _NewMember({required this.email, required this.role});
 
@@ -330,10 +346,6 @@ class _AddDialogState extends State<_AddDialog> {
 
   void _submit() {
     final String email = _controller.text.trim().toLowerCase();
-    // A shape check only. Whether the address is free, or already on another
-    // restaurant's team, is the database's to answer — asking here would mean
-    // an endpoint that reports which emails are taken, which is the enumeration
-    // hole 0009 was written to close.
     if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
       setState(() => _error = 'Enter a valid email address.');
       return;
@@ -355,10 +367,8 @@ class _AddDialogState extends State<_AddDialog> {
             keyboardType: TextInputType.emailAddress,
             autocorrect: false,
             decoration: InputDecoration(
-              labelText: 'Email address',
-              // They sign in with a code mailed to this address, so it has to be
-              // one they actually read.
-              helperText: 'They sign in with a code sent here',
+              labelText: 'Staff Email Address',
+              helperText: 'A sign-in code will be sent to this email',
               errorText: _error,
             ),
             onSubmitted: (_) => _submit(),
@@ -407,9 +417,13 @@ class _ErrorBody extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.cloud_off_rounded, size: 56, color: zc.textMuted),
+            VendorSvgIcon(
+              type: VendorSvgType.storeClosed,
+              size: 56,
+              color: zc.textMuted,
+            ),
             const SizedBox(height: ZopiqSpacing.lg),
-            Text('We couldn\'t load your team', style: t.titleMedium),
+            Text('We couldn\'t load your team', style: t.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: ZopiqSpacing.xs),
             Text(
               'Check the internet and try again.',

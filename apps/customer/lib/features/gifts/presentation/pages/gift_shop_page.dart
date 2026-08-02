@@ -12,11 +12,9 @@ import 'package:zopiqnow/features/gifts/presentation/widgets/gift_item_card.dart
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_item_sheet.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_status_views.dart';
 
-/// A single gift shop's storefront: its cover and tagline up top, then its
-/// products grouped by shelf (the `category`), in the vendor's chosen order.
-///
-/// Resolves from the id alone so a cold link works without the Gifts feed ever
-/// having loaded.
+/// A single gift shop's storefront page:
+/// Features Blinkit studio header with verified artisan badge, rating pill,
+/// shop description card, and products organized by shelf.
 class GiftShopPage extends ConsumerWidget {
   const GiftShopPage({required this.shopId, super.key});
 
@@ -71,13 +69,15 @@ class _ShopHeader extends StatelessWidget {
 
   final GiftShop shop;
 
+  static const Color _blinkitGreen = Color(0xFF0C831F);
+
   @override
   Widget build(BuildContext context) {
     final TextTheme t = Theme.of(context).textTheme;
 
     return SliverAppBar(
       pinned: true,
-      expandedHeight: 220,
+      expandedHeight: 230,
       backgroundColor: Theme.of(context).colorScheme.surface,
       surfaceTintColor: Colors.transparent,
       foregroundColor: Colors.white,
@@ -91,51 +91,124 @@ class _ShopHeader extends StatelessWidget {
               icon: Icons.storefront_rounded,
               iconSize: 64,
             ),
-            // Scrim so the back button and title stay legible over any photo.
+            // Multi-layered Scrim
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: <Color>[Colors.black54, Colors.transparent, Colors.black54],
-                  stops: <double>[0, 0.4, 1],
+                  colors: <Color>[
+                    Colors.black54,
+                    Colors.black26,
+                    Colors.black87,
+                  ],
+                  stops: <double>[0.0, 0.4, 1.0],
                 ),
               ),
             ),
             Positioned(
-              left: ZopiqSpacing.lg,
-              right: ZopiqSpacing.lg,
-              bottom: ZopiqSpacing.lg,
+              left: 16,
+              right: 16,
+              bottom: 16,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
+                  // Badges Row
+                  Row(
+                    children: <Widget>[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: const Color(0xFFFFD700).withValues(alpha: 0.6),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            const Icon(
+                              Icons.workspace_premium_rounded,
+                              size: 12,
+                              color: Color(0xFFFFD700),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              'VERIFIED STUDIO',
+                              style: t.labelSmall?.copyWith(
+                                color: Colors.white,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   Text(
                     shop.name,
                     style: t.headlineSmall?.copyWith(
                       color: Colors.white,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 22,
                     ),
                   ),
-                  const SizedBox(height: ZopiqSpacing.xxs),
+                  const SizedBox(height: 2),
                   Text(
                     shop.tagline,
-                    style: t.bodyMedium?.copyWith(color: Colors.white70),
+                    style: t.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 13,
+                    ),
                   ),
                   if (shop.rating != null) ...<Widget>[
-                    const SizedBox(height: ZopiqSpacing.sm),
-                    Row(
-                      children: <Widget>[
-                        const Icon(Icons.star_rounded, size: 16, color: Colors.white),
-                        const SizedBox(width: ZopiqSpacing.xxs),
-                        Text(
-                          '${shop.rating!.toStringAsFixed(1)}  ·  ${shop.ratingCount}+ ratings',
-                          style: t.labelMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _blinkitGreen,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(
+                            shop.rating!.toStringAsFixed(1),
+                            style: t.labelMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 3),
+                          const Icon(
+                            Icons.star_rounded,
+                            size: 12,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '· ${shop.ratingCount}+ ratings',
+                            style: t.labelSmall?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ],
@@ -148,8 +221,7 @@ class _ShopHeader extends StatelessWidget {
   }
 }
 
-/// The shop's blurb, rendered as its own sliver beneath the header. Kept off the
-/// [SliverAppBar.bottom] so it scrolls away with the content rather than pinning.
+/// The shop's blurb with clean icon callout.
 class _ShopDescription extends StatelessWidget {
   const _ShopDescription({required this.description});
 
@@ -160,19 +232,44 @@ class _ShopDescription extends StatelessWidget {
     if (description.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          ZopiqSpacing.lg,
-          ZopiqSpacing.lg,
-          ZopiqSpacing.lg,
-          0,
-        ),
-        child: Text(
-          description,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: context.zc.textMuted,
-            height: 1.4,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.04)
+                : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : const Color(0xFFE2E8F0),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Icon(
+                Icons.auto_awesome_rounded,
+                size: 18,
+                color: Color(0xFF0C831F),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  description,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: isDark ? Colors.white70 : const Color(0xFF475569),
+                    height: 1.4,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -194,8 +291,6 @@ class _ShopItems extends StatelessWidget {
       );
     }
 
-    // Group into shelves, preserving the query's order (category_rank, item_rank)
-    // — the vendor's merchandising, not a re-sort.
     final List<String> shelves = <String>[];
     final Map<String, List<GiftItem>> byShelf = <String, List<GiftItem>>{};
     for (final GiftItem item in items) {
@@ -211,24 +306,19 @@ class _ShopItems extends StatelessWidget {
       builder: (BuildContext context, SliverConstraints constraints) {
         final double width = constraints.crossAxisExtent;
         final int crossAxisCount = width > 900 ? 4 : (width > 550 ? 3 : 2);
-        final double childAspectRatio = width < 400 ? 0.62 : 0.66;
+        final double childAspectRatio = width < 400 ? 0.60 : 0.64;
 
         return SliverMainAxisGroup(
           slivers: <Widget>[
             for (final String shelf in shelves) ...<Widget>[
               SliverToBoxAdapter(child: _ShelfHeader(title: shelf)),
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  ZopiqSpacing.lg,
-                  0,
-                  ZopiqSpacing.lg,
-                  ZopiqSpacing.lg,
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 sliver: SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: ZopiqSpacing.lg,
-                    crossAxisSpacing: ZopiqSpacing.lg,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 14,
                     childAspectRatio: childAspectRatio,
                   ),
                   delegate: SliverChildBuilderDelegate(
@@ -258,21 +348,33 @@ class _ShelfHeader extends StatelessWidget {
 
   final String title;
 
+  static const Color _blinkitGreen = Color(0xFF0C831F);
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        ZopiqSpacing.pageGutter,
-        ZopiqSpacing.lg,
-        ZopiqSpacing.pageGutter,
-        ZopiqSpacing.md,
-      ),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w800,
-        ),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 3.5,
+            height: 16,
+            decoration: BoxDecoration(
+              color: _blinkitGreen,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+

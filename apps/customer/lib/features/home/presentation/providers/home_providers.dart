@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:zopiqnow/features/account/presentation/providers/veg_mode_provider.dart';
 import 'package:zopiqnow/features/home/data/datasources/hero_slide_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/home_catalog_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_datasource.dart';
@@ -66,6 +67,25 @@ final Provider<List<FoodCategory>> foodCategoriesProvider =
       (Ref ref) => ref.watch(homeCatalogDataSourceProvider).fetchCategories(),
     );
 
+/// The "View More" sheet's dish list, with Account's "100% Veg Mode" applied.
+///
+/// Same rule as [filteredRestaurantsProvider]: the mode is a standing
+/// preference, so it filters the merchandising too. Filtering here rather than
+/// in the sheet keeps the toggle live — flipping veg mode rebuilds the grid
+/// under an open sheet.
+final Provider<List<FoodCategory>> moreFoodCategoriesProvider =
+    Provider<List<FoodCategory>>((Ref ref) {
+      final List<FoodCategory> all = ref
+          .watch(homeCatalogDataSourceProvider)
+          .fetchMoreCategories();
+
+      return ref.watch(vegModeProvider)
+          ? all
+                .where((FoodCategory category) => category.isVeg)
+                .toList(growable: false)
+          : all;
+    });
+
 final Provider<List<Offer>> offersProvider = Provider<List<Offer>>(
   (Ref ref) => ref.watch(homeCatalogDataSourceProvider).fetchOffers(),
 );
@@ -97,9 +117,18 @@ class HomeFiltersNotifier extends Notifier<HomeFilters> {
 final Provider<AsyncValue<List<Restaurant>>> filteredRestaurantsProvider =
     Provider<AsyncValue<List<Restaurant>>>((Ref ref) {
       final HomeFilters filters = ref.watch(homeFiltersProvider);
+
+      // Account's "100% Veg Mode" forces the chip on and cannot be turned off
+      // from here — that is what makes it a *mode* rather than a second copy of
+      // the Pure Veg chip. One predicate does the filtering either way, so the
+      // two controls can never disagree about what "veg" means.
+      final HomeFilters effective = ref.watch(vegModeProvider)
+          ? filters.copyWith(pureVeg: true)
+          : filters;
+
       return ref
           .watch(nearbyRestaurantsProvider)
-          .whenData((List<Restaurant> all) => filters.apply(all));
+          .whenData((List<Restaurant> all) => effective.apply(all));
     });
 
 /// "Top restaurant chains" rail — highest-rated first, ignores the chip row.

@@ -8,10 +8,14 @@
          this the kitchen never gets asked, and a new-order push is silent. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
+    <!-- See the customer app's manifest for the reasoning: a Keystore-backed
+         session survives a Drive backup as ciphertext whose key does not, so a
+         restored device would hold bytes nothing can open. -->
     <application
-        android:label="Zopiqnow Partner"
+        android:label="Zopiq Partner"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -186,6 +186,7 @@ flutter:
   assets:
     - assets/categories/
     - assets/icons_zopiq/
+    - assets/icons-2.0/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

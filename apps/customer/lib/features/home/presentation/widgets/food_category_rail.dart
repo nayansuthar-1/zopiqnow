@@ -16,11 +16,16 @@ class FoodCategoryRail extends StatelessWidget {
   final List<FoodCategory> categories;
   final ValueChanged<FoodCategory>? onTapCategory;
 
-  static const double _artSize = 58;
+  /// The diameter of a category disc, everywhere it is drawn. Public because
+  /// the "View More" sheet draws the same discs and has to draw them the same
+  /// size — a grid that sized its art from the cell instead came out at nearly
+  /// twice this, and the two screens stopped looking like one product.
+  static const double artSize = 58;
+
   static const double _tileWidth = 66;
 
   /// Art + top pad + gap + one line of label, so the rail never reflows on long names.
-  static const double railHeight = _artSize + ZopiqSpacing.lg + ZopiqSpacing.sm + 18;
+  static const double railHeight = artSize + ZopiqSpacing.lg + ZopiqSpacing.sm + 18;
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +73,7 @@ class _CategoryTile extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            CategoryArt(category: category, size: FoodCategoryRail._artSize),
+            CategoryArt(category: category, size: FoodCategoryRail.artSize),
             const SizedBox(height: ZopiqSpacing.sm),
             Text(
               category.label,

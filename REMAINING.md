@@ -23,7 +23,13 @@ the admin console (B7 + all-orders), and vendor Phases 1–7 bar one item.
 
 ## Vendor app
 
-- **Sound + haptic** on a new order in the foreground. *(Phase 7 leftover, no deps.)*
+- ~~**Sound + haptic** on a new order in the foreground.~~ **Already done** — struck
+  2026-07-30. `new_order_alarm.dart` fires `HapticFeedback.heavyImpact()` and
+  `PushService.chimeNewOrder()`, adopts the first batch silently so a morning
+  launch does not ring nine times, is wired into `vendor_shell.dart`, and is
+  covered by `new_order_alarm_test.dart`. It had been carried here as owed since
+  Phase 7 and a launch audit re-reported it as missing on the strength of this
+  line. A stale tracker costs more than an untracked task.
 - Phase 9 hardening folds into B8 below.
 
 ## Rider app

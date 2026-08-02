@@ -8,7 +8,12 @@ import 'package:flutter/foundation.dart';
 /// layout change.
 @immutable
 class FoodCategory {
-  const FoodCategory({required this.id, required this.label, this.imageAsset});
+  const FoodCategory({
+    required this.id,
+    required this.label,
+    this.imageAsset,
+    this.isVeg = true,
+  });
 
   final String id;
 
@@ -18,6 +23,11 @@ class FoodCategory {
   /// Bundled asset path, e.g. `assets/categories/biryani.webp`. Null until real
   /// artwork is supplied.
   final String? imageAsset;
+
+  /// False for meat and egg dishes. "100% Veg Mode" hides those tiles, so the
+  /// mode is honoured before a tap rather than after — a person who has turned
+  /// meat off should not be shown a Mutton tile at all.
+  final bool isVeg;
 
   @override
   bool operator ==(Object other) =>

@@ -12,6 +12,7 @@ import 'package:zopiqnow/features/home/presentation/widgets/food_category_rail.d
 import 'package:zopiqnow/features/home/presentation/widgets/home_app_bar.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_filter_chips.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_status_views.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/more_categories_sheet.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_list_skeleton.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/section_header.dart';
@@ -302,7 +303,9 @@ class _FoodCategoryRailDelegate extends SliverPersistentHeaderDelegate {
       color: Theme.of(context).colorScheme.surface,
       child: FoodCategoryRail(
         categories: categories,
-        onTapCategory: (FoodCategory _) {},
+        onTapCategory: (FoodCategory category) {
+          if (category.id == 'view_more') showMoreCategoriesSheet(context);
+        },
       ),
     );
   }
