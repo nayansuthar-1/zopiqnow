@@ -24,9 +24,10 @@ import 'package:zopiqnow/features/location/presentation/widgets/address_picker_s
 /// Checkout: who is ordering, where it goes, what it costs after a coupon, and
 /// how it's paid. Auth-guarded — only signed-in users reach it.
 ///
-/// UPI settles through the mock gateway until the Razorpay keys and the
-/// payment-order endpoint land (Step 7). The tile says so: a test payment that
-/// looks like a real one is worse than one that admits what it is.
+/// UPI settles through Razorpay, and through the mock only while the merchant
+/// keys are unset — the server decides which, not this screen (launch C2). The
+/// row says so whenever it is the mock: a test payment that looks like a real
+/// one is worse than one that admits what it is.
 class CheckoutPage extends ConsumerWidget {
   const CheckoutPage({super.key});
 

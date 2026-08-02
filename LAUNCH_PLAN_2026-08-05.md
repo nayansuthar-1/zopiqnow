@@ -123,13 +123,48 @@ be a different address, say so and it changes in one constant.
 | # | What | Who | Time |
 |---|---|---|---|
 | ✅ C1 | **Remove cash on delivery from checkout.** UPI becomes the only method offered. Server and vendor/rider apps keep the ability to handle a cash order — that is data that already exists — but no new one can be created. | Me | 1 h |
-| C2 | **Razorpay adapter + server-side signature verification + the mock lockout** described above. Ends with everything ready for keys. | Me | 5 h |
+| ✅ C2 | **Razorpay adapter + server-side signature verification + the mock lockout** described above. Ends with everything ready for keys. | Me | 5 h |
 | C3 | **Crash reporting** (audit OBS-001) — Crashlytics in the customer app, and in vendor and rider if time allows. Launching without it means your first bug report is a one-star review. This is the highest-value non-gate item on the list. | Me | 3 h |
 | C4 | **Idempotency on `place_order`** (audit CUS-005). A double-tap or a retry on a flaky connection currently places two orders. With prepaid UPI that is two charges. | Me | 2 h |
 | ✅ C5 | **Hide the dead Account tiles** (audit UX-001). Done alongside LEG-001 — the legal rows went where they were. All five are gone, and Help & support is the support address rather than a snackbar. | Me | 1 h |
 | C6 | **Delivery OTP no longer shown unconditionally** on the tracking card (audit CUS-015). It is the proof-of-delivery code; it should appear when the rider is at the door, not from the moment the order is placed. | Me | 1 h |
 | C7 | **`ola-static` gets caller authentication** (audit API-002). It proxies your Ola Maps key with no auth — anyone who finds the URL spends your quota. | Me | 2 h |
 | C8 | **Release keystores for vendor and rider**, so the closed-track builds are real builds. Customer already has one. | Me + you for the passwords | 1 h |
+
+**C2 is closed, and PAY-001 with it — pending one statement.** Three pieces:
+
+- **`razorpay-order`** creates the Razorpay order server-side, so the amount is
+  fixed by us and not by the phone, and writes a `payment_intents` row.
+- **`razorpay-verify`** checks Razorpay's HMAC signature
+  (`HMAC_SHA256(order_id|payment_id, key_secret)`), in constant time, and moves
+  the intent to `verified`. Its implementation was cross-checked against
+  `openssl dgst -sha256 -hmac` on the same input — byte-identical.
+- **Migration 0085** adds a second `before insert` guard on `orders`: a UPI order
+  must name a **verified, unconsumed** intent belonging to the same customer,
+  worth at least the order's total. Consuming it is what stops one payment
+  buying two dinners.
+
+**The gate ships off.** `payment_settings.require_verified_payment` is `false`,
+because turning it on with no keys would stop the product taking orders — the
+outage 0082 just fixed. The day the keys are set:
+
+```sql
+update public.payment_settings set require_verified_payment = true;
+```
+
+**The mock lockout.** Razorpay is bound always; the *server* says whether it
+acts, so the day the keys become function secrets every installed build starts
+taking real payments with no new release. What sits behind it depends on the
+build: debug gets the mock, a release built with
+`--dart-define=ALLOW_MOCK_PAYMENTS=true` gets the mock, and a release without it
+gets a refusal. **The production build cannot settle a mock payment by
+accident.**
+
+**Still owed, and it needs the keys:** set `RAZORPAY_KEY_ID` and
+`RAZORPAY_KEY_SECRET` as function secrets, flip the switch above, and put one
+real ₹1 payment through a device — the signature path has never run against
+Razorpay, only against a known-good vector. On iOS that same run is I8, and it
+is also the check that I1's UPI scheme list is right.
 
 **C1 is closed.** The payment card offers UPI and nothing else — cash was removed
 rather than disabled, because a greyed-out row invites the question of when it

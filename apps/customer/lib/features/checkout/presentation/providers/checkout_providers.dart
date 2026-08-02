@@ -1,12 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:zopiqnow/app/env.dart';
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_supabase_datasource.dart';
+import 'package:zopiqnow/features/checkout/data/gateways/locked_payment_gateway.dart';
+import 'package:zopiqnow/features/checkout/data/gateways/razorpay_payment_gateway.dart';
 import 'package:zopiqnow/features/checkout/data/repositories/order_repository_impl.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
@@ -24,11 +28,29 @@ import 'package:zopiqnow/features/location/presentation/providers/location_provi
 final Provider<OrderDataSource> orderDataSourceProvider =
     Provider<OrderDataSource>((Ref ref) => const OrderSupabaseDataSource());
 
-/// Payment gateway binding — the seam Razorpay slots into once the keys and the
-/// payment-order endpoint exist (Step 7). Until then, the mock settles UPI.
+/// Payment gateway binding (launch C2).
+///
+/// Razorpay is always bound. Whether it *acts* is the server's decision, not a
+/// build-time one: `razorpay-order` answers `configured: false` while there are
+/// no keys, and the adapter falls through to whatever is behind it. So the day
+/// the keys are set as function secrets, every already-installed build starts
+/// taking real payments — no release, no store review, no waiting.
+///
+/// What is behind it depends on the build, and this is the mock lockout:
+///
+/// * **Debug** — the mock, always. That is what makes the flow exercisable.
+/// * **Release with `--dart-define=ALLOW_MOCK_PAYMENTS=true`** — the mock.
+///   Testing tracks are built this way.
+/// * **Release without it** — a refusal. A production build cannot settle a
+///   payment through a gateway that moves no money, and cannot be made to by
+///   forgetting something.
 final Provider<PaymentGateway> paymentGatewayProvider = Provider<PaymentGateway>(
-  (Ref ref) =>
-      MockPaymentGateway(navigatorKey: ref.watch(rootNavigatorKeyProvider)),
+  (Ref ref) => RazorpayPaymentGateway(
+    supabase: Supabase.instance.client,
+    fallback: kReleaseMode && !Env.allowMockPayments
+        ? const LockedPaymentGateway()
+        : MockPaymentGateway(navigatorKey: ref.watch(rootNavigatorKeyProvider)),
+  ),
 );
 
 /// Repository binding — the seam the UI depends on (SAD 7.4).

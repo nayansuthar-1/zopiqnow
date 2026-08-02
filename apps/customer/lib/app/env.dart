@@ -65,6 +65,26 @@ abstract final class Env {
     'CLOUDINARY_UPLOAD_PRESET',
     defaultValue: 'zopiqnow_unsigned',
   );
+
+  /// Lets a **release** build settle checkout through the mock gateway.
+  ///
+  /// Off unless asked for, and asked for by build argument rather than by any
+  /// runtime switch, because the failure this prevents is somebody shipping a
+  /// payment screen that moves no money:
+  ///
+  ///     flutter build appbundle --dart-define=ALLOW_MOCK_PAYMENTS=true
+  ///
+  /// Testing tracks get the flag; the production build cannot acquire it by
+  /// accident. Debug builds ignore this entirely and always keep the mock — see
+  /// `LockedPaymentGateway`.
+  ///
+  /// Nothing here decides whether *Razorpay* is used. That is the server's
+  /// answer: `razorpay-order` reports whether keys are configured, so the day
+  /// they are set every installed build starts taking real payments with no new
+  /// release. This flag only governs what happens while the answer is no.
+  static const bool allowMockPayments = bool.fromEnvironment(
+    'ALLOW_MOCK_PAYMENTS',
+  );
 }
 
 // The Maps key is deliberately absent from this file. Google's Maps SDK reads
