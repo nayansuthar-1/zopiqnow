@@ -12,6 +12,7 @@ import 'package:zopiqnow/features/home/presentation/widgets/food_category_rail.d
 import 'package:zopiqnow/features/home/presentation/widgets/home_app_bar.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_filter_chips.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_status_views.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/more_categories_sheet.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_list_skeleton.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/section_header.dart';
@@ -117,25 +118,24 @@ class _HomePageState extends ConsumerState<HomePage>
     }
   }
 
-  /// A tap on the "What's on your mind?" rail. Every tile in it — including the
-  /// trailing "View More" — was wired to an empty callback, so the whole rail
-  /// was decoration: pressing one gave the ink ripple and then nothing.
+  /// A tap on the "What's on your mind?" rail. Every tile in it was wired to an
+  /// empty callback, so the whole rail was decoration: pressing one gave the ink
+  /// ripple and then nothing.
   ///
-  /// Search is the destination because it already answers the question the tile
-  /// asks. `searchRestaurants` matches name *or cuisine*, so seeding the query
-  /// with the tile's label ("Biryani") is a real dish search, not a name match
-  /// that happens to work. "View More" seeds nothing and lands on the empty
-  /// search screen, which is the browse-everything screen.
+  /// Two destinations, because the rail has two kinds of tile. "View More" opens
+  /// [showMoreCategoriesSheet], which is the screen built for it. Every other
+  /// tile goes to search: `searchRestaurants` matches name *or cuisine*, so
+  /// seeding the query with the tile's label ("Biryani") is a real dish search,
+  /// not a name match that happens to work.
   ///
   /// Pushed, not `go`: search sits outside the shell, so a `go` would leave it
   /// with no bottom bar and no back arrow — a screen with no way out.
   void _openCategory(FoodCategory category) {
-    final SearchQueryNotifier query = ref.read(searchQueryProvider.notifier);
     if (category.id == 'view_more') {
-      query.clear();
-    } else {
-      query.set(category.label);
+      showMoreCategoriesSheet(context);
+      return;
     }
+    ref.read(searchQueryProvider.notifier).set(category.label);
     context.pushNamed(Routes.search);
   }
 

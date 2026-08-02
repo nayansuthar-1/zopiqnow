@@ -4,15 +4,19 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_shop.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_image.dart';
 
-/// A gift shop in the storefront rail: cover image with verified badge, title, tagline, and rating pill.
+/// A gift shop card in the storefront rail:
+/// Inspired by Blinkit's partner studio cards with verified badges, rating pills,
+/// cover gradient scrim, and studio taglines.
 class GiftShopCard extends StatelessWidget {
   const GiftShopCard({required this.shop, this.onTap, super.key});
 
   final GiftShop shop;
   final VoidCallback? onTap;
 
-  /// Fixed width so the rail scrolls horizontally with consistent cards.
-  static const double cardWidth = 230;
+  /// Fixed width so the rail scrolls horizontally smoothly.
+  static const double cardWidth = 240;
+
+  static const Color _blinkitGreen = Color(0xFF0C831F);
 
   @override
   Widget build(BuildContext context) {
@@ -24,26 +28,29 @@ class GiftShopCard extends StatelessWidget {
       width: cardWidth,
       child: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: ZopiqRadii.rLg,
+          color: isDark ? const Color(0xFF1E1E24) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : const Color(0xFFE8ECEF),
             width: 1.0,
           ),
           boxShadow: <BoxShadow>[
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: ZopiqRadii.rLg,
+          borderRadius: BorderRadius.circular(16),
           child: Material(
             type: MaterialType.transparency,
             child: InkWell(
               onTap: onTap,
+              borderRadius: BorderRadius.circular(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
@@ -57,43 +64,66 @@ class GiftShopCard extends StatelessWidget {
                           icon: Icons.storefront_rounded,
                         ),
                       ),
+                      // Scrim
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: <Color>[
+                                Colors.black.withValues(alpha: 0.3),
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.25),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Top Left Verified Pill
                       Positioned(
-                        top: ZopiqSpacing.xs,
-                        left: ZopiqSpacing.xs,
+                        top: 8,
+                        left: 8,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: ZopiqSpacing.xs + 2,
-                            vertical: 2,
+                            horizontal: 8,
+                            vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            borderRadius: ZopiqRadii.rSm,
+                            color: Colors.black.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: const Color(0xFFFFD700).withValues(alpha: 0.5),
+                              width: 0.8,
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: <Widget>[
                               const Icon(
-                                Icons.verified_rounded,
+                                Icons.workspace_premium_rounded,
                                 size: 12,
                                 color: Color(0xFFFFD700),
                               ),
                               const SizedBox(width: 3),
                               Text(
-                                'Verified Studio',
+                                'VERIFIED STUDIO',
                                 style: t.labelSmall?.copyWith(
                                   color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.4,
                                 ),
                               ),
                             ],
                           ),
                         ),
                       ),
+
                     ],
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(ZopiqSpacing.md),
+                    padding: const EdgeInsets.all(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
@@ -107,11 +137,12 @@ class GiftShopCard extends StatelessWidget {
                                 style: t.titleSmall?.copyWith(
                                   fontWeight: FontWeight.w800,
                                   fontSize: 14,
+                                  color: isDark ? Colors.white : const Color(0xFF1E1E1E),
                                 ),
                               ),
                             ),
                             if (shop.rating != null) ...<Widget>[
-                              const SizedBox(width: ZopiqSpacing.xs),
+                              const SizedBox(width: 6),
                               _RatingPill(rating: shop.rating!),
                             ],
                           ],
@@ -123,7 +154,7 @@ class GiftShopCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: t.bodySmall?.copyWith(
                             color: zc.textMuted,
-                            fontSize: 12,
+                            fontSize: 11.5,
                           ),
                         ),
                       ],
@@ -139,24 +170,24 @@ class GiftShopCard extends StatelessWidget {
   }
 }
 
-/// Dark-green rating pill.
+/// Blinkit signature green rating pill.
 class _RatingPill extends StatelessWidget {
   const _RatingPill({required this.rating});
 
   final double rating;
 
-  static const Color _darkGreen = Color(0xFF267335);
+  static const Color _blinkitGreen = Color(0xFF0C831F);
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: ZopiqSpacing.xs + 2,
+        horizontal: 6,
         vertical: 2,
       ),
-      decoration: const BoxDecoration(
-        color: _darkGreen,
-        borderRadius: ZopiqRadii.rSm,
+      decoration: BoxDecoration(
+        color: _blinkitGreen,
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -165,14 +196,15 @@ class _RatingPill extends StatelessWidget {
             rating.toStringAsFixed(1),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: Colors.white,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               fontSize: 11,
             ),
           ),
           const SizedBox(width: 2),
-          const Icon(Icons.star_rounded, size: 11, color: Colors.white),
+          const Icon(Icons.star_rounded, size: 10, color: Colors.white),
         ],
       ),
     );
   }
 }
+

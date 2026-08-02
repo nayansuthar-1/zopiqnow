@@ -16,10 +16,17 @@ class VendorApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'Zopiqnow Partner',
+      title: 'Zopiq Partner',
       debugShowCheckedModeBanner: false,
       theme: ZopiqTheme.light,
       darkTheme: ZopiqTheme.dark,
+      // Pinned, and the pin is the point. Omitting `themeMode` defaults it to
+      // `ThemeMode.system`, so a counter tablet set to dark — which many are,
+      // for the screen — would render a dark theme nobody has designed a queue
+      // screen against or looked at on a real device. `darkTheme` stays declared
+      // so the work has somewhere to land; until it is done, light is what this
+      // app has actually been built and tested in.
+      themeMode: ThemeMode.light,
       routerConfig: ref.watch(routerProvider),
     );
   }

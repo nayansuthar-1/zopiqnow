@@ -48,10 +48,6 @@ Future<void> main() async {
     ),
   );
 
-  // Wire push after Supabase is up so a token can register against the restored
-  // session. Guarded internally: no Firebase config means a no-op, app runs on.
-  await PushService.start();
-
   runApp(
     ProviderScope(
       overrides: <Override>[
@@ -61,4 +57,14 @@ Future<void> main() async {
       child: const ZopiqApp(),
     ),
   );
+
+  // After the first frame, not before. Bringing up Firebase, asking the
+  // notification permission and registering a token are three round trips, and
+  // awaiting them above put all three between the splash and the first paint —
+  // on a mid-range phone on a slow connection, seconds of nothing. It still runs
+  // after Supabase is up, which is the ordering that matters (the token
+  // registers against the restored session), and the permission prompt now
+  // lands over a running app rather than a blank screen, which is where a
+  // prompt should land. Guarded internally: no Firebase config means a no-op.
+  await PushService.start();
 }

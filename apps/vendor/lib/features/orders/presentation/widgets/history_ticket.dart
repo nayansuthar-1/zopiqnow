@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_vendor/core/formatting/formatters.dart';
+import 'package:zopiq_vendor/core/widgets/vendor_svg_icons.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 import 'package:zopiq_vendor/features/orders/presentation/widgets/order_detail_sheet.dart';
@@ -29,74 +30,87 @@ class HistoryTicket extends StatelessWidget {
         horizontal: ZopiqSpacing.pageGutter,
         vertical: ZopiqSpacing.xs,
       ),
-      child: ZopiqCard(
+      child: ZopiqPressable(
         onTap: () => showOrderDetail(context, order),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    order.id,
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        child: ZopiqCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      order.id,
+                      style: t.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
                   ),
+                  OrderStatusBadge(status: order.status),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: <Widget>[
+                  Icon(Icons.access_time_rounded, size: 13, color: zc.textMuted),
+                  const SizedBox(width: 4),
+                  Text(
+                    formatOrderDate(order.placedAt),
+                    style: t.bodySmall?.copyWith(color: zc.textMuted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: ZopiqSpacing.md),
+
+              OrderLines(orderId: order.id),
+
+              const SizedBox(height: ZopiqSpacing.md),
+              Divider(height: 1, color: zc.divider.withValues(alpha: 0.5)),
+              const SizedBox(height: ZopiqSpacing.md),
+
+              Row(
+                children: <Widget>[
+                  VendorSvgIcon(
+                    type: order.paymentMethod.isCash
+                        ? VendorSvgType.receiptDetail
+                        : VendorSvgType.verifiedCheck,
+                    size: 18,
+                    color: order.paymentMethod.isCash ? zc.primary : zc.veg,
+                  ),
+                  const SizedBox(width: ZopiqSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      order.paymentMethod.isCash
+                          ? 'Collect Cash: ${formatRupees(order.total)}'
+                          : 'Prepaid Online: ${formatRupees(order.total)}',
+                      style: t.bodyMedium?.copyWith(
+                        color: zc.textStrong,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: zc.textMuted, size: 18),
+                ],
+              ),
+              if (order.deliveryTo.isNotEmpty) ...<Widget>[
+                const SizedBox(height: ZopiqSpacing.xs),
+                Row(
+                  children: <Widget>[
+                    Icon(Icons.location_on_rounded, size: 16, color: zc.textMuted),
+                    const SizedBox(width: ZopiqSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        order.deliveryTo,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.bodySmall?.copyWith(color: zc.textMuted),
+                      ),
+                    ),
+                  ],
                 ),
-                OrderStatusBadge(status: order.status),
               ],
-            ),
-            const SizedBox(height: ZopiqSpacing.xxs),
-            Text(
-              formatOrderDate(order.placedAt),
-              style: t.bodySmall?.copyWith(color: zc.textMuted),
-            ),
-            const SizedBox(height: ZopiqSpacing.md),
-
-            OrderLines(orderId: order.id),
-
-            const SizedBox(height: ZopiqSpacing.md),
-            Divider(height: 1, color: zc.divider),
-            const SizedBox(height: ZopiqSpacing.md),
-
-            _Detail(
-              icon: order.paymentMethod.isCash
-                  ? Icons.payments_outlined
-                  : Icons.check_circle_outline_rounded,
-              text: order.paymentMethod.isCash
-                  ? 'Cash · ${formatRupees(order.total)}'
-                  : 'Paid online · ${formatRupees(order.total)}',
-            ),
-            const SizedBox(height: ZopiqSpacing.sm),
-            _Detail(icon: Icons.location_on_rounded, text: order.deliveryTo),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Detail extends StatelessWidget {
-  const _Detail({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final ZopiqColors zc = context.zc;
-    final TextTheme t = Theme.of(context).textTheme;
-
-    return Row(
-      children: <Widget>[
-        Icon(icon, size: 18, color: zc.textMuted),
-        const SizedBox(width: ZopiqSpacing.sm),
-        Expanded(
-          child: Text(
-            text,
-            style: t.bodyMedium?.copyWith(color: zc.textMuted),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }

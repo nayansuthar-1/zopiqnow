@@ -4,16 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_vendor/app/router.dart';
+import 'package:zopiq_vendor/core/widgets/vendor_animations.dart';
+import 'package:zopiq_vendor/core/widgets/vendor_svg_icons.dart';
 import 'package:zopiq_vendor/features/auth/domain/entities/vendor.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_vendor/features/profile/domain/entities/restaurant_profile.dart';
 import 'package:zopiq_vendor/features/profile/presentation/providers/profile_providers.dart';
 
-/// The restaurant's own page: what customers see, and the door to editing it.
-///
-/// Read-mostly. The one thing a kitchen does here often is not on this screen at
-/// all — pausing orders lives on the queue, where a busy cook already is. This is
-/// where the slower changes happen: the name, the cuisines, the price.
+/// The restaurant's store profile details and editor portal.
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
 
@@ -29,8 +27,7 @@ class ProfilePage extends ConsumerWidget {
         child: Column(
           children: <Widget>[
             // ── Custom Header ──
-            ZopiqReveal(
-              index: 0,
+            VendorFadeSlide(
               child: _Header(onSignOut: () => ref.read(vendorAuthControllerProvider.notifier).signOut()),
             ),
 
@@ -125,8 +122,8 @@ class _ProfileView extends StatelessWidget {
       ),
       children: <Widget>[
         if (profile.imageUrl.isNotEmpty) ...<Widget>[
-          ZopiqReveal(
-            index: 1,
+          VendorFadeSlide(
+            delay: const Duration(milliseconds: 50),
             child: ClipRRect(
               borderRadius: ZopiqRadii.rLg,
               child: AspectRatio(
@@ -141,8 +138,8 @@ class _ProfileView extends StatelessWidget {
           const SizedBox(height: ZopiqSpacing.lg),
         ],
         
-        ZopiqReveal(
-          index: 2,
+        VendorFadeSlide(
+          delay: const Duration(milliseconds: 100),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -162,8 +159,8 @@ class _ProfileView extends StatelessWidget {
         ),
         const SizedBox(height: ZopiqSpacing.md),
         
-        ZopiqReveal(
-          index: 3,
+        VendorFadeSlide(
+          delay: const Duration(milliseconds: 120),
           child: Wrap(
             spacing: ZopiqSpacing.sm,
             runSpacing: ZopiqSpacing.xs,
@@ -174,33 +171,33 @@ class _ProfileView extends StatelessWidget {
         ),
         const SizedBox(height: ZopiqSpacing.xl),
 
-        ZopiqReveal(
-          index: 4,
+        VendorFadeSlide(
+          delay: const Duration(milliseconds: 150),
           child: ZopiqCard(
             padding: EdgeInsets.zero,
             child: Column(
               children: <Widget>[
                 _FieldRow(
-                  icon: Icons.payments_rounded,
+                  svgType: VendorSvgType.receiptDetail,
                   label: 'Cost for two',
                   value: '₹${profile.priceForTwo}',
                 ),
                 const Divider(height: 1),
                 _FieldRow(
-                  icon: Icons.timer_rounded,
+                  svgType: VendorSvgType.prepTimer,
                   label: 'Prep time',
                   value: '${profile.etaMinutes} min',
                 ),
                 const Divider(height: 1),
                 _FieldRow(
-                  icon: profile.isVeg ? Icons.eco_rounded : Icons.restaurant_rounded,
+                  svgType: VendorSvgType.chefMenu,
                   label: 'Pure veg',
                   value: profile.isVeg ? 'Yes' : 'No',
                   iconColor: profile.isVeg ? zc.veg : zc.textMuted,
                 ),
                 const Divider(height: 1),
                 _FieldRow(
-                  icon: Icons.local_offer_rounded,
+                  svgType: VendorSvgType.verifiedCheck,
                   label: 'Offer',
                   value: profile.promoText ?? 'None',
                   muted: profile.promoText == null,
@@ -208,7 +205,7 @@ class _ProfileView extends StatelessWidget {
                 if (email != null) ...<Widget>[
                   const Divider(height: 1),
                   _FieldRow(
-                    icon: Icons.email_rounded,
+                    svgType: VendorSvgType.storefront,
                     label: 'Signed in as',
                     value: email!,
                     muted: true,
@@ -221,8 +218,8 @@ class _ProfileView extends StatelessWidget {
 
         const SizedBox(height: ZopiqSpacing.xl),
         
-        ZopiqReveal(
-          index: 5,
+        VendorFadeSlide(
+          delay: const Duration(milliseconds: 180),
           child: ZopiqButton(
             label: 'Edit profile',
             icon: Icons.edit_rounded,
@@ -231,8 +228,8 @@ class _ProfileView extends StatelessWidget {
         ),
         const SizedBox(height: ZopiqSpacing.md),
         
-        ZopiqReveal(
-          index: 6,
+        VendorFadeSlide(
+          delay: const Duration(milliseconds: 200),
           child: Text(
             'Your name, cuisines, price, offer and prep time show on the '
             'customer app. Ratings are earned and can\'t be edited.',
@@ -247,14 +244,14 @@ class _ProfileView extends StatelessWidget {
 
 class _FieldRow extends StatelessWidget {
   const _FieldRow({
-    required this.icon,
+    required this.svgType,
     required this.label,
     required this.value,
     this.muted = false,
     this.iconColor,
   });
 
-  final IconData icon;
+  final VendorSvgType svgType;
   final String label;
   final String value;
   final bool muted;
@@ -272,8 +269,8 @@ class _FieldRow extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Icon(
-            icon,
+          VendorSvgIcon(
+            type: svgType,
             size: 20,
             color: iconColor ?? zc.textMuted,
           ),
@@ -288,7 +285,7 @@ class _FieldRow extends StatelessWidget {
             value,
             style: t.bodyMedium?.copyWith(
               color: muted ? zc.textMuted : zc.textStrong,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
@@ -318,7 +315,7 @@ class _CuisineChip extends StatelessWidget {
         label,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
           color: zc.primary,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
@@ -354,7 +351,7 @@ class _RatingPill extends StatelessWidget {
             '${rating.toStringAsFixed(1)} ($count)',
             style: t.labelMedium?.copyWith(
               color: zc.veg,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
@@ -379,9 +376,13 @@ class _Error extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.cloud_off_rounded, size: 56, color: zc.textMuted),
+            VendorSvgIcon(
+              type: VendorSvgType.storeClosed,
+              size: 56,
+              color: zc.textMuted,
+            ),
             const SizedBox(height: ZopiqSpacing.lg),
-            Text('We couldn\'t load your profile', style: t.titleMedium),
+            Text('We couldn\'t load your profile', style: t.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: ZopiqSpacing.xs),
             Text(
               'Check the internet and try again.',

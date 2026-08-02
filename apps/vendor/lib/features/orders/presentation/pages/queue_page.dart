@@ -3,19 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_vendor/core/widgets/store_status_banner.dart';
+import 'package:zopiq_vendor/core/widgets/vendor_animations.dart';
+import 'package:zopiq_vendor/core/widgets/vendor_svg_icons.dart';
 import 'package:zopiq_vendor/features/auth/domain/entities/vendor.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 import 'package:zopiq_vendor/features/orders/presentation/widgets/order_ticket.dart';
 
-/// The kitchen's screen — the app's home, and the tab a cook lives on.
-///
-/// A restaurant tablet is glanced at, across a room, by someone holding a pan.
-/// So the queue is nothing but the list: every order that still needs a human,
-/// oldest first, with its next action on it, and the open/closed switch above.
-/// The slower rooms — history, the menu, the profile — are a tab away, not on
-/// this screen, because a cook mid-rush should not have to scroll past them.
+/// The kitchen's screen — live orders worklist for merchant cooks.
 class QueuePage extends ConsumerWidget {
   const QueuePage({super.key});
 
@@ -31,19 +27,18 @@ class QueuePage extends ConsumerWidget {
         child: Column(
           children: <Widget>[
             // ── 1. Custom Header ──
-            ZopiqReveal(
-              index: 0,
+            VendorFadeSlide(
               child: _Header(vendor: vendor, queueCount: queue.length, newCount: newCount),
             ),
             
             // ── 2. Animated Status Banner ──
             if (vendor != null)
-              ZopiqReveal(
-                index: 1,
+              VendorFadeSlide(
+                delay: const Duration(milliseconds: 50),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: ZopiqSpacing.pageGutter,
-                    vertical: ZopiqSpacing.sm,
+                    vertical: ZopiqSpacing.xs,
                   ),
                   child: StoreStatusBanner(vendor: vendor),
                 ),
@@ -52,9 +47,23 @@ class QueuePage extends ConsumerWidget {
             // ── 3. Queue List ──
             Expanded(
               child: orders.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      CircularProgressIndicator(color: context.zc.primary),
+                      const SizedBox(height: ZopiqSpacing.md),
+                      Text(
+                        'Connecting to live kitchen terminal...',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: context.zc.textMuted,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
                 error: (Object _, StackTrace _) => _Message(
-                  icon: Icons.cloud_off_rounded,
+                  iconType: VendorSvgType.storeClosed,
                   title: 'We\'ve lost the connection',
                   body:
                       'Orders can\'t reach you until this is back. '
@@ -65,7 +74,7 @@ class QueuePage extends ConsumerWidget {
                 data: (_) {
                   if (queue.isEmpty) {
                     return const _Message(
-                      icon: Icons.done_all_rounded,
+                      iconType: VendorSvgType.liveOrders,
                       title: 'All caught up',
                       body: 'New orders appear here the moment they\'re placed.',
                     );
@@ -75,8 +84,8 @@ class QueuePage extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.sm),
                     itemCount: queue.length,
                     itemBuilder: (BuildContext context, int i) {
-                      return ZopiqReveal(
-                        index: 2 + i, // Staggered reveal for tickets
+                      return VendorFadeSlide(
+                        delay: Duration(milliseconds: i * 60),
                         child: RepaintBoundary(
                           child: OrderTicket(
                             key: ValueKey<String>(queue[i].id),
@@ -117,7 +126,7 @@ class _Header extends StatelessWidget {
         ZopiqSpacing.pageGutter,
         ZopiqSpacing.lg,
         ZopiqSpacing.pageGutter,
-        ZopiqSpacing.sm,
+        ZopiqSpacing.xs,
       ),
       child: Row(
         children: <Widget>[
@@ -146,24 +155,34 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
+          Container(
+            padding: const EdgeInsets.all(ZopiqSpacing.sm),
+            decoration: BoxDecoration(
+              color: zc.primary.withValues(alpha: 0.1),
+              borderRadius: ZopiqRadii.rMd,
+            ),
+            child: VendorSvgIcon(
+              type: VendorSvgType.chefMenu,
+              size: 24,
+              color: zc.primary,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// The empty and disconnected states, which differ in their words and in whether
-/// there is anything to do about them.
 class _Message extends StatelessWidget {
   const _Message({
-    required this.icon,
+    required this.iconType,
     required this.title,
     required this.body,
     this.actionLabel,
     this.onAction,
   });
 
-  final IconData icon;
+  final VendorSvgType iconType;
   final String title;
   final String body;
   final String? actionLabel;
@@ -180,9 +199,13 @@ class _Message extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(icon, size: 56, color: zc.textMuted),
+            VendorSvgIcon(
+              type: iconType,
+              size: 56,
+              color: zc.textMuted,
+            ),
             const SizedBox(height: ZopiqSpacing.lg),
-            Text(title, style: t.titleMedium),
+            Text(title, style: t.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: ZopiqSpacing.xs),
             Text(
               body,

@@ -21,10 +21,19 @@
          this the customer is never asked, and an order-update push is silent. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
+    <!-- `allowBackup="false"` below: Android's auto-backup would copy this app's
+         shared preferences to the user's Drive, and `flutter_secure_storage` keeps
+         the session there as ciphertext whose key lives in the device Keystore.
+         The key does not travel; the ciphertext would. Restoring onto a new phone
+         then yields bytes nothing can open — a silently signed-out app at best, a
+         crash loop at worst. A session is re-established by signing in, not
+         carried in a backup, so opting out is the honest position rather than a
+         precaution. -->
     <application
-        android:label="zopiqnow"
+        android:label="Zopiq"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false">
 
         <!-- The Maps SDK reads its key from here and nowhere else. The value is
              substituted by Gradle from `android/local.properties`, which is
@@ -88,6 +97,20 @@
         <intent>
             <action android:name="android.intent.action.DIAL"/>
             <data android:scheme="tel"/>
+        </intent>
+
+        <!-- The profile photo's camera path. Same Android 11 visibility rule as
+             the dialler above: `image_picker` declares a FileProvider but no
+             `<queries>` of its own, so a camera app this one cannot see is a
+             camera app it may fail to resolve on stricter OEM builds.
+
+             Note what is deliberately *not* here: `android.permission.CAMERA`.
+             Declaring it would oblige us to request a runtime grant before
+             ACTION_IMAGE_CAPTURE; leaving it out means the camera app takes the
+             photo under its own permission and hands us back the result. Fewer
+             permissions on the Play listing, and one less dialog. -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE"/>
         </intent>
     </queries>
 </manifest>

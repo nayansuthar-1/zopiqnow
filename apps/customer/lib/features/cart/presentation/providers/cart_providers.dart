@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:zopiqnow/core/storage/key_value_store.dart';
+import 'package:zopiqnow/core/storage/storage_providers.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_option.dart';
@@ -15,11 +18,50 @@ enum AddToCartResult {
 }
 
 /// The single source of truth for the cart. Updates are synchronous and
-/// immediate (optimistic UI — Rule 2.6); persistence/sync to the backend is a
-/// later concern behind this same API.
+/// immediate (optimistic UI — Rule 2.6); persisted locally via [KeyValueStore].
 class CartNotifier extends Notifier<Cart> {
+  static const String _storageKey = 'zopiq_customer_cart_v1';
+
+  KeyValueStore? _getStore() {
+    try {
+      return ref.read(keyValueStoreProvider);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
-  Cart build() => const Cart.empty();
+  Cart build() {
+    final KeyValueStore? store = _getStore();
+    if (store == null) return const Cart.empty();
+    try {
+      final String? raw = store.getString(_storageKey);
+      if (raw != null && raw.isNotEmpty) {
+        final Map<String, dynamic> decoded =
+            jsonDecode(raw) as Map<String, dynamic>;
+        return Cart.fromJson(decoded);
+      }
+    } catch (_) {
+      // Fallback to empty cart if parsing fails
+    }
+    return const Cart.empty();
+  }
+
+  @override
+  set state(Cart value) {
+    super.state = value;
+    final KeyValueStore? store = _getStore();
+    if (store == null) return;
+    try {
+      if (value.isEmpty) {
+        store.remove(_storageKey);
+      } else {
+        store.setString(_storageKey, jsonEncode(value.toJson()));
+      }
+    } catch (_) {
+      // Ignore write errors silently
+    }
+  }
 
   AddToCartResult add({
     required String restaurantId,

@@ -67,7 +67,10 @@ class _ShellNavBar extends ConsumerWidget {
   static double _bottomGap(double systemInset) =>
       systemInset + 8.0 > 23.0 ? systemInset + 8.0 : 23.0;
 
-  void _onTap(int index) {
+  void _onTap(WidgetRef ref, int index) {
+    if (!ref.read(bottomNavVisibilityProvider)) {
+      ref.read(bottomNavVisibilityProvider.notifier).state = true;
+    }
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
@@ -185,6 +188,7 @@ class _ShellNavBar extends ConsumerWidget {
                                 children: [
                                   _buildNavItem(
                                     context: context,
+                                    ref: ref,
                                     index: 0,
                                     title: 'Delivery',
                                     icon: Icons.delivery_dining_outlined,
@@ -195,6 +199,7 @@ class _ShellNavBar extends ConsumerWidget {
                                   ),
                                   _buildNavItem(
                                     context: context,
+                                    ref: ref,
                                     index: 1,
                                     title: 'Dining',
                                     icon: Icons.restaurant_outlined,
@@ -205,6 +210,7 @@ class _ShellNavBar extends ConsumerWidget {
                                   ),
                                   _buildNavItem(
                                     context: context,
+                                    ref: ref,
                                     index: 2,
                                     title: 'Grocery',
                                     icon: Icons.local_grocery_store_outlined,
@@ -215,6 +221,7 @@ class _ShellNavBar extends ConsumerWidget {
                                   ),
                                   _buildNavItem(
                                     context: context,
+                                    ref: ref,
                                     index: 3,
                                     title: 'Gifts',
                                     icon: Icons.card_giftcard_outlined,
@@ -239,7 +246,7 @@ class _ShellNavBar extends ConsumerWidget {
                   curve: Curves.easeInOutCubic,
                   offset: isVisible ? Offset.zero : const Offset(1.5, 0), // Slide right
                   child: GestureDetector(
-                    onTap: () => _onTap(AppShell.cartBranchIndex),
+                    onTap: () => _onTap(ref, AppShell.cartBranchIndex),
                     child: Container(
                       height: _pillHeight,
                       padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.lg),
@@ -305,6 +312,7 @@ class _ShellNavBar extends ConsumerWidget {
 
   Widget _buildNavItem({
     required BuildContext context,
+    required WidgetRef ref,
     required int index,
     required String title,
     required IconData icon,
@@ -315,7 +323,7 @@ class _ShellNavBar extends ConsumerWidget {
   }) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => _onTap(index),
+      onTap: () => _onTap(ref, index),
       child: SizedBox(
         width: width,
         child: Column(

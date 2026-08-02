@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
-/// Full-bleed error state with a retry action (Rule 2.5 — no blank screens).
+/// Full-bleed error state with a retry action in Blinkit theme.
 class GiftErrorView extends StatelessWidget {
   const GiftErrorView({required this.message, required this.onRetry, super.key});
 
   final String message;
   final VoidCallback onRetry;
+
+  static const Color _blinkitGreen = Color(0xFF0C831F);
 
   @override
   Widget build(BuildContext context) {
@@ -16,22 +18,25 @@ class GiftErrorView extends StatelessWidget {
     return _CenteredState(
       children: <Widget>[
         Container(
-          width: 80,
-          height: 80,
+          width: 84,
+          height: 84,
           decoration: BoxDecoration(
-            color: zc.primaryDeep.withValues(alpha: 0.1),
+            color: _blinkitGreen.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(
+          child: const Icon(
             Icons.wifi_off_rounded,
-            size: 38,
-            color: zc.primaryDeep,
+            size: 40,
+            color: _blinkitGreen,
           ),
         ),
         const SizedBox(height: ZopiqSpacing.lg),
         Text(
           'Something went wrong',
-          style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          style: t.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+          ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: ZopiqSpacing.xs),
@@ -41,10 +46,20 @@ class GiftErrorView extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: ZopiqSpacing.xl),
-        ZopiqButton(
-          label: 'Try again',
-          icon: Icons.refresh_rounded,
-          expand: false,
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _blinkitGreen,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: const Icon(Icons.refresh_rounded, size: 18),
+          label: const Text(
+            'Try again',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+          ),
           onPressed: onRetry,
         ),
       ],
@@ -56,6 +71,8 @@ class GiftErrorView extends StatelessWidget {
 class GiftEmptyView extends StatelessWidget {
   const GiftEmptyView({super.key});
 
+  static const Color _blinkitGreen = Color(0xFF0C831F);
+
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
@@ -64,22 +81,25 @@ class GiftEmptyView extends StatelessWidget {
     return _CenteredState(
       children: <Widget>[
         Container(
-          width: 80,
-          height: 80,
+          width: 84,
+          height: 84,
           decoration: BoxDecoration(
-            color: zc.primaryDeep.withValues(alpha: 0.1),
+            color: _blinkitGreen.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(
+          child: const Icon(
             Icons.card_giftcard_rounded,
-            size: 38,
-            color: zc.primaryDeep,
+            size: 40,
+            color: _blinkitGreen,
           ),
         ),
         const SizedBox(height: ZopiqSpacing.lg),
         Text(
           'No gifts found',
-          style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          style: t.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+          ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: ZopiqSpacing.xs),
@@ -118,11 +138,11 @@ class GiftGridSkeleton extends StatelessWidget {
             childAspectRatio: childAspectRatio,
           ),
           itemCount: itemCount,
-          itemBuilder: (_, _) => const ZopiqShimmer(
+          itemBuilder: (_, _) => ZopiqShimmer(
             child: ZopiqSkeletonBox(
               width: double.infinity,
               height: double.infinity,
-              borderRadius: ZopiqRadii.rLg,
+              borderRadius: BorderRadius.circular(16),
             ),
           ),
         );
@@ -146,3 +166,4 @@ class _CenteredState extends StatelessWidget {
     );
   }
 }
+

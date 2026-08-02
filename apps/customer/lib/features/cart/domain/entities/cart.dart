@@ -47,6 +47,21 @@ class CartLine {
     quantity: quantity ?? this.quantity,
     options: options,
   );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'item': item.toJson(),
+        'quantity': quantity,
+        'options': options.map((MenuOption o) => o.toJson()).toList(),
+      };
+
+  factory CartLine.fromJson(Map<String, dynamic> json) => CartLine(
+        item: MenuItem.fromJson(json['item'] as Map<String, dynamic>),
+        quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+        options: (json['options'] as List<dynamic>? ?? const <dynamic>[])
+            .cast<Map<String, dynamic>>()
+            .map(MenuOption.fromJson)
+            .toList(),
+      );
 }
 
 /// The customer's cart. A cart belongs to a single restaurant (food-delivery
@@ -89,4 +104,19 @@ class Cart {
       lines: lines ?? this.lines,
     );
   }
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'restaurant_id': restaurantId,
+        'restaurant_name': restaurantName,
+        'lines': lines.map((CartLine l) => l.toJson()).toList(),
+      };
+
+  factory Cart.fromJson(Map<String, dynamic> json) => Cart(
+        restaurantId: json['restaurant_id'] as String?,
+        restaurantName: json['restaurant_name'] as String?,
+        lines: (json['lines'] as List<dynamic>? ?? const <dynamic>[])
+            .cast<Map<String, dynamic>>()
+            .map(CartLine.fromJson)
+            .toList(),
+      );
 }

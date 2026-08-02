@@ -23,8 +23,7 @@ class AddToCartControl extends StatelessWidget {
   final double width;
 
   /// Whether the control accepts taps. False when the restaurant has stopped
-  /// taking orders: the control is greyed and inert, because an ADD that only
-  /// fails at checkout is a worse answer than one that plainly cannot be pressed.
+  /// taking orders.
   final bool enabled;
 
   @override
@@ -34,7 +33,7 @@ class AddToCartControl extends StatelessWidget {
 
     final Widget control = SizedBox(
       width: width,
-      height: 38,
+      height: 36,
       child: quantity == 0
           ? _AddButton(zc: zc, surface: surface, onAdd: onAdd)
           : _Stepper(
@@ -66,33 +65,49 @@ class _AddButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Material(
-      color: surface,
-      borderRadius: ZopiqRadii.rSm,
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        borderRadius: ZopiqRadii.rSm,
+        borderRadius: BorderRadius.circular(20),
         onTap: () {
           HapticFeedback.selectionClick();
           onAdd();
         },
-        child: Ink(
+        child: Container(
           decoration: BoxDecoration(
-            borderRadius: ZopiqRadii.rSm,
-            border: Border.all(color: zc.divider),
+            color: isDark ? zc.primary.withValues(alpha: 0.15) : zc.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: zc.primary,
+              width: 1.2,
+            ),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: zc.cardShadow,
+                color: zc.primary.withValues(alpha: 0.15),
                 blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
           child: Center(
-            child: Text(
-              'ADD',
-              style: Theme.of(
-                context,
-              ).textTheme.labelLarge?.copyWith(color: zc.primary),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(Icons.add_rounded, size: 14, color: zc.primary),
+                const SizedBox(width: 2),
+                Text(
+                  'ADD',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: zc.primary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -116,10 +131,17 @@ class _Stepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
         color: zc.primary,
-        borderRadius: ZopiqRadii.rSm,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: zc.primary.withValues(alpha: 0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -133,9 +155,11 @@ class _Stepper extends StatelessWidget {
           ),
           Text(
             '$quantity',
-            style: Theme.of(
-              context,
-            ).textTheme.labelLarge?.copyWith(color: Colors.white),
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 13,
+            ),
           ),
           _StepButton(
             icon: Icons.add_rounded,
@@ -160,11 +184,12 @@ class _StepButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkResponse(
       onTap: onTap,
-      radius: 22,
+      radius: 20,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.sm),
-        child: Icon(icon, color: Colors.white, size: 18),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Icon(icon, color: Colors.white, size: 16),
       ),
     );
   }
 }
+

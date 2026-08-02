@@ -6,7 +6,6 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.os.SystemClock;
 import android.text.TextUtils;
@@ -50,8 +49,6 @@ final class LiveCardNotification {
     /** The order a tap on the card is asking to open. Read back by {@link ZopiqLiveCardPlugin}. */
     static final String EXTRA_ORDER_ID = "zopiq_live_card_order_id";
 
-    private static final int API_PROGRESS_STYLE = 36;
-
     static void show(Context context, LiveCardSpec spec) {
         final NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager == null) return;
@@ -75,7 +72,6 @@ final class LiveCardNotification {
 
         final Notification.Builder builder = newBuilder(context);
         builder.setSmallIcon(context.getApplicationInfo().icon)
-                .setLargeIcon(artwork(context, spec))
                 .setColor(Ladder.BRAND)
                 .setContentTitle(spec.title)
                 .setContentText(spec.body)
@@ -94,11 +90,7 @@ final class LiveCardNotification {
         // 16 promotion, and the platform honours it only for foreground-service and media
         // notifications anyway. `setColor` still tints the icon and accents orange.
 
-        if (Build.VERSION.SDK_INT >= API_PROGRESS_STYLE) {
-            PromotedStyle.apply(builder, spec);
-        } else {
-            applyCustomTracker(context, builder, spec);
-        }
+        applyCustomTracker(context, builder, spec);
 
         return builder.build();
     }
@@ -122,10 +114,8 @@ final class LiveCardNotification {
      * precedence over this module's — and because the reference below is what is kept, the app's
      * copy is now reachable rather than shrunk away.
      */
-    private static Icon artwork(Context context, LiveCardSpec spec) {
-        final int id =
-                spec.isDelivery() ? R.drawable.zopiq_live_delivery : R.drawable.zopiq_live_prep;
-        return Icon.createWithResource(context, id);
+    private static int artworkResId(LiveCardSpec spec) {
+        return spec.isDelivery() ? R.drawable.zopiq_live_delivery : R.drawable.zopiq_live_prep;
     }
 
     /**
@@ -150,13 +140,14 @@ final class LiveCardNotification {
 
         final android.graphics.Bitmap bar = TrackerBar.render(context, spec.progressNow());
         final String packageName = context.getPackageName();
+        final int artworkId = artworkResId(spec);
 
         final RemoteViews collapsed = new RemoteViews(packageName, R.layout.zopiq_live_card);
-        dress(collapsed, spec, bar);
+        dress(collapsed, spec, bar, artworkId);
 
         final RemoteViews expanded =
                 new RemoteViews(packageName, R.layout.zopiq_live_card_expanded);
-        dress(expanded, spec, bar);
+        dress(expanded, spec, bar, artworkId);
         if (TextUtils.isEmpty(spec.body)) {
             expanded.setViewVisibility(R.id.zopiq_live_body, View.GONE);
         } else {
@@ -176,9 +167,11 @@ final class LiveCardNotification {
      * which is a card telling the customer how late their food is — so at zero it is swapped for a
      * plain line of text and the clock stops being mentioned at all.
      */
-    private static void dress(RemoteViews views, LiveCardSpec spec, android.graphics.Bitmap bar) {
+    private static void dress(
+            RemoteViews views, LiveCardSpec spec, android.graphics.Bitmap bar, int artworkResId) {
         views.setTextViewText(R.id.zopiq_live_title, spec.title);
         views.setImageViewBitmap(R.id.zopiq_live_tracker, bar);
+        views.setImageViewResource(R.id.zopiq_live_artwork, artworkResId);
 
         final long remaining = spec.remainingMs();
         if (remaining > 0L) {

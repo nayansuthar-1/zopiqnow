@@ -55,11 +55,17 @@ class CategoryArt extends StatelessWidget {
                     );
                   },
                 )
-              : Image.asset(
-                  asset,
-                  fit: BoxFit.contain,
-                  cacheWidth:
-                      (size * MediaQuery.devicePixelRatioOf(context)).round(),
+              // Photographic art carries its own backdrop, so it is cropped to
+              // the disc rather than floated inside it like the flat SVGs.
+              : ClipOval(
+                  child: Image.asset(
+                    asset,
+                    fit: BoxFit.cover,
+                    width: size,
+                    height: size,
+                    cacheWidth:
+                        (size * MediaQuery.devicePixelRatioOf(context)).round(),
+                  ),
                 ),
     );
   }
