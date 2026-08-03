@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Apple's required-reason API declaration. Its absence is ITMS-91053, which
+	  arrives as a rejection or an email at submission time and costs a review
+	  cycle, so it is written before the first upload rather than after the first
+	  refusal.
+
+	  Scope, because it is narrower than it looks: this manifest covers the app
+	  target's own use. Every third-party SDK ships its own PrivacyInfo inside its
+	  framework (Firebase, Razorpay, geolocator and the plugin federation all do)
+	  and Apple reads theirs separately. Declaring their APIs here would not make
+	  them any more declared.
+
+	  What collection is declared where: NSPrivacyCollectedDataTypes is left empty
+	  deliberately. The authoritative, user-facing answer is the App Store Connect
+	  privacy nutrition labels (ship D4), and those must match PLAY_DATA_SAFETY.md
+	  answer for answer. Two places disagreeing is worse than one place being
+	  terse.
+	-->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<!--
+	  No tracking, and this is true of the build rather than aspirational: there
+	  is no ATT prompt, no IDFA read, no advertising SDK, and the privacy policy
+	  says the same. An empty domain list is only valid while NSPrivacyTracking is
+	  false; if that ever changes, every domain has to be listed here or the
+	  requests are blocked at runtime.
+	-->
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!--
+			  User defaults. The session is persisted between launches (Supabase
+			  writes it through shared_preferences), as are the app's own
+			  preferences. CA92.1 is the app's own use reason: the data never
+			  leaves the device and is not read from any other app.
+			-->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<!--
+			  File timestamps. The app writes and reads back files inside its own
+			  container: the GST invoice PDF it renders and shares, and images
+			  staged for upload. C617.1 is the reason for files created by the app
+			  itself, which is all of them here.
+			-->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

@@ -851,10 +851,34 @@ All of it is downstream of G1. Ordered by what blocks what.
 - [ ] **X4 — Run all three on a real device**, then work the push chain in order
       rather than guessing: APNs token → FCM token → a `device_tokens` row with
       `platform='ios'` → webhook fired → function logs.
-- [ ] **X5 — `PrivacyInfo.xcprivacy` for all three apps.** None of them has one.
-      Apple rejects or emails ITMS-91053 for missing required-reason API
-      declarations, and this is a submission-time surprise that costs a review
-      cycle if it is left to be discovered.
+- [~] **X5 — `PrivacyInfo.xcprivacy` for all three apps.** **Files written 4 Aug;
+      the Xcode wiring is still owed and needs a Mac.** Confirmed none of the
+      three had one. Each declares `NSPrivacyTracking false`, an empty tracking
+      domain list, and two required-reason APIs: `CA92.1` (user defaults — the
+      session is persisted between launches) and `C617.1` (file timestamps —
+      invoice PDFs, staged uploads, KYC documents, all files the app created
+      itself).
+
+      **Scope, deliberately narrow:** this manifest covers the *app target's own*
+      use. Firebase, Razorpay, geolocator and the plugin federation each ship
+      their own `PrivacyInfo` inside their frameworks and Apple reads those
+      separately, so restating them here would buy nothing.
+      `NSPrivacyCollectedDataTypes` is left empty on purpose — the authoritative
+      answer is App Store Connect's nutrition labels (D4), which must match
+      `PLAY_DATA_SAFETY.md` answer for answer, and two places disagreeing is
+      worse than one being terse. **Location is not a required-reason API** and is
+      correctly absent from the rider's.
+
+      **A defect caught by validating rather than eyeballing:** the first draft
+      used `--` inside XML comments, which is illegal, and all three files were
+      malformed. Xcode would have refused them. Rewritten and re-parsed — all
+      three are valid XML now.
+
+      > **They do nothing yet.** A `.xcprivacy` is inert until it is added to its
+      > Runner target's **Copy Bundle Resources** phase. That is a two-minute
+      > Xcode GUI step and it was *not* faked by hand-editing `project.pbxproj`,
+      > for the same reason X6 says not to. **ITMS-91053 still applies until it is
+      > done.**
 - [ ] **X6 — Crashlytics dSYM upload build phase** (launch I10). Dart errors
       already report from iOS with no work at all; this is what makes *native*
       frames readable. Xcode GUI, not a hand-edited `.pbxproj`.

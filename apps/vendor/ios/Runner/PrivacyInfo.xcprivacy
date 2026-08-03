@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Apple's required-reason API declaration. See the customer app's copy for the
+	  reasoning; the scope note applies identically here. This app's list is
+	  shorter because it does less: no payments, no PDF rendering, no location.
+
+	  NSPrivacyCollectedDataTypes is left empty deliberately. The App Store
+	  Connect nutrition labels (ship D4) are the authoritative answer, and they
+	  must match PLAY_DATA_SAFETY.md.
+	-->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!--
+			  User defaults: the signed-in restaurant's session is persisted
+			  between launches, which is the whole point of a kitchen tablet that
+			  is not signed in again every morning. CA92.1 is the app's own use
+			  reason; it is never read from another app.
+			-->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<!--
+			  File timestamps: menu photographs are staged in the app's own
+			  container before upload. C617.1 covers files the app created itself.
+			-->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
