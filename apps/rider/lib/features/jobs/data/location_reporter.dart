@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 
 import 'package:geolocator/geolocator.dart';
 
+import 'package:zopiq_rider/core/widgets/location_disclosure.dart';
 import 'package:zopiq_rider/features/jobs/data/jobs_datasource.dart';
 
 /// Sends this rider's position to the platform while — and only while — they are
@@ -186,6 +187,12 @@ class RiderLocationReporter {
       if (!await Geolocator.isLocationServiceEnabled()) return false;
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
+        // Play's prominent disclosure, in front of the system dialog. This
+        // class has no widget of its own, so the sheet goes up on the root
+        // navigator — see `riderNavigatorKey`. Declining returns false and the
+        // rider simply does not appear on the customer's map, which is the
+        // outcome this class was already written to tolerate.
+        if (!await ensureLocationDisclosed()) return false;
         permission = await Geolocator.requestPermission();
       }
       return permission == LocationPermission.always ||

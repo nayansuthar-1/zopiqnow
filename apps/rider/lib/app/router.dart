@@ -16,6 +16,20 @@ abstract final class Routes {
   static const String notifications = 'notifications';
 }
 
+/// The root navigator, held so that code with no widget of its own can still
+/// put something in front of the rider.
+///
+/// There is exactly one such caller and it is not a convenience:
+/// `RiderLocationReporter` is a provider-driven data class that requests the
+/// location permission when a delivery starts, and Play requires a disclosure
+/// *in front of* that request. Without a key there is no context to show it in.
+/// GoRouter makes its own root key when none is passed; passing one changes
+/// nothing about routing and simply gives that key a name.
+///
+/// Not a general escape hatch for reaching the navigator from business logic —
+/// widgets that have a context must use it.
+final GlobalKey<NavigatorState> riderNavigatorKey = GlobalKey<NavigatorState>();
+
 const String _homePath = '/jobs';
 const String _splashPath = '/splash';
 const String _loginPath = '/login';
@@ -47,6 +61,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
+    navigatorKey: riderNavigatorKey,
     initialLocation: _homePath,
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {

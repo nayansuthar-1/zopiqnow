@@ -717,11 +717,49 @@ the rest, and it is folded into Phase 5.**
       form — because a disclosure on one of two doors is not a disclosure.
       `flutter analyze` clean.
 
-      **The rider's disclosure is still owed and is not a copy of this one:** the
-      rider app tracks *continuously while on a delivery*, so its wording has to
-      say so, and its listing needs the foreground-location declaration too.
-      Written into `PLAY_DATA_SAFETY.md` rather than done here — the rider goes to
-      a closed track and its form is a separate job.
+      **The rider's disclosure is now built too — see A7.**
+- [x] **A7 — The rider's prominent disclosure.** ✅ **Closed 3 Aug.** The half A6
+      left open, and **not a copy of the customer's** — that app reads a location
+      once to fill in an address; this one reports a position every 30 m for the
+      whole of a delivery, into a screen a stranger is watching. A disclosure that
+      did not say so would be accurate about the permission and misleading about
+      the app.
+
+      **The design question A6 appeared to leave open turned out not to be one.**
+      "Does it fire at the online toggle or at job accept?" only arises if the
+      disclosure lives at one point, which is the wrong shape: the policy asks for
+      it *in front of the system dialog*, wherever that dialog appears. Keying it
+      to permission state instead of to a screen answers it with no product
+      decision — `ensureLocationDisclosed()` shows nothing unless
+      `checkPermission()` is exactly `denied`. `deniedForever` shows nothing
+      (Android will not raise the dialog again, so there is nothing to disclose in
+      front of, and a sheet there argues with a decision already made), and
+      granted shows nothing.
+
+      **Both doors are covered, and neither knows about the other** — whichever
+      runs second finds the permission settled and stays silent. The obstacle was
+      that only one door has a `BuildContext`: `job_map_page` is a widget, but
+      `RiderLocationReporter` is a provider-driven data class. Solved with an
+      explicit `navigatorKey` on the existing GoRouter — **GoRouter makes one
+      anyway when none is passed, so this changes nothing about routing and
+      merely gives that key a name.** No architectural change, and the sheet lives
+      in `core/widgets/` rather than under `features/jobs/presentation/`, because
+      the reporter is in `data/` and importing presentation from there would have
+      been the app's first such violation.
+
+      **Four claims, each true of this build**, which is the point — the reviewer
+      checks them: continuous *while carrying* and said plainly; a foreground-
+      service notification visible the whole time it is on; never sold or shared
+      for advertising; and refusable, because declining costs the rider nothing
+      but the dot (0057 refuses a position from a rider with no live job anyway).
+      Declining returns false and the reporter simply does not start — the outcome
+      that class was already written to tolerate.
+
+      `flutter analyze` clean (9 pre-existing issues, none in the touched files).
+      **Still needs the listing's foreground-location declaration**, which is
+      yours and is recorded in `PLAY_DATA_SAFETY.md`. **Not yet seen on a real
+      screen** — the sheet has never been rendered on a device; that is a
+      Phase 5 check.
 - [ ] **A5 — Build the signed AAB from a clean worktree**, install it on a real
       Android 10 device and a current one, and smoke it before anything is
       uploaded. `main` was unbuildable from a clone once already.

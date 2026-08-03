@@ -242,9 +242,25 @@ shared for advertising (matches the privacy policy and the answers above), and
 refusable (typing an address by hand reaches every screen the GPS path does).
 Both entry points are covered — the address picker sheet and the address form.
 
-**The rider's is still owed.** It is a different disclosure and a stricter one:
-the rider app tracks *continuously while on a delivery*, so its wording must say
-so, and the listing needs the foreground-location declaration as well.
+**The rider's is now built too** (3 Aug, ship A7), and it is a different
+disclosure and a stricter one: the rider app tracks *continuously while on a
+delivery*, and its wording says exactly that rather than borrowing the
+customer's. Four claims, each true of the build — continuous while carrying and
+not between jobs; a foreground-service notification in the shade for as long as
+it is on; never sold or shared for advertising; and refusable, since declining
+costs the rider nothing but the dot on the customer's map.
+
+Both of the rider's location doors are covered — the job map page and the
+location reporter that starts when a delivery begins — and, as with the
+customer's, the sheet is keyed to *permission state* rather than to a screen, so
+it appears only when the system dialog is genuinely about to be raised and the
+second door stays silent.
+
+**What is still owed here is yours, not code: the listing's foreground-location
+declaration.** Play requires it for the rider app, and it is a Console form
+rather than a manifest change — `ACCESS_BACKGROUND_LOCATION` is deliberately
+absent from all three apps, which is what keeps this out of the stricter
+background-location review.
 
 ## Two things deliberately NOT changed, so they are not re-opened
 

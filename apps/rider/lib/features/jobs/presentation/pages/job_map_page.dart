@@ -7,6 +7,7 @@ import 'package:zopiq_map/zopiq_map.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_rider/core/launcher.dart';
+import 'package:zopiq_rider/core/widgets/location_disclosure.dart';
 import 'package:zopiq_rider/core/widgets/rider_svg_icons.dart';
 import 'package:zopiq_rider/features/jobs/domain/entities/job.dart';
 
@@ -66,6 +67,11 @@ class _JobMapPageState extends ConsumerState<JobMapPage> {
       if (!await Geolocator.isLocationServiceEnabled()) return;
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
+        // Play's prominent disclosure, in front of the system dialog. It shows
+        // nothing when the dialog is not about to appear, so opening this page
+        // with the permission already settled is silent.
+        if (!mounted) return;
+        if (!await ensureLocationDisclosed(context)) return;
         permission = await Geolocator.requestPermission();
       }
       final bool granted =
