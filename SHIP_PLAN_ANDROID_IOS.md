@@ -196,11 +196,10 @@ Mine unless marked. Ordered by how much of the system each one covers.
 - [x] **S6 — Rate-limit what costs money or sends mail.** ✅ **Closed 3 Aug —
       migration 0090.** Three limits built and one deliberately not built. See
       below.
-- [ ] **S7 — Edge functions: real auth, not `verify_jwt`.** `verify_jwt` proves a
-      request carries a JWT this project signed — and **the anon key is such a
-      JWT**, shipped in plaintext in every build. That mistake cost us the Ola
-      quota once. Audit every deployed function for what it actually
-      authenticates and what it would cost a stranger to call.
+- [x] **S7 — Edge functions: real auth, not `verify_jwt`.** ✅ **Closed 3 Aug —
+      migration 0091.** The premise was right and its stated mechanism was wrong;
+      the functions themselves came out clean, and the finding was a key sitting
+      somewhere nobody thinks to look. See below.
 - [ ] **S8 — Privileged actions leave a trace.** The admin console is one flat
       role with no MFA (audit SEC-003) and it can release, cancel, and delete
       orders — the order delete is unguarded (migration 0069). Full RBAC is
@@ -378,6 +377,87 @@ stores a **`service_role` JWT in plaintext** in its trigger definition, readable
 from `pg_get_triggerdef` by anything that can read the catalog. `send-notification`
 is deployed `--no-verify-jwt` and authenticates on `x-notify-secret` instead, so
 **that header buys nothing and can simply go.** Logged as `SEC-010`.
+
+### What S7 found — the functions were fine, the catalogue was not
+
+**Correction to this item's own premise, because someone will reason from it
+later.** S7 said `verify_jwt` is weak because "the anon key is such a JWT". The
+conclusion is right; the mechanism is not. **This project's shipped key is not a
+JWT at all** — it is `sb_publishable_…`, the new-format publishable key, one
+segment, no claims. The gateway accepts it anyway: `razorpay-order` answers
+**`200`** to a caller carrying nothing but the key out of the APK, while the same
+request with no header gets `401 UNAUTHORIZED_NO_AUTH_HEADER` and with a
+malformed bearer gets `401 UNAUTHORIZED_INVALID_JWT_FORMAT`. So the rule stands
+and is worth restating properly: **the gateway proves the caller has the key
+every user has. It is not authentication, and only the handler's own check is.**
+
+**All four handlers do have one, and they are right.** Probed as a stranger — no
+header, the shipped key, and a garbage bearer:
+
+| | As a stranger | Verdict |
+|---|---|---|
+| `razorpay-order` | `200 {"configured":false}` | authenticates properly *once configured* — `getUser(token)`, never a user id from the body |
+| `razorpay-verify` | `503 not configured` | same, plus constant-time HMAC and an intent matched on caller as well as order |
+| `send-notification` | `403 Forbidden` | fails closed on `x-notify-secret`; the gateway is not even consulted |
+| `ola-static` | `404` | **gone.** Audit API-002 recorded the delete as still owed; it is done |
+| `send-order-push` | `404` | gone, as G7 recorded |
+
+And the load-bearing assumption underneath the two Razorpay handlers was checked
+rather than believed: `GET /auth/v1/user` with the shipped key returns **`401`**,
+so `getUser()` cannot be satisfied by it.
+
+**The real finding was SEC-010, and it was not in a function at all.** The
+notifications webhook carried `Authorization: Bearer <service_role JWT>` in its
+trigger arguments. `pg_trigger` is world-readable and `pg_get_triggerdef` is
+executable by PUBLIC, so anything that can read the catalogue could read the one
+key that bypasses RLS entirely — a logical backup, a dashboard user, a read-only
+foothold. Not reachable through PostgREST, which exposes no catalogue, so it is
+an **escalation path rather than an open door** — and still the most valuable
+string in the project stored where it did not need to be.
+
+**And it bought nothing.** Proven before touching it: a POST to
+`send-notification` with *no* Authorization header returns `403` from the
+handler's own secret check, not `401` from the gateway. The gateway was never
+looking. 0091 removes the header **by reading the existing headers and deleting
+one key** — restating them would have put `x-notify-secret` into a migration file
+and then into git, which is exactly how SEC-007 happened. The secret never left
+the database.
+
+**Verified end to end, without waking anybody's phone:** one notification
+addressed to a customer id with no registered devices, committed so the webhook
+actually fired. `net._http_response` recorded **`200 "No devices"`** — past the
+secret check, past the row re-read, into the device query. Push is intact and the
+key is out of the catalogue. Probe row deleted.
+
+**The sweep, so this is a class and not an instance:** there is exactly one other
+`http_request` trigger (none), and one function that touches a secret —
+`process_order_routes`, which reads the Ola key from `vault.decrypted_secrets` at
+run time. **The project already knows the right pattern**; the webhook was
+created through the dashboard UI, which inlines the key. `net.http_request_queue`
+retains nothing (checked: zero rows), and the 44 retained responses carry route
+JSON and no credentials.
+
+**Also closed here: a payment intent is a real Razorpay order, and nothing
+bounded it.** `razorpay-order` authenticates the caller properly but a signed-in
+customer could call it without limit, each call creating an order at Razorpay and
+a row here — S6's shape exactly, latent only because the keys are unset, and
+therefore arriving *the same day payments do*. Now 30/hour per customer, in the
+database. Deliberately well above 0090's ten orders an hour: a customer whose UPI
+app fails will retry, and a refused retry is worse than a refused first attempt.
+
+**Two things logged rather than done, both tied to G3.** Both are edge-function
+source changes, and changing that source without deploying it is how the repo and
+the live system drift — which this project has been bitten by four times. The
+keys must be set and the functions redeployed for S5 anyway, so both belong to
+that same run:
+
+- The `{configured:false}` / `503` early returns sit *before* the auth check, so
+  an unauthenticated caller learns whether payments are configured. Trivial, and
+  it should still be the other way round.
+- `razorpay-order` creates the Razorpay order *before* inserting the intent, so a
+  rate refusal leaves an unused order at Razorpay and returns a 500. That is the
+  safe direction — the alternative is a payment that can never become an order —
+  but checking the ceiling before the Razorpay call is tidier.
 
 **Two things noted and deliberately not fixed**, both written into
 `AUDIT_CHECKLIST.md` rather than done here:
