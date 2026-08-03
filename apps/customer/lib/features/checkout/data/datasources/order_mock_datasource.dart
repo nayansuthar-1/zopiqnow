@@ -308,6 +308,10 @@ class OrderMockDataSource implements OrderDataSource {
     String? couponCode,
     String? paymentId,
     String? deliveryNotes,
+    // Accepted and ignored. This mock places an order per call by design — it
+    // stands in for the service, and replaying its own responses would hide the
+    // very retry behaviour a test might be trying to exercise.
+    String? idempotencyKey,
   }) async {
     await Future<void>.delayed(latency);
 

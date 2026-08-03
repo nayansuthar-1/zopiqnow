@@ -72,6 +72,7 @@ class OrderSupabaseDataSource implements OrderDataSource {
     String? couponCode,
     String? paymentId,
     String? deliveryNotes,
+    String? idempotencyKey,
   }) async {
     try {
       // The session's JWT rides along on the RPC, and `place_order` takes the
@@ -103,6 +104,10 @@ class OrderSupabaseDataSource implements OrderDataSource {
               'p_coupon_code': couponCode,
               'p_payment_id': paymentId,
               'p_delivery_notes': deliveryNotes,
+              // The one parameter whose whole purpose is to be sent *again*.
+              // 0086 answers a key it has already seen with the order it
+              // already placed, so a retry after a lost response is safe.
+              'p_idempotency_key': idempotencyKey,
             },
           );
 

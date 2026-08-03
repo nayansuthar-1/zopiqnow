@@ -125,11 +125,45 @@ be a different address, say so and it changes in one constant.
 | ✅ C1 | **Remove cash on delivery from checkout.** UPI becomes the only method offered. Server and vendor/rider apps keep the ability to handle a cash order — that is data that already exists — but no new one can be created. | Me | 1 h |
 | ✅ C2 | **Razorpay adapter + server-side signature verification + the mock lockout** described above. Ends with everything ready for keys. | Me | 5 h |
 | ✅ C3 | **Crash reporting** (audit OBS-001) — Crashlytics in the customer app, and in vendor and rider if time allows. Launching without it means your first bug report is a one-star review. This is the highest-value non-gate item on the list. | Me | 3 h |
-| C4 | **Idempotency on `place_order`** (audit CUS-005). A double-tap or a retry on a flaky connection currently places two orders. With prepaid UPI that is two charges. | Me | 2 h |
+| ✅ C4 | **Idempotency on `place_order`** (audit CUS-005). A double-tap or a retry on a flaky connection currently places two orders. With prepaid UPI that is two charges. | Me | 2 h |
 | ✅ C5 | **Hide the dead Account tiles** (audit UX-001). Done alongside LEG-001 — the legal rows went where they were. All five are gone, and Help & support is the support address rather than a snackbar. | Me | 1 h |
 | C6 | **Delivery OTP no longer shown unconditionally** on the tracking card (audit CUS-015). It is the proof-of-delivery code; it should appear when the rider is at the door, not from the moment the order is placed. | Me | 1 h |
 | ✅ C7 | **`ola-static` gets caller authentication** (audit API-002). It proxies your Ola Maps key with no auth — anyone who finds the URL spends your quota. **It got retirement instead — see below.** | Me | 2 h |
 | C8 | **Release keystores for vendor and rider**, so the closed-track builds are real builds. Customer already has one. | Me + you for the passwords | 1 h |
+
+**C4 is closed — and what it costs today is not what the row says.** The row
+says two orders and two charges. With 0085's gate armed the second attempt does
+not double-charge: the intent is already `consumed` and the trigger refuses it —
+but it refuses with *"We couldn't confirm your payment"*, which is the worst
+possible sentence to show somebody whose payment worked. With the gate still off,
+the retry simply creates a second order. Both are fixed by the same key.
+
+**The key is the client's, not a shape the server guesses.** Two genuinely
+separate orders of the same food to the same address minutes apart are something
+people really do; a natural key over the cart contents would refuse the second
+and be wrong. Only the caller knows whether this is a retry or a new intent, so
+the caller names it — one 128-bit key per checkout attempt, reused verbatim on
+every retry, cleared on success. No new dependency for it (`Random.secure`, not
+a UUID package).
+
+Migration 0086 adds the column, a **partial unique index scoped to the customer**
+(a key is only unique within the client that invented it), and restates
+`place_order` — the whole 353 lines, taken from `pg_get_functiondef` against the
+live database rather than the repo's history, because the two have drifted four
+times. Adding a parameter makes a *new* signature, so the old ten-argument one is
+dropped explicitly; leaving both would let PostgREST bind to whichever it liked.
+
+The pre-check alone is not enough, so the insert is wrapped: two retries that
+arrive together both find nothing, and the unique index is the real arbiter. The
+loser reads back the winner's row rather than failing an order already paid for.
+
+Verified against the live database in rolled-back transactions, **including under
+the `authenticated` role and not just as `postgres`**: same key returns the same
+receipt and creates one order; a different key is a new order; no key still works
+for every build shipped today; the index refuses a duplicate per customer and
+allows the same key across customers. Nothing leaked. Incidentally confirmed that
+`pg_safeupdate` is no longer armed on `authenticated` — only an 8s statement
+timeout.
 
 **C7 is closed, and it needed deleting rather than fixing.** The row above says
 "gets caller authentication". It has none, and it does not need any, because

@@ -42,6 +42,10 @@ abstract interface class OrderRepository {
   /// The buyer is whoever the session says they are — the order service reads it
   /// from the JWT, so there is no user id to pass. [userPhone] is the number the
   /// rider calls.
+  /// [idempotencyKey] is one value per checkout attempt, reused on every retry
+  /// of that attempt. A key the service has already seen is answered with the
+  /// order it already placed (migration 0086), which is what makes a lost
+  /// response safe to retry.
   Future<PlacedOrder> placeOrder({
     required Cart cart,
     required Address deliveryAddress,
@@ -50,6 +54,7 @@ abstract interface class OrderRepository {
     String? couponCode,
     String? paymentId,
     String? deliveryNotes,
+    String? idempotencyKey,
   });
 
   /// The offers a cart from [restaurantId] can use — Zopiqnow's own plus that

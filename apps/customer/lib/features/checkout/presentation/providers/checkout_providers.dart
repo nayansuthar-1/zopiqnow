@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -137,6 +139,30 @@ class CheckoutController extends Notifier<CheckoutState> {
   /// (sign-in is by email), but an order cannot. Checkout collects it before it
   /// gets here — see `showDeliveryPhoneSheet`. Who is buying is not passed at
   /// all: `place_order` reads that from the session's JWT.
+  /// The key that makes a retry safe (launch C4, migration 0086).
+  ///
+  /// Generated once per checkout attempt and **deliberately kept when placing
+  /// fails**: the whole point is that the retry carries the same key, so a
+  /// response lost on a bad connection is answered with the order that was
+  /// already placed rather than a second one. Cleared on success.
+  ///
+  /// Not part of [CheckoutState], because that is rebuilt whenever the cart's
+  /// subtotal changes — which is exactly right for a coupon and exactly wrong
+  /// here: editing the cart makes this a different order, and a different order
+  /// should get a different key. The notifier is recreated in that case anyway,
+  /// which gives us the new key for free.
+  String? _attemptKey;
+
+  /// 128 bits from the platform's secure generator, hex-encoded. Not a UUID
+  /// package: this needs to be unique for one customer over a few minutes, and
+  /// that is not worth a dependency the version freeze would have to approve.
+  static String _newAttemptKey() {
+    final Random random = Random.secure();
+    return List<int>.generate(16, (_) => random.nextInt(256))
+        .map((int byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join();
+  }
+
   Future<PlacedOrder?> placeOrder({
     required Address deliveryAddress,
     required String userPhone,
@@ -148,6 +174,10 @@ class CheckoutController extends Notifier<CheckoutState> {
       cart,
       discount: state.coupon?.discount ?? 0,
     );
+    // Minted on the first attempt and reused by every retry of it. See the
+    // field: surviving a failure is the entire behaviour.
+    _attemptKey ??= _newAttemptKey();
+
     state = CheckoutState(coupon: state.coupon, isPlacingOrder: true);
     try {
       final String paymentId;
@@ -181,7 +211,13 @@ class CheckoutController extends Notifier<CheckoutState> {
             // Read here rather than passed in: the note is checkout's own state,
             // and the button that calls this already has enough arguments.
             deliveryNotes: ref.read(deliveryNotesProvider),
+            idempotencyKey: _attemptKey,
           );
+      // Spent. A later order from this same notifier — the cart is cleared
+      // below, so there will not be one, but it costs a line to be sure — must
+      // never reuse a key that already names an order, or it would be answered
+      // with that order instead of being placed.
+      _attemptKey = null;
       ref.read(lastPlacedOrderProvider.notifier).record(order);
       // Clearing the cart also resets this notifier (build watches subtotal).
       ref.read(cartProvider.notifier).clear();

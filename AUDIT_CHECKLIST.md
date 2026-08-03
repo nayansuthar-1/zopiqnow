@@ -62,7 +62,7 @@ Sorted by effort, cheapest first.
 - [ ] **SEC-007** — The Resend API key remains unrotated after being committed to git history. 🔸<br><sub>Secrets · Security · effort XS</sub>
 - [x] **API-002** — ola-static proxies the Ola Maps key with no caller authentication or rate limit shown in its handler. **Closed 2026-08-03 by retirement, not authentication: nothing has called it since B3. Key unset from the function env (Vault routing key untouched), handler returns 410 unconditionally. `supabase functions delete ola-static` still owed — classifier-blocked.**<br><sub>Edge fn · Security · effort S</sub>
 - [ ] **CUS-001** — Hard 25-order ceiling with no "load more".<br><sub>Order history · UX · effort S</sub>
-- [ ] **CUS-005** — No idempotency on place_order.<br><sub>Checkout · Functional · effort S</sub>
+- [x] **CUS-005** — No idempotency on place_order. **Closed 2026-08-03 (migration 0086): caller-chosen key per checkout attempt, unique per customer, retries answered with the order already placed.**<br><sub>Checkout · Functional · effort S</sub>
 - [ ] **DAT-002** — A temp table is created on every order.<br><sub>place_order · Performance · effort S</sub>
 - [ ] **DAT-006** — The CLI migration ledger has drifted from the live database four times and migrations 0062–0069 show as local-only despite being applied.<br><sub>Migrations · Architecture · effort S</sub>
 - [ ] **RID-005** — No concurrent-claim cap and no fraud limits.<br><sub>Jobs · Business · effort S</sub>

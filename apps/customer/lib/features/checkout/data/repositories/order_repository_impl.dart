@@ -44,6 +44,7 @@ class OrderRepositoryImpl implements OrderRepository {
     String? couponCode,
     String? paymentId,
     String? deliveryNotes,
+    String? idempotencyKey,
   }) async {
     try {
       return await _dataSource.placeOrder(
@@ -54,6 +55,7 @@ class OrderRepositoryImpl implements OrderRepository {
         couponCode: couponCode,
         paymentId: paymentId,
         deliveryNotes: deliveryNotes,
+        idempotencyKey: idempotencyKey,
       );
     } on OrderPlacementFailure {
       // Already a domain failure carrying the service's own message — relabelling

@@ -40,6 +40,11 @@ abstract interface class OrderDataSource {
   /// is frozen onto the order rather than read back off the address later —
   /// editing "ring twice" into "the bell is broken" must not rewrite what the
   /// rider was told last Tuesday.
+  /// [idempotencyKey] makes a retry safe. One key per checkout attempt, reused
+  /// verbatim on every retry of that attempt: the service answers a key it has
+  /// already seen with the order it already placed, rather than placing a
+  /// second one (migration 0086). Null is allowed and means "no protection" —
+  /// which is what every caller had before C4.
   Future<PlacedOrder> placeOrder({
     required Cart cart,
     required Address deliveryAddress,
@@ -48,6 +53,7 @@ abstract interface class OrderDataSource {
     String? couponCode,
     String? paymentId,
     String? deliveryNotes,
+    String? idempotencyKey,
   });
 
   /// The offers a cart from [restaurantId] can actually use: Zopiqnow's own,
