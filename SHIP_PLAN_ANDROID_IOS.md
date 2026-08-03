@@ -616,10 +616,36 @@ the rest, and it is folded into Phase 5.**
       repo. `pubspec.lock` untouched.
 - [ ] **A2 — Release keystores for vendor and rider** (audit REL-001, launch C8).
       Customer already has one. Needs G9.
-- [ ] **A3 — R8 on, and proven.** A minified release build is a different binary
-      from every build tested so far, and it is exactly where release-only
-      crashes live. Confirm reflection-dependent paths (Razorpay, Firebase,
-      Live Activity plugin) survive it.
+- [x] **A3 — R8 on, and proven.** ✅ **Closed 3 Aug — and the finding is which
+      app it was off in.** Customer and vendor already had `isMinifyEnabled`;
+      **the rider had neither it nor a keep file**, so a third of what ships was
+      a binary R8 had never touched — exactly the "different binary from every
+      build tested so far" this item was written about. Now on, with its own
+      `proguard-rules.pro`.
+
+      **The rider's keep file is deliberately not a copy of the other two.** Both
+      carry a Razorpay block; `razorpay_flutter` is a **customer-only**
+      dependency and a rider never takes a payment. Firebase, geolocator and
+      `google_maps_flutter` ship consumer rules inside their AARs, so nothing is
+      restated. *(Noted, not fixed: the **vendor's** file carries the same
+      Razorpay block for a dependency it does not have either. A keep on absent
+      classes is a no-op, so it is misleading rather than harmful.)*
+
+      **Proven rather than switched on.** `assembleRelease` succeeds in 679s with
+      no missing-class warnings, and R8 demonstrably ran: a 17 MB mapping, 2,606
+      classes renamed, 437 removed outright, plus the resource-shrinker report.
+      The keeps held **both ways** — every `io.flutter.*` entry maps to itself
+      and none is renamed short — and geolocator (33), Maps (87), Firebase (288)
+      and the Flutter plugins (357) all survive. All three apps now carry the
+      same evidence: customer 4,276 renamed / 609 removed, vendor 2,221 / 354,
+      rider 2,606 / 437.
+
+      > **What this does not prove, and the reason A3 is not the end of it:** a
+      > minified build that *compiles* has not *exercised* a reflection path.
+      > Razorpay's `@JavascriptInterface` callbacks and the Live Activity plugin
+      > fail at runtime or not at all. That is a device smoke test — **A5 and
+      > Phase 5**, on the release build, which is now the only build worth
+      > testing.
 - [x] **A4 — Manifest and permission minimisation.** ✅ **Closed 3 Aug — no code
       change, and that is the finding.** The register is in
       `PLAY_DATA_SAFETY.md`; read it before answering D3.
