@@ -786,9 +786,31 @@ the rest, and it is folded into Phase 5.**
       yours and is recorded in `PLAY_DATA_SAFETY.md`. **Not yet seen on a real
       screen** — the sheet has never been rendered on a device; that is a
       Phase 5 check.
-- [ ] **A5 — Build the signed AAB from a clean worktree**, install it on a real
+- [~] **A5 — Build the signed AAB from a clean worktree**, install it on a real
       Android 10 device and a current one, and smoke it before anything is
       uploaded. `main` was unbuildable from a clone once already.
+
+      **The build clause is closed (4 Aug); the device clause is not, and A5
+      stays open until it is.** All three bundles built from a *fresh clone of
+      committed `main`* (`e16c1a5`) — customer 68.6 MB in 242.8s, vendor 55.9 MB
+      in 177.4s, rider 53.4 MB in 165.0s — each signed with its own release
+      certificate, read back out of the bundle. **`main` builds from a clone.**
+
+      **What the clone proved that an in-place build cannot.** Nine files a
+      checkout cannot have were copied in deliberately and listed as they were
+      copied: three `local.properties`, three `key.properties`, three `.jks`.
+      Everything else came from git. A build in the working tree silently reads
+      whatever else is lying around on this laptop and would never have caught a
+      missing committed file — which is exactly how `main` became unbuildable
+      last time. The script is at
+      `scratchpad/clean-build.sh` and lists what it copies precisely so the set
+      is auditable rather than implicit.
+
+      > **Still owed, and it is the risky half.** A minified bundle that
+      > *compiles* has not *exercised* a reflection path: Razorpay's
+      > `@JavascriptInterface` callbacks and the Live Activity plugin fail at
+      > runtime or not at all (A3). Install on a real Android 10 device and a
+      > current one and smoke them. Tracked in `ACTION_REQUIRED.md` §5.
 
 ---
 
