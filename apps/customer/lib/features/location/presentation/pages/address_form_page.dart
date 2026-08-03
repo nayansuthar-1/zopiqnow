@@ -6,6 +6,7 @@ import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/domain/repositories/address_repository.dart';
 import 'package:zopiqnow/features/location/domain/services/device_location_service.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
+import 'package:zopiqnow/features/location/presentation/widgets/location_disclosure.dart';
 
 /// Add or edit one saved address.
 ///
@@ -73,6 +74,14 @@ class _AddressFormPageState extends ConsumerState<AddressFormPage> {
   static String _query(String line1, String city) => '$line1, $city';
 
   Future<void> _useCurrentLocation() async {
+    // See the picker sheet: Play's prominent disclosure goes immediately before
+    // the system dialog, and declining is silent.
+    if (await ref.read(deviceLocationServiceProvider).needsPermissionPrompt()) {
+      if (!mounted) return;
+      if (!await showLocationDisclosure(context)) return;
+    }
+    if (!mounted) return;
+
     setState(() {
       _detecting = true;
       _error = null;

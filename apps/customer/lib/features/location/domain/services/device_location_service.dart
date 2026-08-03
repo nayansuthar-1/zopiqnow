@@ -21,6 +21,16 @@ abstract interface class DeviceLocationService {
   /// Throws [AddressNotFound] when the geocoder is missing (a device with no
   /// Play services) or the text matches nothing.
   Future<GeoPoint> coordinatesOf(String query);
+
+  /// Whether calling [currentAddress] would put the *system* location dialog on
+  /// screen.
+  ///
+  /// Exists so the UI can show Play's required prominent disclosure immediately
+  /// before that dialog and at no other time. Granted and permanently-denied
+  /// both answer false: one needs no explanation and the other will never see
+  /// the dialog again, so a disclosure in front of either is a sheet arguing
+  /// with a decision the customer has already made.
+  Future<bool> needsPermissionPrompt();
 }
 
 /// A latitude/longitude pair. Not an [Address]: this is the answer to "where is

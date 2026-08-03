@@ -22,6 +22,18 @@ class GeolocatorLocationService implements DeviceLocationService {
   );
 
   @override
+  Future<bool> needsPermissionPrompt() async {
+    // `denied` is "not decided yet", which is the only state where the system
+    // dialog still appears. `deniedForever` never shows it again, and the two
+    // granted states have no reason to. `unableToDetermine` is the unknown case
+    // and is treated as a prompt: an extra disclosure costs a tap, a missing one
+    // costs a review cycle.
+    final LocationPermission permission = await Geolocator.checkPermission();
+    return permission == LocationPermission.denied ||
+        permission == LocationPermission.unableToDetermine;
+  }
+
+  @override
   Future<Address> currentAddress() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw const LocationServiceDisabled();

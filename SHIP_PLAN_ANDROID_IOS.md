@@ -659,9 +659,43 @@ the rest, and it is folded into Phase 5.**
       **Two answers the forms will need**, both written up in the register:
       `FOREGROUND_SERVICE_SPECIAL_USE` needs a Console justification (copy the
       `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` text from the live-card manifest
-      verbatim — a vague one is the usual rejection), and **the customer's
-      location prominent-disclosure screen is still not built** — the item
-      `LEG-001` left open, and a policy requirement rather than a nicety.
+      verbatim — a vague one is the usual rejection), and the customer's
+      location prominent-disclosure screen, **now built — see A6.**
+
+- [x] **A6 — The customer's location prominent disclosure.** ✅ **Closed 3 Aug.**
+      Found by A4; the piece `LEG-001` deliberately left open. **Play rejects for
+      its absence, and the rejection arrives after review rather than at upload**,
+      so it costs a cycle rather than a re-upload.
+
+      Google's User Data policy requires an *in-app* disclosure before the system
+      location dialog, naming the data, saying what it is for, and taking an
+      affirmative action. The system dialog cannot be that disclosure — it says
+      "allow this app to access your location" and nothing about why.
+
+      A sheet in the app's own idiom, shown **only when the system dialog is
+      actually about to appear**: `needsPermissionPrompt()` answers false for both
+      granted *and* permanently-denied, because a disclosure in front of either is
+      a sheet arguing with a decision the customer already made. It makes three
+      claims and **each is true of this build**, which is the point — the reviewer
+      checks them against the app: foreground only (no
+      `ACCESS_BACKGROUND_LOCATION` anywhere), never sold or shared for
+      advertising (matches the privacy policy and D3's answers), and refusable
+      (typing an address by hand reaches every screen the GPS path does).
+
+      **Declining is silent.** No error, no red text: the customer did not fail to
+      give us a location, they said no, and an error would be an argument with
+      their answer. The saved-address list and the manual form are both still
+      there.
+
+      Both entry points are covered — the address picker sheet and the address
+      form — because a disclosure on one of two doors is not a disclosure.
+      `flutter analyze` clean.
+
+      **The rider's disclosure is still owed and is not a copy of this one:** the
+      rider app tracks *continuously while on a delivery*, so its wording has to
+      say so, and its listing needs the foreground-location declaration too.
+      Written into `PLAY_DATA_SAFETY.md` rather than done here — the rider goes to
+      a closed track and its form is a separate job.
 - [ ] **A5 — Build the signed AAB from a clean worktree**, install it on a real
       Android 10 device and a current one, and smoke it before anything is
       uploaded. `main` was unbuildable from a clone once already.

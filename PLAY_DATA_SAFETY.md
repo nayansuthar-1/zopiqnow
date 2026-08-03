@@ -231,9 +231,20 @@ manifest also records why no *other* foreground-service type fits.
 
 **2. Location, and the prominent disclosure.** Both customer and rider request
 foreground location and both need an in-app prominent disclosure before the
-system dialog. **The customer's rationale screen is still not built** — it is the
-item `LEG-001` explicitly left open, and it is a Play policy requirement rather
-than a nicety.
+system dialog.
+
+**The customer's is now built** (3 Aug) — a sheet that names the data, says what
+it is used for, and takes an affirmative "Continue", shown *only* when the system
+dialog is actually about to appear. It makes three claims and each is true of
+this build, which matters because the reviewer checks them against the app:
+foreground only (no `ACCESS_BACKGROUND_LOCATION` in the manifest), never sold or
+shared for advertising (matches the privacy policy and the answers above), and
+refusable (typing an address by hand reaches every screen the GPS path does).
+Both entry points are covered — the address picker sheet and the address form.
+
+**The rider's is still owed.** It is a different disclosure and a stricter one:
+the rider app tracks *continuously while on a delivery*, so its wording must say
+so, and the listing needs the foreground-location declaration as well.
 
 ## Two things deliberately NOT changed, so they are not re-opened
 

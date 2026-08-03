@@ -7,6 +7,7 @@ import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/domain/services/device_location_service.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
+import 'package:zopiqnow/features/location/presentation/widgets/location_disclosure.dart';
 
 /// Bottom sheet for choosing the delivery address: detect via GPS, or pick a
 /// saved one.
@@ -35,6 +36,16 @@ class _AddressPickerSheetState extends ConsumerState<AddressPickerSheet> {
   String? _error;
 
   Future<void> _useCurrentLocation() async {
+    // Play's prominent disclosure, before the system dialog and only when that
+    // dialog is actually about to appear. Declining is an answer, not a failure:
+    // no error is shown, because the customer did not fail to give us a
+    // location — they said no, and the saved-address list below still works.
+    if (await ref.read(deviceLocationServiceProvider).needsPermissionPrompt()) {
+      if (!mounted) return;
+      if (!await showLocationDisclosure(context)) return;
+    }
+    if (!mounted) return;
+
     setState(() {
       _detecting = true;
       _error = null;

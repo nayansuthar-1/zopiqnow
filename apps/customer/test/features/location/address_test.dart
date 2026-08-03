@@ -57,6 +57,12 @@ class FakeDeviceLocationService implements DeviceLocationService {
     if (point == null) throw const AddressNotFound();
     return point!;
   }
+
+  /// Permission is already granted, so no prominent disclosure stands between a
+  /// tap and the GPS. That keeps these tests about detection rather than about
+  /// the Play disclosure, which has its own manual check.
+  @override
+  Future<bool> needsPermissionPrompt() async => false;
 }
 
 Widget _app(ProviderContainer container) =>
