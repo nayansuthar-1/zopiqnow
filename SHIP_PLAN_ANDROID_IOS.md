@@ -614,8 +614,34 @@ the rest, and it is folded into Phase 5.**
       dependency was added: `flutter_launcher_icons` would have moved the
       pubspecs, so the generator ran from a throwaway Dart project outside the
       repo. `pubspec.lock` untouched.
-- [ ] **A2 — Release keystores for vendor and rider** (audit REL-001, launch C8).
-      Customer already has one. Needs G9.
+- [x] **A2 — Release keystores for vendor and rider** (audit REL-001, launch C8).
+      ✅ **Closed 4 Aug.** Both generated to the customer keystore's own
+      conventions rather than to new ones — `SHA256withRSA`, 2048-bit, 10000-day
+      validity, the same `OU=SiteOnLab, O=SiteOnLab, L=Surat, ST=Gujarat, C=IN`,
+      with the CN distinguishing the three. Aliases `zopiqvendor` and
+      `zopiqrider`; 32-character random passwords.
+
+      Both build files now carry the customer's pattern verbatim, including the
+      part that matters most for a repo more than one person clones: **a missing
+      `key.properties` falls back to debug signing rather than failing the
+      build.** Such a build is not publishable, which is the honest consequence.
+      The `TODO: Replace debug signing` in each is gone because it is done.
+
+      **Proven by the certificate, not by the build succeeding.** Both AABs were
+      built and the cert *inside the bundle* read back with
+      `keytool -printcert -jarfile`: vendor `FF:60:1D:6E:…`, rider
+      `43:37:B4:B4:…`, each matching its own keystore's SHA-256 exactly. A
+      bundle that builds proves nothing about *which* key signed it — a debug
+      fallback builds just as happily.
+
+      **Verified ignored before anything was committed:** `git status --ignored`
+      reports all four files (`key.properties` × 2, `.jks` × 2) as `!!`. Nothing
+      secret is in this repository.
+
+      > **G9 is what is left, and it is yours.** The passwords exist in
+      > `apps/<app>/android/key.properties` on one laptop. Copy those two
+      > passwords **and** the two `.jks` files off it. **A lost upload key is a
+      > new app listing** — there is no recovery, from anyone.
 - [x] **A3 — R8 on, and proven.** ✅ **Closed 3 Aug — and the finding is which
       app it was off in.** Customer and vendor already had `isMinifyEnabled`;
       **the rider had neither it nor a keep file**, so a third of what ships was

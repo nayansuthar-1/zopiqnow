@@ -1,3 +1,8 @@
+// Imported rather than written as `java.util.Properties`: inside a Kotlin DSL
+// build script `java` resolves to Gradle's own `java` extension, which shadows
+// the package.
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -5,6 +10,25 @@ plugins {
     // Firebase config (google-services.json) for push. Phase 7, 2026-07-18.
     id("com.google.gms.google-services")
     id("com.google.firebase.crashlytics")
+}
+
+// The release signing key, read from `android/key.properties` — gitignored,
+// alongside the `.jks` it points at. Both are ignored by
+// `android/.gitignore`, and that is the only thing standing between this
+// keystore and a public repository.
+//
+// **The keystore is not recoverable.** Lose the `.jks` or its password and this
+// application id can never be updated on Play again — a new certificate means a
+// new app listing. It must be backed up somewhere that outlives this laptop.
+//
+// Absent on a fresh checkout, and deliberately not fatal: the build falls back
+// to debug signing so someone who clones this can still compile. Such a build
+// is not publishable, which is the honest consequence.
+val keystoreProperties: Properties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hasReleaseKeystore: Boolean = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
 android {
@@ -35,10 +59,24 @@ android {
         }
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Replace debug signing with a real release keystore before publishing.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             // Crashlytics uploads the R8 mapping file over the network as part of
             // `assembleRelease`, and on 2026-08-02 that failed the whole build
             // with an SSL handshake error -- a release build that cannot be made
