@@ -65,11 +65,18 @@ android {
 
             // Off for the same reason as the customer app: the upload is a
             // network call inside `assembleRelease`, and it failed the build
-            // outright on 2026-08-02. This app is not minified, so there is not
-            // even a mapping worth sending. Crash *reporting* is unaffected.
+            // outright on 2026-08-02. Crash *reporting* is unaffected; what it
+            // costs is that Java frames stay obfuscated, which is a small bill
+            // for a Flutter app whose stack traces are Dart.
             configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
                 mappingFileUploadEnabled = false
             }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
