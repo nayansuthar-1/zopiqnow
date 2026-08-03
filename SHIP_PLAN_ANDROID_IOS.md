@@ -620,9 +620,48 @@ the rest, and it is folded into Phase 5.**
       from every build tested so far, and it is exactly where release-only
       crashes live. Confirm reflection-dependent paths (Razorpay, Firebase,
       Live Activity plugin) survive it.
-- [ ] **A4 — Manifest and permission minimisation.** Every permission in all
-      three manifests justified out loud or removed. Play asks about the
-      dangerous ones and a wrong answer is a rejection.
+- [x] **A4 — Manifest and permission minimisation.** ✅ **Closed 3 Aug — no code
+      change, and that is the finding.** The register is in
+      `PLAY_DATA_SAFETY.md`; read it before answering D3.
+
+      **What a manifest declares is not what an app ships.** The customer app
+      declares four permissions and **ships sixteen**; the rest arrive from
+      libraries when the merger runs, and Play lists all of them. Every entry was
+      read out of the **built release APK** with `aapt2 dump badging`, not out of
+      the source manifests — the same lesson as S2's UTF-16 grep, that the
+      artefact and the source disagree.
+
+      **The three source manifests are already minimal and every declared line
+      already carries its justification in a comment.** Nothing was removable.
+      Two candidates were examined and both rejected on evidence:
+
+      - **`ACCESS_FINE_LOCATION` in the customer app.** The code asks for
+        `LocationAccuracy.medium`, which reads like COARSE would do — but the
+        granted permission is the ceiling, and Android 12+ fuzzes an
+        approximate-only grant to a ~3 km² grid. That is "Hyderabad" instead of
+        "Banjara Hills", exactly the failure the existing comment describes. The
+        FINE+COARSE pair is the correct pattern. **I was wrong and the manifest
+        was right.**
+      - **The four Razorpay permissions** (`NFC`, `READ_BASIC_PHONE_STATE`,
+        `USE_BIOMETRIC`, `USE_FINGERPRINT`), which merge from the checkout AAR.
+        NFC is genuinely dead in a UPI-only flow, but the payment path has never
+        run against live Razorpay (S5) and an untested change to it before
+        submission is the wrong trade. **They cost nothing on the listing:**
+        `aapt2` confirms the SDK already ships `android.hardware.nfc` as
+        `required="false"`, so **no device is filtered out.**
+
+      **The only implied hardware features anywhere are `android.hardware.location`
+      and the default `faketouch`** — neither excludes a real phone, so no
+      `uses-feature` work is owed. `ACCESS_BACKGROUND_LOCATION` is absent from all
+      three, which is right: the rider tracks inside a foreground service, which
+      avoids Play's background-location review entirely.
+
+      **Two answers the forms will need**, both written up in the register:
+      `FOREGROUND_SERVICE_SPECIAL_USE` needs a Console justification (copy the
+      `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` text from the live-card manifest
+      verbatim — a vague one is the usual rejection), and **the customer's
+      location prominent-disclosure screen is still not built** — the item
+      `LEG-001` left open, and a policy requirement rather than a nicety.
 - [ ] **A5 — Build the signed AAB from a clean worktree**, install it on a real
       Android 10 device and a current one, and smoke it before anything is
       uploaded. `main` was unbuildable from a clone once already.

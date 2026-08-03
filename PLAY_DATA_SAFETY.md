@@ -166,3 +166,95 @@ plus KYC documents (licence, insurance, ID, vehicle registration) under
 "Personal info → Other info", and it needs a foreground-location disclosure in
 the listing as well as a prominent in-app disclosure. Do that form separately and
 carefully.
+
+---
+
+# The permission register (ship A4, 3 August 2026)
+
+**Read this before answering anything on the Play forms.** What a manifest
+*declares* is not what an app *ships*: the customer app declares four permissions
+and ships sixteen. The rest arrive from libraries when the manifest merger runs,
+and Play lists all of them. Every one below was read out of the **built release
+APK** with `aapt2 dump badging`, not out of the source manifests.
+
+    aapt2 dump badging apps/<app>/build/app/outputs/apk/release/app-release.apk
+
+## Customer — 16, of which 4 are declared by us
+
+| Permission | Comes from | Why it is there |
+|---|---|---|
+| `INTERNET` | ours | Reaching the API and loading imagery. |
+| `ACCESS_FINE_LOCATION` | ours | Delivery-address detection. **Needed, see the note below.** |
+| `ACCESS_COARSE_LOCATION` | ours | Declared alongside FINE so Android 12+ can offer the user "Approximate". |
+| `POST_NOTIFICATIONS` | ours | Order-update pushes; opt-in from Android 13. |
+| `WAKE_LOCK` | firebase_messaging | Waking to handle a push. |
+| `ACCESS_NETWORK_STATE` | firebase_messaging | Retry/backoff on connectivity. |
+| `VIBRATE` | flutter_local_notifications | Notification vibration. |
+| `FOREGROUND_SERVICE` | zopiq_live_card | Advancing the live order card. |
+| `FOREGROUND_SERVICE_SPECIAL_USE` | zopiq_live_card | **Needs a Play Console declaration — see below.** |
+| `POST_PROMOTED_NOTIFICATIONS` | zopiq_live_card | Android 16 "Live Update" treatment; inert below 16. |
+| `NFC` | Razorpay checkout SDK | Contactless card entry. **We are UPI-only and never use it.** |
+| `READ_BASIC_PHONE_STATE` | Razorpay checkout SDK | Their SIM/carrier detection. |
+| `USE_BIOMETRIC` | Razorpay checkout SDK | Their in-SDK authentication. |
+| `USE_FINGERPRINT` | Razorpay checkout SDK | As above, older API. |
+| `com.google.android.c2dm.permission.RECEIVE` | firebase_messaging | Receiving FCM. |
+| `<applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | AndroidX | Self-scoped; protects the library's own broadcasts. |
+
+## Rider — 11, of which 7 are declared by us
+
+`INTERNET`, `POST_NOTIFICATIONS`, `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`,
+`FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION`, `WAKE_LOCK` are ours;
+`ACCESS_NETWORK_STATE`, `VIBRATE`, the C2DM one and the AndroidX one merge in.
+Precise location is genuinely required here — the customer watches the rider move
+on a map. **`FOREGROUND_SERVICE_LOCATION` is the reason RID-001 was closed**, and
+it is also why **`ACCESS_BACKGROUND_LOCATION` is deliberately absent**: tracking
+happens in a foreground service with a visible notification, which is the shape
+Play prefers and which avoids the background-location review entirely.
+
+## Vendor — 7, of which 2 are declared by us
+
+`INTERNET` and `POST_NOTIFICATIONS`; the rest are `WAKE_LOCK`,
+`ACCESS_NETWORK_STATE`, `VIBRATE`, C2DM and AndroidX. **No location, no camera,
+no storage.** The leanest of the three.
+
+## Two answers the forms will ask for
+
+**1. `FOREGROUND_SERVICE_SPECIAL_USE` (customer only).** Play makes you justify
+this one in the Console, and a vague justification is the usual reason it is
+rejected. The text to give them is already in the manifest, as the
+`PROPERTY_SPECIAL_USE_FGS_SUBTYPE` property in
+`packages/zopiq_live_card/android/src/main/AndroidManifest.xml` — **copy it
+verbatim** rather than writing a new sentence. It explains that the service
+advances the progress bar and countdown on the live order notification, runs only
+while an order is in flight, and stops itself when the order ends. That module's
+manifest also records why no *other* foreground-service type fits.
+
+**2. Location, and the prominent disclosure.** Both customer and rider request
+foreground location and both need an in-app prominent disclosure before the
+system dialog. **The customer's rationale screen is still not built** — it is the
+item `LEG-001` explicitly left open, and it is a Play policy requirement rather
+than a nicety.
+
+## Two things deliberately NOT changed, so they are not re-opened
+
+- **Removing `ACCESS_FINE_LOCATION` from the customer app was considered and
+  rejected.** The code asks for `LocationAccuracy.medium`, which reads like coarse
+  would do — but the *granted permission is the ceiling*, and Android 12+ fuzzes
+  an approximate-only grant to a ~3 km² grid. That picks "Hyderabad" instead of
+  "Banjara Hills", which is exactly the failure the manifest comment describes.
+  Declaring FINE **and** COARSE together is the correct pattern and is what lets
+  the user choose approximate if they want to.
+- **Stripping the four Razorpay permissions was considered and rejected for v1.**
+  `tools:node="remove"` would do it and NFC in particular is genuinely dead in a
+  UPI-only flow — but the payment path has never run against live Razorpay
+  (ship S5), and an untested change to it days before a submission is the wrong
+  trade. **They cost nothing on the listing:** verified with `aapt2` that the
+  Razorpay SDK already ships
+  `<uses-feature android:name="android.hardware.nfc" android:required="false"/>`,
+  so **no device is filtered out of the Play listing by NFC.** Revisit after the
+  first real payment, not before.
+
+The only implied hardware feature across all three apps is
+`android.hardware.location` (from the location permissions) plus the
+`android.hardware.faketouch` that every app gets. Neither excludes any real
+phone, so **no `uses-feature` work is owed.**
