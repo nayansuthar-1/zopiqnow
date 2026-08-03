@@ -86,6 +86,17 @@ Nothing here is code. Every one of them blocks something later.
 - [ ] **G9 — Choose and record two keystore passwords** for the vendor and rider
       release keystores (A2), and put them somewhere that survives this laptop.
       A lost upload key is a new app listing.
+- [ ] **G11 — Restrict the Google Maps Android key** in the Cloud Console to the
+      three package names and their signing-certificate SHA-1s. The key is in
+      every APK's manifest and has to be — the Maps SDK reads it from there, and
+      `google_maps_flutter` is a real dependency, so it cannot be removed. Key
+      restriction is the only control that exists for it. Found by S2.
+- [ ] **G12 — Cap the Cloudinary unsigned preset** in the dashboard (audit
+      SEC-004): restrict allowed formats, max file size, and folder. The preset
+      ships inside every binary by design — an unsigned preset carries no
+      secret, but it does let a stranger upload to your account. The real fix is
+      signed uploads through an edge function; that is a post-launch item, and
+      capping the preset is the launch-week control.
 - [ ] **G10 — Access to a Mac with Xcode**, for the run of iOS work in Phase 3.
       The three apps compiled there on 2 August; it is needed again for signing,
       the device run, and the archive upload.
@@ -99,12 +110,21 @@ Mine unless marked. Ordered by how much of the system each one covers.
 - [x] **S1 — Full server-side authorization sweep.** ✅ **Closed 3 Aug —
       migration 0087.** Read from the live database, not from the migrations.
       What it found is below.
-- [ ] **S2 — What actually ships inside the binaries.** Unzip the release AAB and
-      the IPA, and inventory every secret in them. Expected and fine: the
-      Supabase anon key, the Razorpay *key id*, the Google Maps Android key
-      (restricted). Expected and **not** fine: the Cloudinary unsigned upload
-      preset (audit SEC-004), which lets anyone upload to your account. Anything
-      else found is a finding.
+- [x] **S2 — What actually ships inside the binaries.** ✅ **Closed 3 Aug** for
+      Android, against a real signed release APK. **Clean: nothing unexpected is
+      in there.** Probed for all 14 values in `.env`; the ten that must never
+      ship — Cloudinary API key and secret, DB password, Supabase access token,
+      Resend key, SMTP password, the notify webhook secret, both Ola secrets and
+      the Google client secret — are all absent. Present and public by design:
+      the anon key, the project URL, the OAuth *web client id*, the Cloudinary
+      cloud name. **The one real finding is the known one:** the Cloudinary
+      unsigned upload preset (audit SEC-004) is in `libapp.so`. See G11 for the
+      Maps key, which is legitimate but needs restricting.
+
+      > **Method note, because it nearly produced a false all-clear:** a plain
+      > ASCII `grep` of an APK under-reports. Android's binary manifest stores
+      > strings **UTF-16**, so the Maps key is invisible to a normal search and
+      > only turned up on a wide-character pass. Any future scan has to do both.
 - [ ] **S3 — Auth cannot be abused.** OTP resend throttle and an attempt cap in
       all three apps (audit CUS-026) — today the only limit is Supabase's
       project-level email rate, which is a bill and a blocklist waiting to
@@ -213,6 +233,48 @@ already carries no PUBLIC entry and new functions still arrive with one.
 
 ---
 
+## Found on the way — the app was 225 MB (3 Aug, closed)
+
+Found while unzipping the release APK for S2, which is the only reason it was
+found at all: **the customer release APK was 225.7 MB, and 198 MB of it was
+category artwork.**
+
+`assets/icons_zopiq/*.svg` were not vector art. Each was an `<svg>` element
+wrapping a single **1536×1024 base64-encoded PNG**, C2PA generation metadata and
+all — so `flutter_svg` parsed 6–9 MB of XML and base64-decoded a megapixel image
+to fill a **58 dp** circle. `assets/icons-2.0/*.PNG` were the same story without
+the wrapper: 1024² photographs for the same 58 dp slot.
+
+That is roughly 700× more pixels than the screen ever asks for, and it cost
+twice — once in download size, once in decode time on the home screen, on the
+Android 10 devices this app promises to run well on.
+
+All 50 files are now 256 px, which is still generous: 58 dp at a 4× device pixel
+ratio is 232 px. Alpha decides the format, so cut-outs stay PNG and the rest
+become JPEG. **103 MB of source art → 3.4 MB, and the APK went 225.7 MB → 68.9
+MB** — and that is the fat APK with all three ABIs; the per-device split from an
+AAB is far smaller again.
+
+Two things this changes beyond the number:
+
+1. **The `.svg` extension was load-bearing and nobody knew.** Two widgets chose
+   the *visual treatment* — floated inside the disc vs cropped to it — by asking
+   whether the filename ended in `.svg`. Renaming the files would have silently
+   restyled the rail. Both now branch on the folder, which is what they were
+   really asking. The two genuine vectors in that folder still render as vectors.
+2. **The attribution comment was wrong.** It said the art was Microsoft Fluent
+   Emoji, MIT licensed, "see `ATTRIBUTIONS.md`" — the art is not Fluent Emoji,
+   and **`ATTRIBUTIONS.md` does not exist in this repo.** `assets/categories/`
+   may well be genuine Fluent Emoji and `FLUENT-EMOJI-LICENSE.txt` is still
+   there. **This needs your answer before D3/D4**, both of which ask you to
+   affirm you have the rights to the content you ship — see the open question in
+   Phase 4.
+
+Masters of the originals are kept outside the repo at
+`D:\siteonlab\zopiq-safe\art-masters\`, and git has them regardless.
+
+---
+
 ## Phase 3 — iOS release engineering
 
 All of it is downstream of G1. Ordered by what blocks what.
@@ -270,6 +332,15 @@ Play first, App Store as soon as X8 allows. Most of this is yours.
       notes need it too, plus a note explaining that vendor and rider are
       separate apps for onboarded partners.
 - [ ] **D6 — Submit.** Answer review feedback the same hour it arrives.
+
+> **Open question you have to settle before D3 and D4: where did the dish art
+> come from?** The code claimed Microsoft Fluent Emoji under MIT and pointed at
+> an `ATTRIBUTIONS.md` that does not exist. The files themselves carry C2PA
+> generation metadata, which says AI-generated rather than Fluent Emoji. Both
+> stores make you affirm you have the rights to what you ship, so the answer
+> decides whether `FLUENT-EMOJI-LICENSE.txt` stays, changes, or is joined by a
+> real attributions file. If you generated them, that is a perfectly good answer
+> — it just needs to be the one written down.
 
 ---
 

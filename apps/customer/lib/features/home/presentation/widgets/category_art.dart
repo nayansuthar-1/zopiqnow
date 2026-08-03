@@ -36,7 +36,11 @@ class CategoryArt extends StatelessWidget {
                     color: theme.colorScheme.primary,
                   ),
                 )
-              : asset.endsWith('.svg')
+              // Which folder the art came from, not which extension it has:
+              // the flat art stopped being `.svg` when it turned out to be
+              // 1536x1024 PNGs in an `<svg>` wrapper, and the file type was
+              // never what this branch was really asking about.
+              : asset.contains('icons_zopiq')
               ? Builder(
                   builder: (context) {
                     final bool isSmall = category.id == 'sandwich' ||
@@ -46,12 +50,22 @@ class CategoryArt extends StatelessWidget {
                     return OverflowBox(
                       maxWidth: s,
                       maxHeight: s,
-                      child: SvgPicture.asset(
-                        asset,
-                        fit: BoxFit.contain,
-                        width: s,
-                        height: s,
-                      ),
+                      child: asset.endsWith('.svg')
+                          ? SvgPicture.asset(
+                              asset,
+                              fit: BoxFit.contain,
+                              width: s,
+                              height: s,
+                            )
+                          : Image.asset(
+                              asset,
+                              fit: BoxFit.contain,
+                              width: s,
+                              height: s,
+                              cacheWidth: (s *
+                                      MediaQuery.devicePixelRatioOf(context))
+                                  .round(),
+                            ),
                     );
                   },
                 )

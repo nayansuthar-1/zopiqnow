@@ -53,7 +53,8 @@ class CompactCategoryRail extends StatelessWidget {
                             color: Theme.of(context).colorScheme.primary,
                           ),
                         )
-                      : asset.endsWith('.svg')
+                      // Folder, not extension — see CategoryArt for why.
+                      : asset.contains('icons_zopiq')
                           ? Builder(
                               builder: (context) {
                                 final bool isSmall = category.id == 'sandwich' ||
@@ -63,12 +64,20 @@ class CompactCategoryRail extends StatelessWidget {
                                 return OverflowBox(
                                   maxWidth: s,
                                   maxHeight: s,
-                                  child: SvgPicture.asset(
-                                    asset,
-                                    fit: BoxFit.contain,
-                                    width: s,
-                                    height: s,
-                                  ),
+                                  child: asset.endsWith('.svg')
+                                      ? SvgPicture.asset(
+                                          asset,
+                                          fit: BoxFit.contain,
+                                          width: s,
+                                          height: s,
+                                        )
+                                      : Image.asset(
+                                          asset,
+                                          fit: BoxFit.contain,
+                                          width: s,
+                                          height: s,
+                                          cacheWidth: (s * MediaQuery.devicePixelRatioOf(context)).round(),
+                                        ),
                                 );
                               },
                             )

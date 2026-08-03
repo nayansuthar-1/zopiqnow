@@ -21,25 +21,29 @@ class HomeCatalogDataSource {
 
   List<Offer> fetchOffers() => _offers;
 
-  /// Artwork is Microsoft Fluent Emoji (3D) — MIT licensed, free to ship. See
-  /// ATTRIBUTIONS.md. Each category maps to its closest food emoji; these are
-  /// stand-ins for commissioned renders, and swapping one is a single edit here.
+  /// Rendered dish art, drawn at 58dp — so the files are 256px and no larger.
+  ///
+  /// They used to be `.svg`, which they never were: each was an `<svg>` element
+  /// wrapping one 1536x1024 base64 PNG, so flutter_svg parsed XML and decoded a
+  /// megapixel image to fill a circle the size of a thumbnail. 146 MB of the
+  /// APK, and the slowest thing on the home screen. Swapping one is still a
+  /// single edit here.
   static const String _art = 'assets/icons_zopiq';
 
   static const List<FoodCategory> _categories = <FoodCategory>[
-    FoodCategory(id: 'sandwich', label: 'Sandwich', imageAsset: '$_art/realistic_sandwich.svg'),
-    FoodCategory(id: 'pizza', label: 'Pizza', imageAsset: '$_art/realistic_pizza.svg'),
-    FoodCategory(id: 'burger', label: 'Burger', imageAsset: '$_art/realistic_burger.svg'),
-    FoodCategory(id: 'momos', label: 'Momos', imageAsset: '$_art/momos_hd.svg'),
-    FoodCategory(id: 'pav_bhaji', label: 'Pav Bhaji', imageAsset: '$_art/pav_bhaji_plate.svg'),
-    FoodCategory(id: 'dosa', label: 'Dosa', imageAsset: '$_art/dosa_hd.svg'),
-    FoodCategory(id: 'aloo_paratha', label: 'Aloo Paratha', imageAsset: '$_art/realistic_aloo_paratha.svg'),
-    FoodCategory(id: 'paneer_tikka', label: 'Paneer Tikka', imageAsset: '$_art/paneer_tikka_hd.svg'),
-    FoodCategory(id: 'paneer_sabji', label: 'Paneer Sabji', imageAsset: '$_art/paneer_sabji_1.svg'),
-    FoodCategory(id: 'icecream', label: 'Ice Cream', imageAsset: '$_art/ice_cream_sundae_2.svg'),
-    FoodCategory(id: 'sweet_box', label: 'Sweet Box', imageAsset: '$_art/mix_sweet_box.svg'),
-    FoodCategory(id: 'chocolate_cake', label: 'Cake', imageAsset: '$_art/chocolate_cake_2.svg'),
-    FoodCategory(id: 'cold_coffee', label: 'Cold Coffee', imageAsset: '$_art/cold_coffee_hd.svg'),
+    FoodCategory(id: 'sandwich', label: 'Sandwich', imageAsset: '$_art/realistic_sandwich.png'),
+    FoodCategory(id: 'pizza', label: 'Pizza', imageAsset: '$_art/realistic_pizza.png'),
+    FoodCategory(id: 'burger', label: 'Burger', imageAsset: '$_art/realistic_burger.png'),
+    FoodCategory(id: 'momos', label: 'Momos', imageAsset: '$_art/momos_hd.png'),
+    FoodCategory(id: 'pav_bhaji', label: 'Pav Bhaji', imageAsset: '$_art/pav_bhaji_plate.png'),
+    FoodCategory(id: 'dosa', label: 'Dosa', imageAsset: '$_art/dosa_hd.png'),
+    FoodCategory(id: 'aloo_paratha', label: 'Aloo Paratha', imageAsset: '$_art/realistic_aloo_paratha.png'),
+    FoodCategory(id: 'paneer_tikka', label: 'Paneer Tikka', imageAsset: '$_art/paneer_tikka_hd.png'),
+    FoodCategory(id: 'paneer_sabji', label: 'Paneer Sabji', imageAsset: '$_art/paneer_sabji_1.png'),
+    FoodCategory(id: 'icecream', label: 'Ice Cream', imageAsset: '$_art/ice_cream_sundae_2.png'),
+    FoodCategory(id: 'sweet_box', label: 'Sweet Box', imageAsset: '$_art/mix_sweet_box.png'),
+    FoodCategory(id: 'chocolate_cake', label: 'Cake', imageAsset: '$_art/chocolate_cake_2.png'),
+    FoodCategory(id: 'cold_coffee', label: 'Cold Coffee', imageAsset: '$_art/cold_coffee_hd.png'),
     FoodCategory(id: 'view_more', label: 'View More', imageAsset: null),
   ];
 
