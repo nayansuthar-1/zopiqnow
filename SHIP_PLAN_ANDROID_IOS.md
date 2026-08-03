@@ -86,6 +86,23 @@ Nothing here is code. Every one of them blocks something later.
 - [ ] **G9 — Choose and record two keystore passwords** for the vendor and rider
       release keystores (A2), and put them somewhere that survives this laptop.
       A lost upload key is a new app listing.
+- [ ] **G13 — Raise `rate_limit_email_sent`. This is a launch blocker twice
+      over.** It is **30 emails per hour, project-wide** — the Supabase default,
+      never changed after custom SMTP was wired to Brevo. Found by S3.
+
+      1. **Capacity.** Thirty sign-in mails an hour, shared across customer,
+         vendor and rider. A launch with any traction stops being able to sign
+         anybody in, and the failure looks like "the code never arrived".
+      2. **Denial of service.** The 45-second throttle is *per address*, so it
+         does not apply across different ones. Anyone can type thirty addresses
+         into the sign-in form in about a minute and nobody — in any of the three
+         apps — receives a code for the rest of the hour. Unauthenticated, no
+         tooling, repeatable.
+
+      The right number depends on your Brevo plan, which is why this is yours and
+      not mine. **hCaptcha on the auth endpoints is the control that actually
+      fixes (2)** — it is off today; it needs client work in all three apps and
+      is a post-launch item unless the abuse starts.
 - [ ] **G11 — Restrict the Google Maps Android key** in the Cloud Console to the
       three package names and their signing-certificate SHA-1s. The key is in
       every APK's manifest and has to be — the Maps SDK reads it from there, and
@@ -125,11 +142,32 @@ Mine unless marked. Ordered by how much of the system each one covers.
       > ASCII `grep` of an APK under-reports. Android's binary manifest stores
       > strings **UTF-16**, so the Maps key is invisible to a normal search and
       > only turned up on a wide-character pass. Any future scan has to do both.
-- [ ] **S3 — Auth cannot be abused.** OTP resend throttle and an attempt cap in
-      all three apps (audit CUS-026) — today the only limit is Supabase's
-      project-level email rate, which is a bill and a blocklist waiting to
-      happen. Plus: sign-out and session invalidation on account deletion, and no
-      account-enumeration difference between a known and unknown email.
+- [x] **S3 — Auth cannot be abused.** ✅ **Closed 3 Aug**, and it closed
+      differently from how it was written. Read against the live auth config
+      rather than the audit's description.
+
+      **Already correct, verified not assumed:** deleting an account ends every
+      session, because `delete_my_account` deletes the `auth.users` row and
+      sessions cascade from it (0081). And there is **no account enumeration** —
+      `signInWithOtp` creates users by default, so a known and an unknown address
+      are indistinguishable. Neither needed work.
+
+      **The audit's premise was stale.** CUS-026 says there is no resend throttle;
+      the server has one — `smtp_max_frequency` is 45 seconds between mails to
+      the same address. Rider and vendor have no resend button at all, so their
+      only send is a one-shot from the sign-in form and the server's 45s covers
+      it. Building UI throttles into all three apps would have been theatre.
+
+      **What was actually wrong:** the customer app's resend cooldown was **30
+      seconds against a server minimum of 45** — so the button went live fifteen
+      seconds early and the resend it invited came back refused. The comment
+      above it said the UI "should never let the user hit" the server limit,
+      which was true as intent and false as a number. Now 45.
+
+      **An attempt cap was considered and deliberately not built:** `rate_limit_verify`
+      is 30/hour, and a 6-digit code needs ~500,000 tries. The server already
+      makes brute force impossible; an in-app counter would add code and no
+      security. See **G13** for the one number here that *is* dangerous.
 - [ ] **S4 — The money path cannot be talked into a discount.** Re-verify, over
       HTTP with a real user token, that item prices, totals, taxes, delivery fee,
       and coupon value are all computed server-side in `place_order` and that no

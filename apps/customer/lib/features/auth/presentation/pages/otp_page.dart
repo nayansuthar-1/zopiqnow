@@ -11,7 +11,16 @@ import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dar
 
 /// Resend cooldown (SAD 9.3). Supabase rate-limits sends server-side, so the UI
 /// should never let the user hit it.
-const Duration otpResendCooldown = Duration(seconds: 30);
+///
+/// **45, not 30, because 30 was shorter than the limit it exists to stay under.**
+/// The project's `smtp_max_frequency` is 45 seconds — the minimum gap Supabase
+/// allows between two mails to the *same* address — so at 30 the button went
+/// live fifteen seconds early and the resend it invited came back refused. The
+/// comment above was true as an intent and false as a number.
+///
+/// If that setting is ever changed, change this with it: it is the one number
+/// here that is not ours to choose.
+const Duration otpResendCooldown = Duration(seconds: 45);
 
 /// Verifies the code. Navigation on success is *not* this screen's job: the
 /// router's redirect watches auth state and sends the user to wherever they were
