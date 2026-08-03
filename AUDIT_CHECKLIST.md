@@ -60,10 +60,11 @@ Sorted by effort, cheapest first.
 ## 🟠 Critical
 
 - [ ] **SEC-007** — The Resend API key remains unrotated after being committed to git history. 🔸<br><sub>Secrets · Security · effort XS</sub>
+- [ ] **SEC-010** — The `push_on_notification_insert` webhook stores a **`service_role` JWT in plaintext** in its trigger definition, readable via `pg_get_triggerdef` by anything that can read the catalog — a read-only foothold, a backup or a dashboard user thereby escalates to a key that bypasses RLS entirely. Not reachable through PostgREST, which exposes no catalog. **The header buys nothing:** `send-notification` is deployed `--no-verify-jwt` and authenticates on `x-notify-secret`, so the fix is to drop `Authorization` from the webhook headers. Found by S6, 2026-08-03; belongs to ship-plan S7.<br><sub>Backend · Database · webhook · Security · effort XS</sub>
 - [x] **API-002** — ola-static proxies the Ola Maps key with no caller authentication or rate limit shown in its handler. **Closed 2026-08-03 by retirement, not authentication: nothing has called it since B3. Key unset from the function env (Vault routing key untouched), handler returns 410 unconditionally. `supabase functions delete ola-static` still owed — classifier-blocked.**<br><sub>Edge fn · Security · effort S</sub>
 - [ ] **CUS-001** — Hard 25-order ceiling with no "load more".<br><sub>Order history · UX · effort S</sub>
 - [x] **CUS-005** — No idempotency on place_order. **Closed 2026-08-03 (migration 0086): caller-chosen key per checkout attempt, unique per customer, retries answered with the order already placed.**<br><sub>Checkout · Functional · effort S</sub>
-- [ ] **DAT-002** — A temp table is created on every order.<br><sub>place_order · Performance · effort S</sub>
+- [ ] **DAT-002** — A temp table is created on every order. **Second face of the same fact, found by the S4 probe 2026-08-03:** `_lines` is `on commit drop`, so `place_order` **cannot be called twice inside one transaction** — the second call dies on `relation "_lines" already exists`. Harmless in production, where every PostgREST RPC is its own transaction, but it means any test or batch that places two orders needs a savepoint per call.<br><sub>place_order · Performance · effort S</sub>
 - [ ] **DAT-006** — The CLI migration ledger has drifted from the live database four times and migrations 0062–0069 show as local-only despite being applied.<br><sub>Migrations · Architecture · effort S</sub>
 - [ ] **RID-005** — No concurrent-claim cap and no fraud limits.<br><sub>Jobs · Business · effort S</sub>
 - [ ] **SEC-004** — The Cloudinary unsigned upload preset ships inside every APK<br><sub>Customer App · Vendor App · Media · effort S</sub>
@@ -155,7 +156,6 @@ Sorted by effort, cheapest first.
 - [ ] **CUS-020** — No dish images shown at list level in most sections and no "bestseller" or "must try" ranking signal.<br><sub>Menu · UX · effort M</sub>
 - [ ] **CUS-021** — Rating is a sheet with no photo upload and no dish-level rating.<br><sub>Ratings · UX · effort M</sub>
 - [ ] **RID-012** — Navigation is a hand-off to an external maps app, documented as a deliberate choice.<br><sub>Jobs · UX</sub>
-- [ ] **DAT-002** — `place_order` creates a temp table `_lines … on commit drop`, so it cannot be called twice inside one transaction — the second call dies on `relation "_lines" already exists`. Harmless in production, where every PostgREST RPC is its own transaction. Found by the S4 probe, which needs a savepoint per case because of it.<br><sub>Backend · Database · place_order · effort XS</sub>
 - [ ] **SEC-009** — `REFERENCES` and `TRIGGER` are still granted to `anon` on the public tables that 0089 stripped of write privileges. Neither is reachable through PostgREST, which issues no DDL, so this is untidiness rather than exposure — the same default-ACL row is the source.<br><sub>Backend · Database · grants · effort XS</sub>
 
 ---

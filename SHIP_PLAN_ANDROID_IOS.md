@@ -193,10 +193,9 @@ Mine unless marked. Ordered by how much of the system each one covers.
       **Ends with one real ₹1 payment on a real device, on each platform**; the
       signature path has never run against Razorpay, only against a known-good
       vector.
-- [ ] **S6 — Rate-limit what costs money or sends mail.** Not "every RPC" (audit
-      SEC-005 is an M and this is not the week) — the four that matter:
-      order placement, OTP send, broadcast, and push. Per-user, in the database,
-      where it cannot be bypassed by a rebuilt client.
+- [x] **S6 — Rate-limit what costs money or sends mail.** ✅ **Closed 3 Aug —
+      migration 0090.** Three limits built and one deliberately not built. See
+      below.
 - [ ] **S7 — Edge functions: real auth, not `verify_jwt`.** `verify_jwt` proves a
       request carries a JWT this project signed — and **the anon key is such a
       JWT**, shipped in plaintext in every build. That mistake cost us the Ola
@@ -310,6 +309,75 @@ ambiguous `204`s are now `401 42501`, and reads still answer `200`.
 > creates a table must grant it nothing it does not need. The verification query
 > in the footer of `0089_a_grant_nobody_asked_for.sql` **must return zero rows
 > before each release**, alongside 0087's.
+
+### What S6 built — three limits, and one that would have been theatre
+
+Each limit **counts the rows the action itself already writes** rather than
+keeping a bucket table of its own. A counter that is separate from the thing it
+counts is a counter that can drift from it; this one cannot, because it *is* the
+thing it counts. No new table, and `orders_user_idx` already indexed the only
+count that will ever be hot.
+
+| | Limit | Where it lives |
+|---|---|---|
+| **Order placement** | 10 per hour per customer | `before insert` trigger on `orders` |
+| **Broadcast** | 6 per hour per admin | beside the duplicate guard in `admin_send_broadcast` |
+| **Chat** | 20 per side per delivery | beside the 3-second guard in `send_order_message` |
+| **OTP send** | — | GoTrue's, not ours. Not built, on purpose |
+
+**Order placement is a trigger, not a check inside `place_order`** — the same
+shape as 0084's cash refusal, 0085's payment gate and 0088's blocked user,
+because the rule belongs to the table and then every path is covered rather than
+the one path we remembered. The name was chosen so it fires *after* the blocked
+and cash refusals (a blocked customer should read that they are blocked, not that
+they are in a hurry) and *before* the payment gate, so a refused order never
+consumes a payment intent. **Cancelled and rejected orders still count** — each
+one rang a kitchen, and a limit that resets when you cancel is not a limit. Ten
+an hour is generous for a household and cheap for us; with the payment gate
+disarmed (S5), placing an order costs a stranger nothing and costs a cook a
+ticket.
+
+**The broadcast is the most expensive call in the system** — one `notifications`
+row, and one push, per registered device. The only thing limiting it was a
+five-minute refusal of the *exact same* message, which stops a double submit and
+does nothing about a hundred different ones.
+
+**Push is limited at its producers, because it has no other door.** Nothing can
+write a `notifications` row from outside: RLS is on, there is no write policy,
+and after 0089 no write privilege either, so every row comes from a definer
+function. The edge function is already gated on `NOTIFY_WEBHOOK_SECRET` and
+re-reads the row from the table, so it cannot be made to invent one. That leaves
+three producers — order events, broadcasts, and the chat — and all three are now
+capped.
+
+**OTP is the one that was not built, and that is the finding.** No trigger,
+policy or function in this database sits on that path; the endpoint is GoTrue's.
+What governs it is server configuration and it is already set —
+`smtp_max_frequency` 45s per address, `rate_limit_otp` and `rate_limit_email_sent`
+at 200/hour. **`rate_limit_verify` is still 30 and still caps sign-ins: G13.**
+The abuse a throughput cap cannot answer is the distributed one, and hCaptcha is
+that control; it is recorded in G13 as post-launch. Writing something in SQL here
+would have made this file look more complete than the system is.
+
+**Verified by exercising every boundary, in rolled-back transactions:** ten
+orders placed and the eleventh refused, with a second customer unaffected;
+a broadcast let through at five and refused at six, with a second admin
+unaffected and the refusal landing *before* any recipient row is written; the
+twentieth chat line sent, the twenty-first refused, and the customer's side
+untouched by the rider's twenty. The two release checks (0087, 0089) still return
+zero rows.
+
+> **A note on testing time-based limits here:** `now()` is the *transaction*
+> timestamp and does not advance inside one, so `pg_sleep` cannot clear a
+> throttle. The 21st chat line first came back refused by the old 3-second guard
+> rather than the new ceiling, which read as a pass and was not one. Backdating
+> the fixtures is the only way to test the limit you actually added.
+
+**Found on the way, and it is S7's:** the `push_on_notification_insert` webhook
+stores a **`service_role` JWT in plaintext** in its trigger definition, readable
+from `pg_get_triggerdef` by anything that can read the catalog. `send-notification`
+is deployed `--no-verify-jwt` and authenticates on `x-notify-secret` instead, so
+**that header buys nothing and can simply go.** Logged as `SEC-010`.
 
 **Two things noted and deliberately not fixed**, both written into
 `AUDIT_CHECKLIST.md` rather than done here:
