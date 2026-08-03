@@ -128,8 +128,43 @@ be a different address, say so and it changes in one constant.
 | C4 | **Idempotency on `place_order`** (audit CUS-005). A double-tap or a retry on a flaky connection currently places two orders. With prepaid UPI that is two charges. | Me | 2 h |
 | ✅ C5 | **Hide the dead Account tiles** (audit UX-001). Done alongside LEG-001 — the legal rows went where they were. All five are gone, and Help & support is the support address rather than a snackbar. | Me | 1 h |
 | C6 | **Delivery OTP no longer shown unconditionally** on the tracking card (audit CUS-015). It is the proof-of-delivery code; it should appear when the rider is at the door, not from the moment the order is placed. | Me | 1 h |
-| C7 | **`ola-static` gets caller authentication** (audit API-002). It proxies your Ola Maps key with no auth — anyone who finds the URL spends your quota. | Me | 2 h |
+| ✅ C7 | **`ola-static` gets caller authentication** (audit API-002). It proxies your Ola Maps key with no auth — anyone who finds the URL spends your quota. **It got retirement instead — see below.** | Me | 2 h |
 | C8 | **Release keystores for vendor and rider**, so the closed-track builds are real builds. Customer already has one. | Me + you for the passwords | 1 h |
+
+**C7 is closed, and it needed deleting rather than fixing.** The row above says
+"gets caller authentication". It has none, and it does not need any, because
+**nothing has called it since B3** — `zopiq_map` paints the map on the device and
+makes no network request at all. The function outlived its caller and stayed
+deployed, which is the whole reason it became a security item.
+
+The hole was real and worse than the row suggests. `ola-static` *is* behind the
+platform's JWT check — its own header comment says so and concludes the quota is
+"spent only on signed-in customers and riders". **That is false.** `verify_jwt`
+proves a request carries a JWT this project signed, and the **anon key is such a
+JWT**: it is a default value in `env.dart`, ships in plaintext inside every APK,
+and anyone who unzips one can spend the quota forever. Confirmed by doing it —
+the anon key returned a 2877-byte PNG.
+
+Three things now stand between that and your quota:
+
+1. **`OLA_MAPS_API_KEY` unset** from the function environment. The routing key
+   0057 keeps in Vault for `pg_net` is a *different* secret and untouched, so
+   route distances still work — checked, 40 chars, still there.
+2. **An unconditional 410** in the handler. Function secrets are project-wide,
+   so anything later named `OLA_MAPS_API_KEY` would have re-armed this silently.
+   Verified: the exact request that returned a PNG now returns
+   `This endpoint has been retired.`
+3. **Deletion**, which is the real fix and the one part left for you:
+
+   ```
+   supabase functions delete ola-static
+   ```
+
+   Blocked from here by the tooling's classifier. **`send-order-push` is in
+   exactly the same state** and has been since 30 July — dead, superseded by
+   `send-notification`, still ACTIVE at v5. Delete both in the same sitting. The
+   sources stay in the repo until you do; a live function with no source is the
+   same hazard inverted.
 
 **C3 is closed, in all three apps, on both platforms.** Firebase Crashlytics
 4.2.0 — the one release that resolves against the frozen `firebase_core 3.8.1`,

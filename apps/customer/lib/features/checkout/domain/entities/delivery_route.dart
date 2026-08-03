@@ -3,10 +3,16 @@ import 'package:flutter/foundation.dart';
 /// A point on the earth, and the smallest thing this file needs.
 ///
 /// Deliberately not `LatLng` from a mapping package — there is no mapping
-/// package. The map arrives as a finished picture from the `ola-static` Edge
-/// Function, which is what lets the tracking screen show a real map without a
-/// tile renderer, an API key in the APK, or a new dependency. These are the
-/// points we send it.
+/// package.
+///
+/// This used to say the map "arrives as a finished picture from the
+/// `ola-static` Edge Function". It has not since B3: `zopiq_map` paints the map
+/// on the device and makes no network request at all, which is why there is
+/// still no tile renderer, no key in the APK and no new dependency. The
+/// function outlived its caller, and staying deployed is how it turned into
+/// audit API-002 — it is retired now.
+///
+/// These are the points the painter is given.
 @immutable
 class GeoPoint {
   const GeoPoint(this.lat, this.lng);

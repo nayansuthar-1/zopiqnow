@@ -1,3 +1,44 @@
+// ════════════════════════════════════════════════════════════════════════════
+// RETIRED 2026-08-03 — DEAD, DISARMED, AND WAITING TO BE DELETED (audit API-002)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// **Nothing calls this.** The map the customer sees is drawn by `zopiq_map`,
+// which paints it on the device and makes no network request at all (B3). This
+// function outlived its caller and stayed deployed, which is how it became a
+// security item rather than a feature.
+//
+// **What was actually wrong.** The header below claims the platform's JWT check
+// means "the quota is spent only on signed-in customers and riders". That is
+// false, and it is the whole of API-002: `verify_jwt` proves a request carries a
+// JWT this project signed, and the **anon key is such a JWT** — it is a default
+// value in `env.dart`, it ships in plaintext inside every APK, and anyone who
+// unzips one can spend the map quota forever. Verified on 2026-08-03: the anon
+// key returned a 2877-byte PNG.
+//
+// **Three things now stand between that and the quota**, in order of how much
+// they are worth:
+//
+//   1. `OLA_MAPS_API_KEY` was **unset** from the function environment. The DB's
+//      own copy, which 0057 keeps in Vault for the routing `pg_net` calls, is a
+//      different secret and is untouched — routing still works.
+//   2. The unconditional refusal below. Function secrets are **project-wide**,
+//      so anything later named `OLA_MAPS_API_KEY` — for a new function, by
+//      someone with no idea this file exists — would otherwise wake this one
+//      straight back up. That trap is the reason for a hard stop rather than
+//      trusting the missing key.
+//   3. Deletion, which is the real fix and the one thing left:
+//
+//          supabase functions delete ola-static
+//
+//      It could not be run from here (blocked by the tooling's classifier). The
+//      source stays in the repo until it is: a live function with no source is
+//      the same hazard the other way round.
+//
+// Everything below this banner is the original implementation, kept only so the
+// deletion is a deletion of something readable.
+//
+// ════════════════════════════════════════════════════════════════════════════
+
 // ola-static — a real map behind the route, without the key leaving the server.
 //
 // **Why this exists at all.** Ola's tile and static-map APIs are the map we pay
@@ -75,6 +116,13 @@ function isFiniteNumber(n: number): boolean {
 }
 
 Deno.serve(async (req) => {
+  // The hard stop. See the banner: the missing key is not enough on its own,
+  // because function secrets are project-wide and a future one sharing this
+  // name would re-arm the leak silently. 410 rather than 404 because the
+  // resource genuinely existed and genuinely will not come back.
+  return new Response("This endpoint has been retired.", { status: 410 });
+
+  // deno-lint-ignore no-unreachable
   const key = Deno.env.get("OLA_MAPS_API_KEY");
   if (!key) {
     return new Response("Map key not configured", { status: 503 });
