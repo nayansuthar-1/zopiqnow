@@ -178,6 +178,28 @@ export const api = {
   deleteRestaurant: (id: string) =>
     rpc<void>('admin_delete_restaurant', { p_id: id }),
 
+  /// Everybody who has ever signed in, whatever they signed in *to*.
+  ///
+  /// One list rather than one per app, because the roles are not exclusive and a
+  /// per-app list would show the same person three times without saying so.
+  listUsers: () => rpc<UserRow[]>('admin_list_users'),
+
+  getUser: (userId: string) =>
+    rpc<UserDetail>('admin_get_user', { p_user_id: userId }),
+
+  userOrders: (userId: string) =>
+    rpc<UserOrder[]>('admin_user_orders', { p_user_id: userId }),
+
+  /// Blocking sets `auth.users.banned_until` and drops the person's sessions, so
+  /// it survives a reinstall and does not wait for a token to expire. The
+  /// database refuses to block an admin, or you — see migration 0088.
+  setUserBlocked: (userId: string, blocked: boolean, reason?: string) =>
+    rpc<void>('admin_set_user_blocked', {
+      p_user_id: userId,
+      p_blocked: blocked,
+      p_reason: reason ?? null,
+    }),
+
   listRiders: () => rpc<RiderRow[]>('admin_list_riders'),
 
   addRider: (email: string, name: string, phone: string, vehicle: Vehicle) =>
@@ -926,6 +948,72 @@ export type RiderPayRates = {
   base_fee: number
   per_km_fee: number
   updated_at: string
+}
+
+/// What somebody is on the platform. Reported most-privileged-first by
+/// `admin_list_users`, so a person who is both staff and an admin reads as an
+/// admin — which is the answer that matters when deciding whether to block them.
+export type UserRole = 'admin' | 'vendor' | 'rider' | 'customer'
+
+/// A person, with the counts the list is read by.
+///
+/// The three order counts are three different stories and are deliberately not
+/// summed into one: `delivered` is a completed sale, `rejected` is a restaurant
+/// refusing, `cancelled` is the order being called off. Ten orders with nine
+/// cancellations is a different person from ten with nine deliveries.
+export type UserRow = {
+  user_id: string
+  email: string | null
+  phone: string | null
+  name: string | null
+  role: UserRole
+  created_at: string
+  last_sign_in_at: string | null
+  is_blocked: boolean
+  blocked_until: string | null
+  total_orders: number
+  delivered_orders: number
+  rejected_orders: number
+  cancelled_orders: number
+  /// Paise-free rupees, summed over delivered orders only — money that actually
+  /// changed hands, not money that was once in a cart.
+  total_spend: number
+}
+
+export type UserAddress = {
+  id: string
+  label: string | null
+  line1: string | null
+  city: string | null
+  delivery_notes: string | null
+  created_at: string
+}
+
+/// One row of the moderation ledger. Append-only: an unblock does not erase the
+/// block, it follows it, which is the point of keeping a record at all.
+export type UserModeration = {
+  id: number
+  action: 'block' | 'unblock'
+  reason: string | null
+  actor_email: string
+  created_at: string
+}
+
+export type UserDetail = UserRow & {
+  addresses: UserAddress[]
+  restaurants: { restaurant_id: string; role: string; name: string | null }[]
+  moderation: UserModeration[]
+}
+
+export type UserOrder = {
+  id: string
+  restaurant_name: string | null
+  status: string
+  total: number
+  payment_method: string | null
+  delivery_to: string | null
+  created_at: string
+  items: { name: string; quantity: number; unit_price: number }[]
 }
 
 /// The three vehicles `delivery_partners.vehicle` allows.

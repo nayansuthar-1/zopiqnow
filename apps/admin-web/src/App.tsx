@@ -5,6 +5,7 @@ import { AppShell } from './ui/AppShell'
 import { RestaurantsPage } from './restaurants/RestaurantsPage'
 import { WizardPage } from './restaurants/WizardPage'
 import { RidersPage } from './riders/RidersPage'
+import { UsersPage } from './users/UsersPage'
 import { HeroSlidesPage } from './content/HeroSlidesPage'
 import { PayoutsPage } from './payouts/PayoutsPage'
 import { CashPage } from './payouts/CashPage'
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/restaurants/new" element={<WizardPage key="new" />} />
           <Route path="/restaurants/:id" element={<WizardPage key="edit" />} />
           <Route path="/riders" element={<RidersPage />} />
+          <Route path="/users" element={<UsersPage />} />
           <Route path="/hero" element={<HeroSlidesPage />} />
           <Route path="/coupons" element={<CouponsPage />} />
           <Route path="/broadcast" element={<BroadcastPage />} />

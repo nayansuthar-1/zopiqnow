@@ -28,6 +28,7 @@ const groups: {
       { to: '/restaurants', label: 'Restaurants', end: true },
       { to: '/restaurants/new', label: 'Add restaurant', end: false },
       { to: '/riders', label: 'Riders', end: false },
+      { to: '/users', label: 'People', end: false },
     ],
   },
   {

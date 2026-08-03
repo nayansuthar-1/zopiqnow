@@ -361,6 +361,55 @@ All of it is downstream of G1. Ordered by what blocks what.
 
 ---
 
+## Added by request — People, in the console (3 Aug, closed)
+
+Audit **ADM-001** was on the deferred list; it was asked for directly, so it was
+built. Migration **0088** and a new **People** page.
+
+**Every person on the platform, in one list**, with role, order counts and
+controls to block or unblock. There is no `users` table behind it and there
+should not be: a person is a row in `auth.users`, and what they may do lives in
+three tables keyed by email (`platform_admins`, `restaurant_staff`,
+`delivery_partners`). So the role is **derived**, not stored, and stays right the
+day somebody is made staff. Roles report most-privileged-first, because that is
+the answer that matters when deciding whether to block someone.
+
+**Three order counts, not one.** `delivered` is a completed sale, `rejected` is a
+restaurant refusing, `cancelled` is the order being called off. Someone with ten
+orders and nine cancellations is a different person from someone with ten and
+nine deliveries, and the list exists to tell them apart. Opening a person shows
+their addresses, the restaurants they staff, every order with its line items, and
+their moderation history.
+
+**Blocking is real, not cosmetic.** It sets `auth.users.banned_until`, so GoTrue
+refuses to issue or refresh their tokens — it survives a reinstall and does not
+depend on any client behaving. Two things that alone would not cover:
+
+- **An access token already on the phone stays valid until it expires.** So the
+  block also deletes their sessions, *and* a `before insert` trigger on `orders`
+  refuses a blocked user outright — same shape as 0084's cash refusal. Without
+  it, blocking somebody mid-session left them ordering for up to an hour.
+- **It records nothing.** Every block and unblock writes to `user_blocks`, which
+  is append-only. That is **the start of S8's audit trail**, put here because
+  this is the first power the console has over a *person* rather than a row.
+
+**Two rails, in the database rather than the screen:** you cannot block yourself,
+and you cannot block another admin — so locking everyone out takes deliberate
+SQL, not one click.
+
+Verified: every rail and the trigger exercised in rolled-back transactions
+against live data; all four RPCs refuse `anon` **over HTTP** (401), and refuse a
+signed-in non-admin via `assert_admin` in their own bodies; every function
+revoked from PUBLIC per 0087's rule, which still reports zero. The console
+typechecks and builds.
+
+**Not yet done on a real screen** — the page has not been clicked through in a
+browser, and blocking a real person has never been tried end to end. That is a
+handover check, and the one worth doing first is: block a test account, confirm
+it is signed out and cannot order, then unblock it.
+
+---
+
 ## Phase 4 — the two submissions
 
 Play first, App Store as soon as X8 allows. Most of this is yours.
@@ -432,7 +481,7 @@ keeps the full list with severities.
 |---|---|
 | **FEA-001** — "nearby" is a number an admin typed | Fine while you launch one area. Urgent at the second neighbourhood. |
 | **UX-002** — no phone-number auth | Email OTP and Google both work. A conversion problem, not a broken app. Highest-value thing in week one. |
-| **ADM-001 / ADM-002** — no customer management, no support queue | Support by phone and WhatsApp at launch volume. Feel the pain, then build the right queue. |
+| ~~**ADM-001**~~ — no customer management | **Pulled forward and built, 3 Aug** — migration 0088 and the console's People page. See below. **ADM-002**, the support queue, still waits: phone and WhatsApp at launch volume. |
 | **SEC-003** — flat admin role, no MFA | One operator: you. S8 buys the audit trail; the rest waits until a second account exists. |
 | **PERF-002 / CUS-001** — nothing paginated | Nobody has 25 orders on day one. |
 | **CUS-011 / CUS-012 / RID-006** — wallet, referrals, incentives | Growth features. None of them is a launch. |
