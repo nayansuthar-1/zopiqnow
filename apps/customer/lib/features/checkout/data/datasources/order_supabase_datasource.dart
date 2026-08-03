@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:zopiqnow/core/observability/crash_reporter.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
@@ -114,12 +115,29 @@ class OrderSupabaseDataSource implements OrderDataSource {
         etaMinutes: (receipt['eta_minutes'] as num).toInt(),
         paymentId: receipt['payment_id'] as String?,
       );
-    } on PostgrestException catch (e) {
+    } on PostgrestException catch (e, stack) {
       // "Your cart is empty", "Something in your cart is no longer available" —
       // rules we wrote, phrased for the customer, so they are worth showing.
       if (e.code == _businessRuleErrorCode) {
         throw OrderPlacementFailure(e.message);
       }
+
+      // **This line is why crash reporting exists** (launch C3, audit OBS-001).
+      //
+      // On 29 July it swallowed SQLSTATE 21000 — `pg_safeupdate` refusing the
+      // `where`-less update 0078 had just added to `place_order` — and handed
+      // the customer "We couldn't place your order. Please try again." Nobody
+      // could order anything for three days and the real code was written down
+      // nowhere. It was found because somebody happened to try, which is not a
+      // monitoring strategy.
+      //
+      // The rule this establishes: when the app replaces the truth with a
+      // friendlier sentence, the truth goes here first.
+      CrashReporter.recordHandled(
+        e,
+        stack,
+        reason: 'place_order failed with ${e.code ?? 'no code'}',
+      );
       throw const OrderPlacementFailure();
     }
   }

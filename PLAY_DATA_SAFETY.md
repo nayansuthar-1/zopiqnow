@@ -97,13 +97,27 @@ marketing, and none of it is used for tracking across other apps.
 
 | Data type | Collected | Shared | Required? | Purposes |
 |---|---|---|---|---|
-| Crash logs | **See note** | No | — | App functionality, Diagnostics |
+| Crash logs | **Yes** | No | Optional | App functionality, Diagnostics |
+| Diagnostics | **Yes** | No | Optional | App functionality, Diagnostics |
 
-> **Answer this one last.** Today the app ships no crash reporter, so the honest
-> answer is No. Crashlytics is item C3 on the launch plan; if it is in the build
-> you submit, this becomes **Yes / Collected / not shared / Diagnostics**, and
-> "Diagnostics" must be ticked as a purpose. Ticking it before the SDK is in is
-> as wrong as leaving it out afterwards.
+> **Settled 2026-08-02 — this note used to say "answer this one last".** It is
+> answered: launch C3 put Firebase Crashlytics in all three apps, so the honest
+> answer is now **Yes**, and **Diagnostics must be ticked as a purpose**.
+>
+> What actually goes to Crashlytics: the exception, its stack trace, and the
+> device/OS/app-version context the SDK gathers by itself. Plus the Supabase
+> **user id** — set by `CrashReporter.identify` so a customer who phones in can
+> be found — which Google counts under *Device or other IDs*, already declared
+> below. No name, email, phone or address is ever attached to a report.
+>
+> It also collects **handled** errors, not only crashes. That is deliberate (the
+> 29 July order outage was a caught exception, not a crash) and it does not
+> change any answer here — Google's "Crash logs" and "Diagnostics" types cover
+> both.
+>
+> **Not collected in debug builds**: `setCrashlyticsCollectionEnabled(!kDebugMode)`.
+> Irrelevant to Play, which only ever sees a release build, but it is why a
+> developer's own broken widget never reaches the dashboard.
 
 ### Device or other IDs
 

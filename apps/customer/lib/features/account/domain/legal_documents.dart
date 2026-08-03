@@ -120,9 +120,13 @@ const LegalDocument privacyPolicy = LegalDocument(
             'it.',
         'Our payment provider (Razorpay) handles the payment itself.',
         'Our technical providers store the data on our behalf: Supabase '
-            '(database and accounts), Google Firebase (push notifications), '
-            'Cloudinary (images), and Google Maps and Ola Maps (maps and '
-            'routing). They process it for us and for nobody else.',
+            '(database and accounts), Google Firebase (push notifications, and '
+            'crash reports when the app goes wrong), Cloudinary (images), and '
+            'Google Maps and Ola Maps (maps and routing). They process it for '
+            'us and for nobody else.',
+        'A crash report says what broke, on what kind of phone, and which '
+            'account hit it. It does not carry your name, email, phone number '
+            'or address. We read them to fix the app, and for nothing else.',
         'Government authorities, if the law requires it of us.',
       ],
     ),

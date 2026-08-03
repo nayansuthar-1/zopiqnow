@@ -6,12 +6,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:zopiq_vendor/app/env.dart';
 import 'package:zopiq_vendor/app/vendor_app.dart';
+import 'package:zopiq_vendor/core/observability/crash_reporter.dart';
 import 'package:zopiq_vendor/core/storage/secure_store.dart';
 import 'package:zopiq_vendor/core/storage/supabase_secure_local_storage.dart';
 import 'package:zopiq_vendor/features/notifications/push_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // First, before anything can throw. A kitchen screen that dies mid-service and
+  // tells nobody why is the failure this exists to end.
+  CrashReporter.attach();
 
   // Portrait-locked, like the customer app. A tablet in a stand is the obvious
   // next form factor, and landscape will have to be earned properly — a queue
@@ -37,5 +42,9 @@ Future<void> main() async {
   // After the first frame, not before: push brings up Firebase and asks the
   // notification permission, and that prompt should land over a running app, not
   // a blank screen. Guarded internally — if any of it fails, the app is unharmed.
+  //
+  // Crash reporting first and separately: it must not inherit push's failure
+  // modes. Both bring Firebase up and the call is idempotent.
+  await CrashReporter.enable();
   await PushService.start();
 }

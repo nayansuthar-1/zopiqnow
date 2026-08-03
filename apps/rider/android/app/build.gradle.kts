@@ -9,6 +9,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     // Firebase config (google-services.json) for push. B0, 2026-07-25.
     id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 // The Google Maps key, read from `android/local.properties` — gitignored, and
@@ -61,6 +62,14 @@ android {
         release {
             // TODO: Replace debug signing with a real release keystore before publishing.
             signingConfig = signingConfigs.getByName("debug")
+
+            // Off for the same reason as the customer app: the upload is a
+            // network call inside `assembleRelease`, and it failed the build
+            // outright on 2026-08-02. This app is not minified, so there is not
+            // even a mapping worth sending. Crash *reporting* is unaffected.
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
         }
     }
 }

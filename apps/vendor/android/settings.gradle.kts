@@ -24,6 +24,12 @@ plugins {
     // Reads google-services.json into the build so Firebase can wake the app.
     // Phase 7 push (2026-07-18). Applied in :app.
     id("com.google.gms.google-services") version "4.4.2" apply false
+    // Uploads the R8 mapping file so a Java-side stack trace in Crashlytics is
+    // readable rather than a list of one-letter class names. Dart traces need
+    // no such thing -- they are not what R8 renames -- so if this plugin ever
+    // fights the toolchain, dropping it costs symbolication and not reporting.
+    // Launch C3, 2026-08-02.
+    id("com.google.firebase.crashlytics") version "3.0.2" apply false
 }
 
 include(":app")

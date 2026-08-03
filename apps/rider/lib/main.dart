@@ -6,12 +6,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:zopiq_rider/app/env.dart';
 import 'package:zopiq_rider/app/rider_app.dart';
+import 'package:zopiq_rider/core/observability/crash_reporter.dart';
 import 'package:zopiq_rider/core/storage/secure_store.dart';
 import 'package:zopiq_rider/core/storage/supabase_secure_local_storage.dart';
 import 'package:zopiq_rider/features/notifications/push_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // First, before anything can throw. A rider mid-shift is the worst possible
+  // person to have an unreported failure in front of.
+  CrashReporter.attach();
 
   // Portrait-locked. This app is used one-handed, at a counter or on a doorstep.
   await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
@@ -40,5 +45,9 @@ Future<void> main() async {
   // looking at a blank screen for the duration. It still runs after Supabase is
   // up, which is the only ordering that actually matters, and it is still
   // guarded internally — no Firebase config means a no-op and the app runs on.
+  //
+  // Crash reporting first and separately: it must not inherit push's failure
+  // modes. Both bring Firebase up and the call is idempotent.
+  await CrashReporter.enable();
   await PushService.start();
 }

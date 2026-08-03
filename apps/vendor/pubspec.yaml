@@ -54,6 +54,12 @@ dependencies:
   firebase_messaging: 15.1.6
   flutter_local_notifications: 18.0.1
 
+  # --- Crash reporting (launch C3, audit OBS-001, 2026-08-02) -----------------
+  # Added, not upgraded: the one crashlytics release that resolves against the
+  # frozen `firebase_core: 3.8.1`, and it moved no other pin (Rule 3). Reports
+  # Dart errors, fatal and handled both — see `core/observability/crash_reporter.dart`.
+  firebase_crashlytics: 4.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

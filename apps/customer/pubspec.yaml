@@ -104,6 +104,19 @@ dependencies:
   firebase_messaging: 15.1.6
   flutter_local_notifications: 18.0.1
 
+  # --- Crash reporting (launch C3, audit OBS-001, 2026-08-02) -----------------
+  # Added, not upgraded. This is the crashlytics release that resolves against
+  # the frozen `firebase_core: 3.8.1`, and adding it moved **no other pin** —
+  # the root lockfile gained two entries and changed none (Rule 3).
+  #
+  # It reports Dart errors, fatal and handled both, and the handled half is the
+  # point. The order-placement outage of 29 July — three days, every customer,
+  # every cart — was a *caught* exception behind a generic snackbar. No crash
+  # reporter would ever have seen it. `CrashReporter.recordHandled` is what
+  # makes the next one visible on the day it starts rather than the day someone
+  # complains.
+  firebase_crashlytics: 4.2.0
+
   # --- Calling the rider and the restaurant (B5, 2026-07-29) ------------------
   # The dialler, and nothing else — see `core/dialler.dart` for why `tel:` opens
   # the keypad rather than placing the call. **Not a new version** (Rule 3): the

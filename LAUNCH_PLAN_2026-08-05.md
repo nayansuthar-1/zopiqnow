@@ -124,12 +124,50 @@ be a different address, say so and it changes in one constant.
 |---|---|---|---|
 | ✅ C1 | **Remove cash on delivery from checkout.** UPI becomes the only method offered. Server and vendor/rider apps keep the ability to handle a cash order — that is data that already exists — but no new one can be created. | Me | 1 h |
 | ✅ C2 | **Razorpay adapter + server-side signature verification + the mock lockout** described above. Ends with everything ready for keys. | Me | 5 h |
-| C3 | **Crash reporting** (audit OBS-001) — Crashlytics in the customer app, and in vendor and rider if time allows. Launching without it means your first bug report is a one-star review. This is the highest-value non-gate item on the list. | Me | 3 h |
+| ✅ C3 | **Crash reporting** (audit OBS-001) — Crashlytics in the customer app, and in vendor and rider if time allows. Launching without it means your first bug report is a one-star review. This is the highest-value non-gate item on the list. | Me | 3 h |
 | C4 | **Idempotency on `place_order`** (audit CUS-005). A double-tap or a retry on a flaky connection currently places two orders. With prepaid UPI that is two charges. | Me | 2 h |
 | ✅ C5 | **Hide the dead Account tiles** (audit UX-001). Done alongside LEG-001 — the legal rows went where they were. All five are gone, and Help & support is the support address rather than a snackbar. | Me | 1 h |
 | C6 | **Delivery OTP no longer shown unconditionally** on the tracking card (audit CUS-015). It is the proof-of-delivery code; it should appear when the rider is at the door, not from the moment the order is placed. | Me | 1 h |
 | C7 | **`ola-static` gets caller authentication** (audit API-002). It proxies your Ola Maps key with no auth — anyone who finds the URL spends your quota. | Me | 2 h |
 | C8 | **Release keystores for vendor and rider**, so the closed-track builds are real builds. Customer already has one. | Me + you for the passwords | 1 h |
+
+**C3 is closed, in all three apps, on both platforms.** Firebase Crashlytics
+4.2.0 — the one release that resolves against the frozen `firebase_core 3.8.1`,
+and adding it moved **no other pin**: the lockfile gained 16 lines and changed
+none.
+
+The part that matters is not the crash half. **The 29 July outage was a caught
+exception**, shown to every customer as "We couldn't place your order" while the
+real SQLSTATE went nowhere — no crash reporter would ever have seen it. So
+`CrashReporter.recordHandled` records handled failures too, and the branch in
+`order_supabase_datasource.dart` that swallowed it is now the first caller. The
+rule, written where the next person will hit it: *when the app replaces the truth
+with a friendlier sentence, the truth goes to the reporter first.*
+
+Also: errors are captured from the **first line of `main`**, before Firebase
+exists — anything thrown in that window is buffered and flushed once Crashlytics
+is up, so a startup failure is reported rather than lost. Reports are tied to the
+Supabase user id (and nothing else — no name, email, phone or address) via a
+subscription to auth state, because there are three ways into a session and only
+one of them is a screen anyone would think to edit.
+
+**One thing was tried and taken back out.** The Crashlytics Gradle plugin
+uploads the R8 mapping file during `assembleRelease`, and it failed the build
+outright with `SSLHandshakeException`. A Play release build that cannot be made
+on a flaky connection is not a release process, so `mappingFileUploadEnabled` is
+`false` in all three apps. The cost is Java frames staying obfuscated — a small
+bill for a Flutter app, since Dart stack traces live in the Dart snapshot, are
+not what R8 renames, and arrive readable regardless.
+
+**Play data safety is updated, not left for later.** "Crash logs" and
+"Diagnostics" are now **Yes**, and the privacy policy in-app says Firebase
+receives crash reports and what they contain. Ticking those boxes before the SDK
+was in would have been as wrong as leaving them out afterwards.
+
+**iOS:** the plugin is in the same pubspec, so Dart errors report from iPhones
+with no extra work. What is missing there is the dSYM upload build phase, which
+only Xcode can add — filed as **I10** below, and it costs symbolication of
+native frames, not reporting.
 
 **C2 is closed, and PAY-001 with it — pending one statement.** Three pieces:
 
@@ -240,6 +278,7 @@ Ordered by what blocks what. None of it is on the 5 August path.
 | I6 | **Run all three on a device**, then work the push chain in order rather than guessing: APNs token → FCM token → a `device_tokens` row with `platform='ios'` → webhook fired → function logs. I0 has already cleared the last link. | You + me | 2 h |
 | I7 | **The Live Activity target.** `ZopiqLiveActivity` appears **zero times** in the customer's `project.pbxproj` — the Swift sources, the extension `Info.plist` and `NSSupportsLiveActivities` all exist, but the Xcode target does not, so the live order card is Android-only in practice. Must be done in the Xcode GUI: hand-writing target UUIDs into a `.pbxproj` is a reliable way to corrupt the project. Recipe is `IOS_HANDOVER.md` §4 Step 5 — including the one checkbox that matters, adding `ZopiqLiveCardAttributes.swift` to the extension **as a reference, not a copy**. | Me at the keyboard | 2 h |
 | I8 | **Razorpay on a real iPhone** — the first actual payment through the iOS SDK, and the check that I1's scheme list is right. Downstream of C2 and of live keys. | Me + you | 1 h |
+| I10 | **Crashlytics dSYM upload build phase.** Dart errors already report from iOS with no work at all (launch C3); this is what makes *native* frames readable. A run-script build phase in Xcode — `${PODS_ROOT}/FirebaseCrashlytics/run` plus the input files — for each of the three Runner targets. Same constraint as I7: Xcode GUI, not a hand-edited `.pbxproj`. Note the Android side deliberately has its upload **off** (it broke the release build), so if reporting turns out to be enough in practice, this can stay undone. | Me at the keyboard | 45 min |
 | I9 | **TestFlight build and internal test.** Then the App Store listing, which reuses everything R3/R4 produced for Play — the privacy policy URL, the data-safety answers become Apple's privacy nutrition labels, the same screenshots at Apple's sizes. **Apple requires in-app account deletion too**, and LEG-001 already built it. | You + me | 4 h |
 
 ### What is *not* an iOS gap, so nobody goes hunting

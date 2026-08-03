@@ -4,6 +4,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     // Firebase config (google-services.json) for push. Phase 7, 2026-07-18.
     id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 android {
@@ -38,6 +39,20 @@ android {
         release {
             // TODO: Replace debug signing with a real release keystore before publishing.
             signingConfig = signingConfigs.getByName("debug")
+            // Crashlytics uploads the R8 mapping file over the network as part of
+            // `assembleRelease`, and on 2026-08-02 that failed the whole build
+            // with an SSL handshake error -- a release build that cannot be made
+            // on a flaky connection is not a release process. Off, so the build
+            // is offline and deterministic again.
+            //
+            // What it costs: Java frames in Crashlytics stay obfuscated. That is
+            // a small bill for a Flutter app -- Dart stack traces are in the Dart
+            // snapshot, are not what R8 renames, and arrive readable either way.
+            // Turn it back on (and keep it on only if the build stays reliable)
+            // when a native crash actually needs reading.
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

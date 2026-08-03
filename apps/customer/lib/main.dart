@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:zopiqnow/app/env.dart';
 import 'package:zopiqnow/app/zopiq_app.dart';
+import 'package:zopiqnow/core/observability/crash_reporter.dart';
 import 'package:zopiqnow/core/storage/key_value_store.dart';
 import 'package:zopiqnow/core/storage/secure_store.dart';
 import 'package:zopiqnow/core/storage/storage_providers.dart';
@@ -15,6 +16,12 @@ import 'package:zopiqnow/features/notifications/push_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // First, before anything can throw. It costs nothing and it is the difference
+  // between a startup failure that is reported and one that is simply a customer
+  // staring at a dead splash screen. Firebase is not up yet — see the class for
+  // what happens to errors raised in that window.
+  CrashReporter.attach();
 
   // Phone-only portrait for now (Rule 1 — predictable on mid-range devices).
   // Awaited now that `main` is async: `unawaited_futures` is a lint here.
@@ -66,5 +73,11 @@ Future<void> main() async {
   // registers against the restored session), and the permission prompt now
   // lands over a running app rather than a blank screen, which is where a
   // prompt should land. Guarded internally: no Firebase config means a no-op.
+  //
+  // Crash reporting goes up first, and separately, so that it does not inherit
+  // push's failure modes: a denied notification permission must not cost us the
+  // report of the exception thrown a second later. Both bring Firebase up; the
+  // call is idempotent and whichever arrives first wins.
+  await CrashReporter.enable();
   await PushService.start();
 }
