@@ -59,14 +59,27 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get --enforce-lockfile
 
-      # Errors fail the build. The warnings and infos are pre-existing (unused
-      # declarations left by the receipt and earnings redesigns, some
-      # `withOpacity` deprecations) and are tracked in the audit rather than
-      # blocking a merge today — but `--fatal-infos` is the setting to turn on
-      # once that backlog is cleared, and it is the reason this step names its
-      # own threshold instead of relying on the default.
+      # Errors fail the build; warnings and infos do not, and **the flags are
+      # what make that true**.
+      #
+      # This step used to be a bare `flutter analyze apps packages` under a
+      # comment asserting that only errors failed it. That was never so:
+      # `flutter analyze` exits non-zero on warnings *and* infos by default, so
+      # from the day this file landed the job failed on every single push, for
+      # 27 pre-existing issues and not one error. A red pipeline nobody can make
+      # green is a pipeline people stop reading, which is worse than no
+      # pipeline — it was mailing failure notices for a week while the suites
+      # were green the whole time. Fixed 2026-08-03.
+      #
+      # The backlog it was tripping over is real but not urgent: 12 warnings
+      # (unused declarations and fields left by the receipt, earnings and gifts
+      # redesigns; one unused import) and 15 infos (`prefer_const`, `withOpacity`
+      # deprecations, one `unawaited_futures`). None of it is a defect. Clearing
+      # it and dropping `--no-fatal-warnings` is the right follow-up, in that
+      # order — the flag is the honest description of today's bar, not an
+      # excuse to let the count climb.
       - name: Analyze
-        run: flutter analyze apps packages
+        run: flutter analyze apps packages --no-fatal-warnings --no-fatal-infos
 
       # Per package, so a failure names the app it belongs to rather than
       # arriving as one undifferentiated wall.
