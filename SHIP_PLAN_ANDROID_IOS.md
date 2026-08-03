@@ -139,6 +139,17 @@ Nothing here is code. Every one of them blocks something later.
 
 Mine unless marked. Ordered by how much of the system each one covers.
 
+> **Phase 1 is closed as of 3 August**, S1–S9, migrations 0087 and 0089–0093.
+> **One item is not finished and is not mine: S5** — the payment gate cannot be
+> armed until the Razorpay merchant keys exist (G3), and it ends with one real ₹1
+> payment on a device on each platform. Everything else in this phase is done and
+> was verified against the live database.
+>
+> **Two standing checks must return zero rows before every release.** They are in
+> the footers of `0087_a_revoke_that_did_nothing.sql` (no function executable by
+> PUBLIC) and `0089_a_grant_nobody_asked_for.sql` (no write grant a policy does
+> not scope). Both return zero today.
+
 - [x] **S1 — Full server-side authorization sweep.** ✅ **Closed 3 Aug —
       migration 0087.** Read from the live database, not from the migrations.
       What it found is below.
@@ -203,10 +214,9 @@ Mine unless marked. Ordered by how much of the system each one covers.
 - [x] **S8 — Privileged actions leave a trace.** ✅ **Closed 3 Aug — migration
       0092.** `admin_actions`, append-only and meant literally, fed by 14
       triggers on 11 tables. **No existing function was rewritten.** See below.
-- [ ] **S9 — The rider KYC gate is server-side.** Migration 0080 gates five work
-      paths on documents. Confirm the gate is in the database and not only in the
-      rider app's navigation, and that an expired document blocks the same way a
-      missing one does.
+- [x] **S9 — The rider KYC gate is server-side.** ✅ **Closed 3 Aug — migration
+      0093.** The gate is sound and needed no change; the two things wrong were
+      beside it. See below. **Phase 1 is now closed.**
 
 ### What S1 found, and the rule it leaves behind
 
@@ -515,6 +525,55 @@ not a Zopiqnow admin."*
 deferred until a second admin account exists. What S8 buys is that when it
 matters, the question "who did this, and what was in the row before it went" has
 an answer.
+
+### What S9 found — the gate holds; a vouch left no trace
+
+**The gate is in the database, confirmed against the live function bodies rather
+than the migration that wrote them** — which matters, because 0083 and the B3
+dispatch work both replaced functions in this area after 0080, and a
+`create or replace` that quietly dropped the guard is exactly this repo's history.
+All five still call it: `set_rider_online`, `available_deliveries`,
+`claim_delivery` and `accept_offer` via `rider_work_block`, and `offer_delivery`
+via `rider_is_verified` — the boolean form, because the dispatcher filters whom
+to offer to rather than raising at them.
+
+**Ten document states, all five paths, every one correct.** No `rider_legal` row,
+pending, rejected, verified-and-current, licence expired, insurance expired,
+expiring *today*, a cyclist with expired papers, an override, and a lapsed
+override. **An expired document blocks exactly as a missing one does** — and
+better, because it names the document and the date it went. Expiry is recomputed
+against `current_date` on every call, never stored, so a licence lapses at
+midnight with nothing to run. The boundary agrees between the two functions:
+expiring *today* still works.
+
+**A cyclist is exempt from licence and insurance by design** — they are verified
+on identity alone. That is correct and worth knowing it is deliberate.
+
+**The finding: an override is the most powerful switch in the product and nothing
+recorded it.** `rider_override_active` passes when `override_reason` is set and
+`override_until` is in the future **or null** — and a null is permanent. It
+defeats every other condition at once: a rider whose documents were *rejected*,
+whose licence expired 400 days ago and whose insurance lapsed with it passed all
+five gates. Proven by building that exact row. It is a legitimate power — a
+partner whose papers are genuinely with the RTO should not lose a week's earnings
+to a queue — but it is the one action that puts an unverified stranger at a
+customer's door, and the only trace was the row itself, which the next override
+overwrites. `rider_legal` now feeds 0092's trail on **every** insert and update:
+one row per rider, every write a KYC decision, no noise to filter.
+
+**And a wording defect worth the four characters.** The rejected message
+concatenated the admin's typed reason with a fixed sentence, so a reason without
+a full stop produced *"The licence photo was unreadable Call Zopiqnow support to
+sort it out."* Two sentences run together, read by somebody who has just been
+stopped from earning. Now trimmed and punctuated once, so a reason typed with or
+without a stop both read correctly.
+
+> **A product decision left for you, deliberately not made in a migration:**
+> should `override_until = null` keep meaning *permanent*? Forcing every vouch to
+> expire — 30 days, say — would mean no rider is ever indefinitely unverified,
+> and would also mean somebody must remember to renew it or a working partner
+> stops earning. That is a judgement about people's livelihoods, not a schema
+> change. It is now at least **visible**, which it was not before.
 
 **Two things noted and deliberately not fixed**, both written into
 `AUDIT_CHECKLIST.md` rather than done here:
