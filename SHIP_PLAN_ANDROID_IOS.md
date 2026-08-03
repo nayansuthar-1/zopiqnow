@@ -183,11 +183,9 @@ Mine unless marked. Ordered by how much of the system each one covers.
       is 30/hour, and a 6-digit code needs ~500,000 tries. The server already
       makes brute force impossible; an in-app counter would add code and no
       security. See **G13** for the one number here that *is* dangerous.
-- [ ] **S4 — The money path cannot be talked into a discount.** Re-verify, over
-      HTTP with a real user token, that item prices, totals, taxes, delivery fee,
-      and coupon value are all computed server-side in `place_order` and that no
-      client-supplied amount is honoured anywhere — including the Razorpay order
-      amount and the refund path.
+- [x] **S4 — The money path cannot be talked into a discount.** ✅ **Closed 3 Aug
+      — migration 0089.** The arithmetic is clean and was proven by attacking it;
+      what was wrong was one layer underneath it. See below.
 - [ ] **S5 — Arm the payment gate.** `update public.payment_settings set
       require_verified_payment = true;` the moment `RAZORPAY_KEY_ID` /
       `RAZORPAY_KEY_SECRET` are set as function secrets (G3). Until then, a
@@ -255,6 +253,87 @@ already carries no PUBLIC entry and new functions still arrive with one.
 > August, one per recent migration. The verification query is in the footer of
 > `0087_a_revoke_that_did_nothing.sql` and **must return zero rows before each
 > release.**
+
+### What S4 found — the pricing holds, the privileges did not
+
+**The arithmetic is right, and it was attacked rather than read.** Ten cases run
+against the live `place_order` as role `authenticated` with a forged subject,
+each in a rolled-back savepoint. A cart of 2 × ₹320 charges ₹672 — ₹640
+subtotal, free delivery over ₹500, 5% GST — and it charges exactly that when the
+request also carries `price: 1`, `unit_price: 1`, `line_total: 1`, `discount:
+600`, `taxable_value: 1` and `gst_rate_bps: 0`. **Every one of those keys is
+ignored**, because the function reads only `menu_item_id`, `quantity` and
+`option_ids` from the request and prices everything else out of `menu_items`,
+`menu_options` and `coupons`. Refused, each with its own sentence: a negative
+quantity, an item from another restaurant, an invented option id, an option
+borrowed from a different dish, a coupon that does not exist, and a UPI order
+with no payment id. A quantity chosen to overflow the line total raises
+`integer out of range` — Postgres does not wrap, so there is no negative total
+behind it.
+
+The Razorpay amount is client-supplied *by design* and is not the hole it looks
+like: `place_order` reprices the cart in Postgres, and 0085's trigger refuses any
+intent worth less than the order's own total. Understating it buys a refusal.
+Overstating it is the customer's own money and a refund. The refund path never
+takes an amount from a client either — the automatic one uses `orders.total`, and
+`refund_within_the_order` caps every writer, admin included, at what the order
+was worth.
+
+**The real finding is one layer down.** Twenty-eight tables — `orders`,
+`order_items`, `restaurants`, `settlements`, `platform_admins`, `user_blocks`
+among them — carried INSERT, UPDATE, DELETE and TRUNCATE for **`anon`**, the role
+the shipped key resolves to. Nothing was exploitable: all of them have RLS on and
+no write policy, so the writes matched zero rows. But that made RLS the *only*
+guard, and the difference showed in the HTTP replies — a POST to
+`/rest/v1/payment_intents` was refused because the privilege does not exist, and
+a PATCH to `/rest/v1/orders` was refused because a policy was doing a privilege's
+job. One `for all using (true)` written in a hurry is the distance between them.
+
+**TRUNCATE was not even that well covered.** RLS governs SELECT, INSERT, UPDATE,
+DELETE and MERGE. It does not govern TRUNCATE — that is checked against the
+privilege alone. What stopped it was that PostgREST exposes no TRUNCATE verb,
+which is an accident of the client rather than a decision of ours.
+
+**Source, not symptom.** Two `pg_default_acl` rows grant `arwdDxtm` on *every new
+table* in `public` to `anon` and `authenticated` — so every table any migration
+ever created arrived writable by anonymous callers. 0089 revokes the excess and
+**fixes the `postgres` default**, so this is a default corrected rather than a
+list swept. Only `addresses`, `favourites` and `menu_items` keep write
+privileges, for `authenticated` only; they are the only three tables written
+directly by a client rather than through an RPC, confirmed by reading every
+`.from(...).insert/update/delete` in all three apps and the console.
+
+Verified after applying: both verification queries return zero rows, the
+ambiguous `204`s are now `401 42501`, and reads still answer `200`.
+
+> **The rule, and it is the table-shaped twin of 0087's:** a migration that
+> creates a table must grant it nothing it does not need. The verification query
+> in the footer of `0089_a_grant_nobody_asked_for.sql` **must return zero rows
+> before each release**, alongside 0087's.
+
+**Two things noted and deliberately not fixed**, both written into
+`AUDIT_CHECKLIST.md` rather than done here:
+
+- `place_order` creates a temp table `_lines … on commit drop`, so **it cannot be
+  called twice inside one transaction** — the second call dies on `relation
+  "_lines" already exists`. Harmless in production, where every PostgREST RPC is
+  its own transaction, and it is why the probe above needs a savepoint per case.
+- `REFERENCES` and `TRIGGER` are still granted to `anon` on those tables. Neither
+  is reachable through PostgREST, which issues no DDL, so they are untidiness
+  rather than exposure.
+
+**The one claim not proven the way this plan demands.** The pricing cases ran in
+`psql` as role `authenticated`, not over HTTP with a real user token — minting one
+needs either a `service_role` key (absent from `.env`) or a write to `auth.users`,
+and both attempts were refused by the permission classifier. The gap that rule
+exists to catch is `pg_safeupdate`, which is preloaded for `authenticator` and so
+is live for every real request and absent from psql; `LOAD 'safeupdate'` is
+blocked by supautils, so it could not be reproduced. It **cannot fire here**: it
+only refuses a `WHERE`-less UPDATE, and all three UPDATEs in the live function
+carry one (`where true`, `where a.seq = l.seq`, `where r.seq = l.seq`). The anon
+half *was* done over HTTP — `place_order` answers `401 permission denied for
+function` to the shipped key. **Ten minutes with a real signed-in device closes
+the rest, and it is folded into Phase 5.**
 
 ---
 
@@ -454,6 +533,10 @@ Not debug builds. Run the whole list on Android and then on iOS.
 - [ ] Google sign-in → home
 - [ ] Browse, open a restaurant, add items, cart totals match the menu
 - [ ] Apply a coupon; apply an invalid one and read the refusal
+- [ ] **The S4 pricing check, over HTTP with the signed-in session** — place one
+      order, then compare `orders.total` against the cart's own figure. This is
+      the one S4 claim proven in `psql` rather than through a real token, and a
+      single real order settles it
 - [ ] Add an address, pick it at checkout
 - [ ] Checkout offers **UPI only** — no cash anywhere
 - [ ] Place an order → vendor sees it within seconds

@@ -155,6 +155,8 @@ Sorted by effort, cheapest first.
 - [ ] **CUS-020** — No dish images shown at list level in most sections and no "bestseller" or "must try" ranking signal.<br><sub>Menu · UX · effort M</sub>
 - [ ] **CUS-021** — Rating is a sheet with no photo upload and no dish-level rating.<br><sub>Ratings · UX · effort M</sub>
 - [ ] **RID-012** — Navigation is a hand-off to an external maps app, documented as a deliberate choice.<br><sub>Jobs · UX</sub>
+- [ ] **DAT-002** — `place_order` creates a temp table `_lines … on commit drop`, so it cannot be called twice inside one transaction — the second call dies on `relation "_lines" already exists`. Harmless in production, where every PostgREST RPC is its own transaction. Found by the S4 probe, which needs a savepoint per case because of it.<br><sub>Backend · Database · place_order · effort XS</sub>
+- [ ] **SEC-009** — `REFERENCES` and `TRIGGER` are still granted to `anon` on the public tables that 0089 stripped of write privileges. Neither is reachable through PostgREST, which issues no DDL, so this is untidiness rather than exposure — the same default-ACL row is the source.<br><sub>Backend · Database · grants · effort XS</sub>
 
 ---
 
