@@ -70,10 +70,16 @@ Nothing here is code. Every one of them blocks something later.
       git history since before the audit. Code cannot un-leak a secret.
 - [ ] **G6 — Enable PITR** in the Supabase dashboard (audit SEC-008). Launch week
       with no point-in-time recovery is the one bad day that cannot be undone.
-- [ ] **G7 — Delete the two dead edge functions.** Both are ACTIVE and neither
-      has a caller: `supabase functions delete ola-static` (retired 3 Aug, audit
-      API-002) and `supabase functions delete send-order-push` (dead since
-      migration 0058, audit API-001). Blocked from here by tooling.
+- [x] **G7 — Delete the two dead edge functions.** ✅ **Closed 3 Aug — and it
+      was not housekeeping.** `send-order-push` was a **live unauthenticated
+      push endpoint**: `verify_jwt: false` at the gateway, no caller check in
+      the handler, and it trusted the request body wholesale — an
+      attacker-chosen `restaurant_id` rang every device registered to it, with
+      attacker-controlled text, using the service-role key. Proven by calling it
+      with no credentials at all (200; the probe used a payload that sends
+      nothing). Audit SEC-001 was fixed for `send-notification` and its dead
+      predecessor was left deployed with the hole intact. Both deleted; the same
+      call is now 404. Sources stay in the repo.
 - [ ] **G8 — Confirm `support@zopiqnow.com` is a real inbox somebody reads.** It
       is written into both legal documents, the deletion page, and the in-app
       support tile. Both stores email it.
@@ -181,9 +187,17 @@ already carries no PUBLIC entry and new functions still arrive with one.
 
 ## Phase 2 — Android release engineering
 
-- [ ] **A1 — A real app icon**, all three apps, adaptive on Android. They are all
-      still Flutter's default blue-on-white, which is both a listing problem and
-      the single most visible signal of an unfinished app.
+- [x] **A1 — A real app icon**, all three apps, **both platforms.** ✅ **Closed
+      3 Aug.** Your three marks from `zopiq-safe`, generated into 5 Android
+      densities + a proper **adaptive icon** (background colour sampled per app,
+      foreground keyed out to white-on-alpha so the launcher can mask, shadow
+      and theme it) and all 15 iOS sizes, **opaque** — Apple rejects an icon
+      with an alpha channel. Mark spans 54–60% of the adaptive canvas against a
+      66.7% safe zone, so nothing clips. Verified by building the vendor APK and
+      confirming `res/mipmap-anydpi-v26/ic_launcher.xml` is inside it. No
+      dependency was added: `flutter_launcher_icons` would have moved the
+      pubspecs, so the generator ran from a throwaway Dart project outside the
+      repo. `pubspec.lock` untouched.
 - [ ] **A2 — Release keystores for vendor and rider** (audit REL-001, launch C8).
       Customer already has one. Needs G9.
 - [ ] **A3 — R8 on, and proven.** A minified release build is a different binary
@@ -236,9 +250,11 @@ All of it is downstream of G1. Ordered by what blocks what.
 
 Play first, App Store as soon as X8 allows. Most of this is yours.
 
-- [ ] **D1 — Store assets, once, for both.** Icon (512² and 1024²), feature
-      graphic, phone screenshots at both stores' sizes. Same screenshots, two
-      crops.
+- [ ] **D1 — Store assets, once, for both.** **Icons are done** — A1 also
+      produced `<app>-play-512.png` and `<app>-appstore-1024.png` for all three,
+      opaque, in the session scratchpad; say where you want them kept and they
+      move into the repo. Still owed: feature graphic (Play, 1024×500) and phone
+      screenshots at both stores' sizes.
 - [ ] **D2 — Play listing**: title, short and full description, category, contact
       email, privacy policy URL (G4), countries = India, release notes.
 - [ ] **D3 — Play declarations**: content rating questionnaire, target audience,
