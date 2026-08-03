@@ -245,7 +245,7 @@ analyze and all four suites; there is still no deployment pipeline.
 - [x] **RID-002** — No KYC.<br><sub>Onboarding · Business · Blocker · effort L</sub>
 - [x] **RID-013** — App label is zopiq_rider — the raw package name shows on the launcher and in the app switcher.<br><sub>Shell · UI · effort XS</sub>
 - [x] **SEC-001** — The push notification Edge Function authenticates nothing — anyone can notify any user<br><sub>Backend · supabase/functions/send-notification · Blocker · effort XS</sub>
-- [x] **SEC-002** — 51 security definer functions were never revoked from PUBLIC<br><sub>Backend · Database · grants · Critical · effort S</sub>
+- [x] **SEC-002** — 51 security definer functions were never revoked from PUBLIC. **Recurred, and re-closed 2026-08-03 by migration 0087: six more had arrived by then, one per recent migration, because functions here are *born* with PUBLIC EXECUTE and `alter default privileges` does not prevent it. One was a live hole — `order_receipt_by_key`, callable unauthenticated with the anon key. This finding is a standing rule, not a one-off sweep: see `SHIP_PLAN_ANDROID_IOS.md` S1.**<br><sub>Backend · Database · grants · Critical · effort S</sub>
 - [x] **SEC-006** — android:allowBackup is not set to false in any manifest.<br><sub>Android · Security · Major · effort XS</sub>
 - [x] **UI-003** — The muted text token fails WCAG AA.<br><sub>Design system · UI · Critical · effort XS</sub>
 - [x] **VEN-010** — No themeMode set, so the app inherits ThemeMode.system and renders an untested dark theme on any tablet in dark mode.<br><sub>Shell · UI · Major · effort XS</sub>
