@@ -200,11 +200,9 @@ Mine unless marked. Ordered by how much of the system each one covers.
       migration 0091.** The premise was right and its stated mechanism was wrong;
       the functions themselves came out clean, and the finding was a key sitting
       somewhere nobody thinks to look. See below.
-- [ ] **S8 — Privileged actions leave a trace.** The admin console is one flat
-      role with no MFA (audit SEC-003) and it can release, cancel, and delete
-      orders — the order delete is unguarded (migration 0069). Full RBAC is
-      deferred; **an append-only audit row for every destructive admin action is
-      not.**
+- [x] **S8 — Privileged actions leave a trace.** ✅ **Closed 3 Aug — migration
+      0092.** `admin_actions`, append-only and meant literally, fed by 14
+      triggers on 11 tables. **No existing function was rewritten.** See below.
 - [ ] **S9 — The rider KYC gate is server-side.** Migration 0080 gates five work
       paths on documents. Confirm the gate is in the database and not only in the
       rider app's navigation, and that an expired document blocks the same way a
@@ -458,6 +456,65 @@ that same run:
   rate refusal leaves an unused order at Razorpay and returns a 500. That is the
   safe direction — the alternative is a payment that can never become an order —
   but checking the ceiling before the Razorpay call is tidier.
+
+### What S8 built — a trail that cannot be forgotten or edited
+
+**Triggers on tables, not a log line inside each admin function.** There are 72
+`admin_*` functions and roughly 25 are destructive. Instrumenting each means
+rewriting 25 working bodies — 25 chances to mistranscribe — and it records only
+what we *remembered* to instrument: the next migration that deletes a row
+directly, or a console screen that grows a new delete, would be silently outside
+the trail. A trigger is attached to the thing being protected rather than to the
+path that happens to reach it. **This migration rewrites no existing function.**
+
+| Covered | What |
+|---|---|
+| Every `DELETE` | orders, restaurants, menu_items, coupons, hero_slides, platform_admins, restaurant_staff, delivery_partners |
+| Privilege | `INSERT` into platform_admins — adding an admin makes more of the power this table watches |
+| Money & livelihood | refunds, settlements, rider_payouts on `status` change; delivery_partners, restaurants on `is_active` change |
+
+The `when` clause does the filtering, so an ordinary edit writes nothing —
+verified: an `update restaurants set eta_minutes = eta_minutes` leaves the trail
+at the same length. **Deliberately not covered:** ordinary order-lifecycle
+transitions, menu edits short of deletion, and reads. An audit log that records
+everything is one nobody reads.
+
+**The actor is whoever the request belonged to**, from the JWT, lower-cased. A
+deletion run by a migration or a cron job has no JWT and is recorded as
+`system` — a true and useful answer rather than a null. Verified both ways.
+
+**"Append-only" is meant literally.** Grants alone would leave `postgres` and
+`service_role` able to rewrite history, so a statement-level trigger refuses
+`UPDATE` and `DELETE` outright. Proven by trying it *as `postgres`*: both come
+back refused. The only way to alter this table is to deliberately disable a
+trigger, which nobody does by accident.
+
+**The deleted row is recoverable from the trail.** `detail` holds the whole old
+row — a coupon deleted at 50 off reads back as 50 off. For updates it holds
+`before` and `after`.
+
+**Read through `admin_list_actions` and nowhere else** — RLS on with no policy,
+the `user_blocks` shape from 0088. A signed-in stranger calling it gets *"You are
+not a Zopiqnow admin."*
+
+**Two things worth recording beyond the feature:**
+
+1. **0089's fixed default proved itself.** `admin_actions` is the first table
+   created since, and it arrived with **no INSERT, UPDATE, DELETE or TRUNCATE**
+   for `anon` or `authenticated`. That is the live confirmation the migration
+   could only assert.
+2. **It still arrived with `SELECT`,** which is right for most tables and wrong
+   for this one — it holds snapshots of deleted rows, the most personal data in
+   the schema gathered in one place. S4's lesson was that RLS should not be the
+   only guard, so `SELECT` is revoked from `anon` and `authenticated` on
+   `admin_actions` **and on `user_blocks`**. Safe because the console makes no
+   direct table reads at all: its only `.from(...)` calls are Storage buckets and
+   every table access is an RPC.
+
+**Still one flat admin role with no MFA (SEC-003).** That is unchanged and still
+deferred until a second admin account exists. What S8 buys is that when it
+matters, the question "who did this, and what was in the row before it went" has
+an answer.
 
 **Two things noted and deliberately not fixed**, both written into
 `AUDIT_CHECKLIST.md` rather than done here:
