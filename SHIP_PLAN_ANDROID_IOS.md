@@ -86,9 +86,23 @@ Nothing here is code. Every one of them blocks something later.
 - [ ] **G9 — Choose and record two keystore passwords** for the vendor and rider
       release keystores (A2), and put them somewhere that survives this laptop.
       A lost upload key is a new app listing.
-- [ ] **G13 — Raise `rate_limit_email_sent`. This is a launch blocker twice
-      over.** It is **30 emails per hour, project-wide** — the Supabase default,
-      never changed after custom SMTP was wired to Brevo. Found by S3.
+- [ ] **G13 — One knob left: set `rate_limit_verify` to 200.** Two of the three
+      are done (`rate_limit_email_sent` and `rate_limit_otp`, both 30 → 200, on
+      your call). **`rate_limit_verify` is still 30 and it caps successful
+      sign-ins at 30/hour across all three apps**, so the problem below is only
+      two-thirds fixed until it moves. My attempt to PATCH it was blocked by the
+      permission classifier and I did not work around it. Supabase dashboard →
+      Authentication → Rate Limits, or the same Management API call.
+
+      Raising it is safe, and the arithmetic is the argument: a 6-digit code is
+      1,000,000 possibilities and `mailer_otp_exp` is 300 seconds, so 200
+      verifications/hour buys an attacker **16.7 tries inside one code's
+      lifetime — a 0.0017% chance**. Brute force stays impossible; only the
+      capacity ceiling moves.
+
+      **Original finding — a launch blocker twice over.** All three were **30 per
+      hour, project-wide**: the Supabase defaults, never changed after custom
+      SMTP was wired to Brevo. Found by S3.
 
       1. **Capacity.** Thirty sign-in mails an hour, shared across customer,
          vendor and rider. A launch with any traction stops being able to sign
@@ -99,10 +113,11 @@ Nothing here is code. Every one of them blocks something later.
          apps — receives a code for the rest of the hour. Unauthenticated, no
          tooling, repeatable.
 
-      The right number depends on your Brevo plan, which is why this is yours and
-      not mine. **hCaptcha on the auth endpoints is the control that actually
-      fixes (2)** — it is off today; it needs client work in all three apps and
-      is a post-launch item unless the abuse starts.
+      **hCaptcha on the auth endpoints is the control that actually fixes (2)**
+      — a throughput cap never did, since it is not per-IP and throttles your
+      users rather than the attacker. It is off today; it needs client work in
+      all three apps and is a post-launch item unless the abuse starts. **Brevo's
+      own daily quota is now the real ceiling** — worth knowing what it is.
 - [ ] **G11 — Restrict the Google Maps Android key** in the Cloud Console to the
       three package names and their signing-certificate SHA-1s. The key is in
       every APK's manifest and has to be — the Maps SDK reads it from there, and
