@@ -45,13 +45,45 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
       the payment gate (S5), and S5 ends with **one real ₹1 payment on a real
       device per platform** — the signature path has never run against Razorpay,
       only against a known-good vector.
-- [ ] **G4 — Host `legal/` at a public URL.** Privacy policy, terms, and the web
-      account-deletion page. Both stores require a reachable policy URL before
-      they will accept a listing, and Play additionally requires the deletion
-      route to work **without installing the app**. GitHub Pages is enough.
-- [ ] **G5 — Rotate the leaked Resend API key** (audit SEC-007). It has been in
-      git history since before the 30 July audit. **Code cannot un-leak a
-      secret**; only rotation closes this.
+- [~] **G4 — Host the legal documents at a public URL.** **Files are in place;
+      one switch in the GitHub UI is yours.** `legal/` is now **`docs/`**,
+      because GitHub Pages can only be served from a repository's root or from
+      `/docs`, and `/docs` publishes those four files rather than the whole
+      monorepo. Nothing in the app moved: the in-app documents are Dart, in
+      `legal_documents.dart`, and never read this HTML.
+
+      **Do this:** repo → *Settings* → *Pages* → Source **Deploy from a branch**
+      → branch `main`, folder `/docs` → Save. First publish takes a minute or two.
+      Then these are the URLs both stores need:
+
+      | | |
+      |---|---|
+      | Privacy policy | `https://nayansuthar-1.github.io/zopiqnow/privacy.html` |
+      | Terms | `https://nayansuthar-1.github.io/zopiqnow/terms.html` |
+      | Account deletion | `https://nayansuthar-1.github.io/zopiqnow/delete-account.html` |
+
+      Play's deletion requirement is satisfied by that third URL: it is a static
+      page and works **without installing the app**, which is the part reviewers
+      actually check.
+
+      > A `.nojekyll` file sits in `docs/`. Without it Pages runs the content
+      > through Jekyll, which silently drops files beginning with an underscore
+      > and can fail a build on a tree it was not expecting.
+- [ ] **G5 — Rotate the leaked Resend API key** (audit SEC-007). **Raised to
+      urgent 4 Aug: this repository is public** — `"visibility": "public"` from
+      GitHub's own API — so the key is not merely "in git history", it is
+      readable by anyone who clones or browses `936f07c` right now.
+
+      Verified rather than assumed, and the news is better than it could have
+      been: **`RESEND_API` is the only variable that was ever committed.** The
+      other thirteen — `SUPABASE_DB_PASSWORD`, `SUPABASE_ACCESS_TOKEN`,
+      `SMTP_PASS`, `CLOUDINARY_API_SECRET`, both Ola secrets,
+      `GOOGLE_WEB_CLIENT_SECRET`, `NOTIFY_WEBHOOK_SECRET` and the rest — have
+      never been in a commit. The blast radius is one key.
+
+      **Code cannot un-leak a secret**, and neither can deleting the file, which
+      was already done and changes nothing: the object is still in history and
+      still served by GitHub. Only rotation closes this.
 - [ ] **G6 — Enable PITR** in the Supabase dashboard (audit SEC-008). Launch week
       without point-in-time recovery is the one bad day that cannot be undone.
 - [ ] **G13 — Set `rate_limit_verify` to 200.** Still 30, and **it caps

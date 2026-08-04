@@ -62,7 +62,10 @@ Nothing here is code. Every one of them blocks something later.
 - [ ] **G3 — Razorpay merchant KYC**, if it is not already in. No live keys
       means no real money, and the payment gate (S5) stays disarmed until they
       exist.
-- [ ] **G4 — Host `legal/` at a public URL.** The privacy policy, the terms, and
+- [~] **G4 — Host the legal documents at a public URL.** *(Files moved to
+      `docs/` on 4 Aug and ready to serve; enabling Pages is the remaining step.
+      Full instructions and the three URLs are in `ACTION_REQUIRED.md`.)* The
+      privacy policy, the terms, and
       the web account-deletion page. Both stores require a reachable policy URL
       before they will accept a listing; Play additionally requires the deletion
       route to work without installing the app. A GitHub Pages site is enough.

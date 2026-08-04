@@ -29,10 +29,11 @@ submission today.
   a queue. Every iOS task is downstream of the certificate it issues.
 - **G3 Razorpay merchant KYC** — until the live keys exist, the payment gate
   (S5) stays disarmed and no real money can move.
-- **G4 Host `legal/` at a public URL** — both stores require a reachable privacy
-  policy before they will accept a listing.
-- **G5 Rotate the leaked Resend key** — it has been in git history since before
-  the 30 July audit. Code cannot un-leak a secret.
+- **G4 Host the legal documents at a public URL** — files moved to `docs/` and
+  ready; enabling Pages (Settings → Pages → `main` / `/docs`) is the last step.
+- **G5 Rotate the leaked Resend key** — **urgent: the repository is public**, so
+  the key is readable by anyone browsing `936f07c`, not merely "in history".
+  It is the only variable ever committed. Code cannot un-leak a secret.
 - **G6 Enable PITR**, **G11 restrict the Maps key**, **G12 cap the Cloudinary
   preset** — three dashboard settings, each the only control that exists for the
   thing it protects.

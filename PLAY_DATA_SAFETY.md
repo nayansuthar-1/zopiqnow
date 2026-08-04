@@ -28,7 +28,7 @@ Two things worth knowing before you start:
 | Does your app collect or share any of the required user data types? | **Yes** |
 | Is all of the user data collected by your app encrypted in transit? | **Yes** — everything goes over HTTPS/TLS to Supabase and Razorpay |
 | Do you provide a way for users to request that their data be deleted? | **Yes** |
-| Account deletion URL | `https://<your-host>/legal/delete-account.html` |
+| Account deletion URL | `https://nayansuthar-1.github.io/zopiqnow/delete-account.html` |
 | Has your app been independently reviewed against a global security standard? | **No** — do not tick this |
 
 ---
