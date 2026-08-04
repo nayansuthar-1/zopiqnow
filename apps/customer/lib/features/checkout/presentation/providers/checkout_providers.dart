@@ -4,14 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:zopiqnow/app/env.dart';
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_supabase_datasource.dart';
-import 'package:zopiqnow/features/checkout/data/gateways/locked_payment_gateway.dart';
 import 'package:zopiqnow/features/checkout/data/gateways/razorpay_payment_gateway.dart';
 import 'package:zopiqnow/features/checkout/data/repositories/order_repository_impl.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
@@ -38,20 +36,39 @@ final Provider<OrderDataSource> orderDataSourceProvider =
 /// the keys are set as function secrets, every already-installed build starts
 /// taking real payments — no release, no store review, no waiting.
 ///
-/// What is behind it depends on the build, and this is the mock lockout:
+/// **Behind it is the mock, in every build.** Debug, release, and a bundle
+/// installed from Play all behave the same, which is the point: an order can be
+/// placed on whatever build is in somebody's hand, without a `--dart-define`
+/// that has to be remembered at build time and whose absence looks to the
+/// customer like *"Payments aren't available in this build yet."*
 ///
-/// * **Debug** — the mock, always. That is what makes the flow exercisable.
-/// * **Release with `--dart-define=ALLOW_MOCK_PAYMENTS=true`** — the mock.
-///   Testing tracks are built this way.
-/// * **Release without it** — a refusal. A production build cannot settle a
-///   payment through a gateway that moves no money, and cannot be made to by
-///   forgetting something.
+/// **This is not the lock coming off, it is the lock moving to where it works.**
+/// There were two, and the build-time one was the weaker:
+///
+/// 1. **The fallback is unreachable once Razorpay is configured.**
+///    `RazorpayPaymentGateway` drops to it *only* when the server answers
+///    `configured: false`, and it answers that only while there are no keys. The
+///    day `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are set as function secrets,
+///    every already-installed build starts taking real payments and the mock
+///    below stops being reached at all — with no release and no store review.
+/// 2. **The database refuses an unpaid order outright.** `payment_settings.
+///    require_verified_payment` drives the `orders_require_verified_payment`
+///    trigger (0085) — server-side, authoritative, and applying to every client
+///    that ever existed rather than to the ones compiled with the right flag.
+///    It ships disarmed; **arming it is ship S5 and belongs to the day Razorpay
+///    goes live.**
+///
+/// So the honest reading of the old arrangement is that a build flag was
+/// standing in for a server setting. A flag can be forgotten in both directions:
+/// forget it on a test build and nobody can order, forget to *remove* it on a
+/// production one and the lock was never there anyway. The trigger cannot be
+/// forgotten on a per-build basis, because there are no builds involved.
 final Provider<PaymentGateway> paymentGatewayProvider = Provider<PaymentGateway>(
   (Ref ref) => RazorpayPaymentGateway(
     supabase: Supabase.instance.client,
-    fallback: kReleaseMode && !Env.allowMockPayments
-        ? const LockedPaymentGateway()
-        : MockPaymentGateway(navigatorKey: ref.watch(rootNavigatorKeyProvider)),
+    fallback: MockPaymentGateway(
+      navigatorKey: ref.watch(rootNavigatorKeyProvider),
+    ),
   ),
 );
 

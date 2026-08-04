@@ -429,27 +429,29 @@ without a device or a browser. **None has been exercised by a human.**
       one, and smoke them** before anything is uploaded. Bundles are built and
       signed; the device half is yours.
 
-      > **Rebuild the customer bundle before you smoke it, or checkout is dead
-      > in your hand.** The bundles were built with a plain
-      > `flutter build appbundle --release`, and in a release build with no
-      > `ALLOW_MOCK_PAYMENTS` the payment gateway is `LockedPaymentGateway` —
-      > every attempt to pay answers *"Payments aren't available in this build
-      > yet."* and no order can be placed. That is correct for a production
-      > bundle and wrong for a test one. For anything you install to try the
-      > product on, build it as:
+      > **`ALLOW_MOCK_PAYMENTS` is gone (5 Aug) and no build needs a flag any
+      > more.** Every build — debug, release, and a bundle installed from Play —
+      > falls back to the mock, so an order can be placed on whatever is in
+      > somebody's hand. `flutter run --release` used to answer *"Payments aren't
+      > available in this build yet."*, which is a flag doing its job and looks
+      > exactly like a broken app.
       >
-      > ```
-      > flutter build appbundle --release --dart-define=ALLOW_MOCK_PAYMENTS=true
-      > ```
+      > **The lock did not come off; it moved to where it cannot be forgotten.**
+      > Two things still stop a production build settling fake money, and both
+      > beat a build argument:
       >
-      > This is safe to keep using until Razorpay is live and needs no undoing
-      > afterwards: the flag only decides what happens when `razorpay-order`
-      > answers `configured: false`. The day the keys are set as function
-      > secrets it answers `configured: true`, and the same bundle starts taking
-      > real payments without a rebuild. **Do not ship the flagged bundle to
-      > production** — that is the one thing it must not be used for.
+      > 1. The mock is only *reachable* while `razorpay-order` answers
+      >    `configured: false`. The day the keys are set as function secrets,
+      >    every already-installed build takes real payments and the mock stops
+      >    being reached — no rebuild, no review.
+      > 2. `payment_settings.require_verified_payment` drives the
+      >    `orders_require_verified_payment` trigger (0085): server-side, and it
+      >    applies to every client that has ever been installed rather than the
+      >    ones compiled with the right argument.
       >
-      > A debug build (`flutter run`) already gets the mock and needs no flag.
+      > **So S5 matters more than it did.** Arming that flag the day Razorpay
+      > goes live is now the only thing standing between production and an
+      > unpaid order — write it into the same sitting as setting the keys.
 - [ ] **Phase 5 — the full regression list**, on release builds, both platforms.
       It is in the ship plan and it is 19 lines long.
 - [ ] **All of Phase 3 (iOS)** — signing, APNs key, device run, dSYM phase,
