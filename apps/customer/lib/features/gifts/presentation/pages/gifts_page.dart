@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/providers/bottom_nav_provider.dart';
+import 'package:zopiqnow/features/gifts/presentation/widgets/gift_bag_bar.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_item.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_shop.dart';
 import 'package:zopiqnow/features/gifts/domain/repositories/gift_repository.dart';
@@ -56,6 +57,8 @@ class _GiftsPageState extends ConsumerState<GiftsPage> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
+      // Draws nothing until there is something in the bag.
+      bottomNavigationBar: const GiftBagBar(),
       body: RefreshIndicator.adaptive(
         color: _blinkitGreen,
         backgroundColor: Colors.white,

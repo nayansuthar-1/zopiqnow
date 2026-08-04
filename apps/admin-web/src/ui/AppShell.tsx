@@ -22,6 +22,9 @@ const groups: {
       // Under Today, not under Money: a complaint is worked the day it lands,
       // and it is the only screen here with somebody waiting on the other end.
       { to: '/support', label: 'Support', end: false },
+      // Beside the food queues: a gift order has nobody but this page to move
+      // it, so it belongs where somebody looks every day.
+      { to: '/gift-orders', label: 'Gift orders', end: false },
       { to: '/analytics', label: 'Platform', end: false },
     ],
   },

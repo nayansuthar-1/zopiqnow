@@ -21,6 +21,11 @@ import 'package:zopiqnow/features/checkout/presentation/pages/orders_page.dart';
 import 'package:zopiqnow/features/design_showcase/presentation/design_showcase_page.dart';
 import 'package:zopiqnow/features/favourites/presentation/pages/favourites_page.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_shop.dart';
+import 'package:zopiqnow/features/gifts/presentation/pages/gift_bag_page.dart';
+import 'package:zopiqnow/features/gifts/presentation/pages/gift_checkout_page.dart';
+import 'package:zopiqnow/features/gifts/presentation/pages/gift_order_detail_page.dart';
+import 'package:zopiqnow/features/gifts/presentation/pages/gift_orders_page.dart';
+import 'package:zopiqnow/features/gifts/presentation/pages/gift_placed_page.dart';
 import 'package:zopiqnow/features/gifts/presentation/pages/gift_shop_page.dart';
 import 'package:zopiqnow/features/gifts/presentation/pages/gifts_page.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
@@ -41,6 +46,11 @@ abstract final class Routes {
   static const String menu = 'menu';
   static const String gifts = 'gifts';
   static const String giftShop = 'giftShop';
+  static const String giftBag = 'giftBag';
+  static const String giftCheckout = 'giftCheckout';
+  static const String giftPlaced = 'giftPlaced';
+  static const String giftOrders = 'giftOrders';
+  static const String giftOrderDetail = 'giftOrderDetail';
   static const String cart = 'cart';
   static const String checkout = 'checkout';
   static const String orderSuccess = 'orderSuccess';
@@ -78,6 +88,12 @@ const List<String> _protectedPrefixes = <String>[
   '/orders',
   '/addresses',
   '/favourites',
+  // Gifts browse open, like food — the catalogue is the shop window. Identity
+  // is required at exactly the same two places it is for food: where money and
+  // an address are, and where a receipt with somebody's address on it is read.
+  // `/gift-bag` is deliberately *not* here: building a bag is browsing.
+  '/gift-checkout',
+  '/gift-orders',
 ];
 
 const String _splashPath = '/splash';
@@ -377,6 +393,69 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           onViewCart: () => context.goNamed(Routes.cart),
         ),
       ),
+      // --- Gifts: bag, checkout, receipt, history -------------------------
+      //
+      // Top-level rather than nested under the shell's `/gifts` branch, and the
+      // paths are hyphenated so they cannot collide with it. A bag and a
+      // checkout want the whole screen — the bag docks its own checkout button
+      // and the food cart learned the hard way that stacking a bar on a bottom
+      // bar is a bar too many.
+      GoRoute(
+        path: '/gift-bag',
+        name: Routes.giftBag,
+        builder: (BuildContext context, _) => GiftBagPage(
+          onCheckout: () => context.pushNamed(Routes.giftCheckout),
+          onBrowse: () => context.goNamed(Routes.gifts),
+        ),
+      ),
+      GoRoute(
+        path: '/gift-checkout',
+        name: Routes.giftCheckout,
+        builder: (BuildContext context, _) => GiftCheckoutPage(
+          // `go`, not `push`: nothing above the shell should survive a completed
+          // checkout — the bag is empty and there is nothing to go back *to*.
+          onPlaced: () => context.goNamed(Routes.giftPlaced),
+          onBrowse: () => context.goNamed(Routes.gifts),
+        ),
+        routes: <RouteBase>[
+          GoRoute(
+            path: 'placed',
+            name: Routes.giftPlaced,
+            builder: (BuildContext context, _) => GiftPlacedPage(
+              onTrack: (String id) => context.goNamed(
+                Routes.giftOrderDetail,
+                pathParameters: <String, String>{'id': id},
+              ),
+              onBrowse: () => context.goNamed(Routes.gifts),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/gift-orders',
+        name: Routes.giftOrders,
+        builder: (BuildContext context, _) => GiftOrdersPage(
+          onOpen: (String id) => context.pushNamed(
+            Routes.giftOrderDetail,
+            pathParameters: <String, String>{'id': id},
+          ),
+          onBrowse: () => context.goNamed(Routes.gifts),
+        ),
+        routes: <RouteBase>[
+          // Nested, so a `go` here from the receipt builds the list underneath
+          // and Back lands on the history rather than nowhere.
+          GoRoute(
+            path: ':id',
+            name: Routes.giftOrderDetail,
+            builder: (BuildContext context, GoRouterState state) =>
+                GiftOrderDetailPage(
+                  orderId: state.pathParameters['id']!,
+                  onBack: () => context.goNamed(Routes.giftOrders),
+                ),
+          ),
+        ],
+      ),
+
       GoRoute(
         path: '/licenses',
         name: Routes.licenses,

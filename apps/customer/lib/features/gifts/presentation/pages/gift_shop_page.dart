@@ -7,6 +7,7 @@ import 'package:zopiqnow/features/gifts/domain/entities/gift_item.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_shop.dart';
 import 'package:zopiqnow/features/gifts/domain/repositories/gift_repository.dart';
 import 'package:zopiqnow/features/gifts/presentation/providers/gift_providers.dart';
+import 'package:zopiqnow/features/gifts/presentation/widgets/gift_bag_bar.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_image.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_item_card.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_item_sheet.dart';
@@ -39,6 +40,7 @@ class GiftShopPage extends ConsumerWidget {
               backgroundColor: Theme.of(context).colorScheme.surface,
               elevation: 0,
             ),
+      bottomNavigationBar: const GiftBagBar(),
       body: shop.when(
         loading: () => const Center(child: ZopiqLoader()),
         error: (Object error, _) => GiftErrorView(

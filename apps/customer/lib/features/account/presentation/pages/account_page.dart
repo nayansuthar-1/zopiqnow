@@ -80,6 +80,16 @@ class AccountPage extends ConsumerWidget {
                 subtitle: 'Track and reorder past orders',
                 onTap: () => context.pushNamed(Routes.orders),
               ),
+              // Its own tile beside "My orders" rather than a filter inside it:
+              // a gift is a different order with different states, and one list
+              // mixing "Out for delivery" (a rider, minutes) with "On its way"
+              // (a courier, days) would be one word doing two jobs.
+              _AccountTile(
+                icon: Icons.card_giftcard_rounded,
+                title: 'Gift orders',
+                subtitle: 'Gifts you bought, and where they are',
+                onTap: () => context.pushNamed(Routes.giftOrders),
+              ),
               _AccountTile(
                 icon: Icons.location_on_rounded,
                 title: 'My addresses',

@@ -464,6 +464,41 @@ export const api = {
   /// order that exists, even when all three are null: "this one has no
   /// photographs" is an answer, and an empty result would read as a lookup
   /// failure.
+  /// The gift fulfilment queue (0096), oldest first. `status` null means every
+  /// one. Zopiqnow packs and couriers these, so this queue is the only thing
+  /// that moves a gift order along — there is no vendor app behind it.
+  giftOrders: (f: {
+    status?: GiftOrderStatus | null
+    limit?: number
+    offset?: number
+  }) =>
+    rpc<GiftOrderRow[]>('admin_gift_orders', {
+      p_status: f.status ?? null,
+      p_limit: f.limit ?? 50,
+      p_offset: f.offset ?? 0,
+    }),
+
+  giftOrderItems: (orderId: string) =>
+    rpc<GiftOrderLineRow[]>('admin_gift_order_items', { p_order_id: orderId }),
+
+  /// Moves one along. The ladder only goes forward — placed → accepted →
+  /// dispatched → delivered, with a cancel available until it is with a courier.
+  ///
+  /// `dispatched` is refused without a courier name: a parcel marked on its way
+  /// with nobody named is a customer who cannot ask anybody anything.
+  setGiftOrderStatus: (
+    orderId: string,
+    status: GiftOrderStatus,
+    opts?: { courier?: string; tracking?: string; reason?: string },
+  ) =>
+    rpc<string>('admin_set_gift_order_status', {
+      p_order_id: orderId,
+      p_status: status,
+      p_courier_name: opts?.courier ?? null,
+      p_tracking_ref: opts?.tracking ?? null,
+      p_reason: opts?.reason ?? null,
+    }),
+
   orderPhotos: (orderId: string) =>
     rpc<OrderPhotoRow[]>('admin_order_photos', { p_order_id: orderId }),
 
@@ -1176,4 +1211,54 @@ export type RiderKyc = {
   /// Whether it is in force *today* — a reason plus an unexpired date. Read this
   /// rather than testing `override_reason` yourself.
   override_active: boolean
+}
+
+/// One gift order in the fulfilment queue (migration 0096).
+///
+/// Zopiqnow packs and couriers these — there is no vendor app and no rider in
+/// this story, so this queue is the *only* thing that moves one along.
+export type GiftOrderRow = {
+  id: string
+  shop_id: string
+  shop_name: string
+  status: GiftOrderStatus
+  status_reason: string | null
+  subtotal: number
+  delivery_fee: number
+  taxes: number
+  total: number
+  payment_id: string | null
+  customer_phone: string
+  delivery_to: string
+  delivery_notes: string | null
+  courier_name: string | null
+  tracking_ref: string | null
+  created_at: string
+  dispatched_at: string | null
+  delivered_at: string | null
+  item_count: number
+  total_count: number
+}
+
+export type GiftOrderStatus =
+  | 'placed'
+  | 'accepted'
+  | 'dispatched'
+  | 'delivered'
+  | 'cancelled'
+
+export const GIFT_STATUS_LABEL: Record<GiftOrderStatus, string> = {
+  placed: 'New',
+  accepted: 'Preparing',
+  dispatched: 'With courier',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+}
+
+export type GiftOrderLineRow = {
+  name: string
+  unit_price: number
+  quantity: number
+  line_total: number
+  tax_amount: number
 }
