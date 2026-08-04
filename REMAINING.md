@@ -31,9 +31,10 @@ submission today.
   (S5) stays disarmed and no real money can move.
 - **G4 Host the legal documents at a public URL** — files moved to `docs/` and
   ready; enabling Pages (Settings → Pages → `main` / `/docs`) is the last step.
-- **G5 Rotate the leaked Resend key** — **urgent: the repository is public**, so
-  the key is readable by anyone browsing `936f07c`, not merely "in history".
-  It is the only variable ever committed. Code cannot un-leak a secret.
+- ~~**G5 Rotate the leaked Resend key**~~ — **closed 4 Aug as an accepted risk.**
+  The owning account is unreachable so the key stays live and public, but with no
+  verified domain it cannot send to arbitrary recipients and grants nothing
+  beyond an unused Resend account. **Never verify a domain on that account.**
 - **G6 Enable PITR**, **G11 restrict the Maps key**, **G12 cap the Cloudinary
   preset** — three dashboard settings, each the only control that exists for the
   thing it protects.

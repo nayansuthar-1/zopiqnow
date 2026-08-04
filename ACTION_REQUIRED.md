@@ -69,7 +69,11 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
       > A `.nojekyll` file sits in `docs/`. Without it Pages runs the content
       > through Jekyll, which silently drops files beginning with an underscore
       > and can fail a build on a tree it was not expecting.
-- [ ] **G5 — Rotate the leaked Resend API key** (audit SEC-007). **Raised to
+- [x] **G5 — Rotate the leaked Resend API key** (audit SEC-007). ✅ **Closed
+      4 Aug as an accepted risk, not as a fix** — the owning account is
+      unreachable, so the key stays live. Reasoning and the one standing
+      condition are at the end of this item; read them before touching Resend.
+      **Raised to
       urgent 4 Aug: this repository is public** — `"visibility": "public"` from
       GitHub's own API — so the key is not merely "in git history", it is
       readable by anyone who clones or browses `936f07c` right now.
@@ -99,9 +103,25 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
       >
       > **A new Resend account does not close this**, and one was created on
       > 4 Aug. The leaked key lives in the *original* account and only the
-      > original account can revoke it. If that account is no longer reachable,
-      > say so — a permanently live public credential needs a different answer
-      > (Resend support, or accepting it and never verifying a domain there).
+      > original account can revoke it.
+      >
+      > **Decision, 4 Aug: the risk is accepted and this item is closed as
+      > "will not fix".** The original account is no longer reachable, so the key
+      > cannot be revoked by us. Note for anyone reading this later: the account
+      > is *not* deleted — a deleted account's key would answer 401 and this one
+      > answers 200 — it is abandoned, which is a different thing.
+      >
+      > **Why accepting it is reasonable:** with no verified domain the key
+      > cannot send to arbitrary recipients, so the realistic worst case is a
+      > stranger burning free-tier quota on an account nobody uses. It grants no
+      > access to Zopiqnow, to Supabase, or to any customer data. Nothing in the
+      > app or the edge functions has ever called Resend — mail goes through
+      > Brevo SMTP.
+      >
+      > **The one condition, and it is permanent:** **never verify a domain on
+      > that account.** That single act converts a contained leak into mail sent
+      > as your brand by whoever holds the key. When `zopiqnow.com` exists,
+      > verify it on the **new** account.
 - [ ] **G6 — Enable PITR** in the Supabase dashboard (audit SEC-008). Launch week
       without point-in-time recovery is the one bad day that cannot be undone.
 - [ ] **G13 — Set `rate_limit_verify` to 200.** Still 30, and **it caps
