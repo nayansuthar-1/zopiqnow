@@ -285,3 +285,42 @@ The only implied hardware feature across all three apps is
 `android.hardware.location` (from the location permissions) plus the
 `android.hardware.faketouch` that every app gets. Neither excludes any real
 phone, so **no `uses-feature` work is owed.**
+
+---
+
+## Content rating questionnaire — the answers, and what each rests on
+
+Answered 4 August 2026 for the **customer** app, from the code rather than from
+memory. **Use the same answers for the App Store age rating (D4)** — two stores
+told different stories about the same binary is a problem nobody needs.
+
+| Question | Answer | Evidence |
+|---|---|---|
+| Ratings-relevant content in the app package | **No** | Bundled assets are food/category art and icons. |
+| Users interact or exchange content (voice, text, images, audio) | **Yes** | Customer↔rider calling (`core/dialler.dart`), `rider_chat_sheet.dart`, free-text delivery notes read by the rider, public restaurant reviews. |
+| Is user-generated content the *primary* content | **No** | Menus and restaurants are, and only admins onboard them. |
+| Public sharing of nudity | **No** | Reviews are text only — 500 chars, `rate_order_sheet.dart`. No public image path exists; profile photos are not shown on reviews. |
+| Public sharing of graphic violence | **No** | Same: no public image or video path. |
+| Ability to block users or UGC | **No** | Blocking is admin-console only (0088). A customer cannot block anyone. |
+| Ability to report users or UGC | **Yes** | Order → Report an issue → *"A problem with the delivery partner"* (`order_issue.dart`), into an admin queue that can block. |
+| Chat moderation | **Yes** | Canned chat: the database owns the wording and refuses a body that does not match its code (0061). Users cannot author message text. |
+| Interactions limited to invited friends | **No** | No friends or invite model. |
+| Online content not in the initial download | **Yes** | Restaurants, menus, images and gift listings all come from the server — the Amazon product-listings example verbatim. |
+
+**Two are judgement calls and were made deliberately, not defaulted:**
+
+- **"Report users" = Yes.** The delivery-partner category reports a *person* to
+  someone who can act. A strict reading ("is there a report button on a profile")
+  would answer No; the substance says Yes, and Yes is the friendlier answer for
+  the rating. If a reviewer asks, the path above is the answer.
+- **"Chat moderation" = Yes.** The control is stronger than moderation rather
+  than weaker: there is no user-authored text to moderate, because every message
+  is one we wrote. Read strictly as "do humans review messages", it is No.
+
+**The one that is not a judgement call is "users interact" = Yes.** This app has
+real calling and a real chat. Answering No there is the kind of misdeclaration
+that gets an app removed rather than re-rated.
+
+> **When the rider and vendor apps are rated**, do not copy this table. The
+> rider has the other half of the same chat and the same calling, and the vendor
+> has neither — each needs answering against its own code.
