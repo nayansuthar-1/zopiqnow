@@ -84,6 +84,24 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
       **Code cannot un-leak a secret**, and neither can deleting the file, which
       was already done and changes nothing: the object is still in history and
       still served by GitHub. Only rotation closes this.
+
+      > **Proven live, 4 Aug.** `GET https://api.resend.com/domains` with the
+      > committed key answers **HTTP 200**. It is not a stale credential, it is a
+      > working one that a stranger can read today, and it has more than send
+      > scope — it enumerates the account.
+      >
+      > **What limits the damage, and the condition on it:** that account has
+      > **no verified domains** (`"data": []`), and Resend will not send to
+      > arbitrary recipients without one. So the key currently buys an attacker
+      > very little. **Verifying a domain on that account would turn a contained
+      > leak into an open relay under your own brand** — do not do it, on that
+      > account, ever.
+      >
+      > **A new Resend account does not close this**, and one was created on
+      > 4 Aug. The leaked key lives in the *original* account and only the
+      > original account can revoke it. If that account is no longer reachable,
+      > say so — a permanently live public credential needs a different answer
+      > (Resend support, or accepting it and never verifying a domain there).
 - [ ] **G6 — Enable PITR** in the Supabase dashboard (audit SEC-008). Launch week
       without point-in-time recovery is the one bad day that cannot be undone.
 - [ ] **G13 — Set `rate_limit_verify` to 200.** Still 30, and **it caps
