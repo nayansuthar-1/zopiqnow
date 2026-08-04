@@ -29,6 +29,26 @@ bool isPlausibleIndianMobile(String value) =>
 /// picker would be a control that can only be set wrong.
 const String _dialCode = '+91';
 
+/// **SMS sign-in is built, wired, and switched off. See G16.**
+///
+/// Off because nothing would arrive: India delivers no transactional SMS until
+/// DLT registration clears — entity, header and approved template — and the
+/// project's Send SMS hook is not enabled either. Left drawn, the mobile field
+/// would be the first thing a customer sees, take the focus, own the orange
+/// button, and fail; email would be the smaller control underneath that they
+/// have to notice. That is a worse sign-in screen than the one this app shipped
+/// with, which is the only test that matters here.
+///
+/// A constant rather than a `--dart-define`, deliberately: a build-time flag is
+/// a thing to remember on every build, and the failure mode of forgetting it is
+/// shipping the broken screen — the exact outcome this exists to prevent. It
+/// stops being a decision the day it is deleted.
+///
+/// **Flip to true when a code reaches a real handset**, and nothing else needs
+/// touching: the datasource, the OTP screen and the router already carry the
+/// phone path in full.
+const bool smsSignInEnabled = false;
+
 /// Sign in / sign up — one screen, because an email OTP makes no distinction:
 /// an unknown address is created, a known one is signed in.
 class EmailPage extends ConsumerStatefulWidget {
@@ -183,72 +203,82 @@ class _EmailPageState extends ConsumerState<EmailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text('Enter your mobile number', style: t.headlineSmall),
+              Text(
+                smsSignInEnabled
+                    ? 'Enter your mobile number'
+                    : 'Enter your email',
+                style: t.headlineSmall,
+              ),
               const SizedBox(height: ZopiqSpacing.xs),
               Text(
-                'We\'ll text you a 6-digit verification code.',
+                smsSignInEnabled
+                    ? 'We\'ll text you a 6-digit verification code.'
+                    : 'We\'ll send you a 6-digit verification code.',
                 style: t.bodyMedium?.copyWith(color: zc.textMuted),
               ),
               const SizedBox(height: ZopiqSpacing.xl),
-              TextField(
-                controller: _phoneController,
-                autofocus: true,
-                keyboardType: TextInputType.phone,
-                maxLength: 10,
-                autofillHints: const <String>[AutofillHints.telephoneNumber],
-                // Digits only, so a customer who pastes "+91 98765 43210" or
-                // "098765-43210" is not told their own number is wrong. The
-                // formatter strips it to what the pattern actually judges.
-                inputFormatters: <TextInputFormatter>[
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-                onChanged: (_) => setState(() => _phoneError = null),
-                onSubmitted: (_) => _submitPhone(),
-                decoration: InputDecoration(
-                  hintText: '98765 43210',
-                  counterText: '',
-                  errorText: _phoneError,
-                  // The country code is shown, not typed. One country ships
-                  // (D2), so a picker would be a control that can only be set
-                  // wrong, and a customer who types +91 themselves would send
-                  // a twelve-digit number to a ten-digit field.
-                  prefixText: '$_dialCode  ',
-                  prefixStyle: t.bodyLarge,
-                  border: const OutlineInputBorder(
-                    borderRadius: ZopiqRadii.rMd,
+              if (smsSignInEnabled) ...<Widget>[
+                TextField(
+                  controller: _phoneController,
+                  autofocus: true,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  autofillHints: const <String>[AutofillHints.telephoneNumber],
+                  // Digits only, so a customer who pastes "+91 98765 43210" or
+                  // "098765-43210" is not told their own number is wrong. The
+                  // formatter strips it to what the pattern actually judges.
+                  inputFormatters: <TextInputFormatter>[
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  onChanged: (_) => setState(() => _phoneError = null),
+                  onSubmitted: (_) => _submitPhone(),
+                  decoration: InputDecoration(
+                    hintText: '98765 43210',
+                    counterText: '',
+                    errorText: _phoneError,
+                    // The country code is shown, not typed. One country ships
+                    // (D2), so a picker would be a control that can only be set
+                    // wrong, and a customer who types +91 themselves would send
+                    // a twelve-digit number to a ten-digit field.
+                    prefixText: '$_dialCode  ',
+                    prefixStyle: t.bodyLarge,
+                    border: const OutlineInputBorder(
+                      borderRadius: ZopiqRadii.rMd,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: ZopiqSpacing.lg),
-              ZopiqButton(
-                label: 'Continue',
-                variant: ZopiqButtonVariant.cta,
-                isLoading: _sendingSms,
-                expand: true,
-                onPressed: _isPhoneValid && !_busy ? _submitPhone : null,
-              ),
-              const SizedBox(height: ZopiqSpacing.lg),
-              Row(
-                children: <Widget>[
-                  Expanded(child: Divider(color: zc.divider)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: ZopiqSpacing.md,
+                const SizedBox(height: ZopiqSpacing.lg),
+                ZopiqButton(
+                  label: 'Continue',
+                  variant: ZopiqButtonVariant.cta,
+                  isLoading: _sendingSms,
+                  expand: true,
+                  onPressed: _isPhoneValid && !_busy ? _submitPhone : null,
+                ),
+                const SizedBox(height: ZopiqSpacing.lg),
+                Row(
+                  children: <Widget>[
+                    Expanded(child: Divider(color: zc.divider)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: ZopiqSpacing.md,
+                      ),
+                      child: Text(
+                        'or',
+                        style: t.bodySmall?.copyWith(color: zc.textMuted),
+                      ),
                     ),
-                    child: Text(
-                      'or',
-                      style: t.bodySmall?.copyWith(color: zc.textMuted),
-                    ),
-                  ),
-                  Expanded(child: Divider(color: zc.divider)),
-                ],
-              ),
-              const SizedBox(height: ZopiqSpacing.lg),
+                    Expanded(child: Divider(color: zc.divider)),
+                  ],
+                ),
+                const SizedBox(height: ZopiqSpacing.lg),
+              ],
               TextField(
                 controller: _controller,
-                // The mobile field takes the focus now. Two autofocused fields
-                // on one screen is a race, and the keyboard lands on whichever
-                // widget happened to build second.
+                // Only when the mobile field is not there to take it. Two
+                // autofocused fields on one screen is a race, and the keyboard
+                // lands on whichever widget happened to build second.
+                autofocus: !smsSignInEnabled,
                 keyboardType: TextInputType.emailAddress,
                 autocorrect: false,
                 autofillHints: const <String>[AutofillHints.email],
@@ -264,11 +294,14 @@ class _EmailPageState extends ConsumerState<EmailPage> {
               ),
               const SizedBox(height: ZopiqSpacing.lg),
               ZopiqButton(
-                label: 'Continue with email',
-                // Outlined, because the mobile path above is now the primary
-                // one and two CTA-orange buttons on one screen means neither is
-                // the call to action.
-                variant: ZopiqButtonVariant.outline,
+                label: smsSignInEnabled ? 'Continue with email' : 'Continue',
+                // Secondary only while the mobile path is above it: two
+                // CTA-orange buttons on one screen means neither is the call to
+                // action. With SMS off this is the primary path again, and it
+                // gets the primary button back.
+                variant: smsSignInEnabled
+                    ? ZopiqButtonVariant.outline
+                    : ZopiqButtonVariant.cta,
                 isLoading: _sending,
                 expand: true,
                 onPressed: _isValid && !_busy ? _submit : null,
