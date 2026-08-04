@@ -71,15 +71,45 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
 
       Also restrict the key to the **Maps SDK for Android** alone.
 
-      > **If you enable Play App Signing** (the default, and recommended), Google
-      > re-signs with *its own* key and these SHA-1s stop matching the shipped
-      > app. Add the SHA-1 that Play Console shows under *App integrity* as well,
-      > or maps go blank in production while working perfectly in your own builds.
-      > **G14 is the same problem in a second console — do them in one sitting.**
-- [ ] **G14 — Register Play's app-signing certificate with the Google OAuth
-      client.** *(Added 4 Aug as a prediction. **Confirmed the same day**: the
-      first internal-testing build cannot sign in with Google. This is no longer
-      a risk, it is the current state of the app on Play.)*
+      > **Play App Signing means the three SHA-1s above are not enough.** Google
+      > re-signs with its own key, so the *installed* app presents a different
+      > certificate and a key restricted to the list above goes blank in
+      > production while working perfectly in your own builds. **For the customer
+      > app that certificate is known** — G14 established it:
+      >
+      >     com.siteonlab.zopiqnow    0B:2E:C5:54:E9:08:66:02:1F:6E:36:A7:B6:B2:23:D6:46:65:93:94
+      >
+      > So the customer app needs **both** of its fingerprints in the
+      > restriction. Vendor and rider will each acquire their own the day they
+      > are uploaded; read them with the `adb pull` method in G14 rather than
+      > from the console's copy-buttons.
+- [x] **G14 — Register Play's app-signing certificate with the Google OAuth
+      client.** ✅ **Closed 4 Aug, verified on a device: Google sign-in works from
+      the internal-testing build.** *(Added the same day as a prediction,
+      confirmed as a failure within the hour, fixed the hour after that.)*
+
+      **Play's app signing certificate for `com.siteonlab.zopiqnow`:**
+
+      0B:2E:C5:54:E9:08:66:02:1F:6E:36:A7:B6:B2:23:D6:46:65:93:94
+
+      That value is now registered to a second Android OAuth client in project
+      `789936942272`, alongside the upload key's. **G11 needs it too** — see
+      below.
+
+      > **How it was found, because the console could not be trusted to say.**
+      > Two attempts failed on fingerprints copied from *App integrity*, whose
+      > values are copy-buttons with no visible text — there is no reading back
+      > what you took, and the page offers four of them. The certificate was read
+      > instead **off the binary the phone was actually running**:
+      >
+      >     adb shell pm path com.siteonlab.zopiqnow
+      >     adb pull <base.apk> && apksigner verify --print-certs base.apk
+      >
+      > which answers `CN=Android, OU=Android, O=Google Inc.` — Google's key, not
+      > `CN=Zopiqnow` — and the SHA-1 above. **That is ground truth**: it is the
+      > certificate the device presents, rather than the one a console claims it
+      > should. Use it for the vendor and rider apps rather than repeating the
+      > guesswork.
 
       **It was never avoidable.** Play App Signing has been mandatory for every
       new app since August 2021, so the binary a tester downloads is *always*
