@@ -98,6 +98,24 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
+        // Two of the three ways onto this screen leave nothing to pop, so
+        // `AppBar` drew no leading at all and the list was a dead end:
+        //
+        //   • After sign-in. `/orders` is guarded, so a signed-out tap goes to
+        //     `/login?from=/orders` and the login `go`s to the destination —
+        //     which replaces the stack.
+        //   • After checkout, and after a push. "Track this order" and a
+        //     notification tap both `go` to `/orders/:id`; go_router rebuilds
+        //     that stack from the route tree, so Back off the receipt lands
+        //     here, on what is now the root.
+        //
+        // Same shape as the cart's arrow, and for the same reason: pop when
+        // there is something to pop, and otherwise go somewhere real rather
+        // than draw nothing.
+        leading: BackButton(
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.goNamed(Routes.home),
+        ),
         title: const Text('My orders'),
         elevation: 0,
         backgroundColor: Colors.transparent,
