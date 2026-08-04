@@ -104,6 +104,21 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
       and a different certificate is a different pair, so this does not collide
       with the existing one and does not need it changed.
 
+      > **The trap on that page, walked into first time (4 Aug).** App integrity
+      > shows **two** certificates — *app signing key* and *upload key* — and the
+      > upload key is `A9:09:B9:1D:…`, our own keystore. Copying that one and
+      > creating an OAuth client with it fails with **"the Android package name
+      > and fingerprint are already in use"**, which reads like the July disaster
+      > and is nothing of the kind: the pair is in use *by our own existing
+      > client*, and the error is Google refusing to register the same thing
+      > twice. **The one you want is the fingerprint that is not
+      > `A9:09:B9:1D:…`.** Nothing is damaged by the failed attempt.
+      >
+      > If the *app signing* block shows `A9:09:B9:1D:…` as well, then Play
+      > adopted our key rather than generating one, the pair is already correctly
+      > registered, and the sign-in failure is something else — read the reason
+      > out of Crashlytics rather than guessing at fingerprints.
+
       **Keep the existing Android client.** It is what makes the release builds
       you make by hand work, and it is a different certificate, so the two do not
       compete. Deleting it would break your own testing to fix Play's.
