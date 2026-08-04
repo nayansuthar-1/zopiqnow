@@ -24,3 +24,26 @@
 -keepclasseswithmembers class * {
     public void onPayment*(...);
 }
+
+# Firebase — components are discovered by reflection, never by a call site.
+#
+# **Found on a real device on 5 August 2026, in the release build already on
+# Play's internal track.** `FirebaseInitProvider` reads a list of
+# `ComponentRegistrar` class names out of the AARs' manifest metadata and
+# instantiates each one with its no-argument constructor. Those are strings, so
+# R8 sees classes that nobody constructs and removes the constructors:
+#
+#   ComponentDiscovery: Could not instantiate ...FirebaseMessagingKtxRegistrar
+#   Caused by: java.lang.NoSuchMethodException: ...KtxRegistrar.<init> []
+#
+# The app then logs `FirebaseApp initialization successful` and carries on with
+# **no messaging, no installations and no crash reporting** — which is why the
+# customer app had never registered a push token and why Crashlytics was empty
+# while we were reading it for answers. A minified build that compiles has not
+# exercised a reflection path; this is that lesson arriving in person.
+#
+# Keeping the constructor is the whole fix. The classes are few and tiny, so
+# this costs nothing worth measuring.
+-keep class * implements com.google.firebase.components.ComponentRegistrar {
+    <init>();
+}

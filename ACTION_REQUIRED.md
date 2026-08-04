@@ -377,11 +377,38 @@ without a device or a browser. **None has been exercised by a human.**
       in ship A7. Trigger it by installing a fresh build on a phone that has not
       granted location, then opening a job map or starting a delivery. It should
       appear *once*, before the system dialog, and never again after a decision.
-- [ ] **R8 reflection paths.** All three apps are minified now, and a minified
-      build that *compiles* has not *exercised* reflection. Razorpay's
-      `@JavascriptInterface` checkout callbacks and the Live Activity plugin fail
-      at runtime or not at all. **This is the single highest-risk untested thing
-      in the Android build.**
+- [x] **R8 reflection paths — it happened.** ✅ **Found and fixed 5 Aug.** This
+      item said it was the single highest-risk untested thing in the Android
+      build. It was, and it had already shipped to the internal track.
+
+      **Firebase was silently dead in every release build.** `logcat` off the
+      device running the Play bundle:
+
+          ComponentDiscovery: Could not instantiate ...FirebaseMessagingKtxRegistrar
+          Caused by: java.lang.NoSuchMethodException: ...KtxRegistrar.<init> []
+
+      …and the same for `FirebaseInstallationsKtxRegistrar` and
+      `CrashlyticsRegistrar`. `FirebaseInitProvider` reads registrar class names
+      out of AAR manifest metadata — **strings**, so R8 sees classes nobody
+      constructs and deletes their no-argument constructors. The app then logs
+      *"FirebaseApp initialization successful"* and runs on with **no messaging,
+      no installations and no crash reporting**.
+
+      **It explains two separate mysteries at once**, which is how it was
+      confirmed rather than guessed: the customer app had never written a
+      `device_tokens` row, so *Send a notification → Customer* counted **0
+      recipients**; and Crashlytics was empty the whole time we were reading it
+      for answers about Google sign-in. One cause, both symptoms.
+
+      Fixed with the keep rule now in **all three** `proguard-rules.pro` —
+      `-keep class * implements com.google.firebase.components.ComponentRegistrar
+      { <init>(); }`. Verified in the rebuilt R8 mapping: the registrars survive
+      un-renamed and `void <init>()` is still on them.
+
+      > **The vendor and rider bundles built on 4 Aug carry this bug too.** All
+      > three apps were minified with no Firebase rules, so their release builds
+      > have no push and no crash reporting either. Rebuild both before they go
+      > anywhere near a track.
 - [ ] **The S4 pricing check over HTTP, with a real signed-in session.** Place one
       order and compare `orders.total` against the cart's own figure. The pricing
       was attacked and held, but in `psql` as role `authenticated` rather than
