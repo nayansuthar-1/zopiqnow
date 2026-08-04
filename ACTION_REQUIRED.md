@@ -72,6 +72,33 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
       > re-signs with *its own* key and these SHA-1s stop matching the shipped
       > app. Add the SHA-1 that Play Console shows under *App integrity* as well,
       > or maps go blank in production while working perfectly in your own builds.
+      > **G14 is the same problem in a second console — do them in one sitting.**
+- [ ] **G14 — Register Play's app-signing certificate with the Google OAuth
+      client**, the moment the customer app is created in Play Console and Play
+      App Signing is on. *(Added 4 Aug, and it is the one item here that breaks a
+      feature that currently works.)*
+
+      Google sign-in is authorised by the pair (package name, signing
+      certificate), and the only pair registered today is
+      `com.siteonlab.zopiqnow` + **our** upload certificate
+      `A9:09:B9:1D:C9:0A:26:D6:C7:67:D7:A8:5A:85:20:A9:51:2D:DC:46`. Play App
+      Signing means the binary a tester downloads is signed by **Google's** key,
+      not that one — so sign-in works perfectly in every build you make by hand
+      and fails for everybody who installs from Play. The symptom is the account
+      sheet opening, an account being picked, and a refusal; the log says
+      `Invalid key value: <sha1>:com.siteonlab.zopiqnow`.
+
+      **Do this:** Play Console → *Setup → App integrity* → copy the **app
+      signing key** SHA-1 (not the upload key). Cloud project **789936942272** →
+      Credentials → **create a second Android OAuth client** for the same package
+      name with that fingerprint. Two clients for one package is the supported
+      shape — the global uniqueness rule is per *(package, certificate)* pair,
+      and a different certificate is a different pair, so this does not collide
+      with the existing one and does not need it changed.
+
+      Nothing in `env.dart` changes: only the **web** client id is ever named in
+      code, and it stays. The Android client exists solely to make Google vouch
+      for the certificate.
 - [ ] **G12 — Cap the Cloudinary unsigned preset** (audit SEC-004): allowed
       formats, max file size, folder. The preset ships inside every binary by
       design — it carries no secret, but it lets a stranger upload to your
@@ -80,11 +107,20 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
 - [ ] **G8 — Confirm `support@zopiqnow.com` is a real inbox somebody reads.** It
       is written into both legal documents, the deletion page and the in-app
       support tile. Both stores email it.
-- [ ] **G2 — Confirm the Play Console account type.** A *personal* account
-      registered after Nov 2023 must run a closed test with **12 testers for 14
-      continuous days** before it can apply for production. An *organisation*
-      account need not. This decides whether "live" means public or closed, and
-      it changes nothing about the work — but it changes the date.
+- [ ] **G2 — Confirm the Play Console account type.** *(The account exists and is
+      identity-verified as of 4 Aug — this is now answerable, and it is the
+      longest pole left on Android.)* A *personal* account registered after Nov
+      2023 must run a closed test with **12 testers opted in for 14 continuous
+      days** before it can even apply for production. An *organisation* account
+      need not. Identity verification rather than a D-U-N-S number points at
+      personal, so assume 14 days until the console says otherwise.
+
+      **If it is personal, the clock is the schedule.** It starts when a closed
+      test is actually running with testers on it, not when the account was
+      made, and it runs in parallel with everything else on this page — so get
+      *any* build onto a closed track before polishing a single screenshot. Two
+      weeks of listing copy costs nothing; two weeks of waiting to start costs
+      two weeks.
 
 ---
 
