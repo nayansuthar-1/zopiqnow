@@ -324,3 +324,58 @@ that gets an app removed rather than re-rated.
 > **When the rider and vendor apps are rated**, do not copy this table. The
 > rider has the other half of the same chat and the same calling, and the vendor
 > has neither — each needs answering against its own code.
+
+---
+
+## FOREGROUND_SERVICE_SPECIAL_USE — the Console declaration (5 August 2026)
+
+Play's *Foreground service permissions* screen asks for two things, both required.
+A4 flagged this as owed; here it is. **Customer app only** — the rider's
+foreground service is `location` typed and is a different declaration.
+
+**1. Video link.** Must open **without a login**; an unlisted YouTube video is
+the usual answer. It has to show the *behaviour*, not the app: place an order,
+show the live card in the shade, show the progress bar advancing and the ETA
+counting down **with the phone locked**, and show the card ending when the order
+does. 30-60 seconds. A tour of the app with no visible service is the common
+reason these come back.
+
+**2. "Describe your app's use of this permission."** Paste this. It answers the
+two sub-questions the form names — *why it must start immediately* and *why it
+cannot be paused or restarted* — because a description that ignores them is the
+other common rejection:
+
+> Zopiqnow shows a live order card: an ongoing notification carrying a progress
+> bar and a countdown while a customer's food order is being prepared and
+> delivered. LiveCardService redraws that card on a timer so the bar advances
+> and the ETA counts down while the screen is off, because a posted notification
+> does not update itself and one driven only by server pushes jumps in steps
+> instead of moving.
+>
+> It must start immediately because the card is posted the moment the order is
+> placed, and from then on it is the customer's only view of their order from
+> the lock screen. It cannot be paused or restarted: a paused ticker is a frozen
+> countdown still showing a delivery time that has already passed, which tells
+> the customer something untrue about when their food is arriving.
+>
+> No other foreground service type describes it. Not `location` — the service
+> reads no position and the app holds no background location permission. Not
+> `dataSync` — it makes no network request at all; the card's contents are
+> self-contained by design. Not `shortService`, whose three-minute ceiling is
+> shorter than any delivery. The service runs only while an order is in flight
+> and stops itself when the order is delivered or cancelled.
+
+**Keep this identical to the manifest.** The
+`PROPERTY_SPECIAL_USE_FGS_SUBTYPE` value in
+`packages/zopiq_live_card/android/src/main/AndroidManifest.xml` says the same
+thing more briefly, and a reviewer comparing the two should find them agreeing.
+If the service's behaviour ever changes, change the manifest, this text and the
+video together.
+
+> **The alternative, recorded because it is a real option and not a silly one.**
+> `specialUse` is the most heavily scrutinised foreground service type and this
+> declaration costs a video plus a review cycle if it is refused. Dropping the
+> live card from v1 — as iOS already does, per ship X7 — would delete the
+> permission, the declaration and the risk in one move, at the cost of the
+> feature on Android. Not recommended while the feature works and the text
+> above is honest, but it is the fallback if Play pushes back twice.
