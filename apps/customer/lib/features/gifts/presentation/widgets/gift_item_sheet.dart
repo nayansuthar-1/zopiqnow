@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/gifts/domain/entities/gift_item.dart';
+import 'package:zopiqnow/features/gifts/presentation/providers/gift_cart_providers.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_image.dart';
 
 /// Opens the detail sheet for a gift item:
@@ -19,7 +21,7 @@ Future<void> showGiftItemSheet(BuildContext context, GiftItem item) {
   );
 }
 
-class _GiftItemSheet extends StatelessWidget {
+class _GiftItemSheet extends ConsumerWidget {
   const _GiftItemSheet({required this.item});
 
   final GiftItem item;
@@ -27,8 +29,56 @@ class _GiftItemSheet extends StatelessWidget {
   static const Color _blinkitGreen = Color(0xFF0C831F);
   static const Color _blinkitYellow = Color(0xFFF7C400);
 
+  /// Puts it in the bag, asking first if that means abandoning another shop's.
+  ///
+  /// The same shape as the food cart's "Start new cart?" and for the same
+  /// reason: an order is placed against one seller, so a bag spanning two is a
+  /// bag that cannot be checked out. Asking is the only honest option — silently
+  /// clearing somebody's bag is worse than refusing.
+  Future<void> _addToBag(BuildContext context, WidgetRef ref) async {
+    final GiftCartNotifier bag = ref.read(giftCartProvider.notifier);
+    final NavigatorState navigator = Navigator.of(context);
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+
+    if (bag.add(item) == AddToGiftBagResult.differentShop) {
+      final String holding = ref.read(giftCartProvider).shopName;
+      final bool? replace = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext dialogContext) => AlertDialog(
+          title: const Text('Start a new bag?'),
+          content: Text(
+            'Your bag has gifts from ${holding.isEmpty ? 'another shop' : holding}. '
+            'A gift order goes to one shop, so adding this one starts a new bag.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Keep my bag'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Start new bag'),
+            ),
+          ],
+        ),
+      );
+      if (!(replace ?? false)) return;
+      bag.startNewBagWith(item);
+    }
+
+    navigator.pop();
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('${item.name} added to your gift bag'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
@@ -305,7 +355,9 @@ class _GiftItemSheet extends StatelessWidget {
                     ],
                     const SizedBox(height: 24),
 
-                    // Primary Action Button
+                    // The button that used to say "Close" and close. A
+                    // catalogue with no way to buy anything was the whole of
+                    // the Gifts tab until 0096.
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -318,9 +370,9 @@ class _GiftItemSheet extends StatelessWidget {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: () => _addToBag(context, ref),
                         child: Text(
-                          'Close',
+                          'Add to bag · ₹${item.price}',
                           style: t.titleMedium?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
