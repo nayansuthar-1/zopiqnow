@@ -29,8 +29,9 @@ submission today.
   a queue. Every iOS task is downstream of the certificate it issues.
 - **G3 Razorpay merchant KYC** — until the live keys exist, the payment gate
   (S5) stays disarmed and no real money can move.
-- **G4 Host the legal documents at a public URL** — files moved to `docs/` and
-  ready; enabling Pages (Settings → Pages → `main` / `/docs`) is the last step.
+- ~~**G4 Host the legal documents at a public URL**~~ — **closed 4 Aug.** Live on
+  GitHub Pages from `docs/`; all four pages verified answering 200 over HTTPS.
+  URLs are in `ACTION_REQUIRED.md`.
 - ~~**G5 Rotate the leaked Resend key**~~ — **closed 4 Aug as an accepted risk.**
   The owning account is unreachable so the key stays live and public, but with no
   verified domain it cannot send to arbitrary recipients and grants nothing

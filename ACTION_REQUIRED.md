@@ -45,16 +45,17 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
       the payment gate (S5), and S5 ends with **one real ₹1 payment on a real
       device per platform** — the signature path has never run against Razorpay,
       only against a known-good vector.
-- [~] **G4 — Host the legal documents at a public URL.** **Files are in place;
-      one switch in the GitHub UI is yours.** `legal/` is now **`docs/`**,
+- [x] **G4 — Host the legal documents at a public URL.** ✅ **Closed 4 Aug and
+      verified live**: all four pages answer **HTTP 200** over HTTPS, and the
+      byte counts match the repository's files exactly — so it is serving the
+      real documents rather than a prettier 404. `legal/` is now **`docs/`**,
       because GitHub Pages can only be served from a repository's root or from
       `/docs`, and `/docs` publishes those four files rather than the whole
       monorepo. Nothing in the app moved: the in-app documents are Dart, in
       `legal_documents.dart`, and never read this HTML.
 
-      **Do this:** repo → *Settings* → *Pages* → Source **Deploy from a branch**
-      → branch `main`, folder `/docs` → Save. First publish takes a minute or two.
-      Then these are the URLs both stores need:
+      Served from *Settings → Pages →* branch `main`, folder `/docs`. **These are
+      the URLs both stores need** — paste them, do not retype them:
 
       | | |
       |---|---|
