@@ -56,7 +56,7 @@ class _GiftsPageState extends ConsumerState<GiftsPage> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      body: RefreshIndicator(
+      body: RefreshIndicator.adaptive(
         color: _blinkitGreen,
         backgroundColor: Colors.white,
         onRefresh: () {

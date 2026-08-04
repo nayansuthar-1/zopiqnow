@@ -38,7 +38,7 @@ class _StaffPageState extends ConsumerState<StaffPage> {
         label: const Text('Add'),
       ),
       body: roster.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: ZopiqLoader()),
         error: (Object _, StackTrace _) => _ErrorBody(
           onRetry: () => ref.invalidate(staffProvider),
         ),

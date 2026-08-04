@@ -208,14 +208,7 @@ class OrderCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
                     icon: isReordering
-                        ? SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: zc.primary,
-                            ),
-                          )
+                        ? ZopiqLoader(size: 14, strokeWidth: 2, color: zc.primary)
                         : const Icon(Icons.replay_rounded, size: 16),
                     label: Text(
                       isReordering ? 'Loading' : 'Reorder',

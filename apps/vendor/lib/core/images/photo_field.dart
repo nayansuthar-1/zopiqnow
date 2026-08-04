@@ -79,7 +79,7 @@ class _PhotoFieldState extends ConsumerState<PhotoField> {
               ColoredBox(
                 color: Colors.black.withValues(alpha: 0.35),
                 child: const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
+                  child: ZopiqLoader(color: Colors.white),
                 ),
               )
             else if (hasImage)

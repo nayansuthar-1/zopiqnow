@@ -31,7 +31,7 @@ class InvoicePage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Invoice'), centerTitle: false),
       body: invoice.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: ZopiqLoader()),
         // The service's own sentence, verbatim: "An invoice is issued once your
         // order has been delivered." is a complete answer, and "something went
         // wrong" would replace it with nothing.
@@ -223,11 +223,7 @@ class _InvoiceBodyState extends State<_InvoiceBody> {
             child: ElevatedButton.icon(
               onPressed: _isBuilding ? null : _share,
               icon: _isBuilding
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                  ? const ZopiqLoader(size: 18, strokeWidth: 2)
                   : const Icon(Icons.file_download_outlined),
               label: Text(
                 _isBuilding ? 'Preparing…' : 'Download PDF',

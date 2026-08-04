@@ -58,7 +58,7 @@ class SettlementDetailPage extends ConsumerWidget {
           orders.when(
             loading: () => const Padding(
               padding: EdgeInsets.all(ZopiqSpacing.xl),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: ZopiqLoader()),
             ),
             error: (Object _, StackTrace _) => VendorMessage(
               icon: Icons.cloud_off_rounded,

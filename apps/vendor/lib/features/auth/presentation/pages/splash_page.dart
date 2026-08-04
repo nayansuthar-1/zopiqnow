@@ -22,10 +22,7 @@ class SplashPage extends StatelessWidget {
           children: <Widget>[
             Icon(Icons.storefront_rounded, size: 56, color: zc.primary),
             const SizedBox(height: ZopiqSpacing.lg),
-            const SizedBox.square(
-              dimension: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+            const ZopiqLoader(size: 24, strokeWidth: 2),
           ],
         ),
       ),

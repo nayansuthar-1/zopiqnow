@@ -76,7 +76,7 @@ class AddressBookPage extends ConsumerWidget {
         foregroundColor: Colors.white,
       ),
       body: saved.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: ZopiqLoader()),
         error: (Object error, StackTrace _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(ZopiqSpacing.xl),

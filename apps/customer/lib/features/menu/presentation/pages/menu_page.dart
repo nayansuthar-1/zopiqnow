@@ -33,6 +33,18 @@ class MenuPage extends ConsumerWidget {
     );
 
     return Scaffold(
+      // The back arrow lives in [MenuSliverAppBar], which only exists once the
+      // restaurant has arrived — so while this is loading, and *permanently* if
+      // the id is not a restaurant, the screen had no way out at all. Android
+      // hid that behind the system Back; iOS has none, and `RestaurantNotFound`
+      // offers no retry either, so it was a dead end. A plain bar here, and none
+      // once the sliver one takes over.
+      appBar: restaurant.hasValue
+          ? null
+          : AppBar(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              elevation: 0,
+            ),
       body: restaurant.when(
         loading: () => const _MenuLoading(),
         error: (Object error, _) => _MenuError(

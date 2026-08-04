@@ -365,13 +365,10 @@ class _AvatarEditor extends StatelessWidget {
                       color: Colors.black.withValues(alpha: 0.35),
                     ),
                     child: const Center(
-                      child: SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
+                      child: ZopiqLoader(
+                        size: 28,
+                        strokeWidth: 2.5,
+                        color: Colors.white,
                       ),
                     ),
                   ),

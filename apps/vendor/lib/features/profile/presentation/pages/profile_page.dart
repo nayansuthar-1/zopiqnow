@@ -5,6 +5,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_vendor/app/router.dart';
 import 'package:zopiq_vendor/core/widgets/vendor_animations.dart';
+import 'package:zopiq_vendor/core/widgets/vendor_back_button.dart';
 import 'package:zopiq_vendor/core/widgets/vendor_svg_icons.dart';
 import 'package:zopiq_vendor/features/auth/domain/entities/vendor.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
@@ -33,7 +34,7 @@ class ProfilePage extends ConsumerWidget {
 
             Expanded(
               child: profile.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: ZopiqLoader()),
                 error: (Object _, StackTrace _) => _Error(
                   onRetry: () => ref.invalidate(restaurantProfileProvider),
                 ),
@@ -64,38 +65,44 @@ class _Header extends StatelessWidget {
         ZopiqSpacing.pageGutter,
         ZopiqSpacing.sm,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Restaurant Profile',
-                  style: t.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: zc.textStrong,
-                    letterSpacing: -0.3,
-                  ),
+          const VendorBackButton(),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Restaurant Profile',
+                      style: t.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: zc.textStrong,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: ZopiqSpacing.xxs),
+                    Text(
+                      'Your public storefront details',
+                      style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: ZopiqSpacing.xxs),
-                Text(
-                  'Your public storefront details',
-                  style: t.bodyMedium?.copyWith(color: zc.textMuted),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: zc.nonVeg.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
                 ),
-              ],
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: zc.nonVeg.withValues(alpha: 0.10),
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              icon: Icon(Icons.logout_rounded, color: zc.nonVeg),
-              tooltip: 'Sign out',
-              onPressed: onSignOut,
-            ),
+                child: IconButton(
+                  icon: Icon(Icons.logout_rounded, color: zc.nonVeg),
+                  tooltip: 'Sign out',
+                  onPressed: onSignOut,
+                ),
+              ),
+            ],
           ),
         ],
       ),

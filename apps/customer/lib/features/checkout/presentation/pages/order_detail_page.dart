@@ -31,8 +31,15 @@ class OrderDetailPage extends ConsumerWidget {
     );
 
     return order.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      // An app bar even here: both the other two branches have one, and a
+      // tracking screen that never finishes loading is otherwise a screen with
+      // no back button on a platform with no system Back.
+      loading: () => Scaffold(
+        appBar: AppBar(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          elevation: 0,
+        ),
+        body: const Center(child: ZopiqLoader()),
       ),
       error: (Object _, StackTrace _) => _OrderMessage(
         title: 'We couldn\'t load this order',
@@ -612,11 +619,7 @@ class _OrderBodyState extends ConsumerState<_OrderBody> {
                     ),
                     onPressed: _isReordering ? null : _handleReorder,
                     child: _isReordering
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
+                        ? const ZopiqLoader(size: 18, strokeWidth: 2, color: Colors.white)
                         : const Text('Reorder', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),

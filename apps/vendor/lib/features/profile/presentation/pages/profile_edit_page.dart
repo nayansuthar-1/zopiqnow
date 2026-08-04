@@ -113,7 +113,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Edit profile')),
       body: profile.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: ZopiqLoader()),
         error: (Object _, StackTrace _) => const Center(
           child: Padding(
             padding: EdgeInsets.all(ZopiqSpacing.xl),

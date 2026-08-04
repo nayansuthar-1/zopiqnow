@@ -64,7 +64,7 @@ class HistoryPage extends ConsumerWidget {
                   actionLabel: 'Retry',
                   onAction: () => ref.invalidate(historyOrdersProvider),
                 ),
-                data: (_) => RefreshIndicator(
+                data: (_) => RefreshIndicator.adaptive(
                   color: context.zc.primary,
                   onRefresh: () => ref.refresh(historyOrdersProvider.future),
                   child: visible.isEmpty

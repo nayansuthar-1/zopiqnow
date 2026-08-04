@@ -12,7 +12,7 @@ class SplashPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(child: CircularProgressIndicator(color: context.zc.primary)),
+      body: Center(child: ZopiqLoader(color: context.zc.primary)),
     );
   }
 }

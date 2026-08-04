@@ -122,7 +122,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
             );
           }
 
-          return RefreshIndicator(
+          return RefreshIndicator.adaptive(
             onRefresh: () async => ref.refresh(ordersProvider.future),
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.sm),

@@ -121,7 +121,7 @@ class _HoursEditorPageState extends ConsumerState<HoursEditorPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Opening hours')),
       body: hours.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: ZopiqLoader()),
         error: (Object _, StackTrace _) => VendorMessage(
           icon: Icons.cloud_off_rounded,
           title: 'We couldn\'t load your hours',

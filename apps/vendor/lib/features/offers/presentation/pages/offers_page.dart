@@ -44,7 +44,7 @@ class _OffersPageState extends ConsumerState<OffersPage> {
               label: const Text('New offer'),
             ),
       body: offers.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: ZopiqLoader()),
         error: (Object _, StackTrace _) =>
             _ErrorBody(onRetry: () => ref.invalidate(offersProvider)),
         data: (List<VendorOffer> list) => AbsorbPointer(

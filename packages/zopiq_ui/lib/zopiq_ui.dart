@@ -22,6 +22,7 @@ export 'src/components/zopiq_animated_amount.dart';
 export 'src/components/zopiq_button.dart';
 export 'src/components/zopiq_reveal.dart';
 export 'src/components/zopiq_card.dart';
+export 'src/components/zopiq_loader.dart';
 export 'src/components/zopiq_network_image.dart';
 export 'src/components/zopiq_pressable.dart';
 export 'src/components/zopiq_shimmer.dart';

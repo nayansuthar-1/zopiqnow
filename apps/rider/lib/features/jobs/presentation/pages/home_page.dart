@@ -85,7 +85,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onChanged: (bool board) => setState(() => _wantBoard = board),
               ),
             Expanded(
-              child: RefreshIndicator(
+              child: RefreshIndicator.adaptive(
                 color: context.zc.primary,
                 onRefresh: () async {
                   ref
@@ -345,7 +345,7 @@ class _BoardBodyState extends ConsumerState<_BoardBody>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            CircularProgressIndicator(color: context.zc.primary),
+            ZopiqLoader(color: context.zc.primary),
             const SizedBox(height: ZopiqSpacing.md),
             Text(
               'Scanning live order board...',

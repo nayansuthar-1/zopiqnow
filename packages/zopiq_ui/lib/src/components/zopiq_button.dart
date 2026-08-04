@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:zopiq_ui/src/components/zopiq_loader.dart';
 import 'package:zopiq_ui/src/theme/zopiq_colors.dart';
 import 'package:zopiq_ui/src/tokens/zopiq_radii.dart';
 import 'package:zopiq_ui/src/tokens/zopiq_spacing.dart';
@@ -51,17 +52,12 @@ class ZopiqButton extends StatelessWidget {
     }
 
     final Widget child = isLoading
-        ? SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.4,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                variant == ZopiqButtonVariant.outline
-                    ? zc.primary
-                    : Colors.white,
-              ),
-            ),
+        ? ZopiqLoader(
+            size: 20,
+            strokeWidth: 2.4,
+            color: variant == ZopiqButtonVariant.outline
+                ? zc.primary
+                : Colors.white,
           )
         : Row(
             mainAxisSize: MainAxisSize.min,

@@ -171,7 +171,7 @@ class _HomePageState extends ConsumerState<HomePage>
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      body: RefreshIndicator(
+      body: RefreshIndicator.adaptive(
         // The spinner drops over the hero, so it must not be hero-colored.
         color: ZopiqPalette.primaryDeep,
         backgroundColor: ZopiqPalette.white,
@@ -199,7 +199,12 @@ class _HomePageState extends ConsumerState<HomePage>
               address: address?.shortDisplay ?? 'Set delivery location',
               heroSlides: heroSlides,
               onTapLocation: () => showAddressPicker(context),
-              onTapSearch: () => context.goNamed(Routes.search),
+              // Pushed, not `go` — the same rule `_openCategory` follows and for
+              // the same reason. Search sits outside the shell, so a `go`
+              // replaces the stack and leaves it with neither a bottom bar nor a
+              // back arrow. On Android that was survivable; on iOS there is no
+              // system Back, so the search pill was a one-way door.
+              onTapSearch: () => context.pushNamed(Routes.search),
               onTapProfile: () => context.pushNamed(Routes.account),
               onTapCta: _scrollTowardsRestaurants,
               onOpenHeroTarget: _openHeroTarget,

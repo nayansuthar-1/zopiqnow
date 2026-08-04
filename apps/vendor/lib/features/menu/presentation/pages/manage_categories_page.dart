@@ -41,7 +41,7 @@ class _ManageCategoriesPageState extends ConsumerState<ManageCategoriesPage> {
       return Scaffold(
         appBar: AppBar(title: const Text('Sections')),
         body: menu.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: ZopiqLoader()),
           error: (Object _, StackTrace _) => _ErrorBody(
             onRetry: () => ref.invalidate(menuProvider),
           ),

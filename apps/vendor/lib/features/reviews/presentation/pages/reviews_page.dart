@@ -23,7 +23,7 @@ class ReviewsPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Reviews'), centerTitle: true),
-      body: RefreshIndicator(
+      body: RefreshIndicator.adaptive(
         onRefresh: () async {
           ref
             ..invalidate(reviewsProvider)
@@ -31,7 +31,7 @@ class ReviewsPage extends ConsumerWidget {
           await ref.read(reviewsProvider.future);
         },
         child: reviews.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: ZopiqLoader()),
           error: (Object _, StackTrace _) => _ErrorBody(
             onRetry: () {
               ref

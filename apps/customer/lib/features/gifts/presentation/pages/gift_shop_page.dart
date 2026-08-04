@@ -29,9 +29,18 @@ class GiftShopPage extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
+      // Same reason as the restaurant menu: the back arrow belongs to
+      // [_ShopHeader], which only the `data` branch builds. A shop that is slow
+      // to load — or gone — left the customer on a bare screen with nothing to
+      // press, which on iOS means stuck.
+      appBar: shop.hasValue
+          ? null
+          : AppBar(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              elevation: 0,
+            ),
       body: shop.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator.adaptive()),
+        loading: () => const Center(child: ZopiqLoader()),
         error: (Object error, _) => GiftErrorView(
           message: error is GiftShopNotFound
               ? error.message

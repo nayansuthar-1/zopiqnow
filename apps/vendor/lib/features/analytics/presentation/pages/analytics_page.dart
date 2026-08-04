@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_vendor/core/formatting/formatters.dart';
+import 'package:zopiq_vendor/core/widgets/vendor_back_button.dart';
 import 'package:zopiq_vendor/core/widgets/vendor_message.dart';
 import 'package:zopiq_vendor/features/analytics/domain/entities/analytics_summary.dart';
 import 'package:zopiq_vendor/features/analytics/presentation/providers/analytics_providers.dart';
@@ -25,7 +26,7 @@ class AnalyticsPage extends ConsumerWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: RefreshIndicator(
+        child: RefreshIndicator.adaptive(
           color: context.zc.primary,
           onRefresh: () async {
             ref.invalidate(analyticsProvider(range));
@@ -103,27 +104,33 @@ class _Header extends StatelessWidget {
         ZopiqSpacing.pageGutter,
         ZopiqSpacing.sm,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Analytics & Insights',
-                  style: t.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: zc.textStrong,
-                    letterSpacing: -0.3,
-                  ),
+          const VendorBackButton(),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Analytics & Insights',
+                      style: t.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: zc.textStrong,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: ZopiqSpacing.xxs),
+                    Text(
+                      'See what sells and when you\'re busy',
+                      style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: ZopiqSpacing.xxs),
-                Text(
-                  'See what sells and when you\'re busy',
-                  style: t.bodyMedium?.copyWith(color: zc.textMuted),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -381,7 +388,7 @@ class _AnalyticsSkeleton extends StatelessWidget {
     return const ZopiqCard(
       child: SizedBox(
         height: 220,
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(child: ZopiqLoader()),
       ),
     );
   }

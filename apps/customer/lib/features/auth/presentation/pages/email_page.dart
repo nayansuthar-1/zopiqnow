@@ -173,10 +173,7 @@ class _EmailPageState extends ConsumerState<EmailPage> {
                 icon: _googleBusy
                     // Sized to the icon it replaces, so the label does not
                     // shift sideways when the spinner appears.
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const ZopiqLoader(size: 20, strokeWidth: 2)
                     : SvgPicture.asset(
                         'assets/icons_zopiq/google_g.svg',
                         width: 20,

@@ -49,7 +49,7 @@ class MenuPage extends ConsumerWidget {
 
             Expanded(
               child: menu.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: ZopiqLoader()),
                 error: (Object _, StackTrace _) => _Message(
                   icon: Icons.cloud_off_rounded,
                   title: 'We couldn\'t load your menu',
@@ -74,7 +74,7 @@ class MenuPage extends ConsumerWidget {
                     ],
                   ];
 
-                  return RefreshIndicator(
+                  return RefreshIndicator.adaptive(
                     color: context.zc.primary,
                     onRefresh: () async => ref.refresh(menuProvider.future),
                     child: ListView.separated(

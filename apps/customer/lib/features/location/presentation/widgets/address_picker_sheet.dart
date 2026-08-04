@@ -114,7 +114,7 @@ class _AddressPickerSheetState extends ConsumerState<AddressPickerSheet> {
             saved.when(
               loading: () => const Padding(
                 padding: EdgeInsets.symmetric(vertical: ZopiqSpacing.md),
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(child: ZopiqLoader()),
               ),
               error: (Object _, StackTrace _) => Padding(
                 padding: const EdgeInsets.symmetric(

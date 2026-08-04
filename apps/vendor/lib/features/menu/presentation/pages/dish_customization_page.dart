@@ -104,18 +104,14 @@ class _DishCustomizationPageState extends ConsumerState<DishCustomizationPage> {
             TextButton(
               onPressed: _saving ? null : _save,
               child: _saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                  ? const ZopiqLoader(size: 18, strokeWidth: 2)
                   : const Text('Save'),
             ),
         ],
       ),
       body: SafeArea(
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: ZopiqLoader())
             : _loadError != null
             ? _CenteredMessage(
                 icon: Icons.cloud_off_rounded,

@@ -51,7 +51,7 @@ class QueuePage extends ConsumerWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      CircularProgressIndicator(color: context.zc.primary),
+                      ZopiqLoader(color: context.zc.primary),
                       const SizedBox(height: ZopiqSpacing.md),
                       Text(
                         'Connecting to live kitchen terminal...',

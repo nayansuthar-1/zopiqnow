@@ -38,7 +38,7 @@ class HomePage extends ConsumerWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: RefreshIndicator(
+        child: RefreshIndicator.adaptive(
           color: context.zc.primary,
           onRefresh: () async {
             ref.invalidate(ordersProvider);
@@ -98,7 +98,7 @@ class HomePage extends ConsumerWidget {
               else if (!ordersAsync.hasValue || !todayAsync.hasValue)
                 const SizedBox(
                   height: 140,
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(child: ZopiqLoader()),
                 )
               else
                 _TodayGrid(stats: stats),
@@ -513,7 +513,7 @@ class _WeeklyEarningsCard extends ConsumerWidget {
           earnings.when(
             loading: () => const Padding(
               padding: EdgeInsets.symmetric(vertical: ZopiqSpacing.lg),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: ZopiqLoader()),
             ),
             error: (Object _, StackTrace _) => Text(
               'Earnings unavailable',

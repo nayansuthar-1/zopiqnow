@@ -205,11 +205,7 @@ class _RateOrderSheetState extends ConsumerState<_RateOrderSheet> {
               child: ElevatedButton(
                 onPressed: isSaving ? null : _save,
                 child: isSaving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const ZopiqLoader(size: 18, strokeWidth: 2)
                     : Text(isEdit ? 'Save changes' : 'Submit rating'),
               ),
             ),

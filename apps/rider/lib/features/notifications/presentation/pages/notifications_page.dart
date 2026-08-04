@@ -32,7 +32,7 @@ class NotificationsPage extends ConsumerWidget {
       ),
       body: SafeArea(
         child: async.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: ZopiqLoader()),
           error: (Object _, StackTrace _) => const _Empty(
             icon: Icons.cloud_off_rounded,
             title: 'Notifications are out of reach',

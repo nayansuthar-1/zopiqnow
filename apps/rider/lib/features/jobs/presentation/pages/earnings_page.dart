@@ -23,7 +23,7 @@ class EarningsPage extends ConsumerWidget {
         centerTitle: true,
       ),
       body: SafeArea(
-        child: RefreshIndicator(
+        child: RefreshIndicator.adaptive(
           color: context.zc.primary,
           onRefresh: () async {
             ref

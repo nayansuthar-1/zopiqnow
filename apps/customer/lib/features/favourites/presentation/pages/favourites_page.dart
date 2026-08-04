@@ -29,7 +29,7 @@ class FavouritesPage extends ConsumerWidget {
         backgroundColor: Colors.transparent,
       ),
       body: favourites.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: ZopiqLoader()),
         error: (Object error, StackTrace _) => _Message(
           icon: Icons.cloud_off_rounded,
           title: error is FavouritesFailure
@@ -50,7 +50,7 @@ class FavouritesPage extends ConsumerWidget {
             );
           }
 
-          return RefreshIndicator(
+          return RefreshIndicator.adaptive(
             onRefresh: () async => ref.refresh(favouritesProvider.future),
             child: ListView.builder(
               physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
