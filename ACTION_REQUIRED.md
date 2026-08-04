@@ -77,9 +77,14 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
       > or maps go blank in production while working perfectly in your own builds.
       > **G14 is the same problem in a second console — do them in one sitting.**
 - [ ] **G14 — Register Play's app-signing certificate with the Google OAuth
-      client**, the moment the customer app is created in Play Console and Play
-      App Signing is on. *(Added 4 Aug, and it is the one item here that breaks a
-      feature that currently works.)*
+      client.** *(Added 4 Aug as a prediction. **Confirmed the same day**: the
+      first internal-testing build cannot sign in with Google. This is no longer
+      a risk, it is the current state of the app on Play.)*
+
+      **It was never avoidable.** Play App Signing has been mandatory for every
+      new app since August 2021, so the binary a tester downloads is *always*
+      signed by Google rather than by the upload key — there is no setting that
+      would have kept our certificate on the installed app.
 
       Google sign-in is authorised by the pair (package name, signing
       certificate), and the only pair registered today is
@@ -99,9 +104,23 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
       and a different certificate is a different pair, so this does not collide
       with the existing one and does not need it changed.
 
+      **Keep the existing Android client.** It is what makes the release builds
+      you make by hand work, and it is a different certificate, so the two do not
+      compete. Deleting it would break your own testing to fix Play's.
+
       Nothing in `env.dart` changes: only the **web** client id is ever named in
       code, and it stays. The Android client exists solely to make Google vouch
-      for the certificate.
+      for the certificate. **No rebuild, no new bundle, no version code bump** —
+      this is a registration on Google's side, and the build already on the track
+      starts working once it lands.
+
+      > **The Maps key is the same fingerprint problem and is *not* broken yet,
+      > for the wrong reason.** G11 has not been done, so the key is still
+      > unrestricted and therefore works everywhere, Play-signed builds included.
+      > The day G11 *is* done, Play's app-signing SHA-1 must go in alongside the
+      > three upload SHA-1s — otherwise restricting the key is what takes the
+      > maps out, and it will look like G11 broke them rather than completed
+      > them.
 - [ ] **G12 — Cap the Cloudinary unsigned preset** (audit SEC-004): allowed
       formats, max file size, folder. The preset ships inside every binary by
       design — it carries no secret, but it lets a stranger upload to your
