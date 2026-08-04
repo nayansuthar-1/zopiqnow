@@ -114,6 +114,14 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
       > twice. **The one you want is the fingerprint that is not
       > `A9:09:B9:1D:…`.** Nothing is damaged by the failed attempt.
       >
+      > **And there are four fingerprints on that page, not two.** The *App
+      > signing key · In use* block offers SHA-1 and SHA-256 under a **Classical
+      > key** heading and both again under **Post-quantum cryptography key**
+      > (beta). An Android OAuth client takes the **Classical key → SHA-1**, and
+      > nothing else. The values are copy-buttons with no visible text, so there
+      > is no reading them back afterwards — check what landed in the paste
+      > field, not what you think you clicked.
+      >
       > If the *app signing* block shows `A9:09:B9:1D:…` as well, then Play
       > adopted our key rather than generating one, the pair is already correctly
       > registered, and the sign-in failure is something else — read the reason
