@@ -12,7 +12,10 @@ bundles build, from a clean clone, with R8 on. Nothing in the code blocks Play.
 
 ## 1. Do this first — it is the only irreversible item on the page
 
-- [ ] **G9 — Back up the three keystores and their passwords, off this laptop.**
+- [x] **G9 — Back up the three keystores and their passwords, off this laptop.**
+      ✅ **Done 4 Aug**, before the first upload, which is the only moment it
+      could still have been done. The table below is now a record of what was
+      backed up rather than an instruction.
 
   | App | Keystore | Password |
   |---|---|---|
@@ -107,20 +110,24 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
 - [ ] **G8 — Confirm `support@zopiqnow.com` is a real inbox somebody reads.** It
       is written into both legal documents, the deletion page and the in-app
       support tile. Both stores email it.
-- [ ] **G2 — Confirm the Play Console account type.** *(The account exists and is
-      identity-verified as of 4 Aug — this is now answerable, and it is the
-      longest pole left on Android.)* A *personal* account registered after Nov
-      2023 must run a closed test with **12 testers opted in for 14 continuous
-      days** before it can even apply for production. An *organisation* account
-      need not. Identity verification rather than a D-U-N-S number points at
-      personal, so assume 14 days until the console says otherwise.
+- [x] **G2 — Confirm the Play Console account type.** ✅ **Answered 4 Aug: it is
+      an individual account, identity-verified.** So the closed-test requirement
+      applies in full — **12 testers opted in for 14 continuous days** before the
+      account can even *apply* for production access, and the application is
+      reviewed after that.
 
-      **If it is personal, the clock is the schedule.** It starts when a closed
-      test is actually running with testers on it, not when the account was
-      made, and it runs in parallel with everything else on this page — so get
-      *any* build onto a closed track before polishing a single screenshot. Two
-      weeks of listing copy costs nothing; two weeks of waiting to start costs
-      two weeks.
+      **The 14 days are the schedule, not a step in it.** The clock starts when a
+      closed track is live with testers actually opted in — not when the account
+      was created, and not when the build was uploaded — and it runs in parallel
+      with every other item on this page. So the correct order is: get a build
+      onto a closed track and the twelfth tester opted in **first**, then write
+      the listing during the wait. Two weeks of screenshots costs nothing; two
+      weeks of not having started costs two weeks.
+
+      **Run it with the customer app only.** Production access is granted to the
+      *account*, so vendor and rider do not each need their own fourteen days —
+      confirm that in the console before assuming it, but do not run three tests
+      in parallel on the strength of a guess either way.
 
 ---
 
