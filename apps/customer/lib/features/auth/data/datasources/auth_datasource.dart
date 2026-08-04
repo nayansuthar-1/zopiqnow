@@ -14,6 +14,20 @@ abstract interface class AuthDataSource {
     required String code,
   });
 
+  /// Texts a 6-digit code to [phone], which must already be E.164 (`+91…`).
+  ///
+  /// Supabase owns the code at both ends — it generates it and it checks it.
+  /// MSG91 only carries it, through the `send-sms-otp` Edge Function wired in as
+  /// GoTrue's *Send SMS* hook. That split is the whole design: an SMS provider
+  /// that could mint sessions would need the service-role key, and this one
+  /// never sees anything but a phone number and six digits.
+  Future<void> sendPhoneOtp(String phone);
+
+  Future<AuthUser> verifyPhoneOtp({
+    required String phone,
+    required String code,
+  });
+
   /// Signs in with a Google account, or throws [GoogleSignInCancelled] if the
   /// user backs out of the sheet.
   Future<AuthUser> signInWithGoogle();

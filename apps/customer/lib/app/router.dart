@@ -213,14 +213,28 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
               Routes.otp,
               queryParameters: <String, String>{'email': email, 'from': ?from},
             ),
+            // The same `go`, for the same reason, carrying the number instead of
+            // the address. The OTP screen reads whichever key is present.
+            onSmsOtpSent: (String phone) => context.goNamed(
+              Routes.otp,
+              queryParameters: <String, String>{'phone': phone, 'from': ?from},
+            ),
           );
         },
         routes: <RouteBase>[
           GoRoute(
             path: 'otp',
             name: Routes.otp,
-            builder: (BuildContext context, GoRouterState state) =>
-                OtpPage(email: state.uri.queryParameters['email']!),
+            builder: (BuildContext context, GoRouterState state) {
+              // Whichever one the sign-in screen put there. `OtpPage` asserts
+              // exactly one is present, so a link carrying both — or neither —
+              // fails loudly here rather than verifying a code against the
+              // wrong channel and calling a good code invalid.
+              final String? phone = state.uri.queryParameters['phone'];
+              return phone != null
+                  ? OtpPage(phone: phone)
+                  : OtpPage(email: state.uri.queryParameters['email']!);
+            },
           ),
         ],
       ),

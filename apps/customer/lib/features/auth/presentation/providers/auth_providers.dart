@@ -81,6 +81,20 @@ class AuthController extends Notifier<AuthState> {
     state = AuthSignedIn(user);
   }
 
+  Future<void> sendPhoneOtp(String phone) =>
+      ref.read(authRepositoryProvider).sendPhoneOtp(phone);
+
+  /// Throws [AuthFailure] on a bad/expired code, exactly as the email path does.
+  Future<void> verifyPhoneOtp({
+    required String phone,
+    required String code,
+  }) async {
+    final AuthUser user = await ref
+        .read(authRepositoryProvider)
+        .verifyPhoneOtp(phone: phone, code: code);
+    state = AuthSignedIn(user);
+  }
+
   /// Throws [GoogleSignInCancelled] when the user dismisses the sheet — the
   /// email screen swallows that one; everything else it renders.
   Future<void> signInWithGoogle() async {

@@ -81,6 +81,38 @@ class AuthSupabaseDataSource implements AuthDataSource {
   }
 
   @override
+  Future<void> sendPhoneOtp(String phone) async {
+    try {
+      await _auth.signInWithOtp(phone: phone);
+    } on AuthException catch (e) {
+      throw _sendFailure(e);
+    }
+  }
+
+  @override
+  Future<AuthUser> verifyPhoneOtp({
+    required String phone,
+    required String code,
+  }) async {
+    try {
+      final AuthResponse response = await _auth.verifyOTP(
+        phone: phone,
+        token: code,
+        // `sms`, not `email`. The type is what tells GoTrue which column to
+        // match the code against, and the wrong one is not a near miss — it
+        // looks the code up against an address this user does not have and
+        // answers "invalid code" for a code that is perfectly good.
+        type: OtpType.sms,
+      );
+      final User? user = response.user;
+      if (user == null) throw const InvalidOtp();
+      return _toDomain(user);
+    } on AuthException catch (e) {
+      throw _verifyFailure(e);
+    }
+  }
+
+  @override
   Future<AuthUser> signInWithGoogle() async {
     try {
       await _ensureGoogleReady();
@@ -268,7 +300,12 @@ class AuthSupabaseDataSource implements AuthDataSource {
       // A user who signed in with an email always has one. The field is
       // nullable because Supabase also allows phone-only and anonymous users.
       email: user.email ?? '',
-      phone: meta[phoneMetadataKey] as String?,
+      // The delivery number the customer typed, and failing that the number
+      // they signed in with. A customer who proved they own a phone should not
+      // then be asked for a phone at checkout — but the metadata still wins,
+      // because "where to deliver" and "how you log in" are allowed to differ
+      // and only one of them is a credential.
+      phone: _firstNonEmpty(<Object?>[meta[phoneMetadataKey], user.phone]),
       fullName: name,
       avatarUrl: avatar,
       // `tryParse`, not `parse`: this is free-form JSON on a row the user can

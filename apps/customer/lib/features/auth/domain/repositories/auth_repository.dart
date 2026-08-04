@@ -28,6 +28,23 @@ abstract interface class AuthRepository {
     required String code,
   });
 
+  /// Texts a 6-digit code to [phone] (E.164), creating the account if it is new.
+  ///
+  /// **A phone account is not the customer's email account.** Supabase keys a
+  /// user on phone *or* email, so somebody who signed up with an address and
+  /// later signs in with their number arrives as a different user id, with none
+  /// of their orders, addresses or saved restaurants. Linking the two is a
+  /// deliberate, separate piece of work and has not been done.
+  ///
+  /// Throws the same failures as [sendEmailOtp].
+  Future<void> sendPhoneOtp(String phone);
+
+  /// Exchanges [code] for a session, for the number [sendPhoneOtp] texted.
+  Future<AuthUser> verifyPhoneOtp({
+    required String phone,
+    required String code,
+  });
+
   /// Signs in with a Google account, creating it if it is new.
   ///
   /// Throws [GoogleSignInCancelled] when the user dismisses the account sheet —

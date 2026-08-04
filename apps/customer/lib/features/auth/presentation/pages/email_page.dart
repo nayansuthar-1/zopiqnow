@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -15,11 +16,25 @@ final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
 bool isPlausibleEmail(String value) => _emailPattern.hasMatch(value.trim());
 
+/// India only, which is what the listing ships to (D2). Ten digits, and the
+/// first is 6-9 because no Indian mobile number begins with anything else —
+/// catching that here saves a customer an SMS that was never going to arrive
+/// and saves us the paise it would have cost to not deliver it.
+final RegExp _indianMobilePattern = RegExp(r'^[6-9]\d{9}$');
+
+bool isPlausibleIndianMobile(String value) =>
+    _indianMobilePattern.hasMatch(value.trim());
+
+/// The country code the number is sent with. Not a picker: one country, and a
+/// picker would be a control that can only be set wrong.
+const String _dialCode = '+91';
+
 /// Sign in / sign up — one screen, because an email OTP makes no distinction:
 /// an unknown address is created, a known one is signed in.
 class EmailPage extends ConsumerStatefulWidget {
   const EmailPage({
     required this.onOtpSent,
+    required this.onSmsOtpSent,
     required this.onSignedIn,
     required this.onCancel,
     super.key,
@@ -27,6 +42,10 @@ class EmailPage extends ConsumerStatefulWidget {
 
   /// Called with the address once the code is on its way.
   final void Function(String email) onOtpSent;
+
+  /// The same, for the SMS path, with the number in E.164 (`+91…`) — the form
+  /// GoTrue stores and the form the OTP screen has to verify against.
+  final void Function(String phone) onSmsOtpSent;
 
   /// Called when Google has signed the user in and this screen is done.
   ///
@@ -49,20 +68,50 @@ class EmailPage extends ConsumerStatefulWidget {
 
 class _EmailPageState extends ConsumerState<EmailPage> {
   final TextEditingController _controller = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   bool _sending = false;
+  bool _sendingSms = false;
   bool _googleBusy = false;
   String? _error;
+  String? _phoneError;
 
   @override
   void dispose() {
     _controller.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
   bool get _isValid => isPlausibleEmail(_controller.text);
 
+  bool get _isPhoneValid => isPlausibleIndianMobile(_phoneController.text);
+
+  /// Any one of the three paths in flight locks the other two. They all end in
+  /// the same place, and two codes racing to the same screen is a customer
+  /// typing the one that arrived first into a screen expecting the other.
+  bool get _busy => _sending || _sendingSms || _googleBusy;
+
+  Future<void> _submitPhone() async {
+    if (!_isPhoneValid || _busy) return;
+    setState(() {
+      _sendingSms = true;
+      _phoneError = null;
+      _error = null;
+    });
+
+    final String phone = '$_dialCode${_phoneController.text.trim()}';
+    try {
+      await ref.read(authControllerProvider.notifier).sendPhoneOtp(phone);
+      if (mounted) widget.onSmsOtpSent(phone);
+    } on AuthFailure catch (failure) {
+      if (mounted) setState(() => _phoneError = failure.message);
+    } finally {
+      if (mounted) setState(() => _sendingSms = false);
+    }
+  }
+
   Future<void> _submit() async {
-    if (!_isValid || _sending) return;
+    if (!_isValid || _busy) return;
     setState(() {
       _sending = true;
       _error = null;
@@ -80,7 +129,7 @@ class _EmailPageState extends ConsumerState<EmailPage> {
   }
 
   Future<void> _signInWithGoogle() async {
-    if (_googleBusy || _sending) return;
+    if (_busy) return;
     setState(() {
       _googleBusy = true;
       _error = null;
@@ -123,22 +172,83 @@ class _EmailPageState extends ConsumerState<EmailPage> {
           onPressed: widget.onCancel,
         ),
       ),
+      // Scrollable since the mobile field arrived. This screen now carries two
+      // inputs, three buttons, two dividers and the consent paragraph; with the
+      // keyboard up on a short phone that is taller than the viewport, and an
+      // un-scrollable Column does not clip there, it throws a layout overflow
+      // and paints the yellow-and-black stripes over the sign-in screen.
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text('Enter your email', style: t.headlineSmall),
+              Text('Enter your mobile number', style: t.headlineSmall),
               const SizedBox(height: ZopiqSpacing.xs),
               Text(
-                'We\'ll send you a 6-digit verification code.',
+                'We\'ll text you a 6-digit verification code.',
                 style: t.bodyMedium?.copyWith(color: zc.textMuted),
               ),
               const SizedBox(height: ZopiqSpacing.xl),
               TextField(
-                controller: _controller,
+                controller: _phoneController,
                 autofocus: true,
+                keyboardType: TextInputType.phone,
+                maxLength: 10,
+                autofillHints: const <String>[AutofillHints.telephoneNumber],
+                // Digits only, so a customer who pastes "+91 98765 43210" or
+                // "098765-43210" is not told their own number is wrong. The
+                // formatter strips it to what the pattern actually judges.
+                inputFormatters: <TextInputFormatter>[
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                onChanged: (_) => setState(() => _phoneError = null),
+                onSubmitted: (_) => _submitPhone(),
+                decoration: InputDecoration(
+                  hintText: '98765 43210',
+                  counterText: '',
+                  errorText: _phoneError,
+                  // The country code is shown, not typed. One country ships
+                  // (D2), so a picker would be a control that can only be set
+                  // wrong, and a customer who types +91 themselves would send
+                  // a twelve-digit number to a ten-digit field.
+                  prefixText: '$_dialCode  ',
+                  prefixStyle: t.bodyLarge,
+                  border: const OutlineInputBorder(
+                    borderRadius: ZopiqRadii.rMd,
+                  ),
+                ),
+              ),
+              const SizedBox(height: ZopiqSpacing.lg),
+              ZopiqButton(
+                label: 'Continue',
+                variant: ZopiqButtonVariant.cta,
+                isLoading: _sendingSms,
+                expand: true,
+                onPressed: _isPhoneValid && !_busy ? _submitPhone : null,
+              ),
+              const SizedBox(height: ZopiqSpacing.lg),
+              Row(
+                children: <Widget>[
+                  Expanded(child: Divider(color: zc.divider)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: ZopiqSpacing.md,
+                    ),
+                    child: Text(
+                      'or',
+                      style: t.bodySmall?.copyWith(color: zc.textMuted),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: zc.divider)),
+                ],
+              ),
+              const SizedBox(height: ZopiqSpacing.lg),
+              TextField(
+                controller: _controller,
+                // The mobile field takes the focus now. Two autofocused fields
+                // on one screen is a race, and the keyboard lands on whichever
+                // widget happened to build second.
                 keyboardType: TextInputType.emailAddress,
                 autocorrect: false,
                 autofillHints: const <String>[AutofillHints.email],
@@ -154,11 +264,14 @@ class _EmailPageState extends ConsumerState<EmailPage> {
               ),
               const SizedBox(height: ZopiqSpacing.lg),
               ZopiqButton(
-                label: 'Continue',
-                variant: ZopiqButtonVariant.cta,
+                label: 'Continue with email',
+                // Outlined, because the mobile path above is now the primary
+                // one and two CTA-orange buttons on one screen means neither is
+                // the call to action.
+                variant: ZopiqButtonVariant.outline,
                 isLoading: _sending,
                 expand: true,
-                onPressed: _isValid ? _submit : null,
+                onPressed: _isValid && !_busy ? _submit : null,
               ),
               const SizedBox(height: ZopiqSpacing.lg),
               Row(
@@ -178,7 +291,7 @@ class _EmailPageState extends ConsumerState<EmailPage> {
               ),
               const SizedBox(height: ZopiqSpacing.lg),
               OutlinedButton.icon(
-                onPressed: _sending ? null : _signInWithGoogle,
+                onPressed: _busy ? null : _signInWithGoogle,
                 icon: _googleBusy
                     // Sized to the icon it replaces, so the label does not
                     // shift sideways when the spinner appears.
