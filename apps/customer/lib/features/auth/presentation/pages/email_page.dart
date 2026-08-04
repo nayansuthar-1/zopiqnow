@@ -96,7 +96,16 @@ class _EmailPageState extends ConsumerState<EmailPage> {
     } on GoogleSignInCancelled {
       // They closed the sheet. They know they closed the sheet.
     } on AuthFailure catch (failure) {
-      if (mounted) setState(() => _error = failure.message);
+      // A SnackBar, not `_error`. `_error` renders as the *email field's*
+      // `errorText` — a red line under a box the customer never touched, two
+      // controls above the button they actually pressed. It reads as "the app
+      // did nothing", which is how a Google sign-in that was failing loudly all
+      // along got reported as a screen that simply would not move on.
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(failure.message)));
+      }
     } finally {
       if (mounted) setState(() => _googleBusy = false);
     }

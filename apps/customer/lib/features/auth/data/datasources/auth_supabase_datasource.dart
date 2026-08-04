@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 // Supabase exports an `AuthUser` of its own (an alias of `User`). Ours is the
 // domain entity, so theirs is the one that gives way.
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import 'package:zopiqnow/app/env.dart';
+import 'package:zopiqnow/core/observability/crash_reporter.dart';
 import 'package:zopiqnow/features/auth/data/datasources/auth_datasource.dart';
 import 'package:zopiqnow/features/auth/domain/entities/auth_user.dart';
 import 'package:zopiqnow/features/auth/domain/repositories/auth_repository.dart';
@@ -104,17 +106,54 @@ class AuthSupabaseDataSource implements AuthDataSource {
       final User? user = response.user;
       if (user == null) throw const GoogleSignInFailure();
       return _toDomain(user);
-    } on GoogleSignInException catch (e) {
+    } on GoogleSignInException catch (e, stack) {
       // Dismissing the account sheet is a choice, not a failure. Everything
       // else — no Play services, a certificate that does not match the OAuth
       // client, no network — is one bug report away and reads the same to the
       // user: it didn't work, use email.
-      throw e.code == GoogleSignInExceptionCode.canceled
-          ? const GoogleSignInCancelled()
-          : const GoogleSignInFailure();
-    } on AuthException {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw const GoogleSignInCancelled();
+      }
+
+      // The user gets one sentence; the thing that says *which* failure it was
+      // goes here. Without this line the only way to tell a wrong signing
+      // certificate (`Invalid key value: <sha1>:com.siteonlab.zopiqnow`) from a
+      // dead network is `adb logcat` on a device you happen to be holding —
+      // which cost five rounds of guessing the last time this broke, and is no
+      // use at all for a customer reporting it from their own phone.
+      _reportGoogleFailure(e, stack, 'sign-in failed (${e.code.name})');
+      throw const GoogleSignInFailure();
+    } on AuthException catch (e, stack) {
+      // Google vouched for the user and Supabase would not take it: the `aud`
+      // does not match `external_google_client_id`, the provider is disabled,
+      // or the nonce check refused. A different bug entirely from the above,
+      // and indistinguishable from it on screen.
+      _reportGoogleFailure(
+        e,
+        stack,
+        'id token rejected (${e.code ?? e.statusCode ?? 'no code'})',
+      );
+      throw const GoogleSignInFailure();
+    } on AuthFailure {
+      // Already ours and already the right shape — the two `null` guards above.
+      rethrow;
+    } on Object catch (e, stack) {
+      // Anything else, and `_ensureGoogleReady` is the one that raises it: a
+      // `PlatformException` from a device with no Play services, a plugin that
+      // did not register. Uncaught, it escapes the screen's `on AuthFailure`
+      // too, and the button simply stops with nothing said and nothing shown.
+      _reportGoogleFailure(e, stack, 'sign-in failed unexpectedly');
       throw const GoogleSignInFailure();
     }
+  }
+
+  /// Both halves of the Google failure path record the same way: to Crashlytics
+  /// for a customer's phone, and to the console for ours — Crashlytics collects
+  /// nothing in a debug build (see `CrashReporter.enable`), which is precisely
+  /// the build a developer chasing this is running.
+  static void _reportGoogleFailure(Object e, StackTrace stack, String what) {
+    debugPrint('Google $what: $e');
+    CrashReporter.recordHandled(e, stack, reason: 'Google $what');
   }
 
   Future<void> _ensureGoogleReady() async {

@@ -101,6 +101,27 @@ android {
     }
 
     buildTypes {
+        // **A debug build is signed with the release certificate, and that is
+        // not a convenience.** Google reserves the pair (package name, signing
+        // certificate) globally to exactly one OAuth client — see the note on
+        // `keystoreProperties` above. This package's pair with the *debug*
+        // certificate is still held by the dead Cloud project and can never be
+        // registered to ours. So a debug-signed build cannot do Google sign-in:
+        // the account sheet opens, the customer picks an account, and Play
+        // services refuses the token with
+        // `Invalid key value: <sha1>:com.siteonlab.zopiqnow`. The release
+        // certificate is the only one Google will vouch for, which makes this
+        // the only way `flutter run` can exercise the sign-in path at all.
+        //
+        // A fresh checkout has no `key.properties` and is untouched by this: it
+        // keeps Gradle's debug key and cannot do Google sign-in, exactly as the
+        // release block below already concedes.
+        debug {
+            if (hasReleaseKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+
         release {
             signingConfig = if (hasReleaseKeystore) {
                 signingConfigs.getByName("release")
