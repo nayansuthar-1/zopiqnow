@@ -391,8 +391,13 @@ class JobsController extends Notifier<void> {
   Future<String?> confirmDelivered({
     required String orderId,
     required String otp,
+    String? photoUrl,
   }) => _write(
-    () => _ds.confirmDelivered(orderId: orderId, otp: otp),
+    () => _ds.confirmDelivered(
+      orderId: orderId,
+      otp: otp,
+      photoUrl: photoUrl,
+    ),
     'We couldn\'t mark that delivered.',
   );
 

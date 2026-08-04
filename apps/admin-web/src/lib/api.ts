@@ -432,6 +432,17 @@ export const api = {
       p_offset: f.offset ?? 0,
     }),
 
+  /// The three photographs of an order (0094): cooked and packed by the
+  /// kitchen, the handover by the rider.
+  ///
+  /// One order at a time, because that is how a complaint arrives — a list of
+  /// fifty rows has no use for three URLs each. Always returns a row for an
+  /// order that exists, even when all three are null: "this one has no
+  /// photographs" is an answer, and an empty result would read as a lookup
+  /// failure.
+  orderPhotos: (orderId: string) =>
+    rpc<OrderPhotoRow[]>('admin_order_photos', { p_order_id: orderId }),
+
   /// **Destroys the order.** Not a status change and not an archive: the row is
   /// gone, and seven cascades take its items, its delivery, its messages and the
   /// customer's review with it. There is no status it refuses — a delivered,
@@ -608,6 +619,21 @@ export type AllOrderRow = {
   item_count: number
   /// The size of the full match, repeated on every row — the pager reads it.
   total_count: number
+}
+
+/// The evidence an order carries (0094). Every field is nullable and that is
+/// the point: an order placed before the feature has none, and the gate that
+/// asks for them lives in the two apps rather than in the database, so a missing
+/// one means "nobody took it", not "the request failed".
+export type OrderPhotoRow = {
+  order_id: string
+  status: OrderStatus
+  /// Off the pass, by the kitchen.
+  cooked_photo_url: string | null
+  /// The sealed bag, by the kitchen.
+  packed_photo_url: string | null
+  /// The doorstep, by the rider. Written only when the delivery code was right.
+  delivery_photo_url: string | null
 }
 
 /// A deletion that happened. The order it names does not exist any more; this

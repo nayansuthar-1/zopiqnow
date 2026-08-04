@@ -36,8 +36,18 @@ dependencies:
 
   # Photo upload (approved 2026-07-17). Picks a dish/restaurant photo off the
   # device; the bytes go straight to Cloudinary, only the URL comes back.
+  #
+  # The code moved to `zopiq_uploads` when the rider app needed the same upload
+  # for its delivery photo. These two stay declared here because this app's own
+  # `Env` still supplies the cloud name and preset, and because moving a pin out
+  # from under a Rule-3 approval is not something to do silently.
   image_picker: 1.1.2
   http: 1.6.0
+
+  # The upload itself, shared with the rider app so the Cloudinary contract
+  # cannot drift between them.
+  zopiq_uploads:
+    path: ../../packages/zopiq_uploads
 
   # Charts on the dashboard and earnings screens (approved Rule-3 change,
   # 2026-07-17, Phase 4/5). Pure Dart, no platform channels; its only transitive

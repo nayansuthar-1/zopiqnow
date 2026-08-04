@@ -18,6 +18,25 @@ abstract final class Env {
     'SUPABASE_ANON_KEY',
     defaultValue: 'sb_publishable_FV-_vP7cmhm_4GY11-wPwQ_NsC87Sbb',
   );
+
+  /// Cloudinary, for the photograph of the handover (0094).
+  ///
+  /// The same cloud and the same *unsigned* preset the vendor app uploads dish
+  /// photos through, and the same reasoning: the cloud name is public — it is in
+  /// every delivery URL — and an unsigned preset carries no secret, so the app
+  /// can upload with just these two and never sees the API key or secret. Those
+  /// live only in `.env`, server-side, and exist to create and lock down the
+  /// preset. A mobile binary is decompilable, so a secret compiled into it is a
+  /// public secret; that is why neither is here.
+  static const String cloudinaryCloudName = String.fromEnvironment(
+    'CLOUDINARY_CLOUD_NAME',
+    defaultValue: 'mqppsahn',
+  );
+
+  static const String cloudinaryUploadPreset = String.fromEnvironment(
+    'CLOUDINARY_UPLOAD_PRESET',
+    defaultValue: 'zopiqnow_unsigned',
+  );
 }
 
 // The Maps key is deliberately absent from this file. Google's Maps SDK reads

@@ -1,14 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_uploads/zopiq_uploads.dart';
 
-import 'package:zopiq_vendor/app/env.dart';
+import 'package:zopiq_rider/app/env.dart';
 
-/// The upload itself now lives in `zopiq_uploads`, shared with the rider app so
-/// the Cloudinary contract cannot drift between them. Re-exported here because
-/// this is the import every call site in this app already had, and moving code
-/// out from under callers is not a reason to make them all edit an import.
+/// The upload lives in `zopiq_uploads`, shared with the vendor app so the
+/// Cloudinary contract cannot drift between them. Re-exported so call sites in
+/// this app import one thing.
 export 'package:zopiq_uploads/zopiq_uploads.dart'
-    show ImageUploadFailure, ImageUploader, PhotoSource;
+    show ImageUploadFailure, ImageUploader, PhotoSource, ProofPhotoField;
 
 /// Overridden in tests, which have neither a camera nor a network.
 ///

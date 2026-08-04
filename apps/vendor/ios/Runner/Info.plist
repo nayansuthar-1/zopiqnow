@@ -83,9 +83,9 @@
 	     NSPhotoLibraryAddUsageDescription is deliberately absent — we read a
 	     photo and never write one back. -->
 	<key>NSCameraUsageDescription</key>
-	<string>Zopiq Partner needs the camera so you can photograph your dishes.</string>
+	<string>Zopiq Partner needs the camera so you can photograph your dishes, and photograph each order as it is cooked and packed.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Zopiq Partner needs your photo library so you can choose dish and restaurant photos.</string>
+	<string>Zopiq Partner needs your photo library so you can choose dish and restaurant photos, and attach order photos you have already taken.</string>
 
 	<!-- POST_NOTIFICATIONS has no plist counterpart; the prompt is a runtime
 	     call the app already makes. This is the half with no Android analogue:

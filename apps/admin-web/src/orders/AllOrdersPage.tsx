@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, DELIVERY_LABEL, STATUS_LABEL } from '../lib/api'
-import type { AllOrderRow, OrderStatus, RestaurantRow } from '../lib/api'
+import type {
+  AllOrderRow,
+  OrderPhotoRow,
+  OrderStatus,
+  RestaurantRow,
+} from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
@@ -95,6 +100,12 @@ export function AllOrdersPage() {
   const [restaurantId, setRestaurantId] = useState<string>('')
   const [page, setPage] = useState(0)
 
+  // The evidence viewer (0094). `photosFor` is the order whose modal is open;
+  // `photos` is null while the one fetch is in flight.
+  const [photosFor, setPhotosFor] = useState<AllOrderRow | null>(null)
+  const [photos, setPhotos] = useState<OrderPhotoRow | null>(null)
+  const [photosError, setPhotosError] = useState<string | null>(null)
+
   const [deleting, setDeleting] = useState<AllOrderRow | null>(null)
   const [reason, setReason] = useState('')
   const [confirmId, setConfirmId] = useState('')
@@ -166,6 +177,21 @@ export function AllOrdersPage() {
     setRange('all')
     setRestaurantId('')
     setPage(0)
+  }
+
+  /// Opens the evidence modal and fetches the three URLs. The modal goes up
+  /// first, with a "Loading" line inside it — a support call is waiting on this
+  /// and a button that does nothing for half a second reads as broken.
+  async function openPhotos(order: AllOrderRow) {
+    setPhotosFor(order)
+    setPhotos(null)
+    setPhotosError(null)
+    try {
+      const rows = await api.orderPhotos(order.order_id)
+      setPhotos(rows[0] ?? null)
+    } catch (e) {
+      setPhotosError(e instanceof Error ? e.message : String(e))
+    }
   }
 
   async function confirmDelete() {
@@ -380,6 +406,13 @@ export function AllOrdersPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => void openPhotos(o)}
+                        >
+                          Photos
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             setDeleting(o)
                             setReason('')
@@ -419,6 +452,38 @@ export function AllOrdersPage() {
           </>
         )}
       </div>
+
+      {photosFor && (
+        <Modal
+          onClose={() => setPhotosFor(null)}
+          title={`Photos — ${photosFor.order_id}`}
+          footer={
+            <Button variant="secondary" onClick={() => setPhotosFor(null)}>
+              Close
+            </Button>
+          }
+        >
+          {photosError ? (
+            <Banner tone="warn">{photosError}</Banner>
+          ) : !photos ? (
+            <p className="text-sm text-ink-muted">Loading…</p>
+          ) : (
+            <>
+              <p className="text-sm text-ink-muted">
+                Taken by the kitchen as the order was cooked and packed, and by
+                the rider at the handover. A missing one means nobody took it —
+                the apps ask for all three, but the database does not refuse an
+                order without them.
+              </p>
+              <div className="mt-5 grid gap-5 sm:grid-cols-3">
+                <PhotoPane label="Cooked" url={photos.cooked_photo_url} />
+                <PhotoPane label="Packed" url={photos.packed_photo_url} />
+                <PhotoPane label="Handover" url={photos.delivery_photo_url} />
+              </div>
+            </>
+          )}
+        </Modal>
+      )}
 
       {deleting && (
         <Modal
@@ -485,5 +550,35 @@ export function AllOrdersPage() {
         </Modal>
       )}
     </>
+  )
+}
+
+/// One of the three photographs, or the honest absence of it.
+///
+/// The image is a plain `<img>` at the Cloudinary URL and a link to the full
+/// size — support needs to zoom into a receipt taped to a bag, and a lightbox
+/// this console would have to build is a worse version of the browser's own
+/// image view.
+function PhotoPane({ label, url }: { label: string; url: string | null }) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+        {label}
+      </p>
+      {url ? (
+        <a href={url} target="_blank" rel="noreferrer">
+          <img
+            src={url}
+            alt={`${label} photo`}
+            loading="lazy"
+            className="aspect-square w-full rounded-lg border border-line object-cover"
+          />
+        </a>
+      ) : (
+        <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-line">
+          <span className="text-xs text-ink-muted">Not taken</span>
+        </div>
+      )}
+    </div>
   )
 }

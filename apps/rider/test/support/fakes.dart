@@ -1,3 +1,6 @@
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:zopiq_rider/core/images/image_uploader.dart';
 import 'package:zopiq_rider/core/launcher.dart';
 import 'package:zopiq_rider/features/auth/data/rider_auth_datasource.dart';
 import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
@@ -84,6 +87,11 @@ class FakeJobsDataSource implements JobsDataSource {
   /// The two codes the fake will accept, and the shift it starts in. Riders
   /// default to on shift, exactly as `is_online` defaults in 0049.
   String deliveryOtp = '4321';
+
+  /// What the last [confirmDelivered] carried. The handover photograph is
+  /// optional at the database (0094) and insisted on by the sheet, and this is
+  /// how a test sees which of those happened.
+  String? lastDeliveryPhotoUrl;
   bool online = true;
 
   /// The platform's cash ceiling, matching 0076's seeded row.
@@ -281,7 +289,9 @@ class FakeJobsDataSource implements JobsDataSource {
   Future<void> confirmDelivered({
     required String orderId,
     required String otp,
+    String? photoUrl,
   }) async {
+    lastDeliveryPhotoUrl = photoUrl;
     final Job job = _mine.firstWhere((Job j) => j.orderId == orderId);
     if (job.state != JobState.arrivedAtCustomer) {
       throw const JobFailure(
@@ -553,4 +563,77 @@ class FakeLauncher implements Launcher {
     opened.add('tel:${Uri.encodeComponent(phone)}');
     return succeeds;
   }
+}
+
+/// An uploader with neither a camera nor a network: it hands back a fixed URL
+/// (or null, for the rider backing out of the picker), or throws to rehearse a
+/// failed upload.
+class FakeImageUploader implements ImageUploader {
+  FakeImageUploader({
+    this.url = 'https://res.cloudinary.com/mqppsahn/image/upload/zopiqnow/d.jpg',
+    this.fail = false,
+  });
+
+  /// The URL a pick resolves to. Null models the rider closing the picker.
+  final String? url;
+  final bool fail;
+  int calls = 0;
+
+  /// What the last call asked for. The handover photo offers both, and which
+  /// one the rider chose is worth asserting.
+  PhotoSource? lastSource;
+
+  @override
+  Future<String?> pickAndUpload({
+    PhotoSource source = PhotoSource.gallery,
+  }) async {
+    calls++;
+    lastSource = source;
+    if (fail) throw const ImageUploadFailure();
+    return url;
+  }
+}
+
+/// Walks the handover-photo sheet that 0094 put in front of the delivery code:
+/// open the picker, choose the camera, wait for [FakeImageUploader] to hand back
+/// a URL, then move on to the code.
+///
+/// Lives here rather than in each test because three delivery flows cross it and
+/// none of them is *about* it — they are about the code, the money and the
+/// stacked run behind it.
+Future<void> photographTheHandover(WidgetTester tester) async {
+  await tester.tap(find.byType(ProofPhotoField));
+  await tester.pumpAndSettle();
+
+  await tester.tap(find.text('Take a photo'));
+
+  // Pumped to a *condition*, not to a clock and not to settle.
+  //
+  // Not `pumpAndSettle`: the tile draws a spinner while the upload is in
+  // flight, and a spinner schedules frames forever.
+  //
+  // Not a fixed number of pumps either — that was the first fix and it was
+  // wrong. The source sheet's close animation and the fake's future resolve on
+  // their own schedules, and a count that covered them in one of these three
+  // tests left the other two tapping a still-disabled button, which silently
+  // did nothing and left the sheet open. Waiting for the prompt to disappear is
+  // waiting for the thing that actually matters: a URL in hand.
+  await _pumpUntilGone(tester, find.text('Tap to add'));
+
+  await tester.tap(find.text('Next — customer\'s code'));
+  await _pumpUntilGone(tester, find.text('Photo of the handover'));
+}
+
+/// Pumps in frame-sized steps until [finder] matches nothing, or gives up.
+Future<void> _pumpUntilGone(
+  WidgetTester tester,
+  Finder finder, {
+  Duration limit = const Duration(seconds: 5),
+}) async {
+  const Duration step = Duration(milliseconds: 50);
+  for (Duration spent = Duration.zero; spent < limit; spent += step) {
+    await tester.pump(step);
+    if (finder.evaluate().isEmpty) return;
+  }
+  throw StateError('$finder was still on screen after $limit.');
 }

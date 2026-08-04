@@ -88,6 +88,8 @@ class OrderActionController extends Notifier<Set<String>> {
     OrderStatus to, {
     String? reason,
     int? prepMinutes,
+    String? cookedPhotoUrl,
+    String? packedPhotoUrl,
   }) async {
     if (state.contains(order.id)) return null;
     state = <String>{...state, order.id};
@@ -99,6 +101,8 @@ class OrderActionController extends Notifier<Set<String>> {
             status: to,
             reason: reason,
             prepMinutes: prepMinutes,
+            cookedPhotoUrl: cookedPhotoUrl,
+            packedPhotoUrl: packedPhotoUrl,
           );
       return null;
     } on OrderStatusFailure catch (failure) {

@@ -99,6 +99,20 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Zopiq Rider shares your location with the customer while you are on a delivery, so they can watch their order arrive. It stops the moment you finish.</string>
 
+	<!-- image_picker, for the photograph of the handover (0094). Both keys are
+	     required even though a rider takes only one of the two routes: iOS
+	     resolves them when the picker is constructed, not when the source is
+	     chosen, so a missing key is a crash rather than a refused prompt.
+	     NSPhotoLibraryAddUsageDescription is deliberately absent — we read a
+	     photo and never write one back. The Android app declares nothing for
+	     either: `image_picker` captures through the system camera intent, which
+	     needs no CAMERA permission, and declaring one we do not need would put a
+	     runtime prompt in front of a rider at a doorstep. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Zopiq Rider needs the camera so you can photograph each handover as proof of delivery.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Zopiq Rider needs your photo library so you can attach a handover photo you have already taken.</string>
+
 	<!-- `location` is RID-001's fix; `remote-notification` is what wakes the app
 	     for a new-job push that carries data rather than a banner. The Android
 	     app declares FOREGROUND_SERVICE_LOCATION and WAKE_LOCK for the first and

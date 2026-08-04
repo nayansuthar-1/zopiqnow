@@ -13,6 +13,7 @@ import 'package:zopiq_rider/features/jobs/domain/entities/job.dart';
 import 'package:zopiq_rider/features/jobs/presentation/providers/jobs_providers.dart';
 import 'package:zopiq_rider/features/jobs/presentation/pages/job_map_page.dart';
 import 'package:zopiq_rider/features/jobs/presentation/widgets/customer_chat_sheet.dart';
+import 'package:zopiq_rider/features/jobs/presentation/widgets/delivery_photo_sheet.dart';
 import 'package:zopiq_rider/features/jobs/presentation/widgets/pickup_sheet.dart';
 import 'package:zopiq_rider/features/notifications/presentation/widgets/notification_bell.dart';
 
@@ -715,6 +716,17 @@ class _RunJobCardState extends ConsumerState<_RunJobCard> {
   /// confirmation, and asking twice would be asking a rider at a doorstep to
   /// read two screens.
   Future<void> _deliver() async {
+    // The photograph first, then the code. That order is the doorstep's: the bag
+    // is put down and photographed, and only then does the customer look up
+    // their four digits. It also means a rider who abandons the code entry has
+    // written nothing at all — `confirm_delivered` is the single call, and it
+    // has not happened yet.
+    final String? photoUrl = await showDeliveryPhoto(
+      context,
+      widget.job.deliverTo,
+    );
+    if (photoUrl == null || !mounted) return;
+
     final String? otp = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -728,7 +740,11 @@ class _RunJobCardState extends ConsumerState<_RunJobCard> {
     await _run(
       () => ref
           .read(jobsControllerProvider.notifier)
-          .confirmDelivered(orderId: widget.job.orderId, otp: otp),
+          .confirmDelivered(
+            orderId: widget.job.orderId,
+            otp: otp,
+            photoUrl: photoUrl,
+          ),
     );
   }
 

@@ -58,8 +58,14 @@ abstract interface class JobsDataSource {
   /// I'm at the door. Required before [confirmDelivered], same as above.
   Future<void> arriveAtCustomer(String orderId);
 
-  /// Hand it over, proving it with the code the *customer* reads out.
-  Future<void> confirmDelivered({required String orderId, required String otp});
+  /// Hand it over, proving it with the code the *customer* reads out — and, if
+  /// the rider took one, a photograph of the handover (0094). The photo is
+  /// written only when the code is right, so a wrong code records nothing.
+  Future<void> confirmDelivered({
+    required String orderId,
+    required String otp,
+    String? photoUrl,
+  });
 
   /// Whether this rider is on shift right now.
   Future<bool> fetchOnline();
@@ -261,11 +267,16 @@ class JobsSupabaseDataSource implements JobsDataSource {
   Future<void> confirmDelivered({
     required String orderId,
     required String otp,
+    String? photoUrl,
   }) async => _readCodeVerdict(
     await _guard<String?>(
       () => _db.rpc<String?>(
         'confirm_delivered',
-        params: <String, dynamic>{'p_order_id': orderId, 'p_otp': otp},
+        params: <String, dynamic>{
+          'p_order_id': orderId,
+          'p_otp': otp,
+          'p_photo_url': photoUrl,
+        },
       ),
     ),
     reissuedBy: 'the customer',

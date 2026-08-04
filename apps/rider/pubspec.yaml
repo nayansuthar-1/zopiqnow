@@ -36,6 +36,13 @@ dependencies:
   zopiq_map:
     path: ../../packages/zopiq_map
 
+  # The photo upload, shared with the vendor app (2026-08-04). A delivery now
+  # carries a photograph of the handover, and this is the same Cloudinary path
+  # the kitchen's two photos take. No new pin: `http` and `image_picker` were
+  # already in the root lockfile for the vendor app.
+  zopiq_uploads:
+    path: ../../packages/zopiq_uploads
+
   flutter_riverpod: 2.6.1
   go_router: 14.8.1
 

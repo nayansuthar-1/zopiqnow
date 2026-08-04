@@ -11,6 +11,7 @@ import 'package:zopiq_vendor/features/delivery/presentation/providers/delivery_p
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 import 'package:zopiq_vendor/features/orders/presentation/widgets/order_lines.dart';
+import 'package:zopiq_vendor/features/orders/presentation/widgets/order_photos_sheet.dart';
 import 'package:zopiq_vendor/features/orders/presentation/widgets/order_prep_sheet.dart';
 import 'package:zopiq_vendor/features/orders/presentation/widgets/order_reason_sheet.dart';
 
@@ -27,11 +28,24 @@ class OrderTicket extends ConsumerStatefulWidget {
 class _OrderTicketState extends ConsumerState<OrderTicket> {
   String? _refusal;
 
-  Future<void> _move(OrderStatus to, {String? reason, int? prepMinutes}) async {
+  Future<void> _move(
+    OrderStatus to, {
+    String? reason,
+    int? prepMinutes,
+    String? cookedPhotoUrl,
+    String? packedPhotoUrl,
+  }) async {
     setState(() => _refusal = null);
     final String? refusal = await ref
         .read(orderActionControllerProvider.notifier)
-        .move(widget.order, to, reason: reason, prepMinutes: prepMinutes);
+        .move(
+          widget.order,
+          to,
+          reason: reason,
+          prepMinutes: prepMinutes,
+          cookedPhotoUrl: cookedPhotoUrl,
+          packedPhotoUrl: packedPhotoUrl,
+        );
     if (mounted && refusal != null) setState(() => _refusal = refusal);
   }
 
@@ -45,6 +59,21 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
   Future<void> _reject() async {
     final String? reason = await showRejectReason(context, widget.order.id);
     if (reason != null) await _move(OrderStatus.rejected, reason: reason);
+  }
+
+  /// The one forward step that asks for something first: the food off the pass
+  /// and the sealed bag, photographed, before it becomes a rider's problem.
+  Future<void> _markReady() async {
+    final KitchenPhotos? photos = await showKitchenPhotos(
+      context,
+      widget.order.id,
+    );
+    if (photos == null) return;
+    await _move(
+      OrderStatus.readyForPickup,
+      cookedPhotoUrl: photos.cookedUrl,
+      packedPhotoUrl: photos.packedUrl,
+    );
   }
 
   Future<void> _cancel() async {
@@ -190,7 +219,14 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
                           ? ZopiqButtonVariant.cta
                           : ZopiqButtonVariant.primary,
                       isLoading: isBusy,
-                      onPressed: isNew ? _accept : () => _move(next),
+                      // Two of the three forward steps ask a question first:
+                      // accepting asks how long, and marking ready asks for the
+                      // two photographs. Only "Start preparing" is a bare move.
+                      onPressed: switch (next) {
+                        OrderStatus.accepted => _accept,
+                        OrderStatus.readyForPickup => _markReady,
+                        _ => () => _move(next),
+                      },
                     ),
                   ),
               ],

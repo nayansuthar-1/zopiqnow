@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zopiq_rider/app/rider_app.dart';
+import 'package:zopiq_rider/core/images/image_uploader.dart';
 import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
 import 'package:zopiq_rider/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_rider/features/jobs/domain/entities/job.dart';
@@ -17,6 +18,7 @@ Widget _app({Rider? signedInAs = testRider, required FakeJobsDataSource jobs}) =
           FakeRiderAuthDataSource(signedInAs: signedInAs),
         ),
         jobsDataSourceProvider.overrideWithValue(jobs),
+        imageUploaderProvider.overrideWithValue(FakeImageUploader()),
       ],
       child: const RiderApp(),
     );
@@ -216,6 +218,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Enter Delivery Code'));
     await tester.pumpAndSettle();
+    await photographTheHandover(tester);
     await tester.enterText(find.byType(TextField).first, '4321');
     await tester.pumpAndSettle();
 

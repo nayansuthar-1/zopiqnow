@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zopiq_rider/app/rider_app.dart';
+import 'package:zopiq_rider/core/images/image_uploader.dart';
 import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
 import 'package:zopiq_rider/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiq_rider/features/jobs/domain/entities/job.dart';
@@ -19,6 +20,7 @@ Widget _app({
       FakeRiderAuthDataSource(signedInAs: signedInAs),
     ),
     jobsDataSourceProvider.overrideWithValue(jobs),
+    imageUploaderProvider.overrideWithValue(FakeImageUploader()),
   ],
   child: const RiderApp(),
 );
@@ -206,6 +208,10 @@ void main() {
 
     await tester.tap(find.text('Enter Delivery Code'));
     await tester.pumpAndSettle();
+    // The handover photo comes first now (0094), and the code sheet is behind
+    // it. The button stays dead until a photo has actually uploaded.
+    await photographTheHandover(tester);
+
     // Cash orders get the reminder that the money is the point, in the same
     // breath as the code — one screen, one doorstep, both jobs.
     expect(find.textContaining('Collect ₹720 in cash'), findsOneWidget);
@@ -218,10 +224,13 @@ void main() {
 
     await tester.tap(find.text('Enter Delivery Code'));
     await tester.pumpAndSettle();
+    await photographTheHandover(tester);
     await tester.enterText(find.byType(TextField), '4321');
     await tester.pumpAndSettle();
 
     expect(jobs.mine.single.state, JobState.delivered);
+    // The photograph rode along with the code that worked.
+    expect(jobs.lastDeliveryPhotoUrl, isNotNull);
     expect(find.text('Waiting for your next job'), findsOneWidget);
   });
 

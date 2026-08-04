@@ -102,6 +102,12 @@ class FakeVendorOrderDataSource implements VendorOrderDataSource {
   /// transition — with a sentence written for a human.
   String? refusal;
 
+  /// What the last [setStatus] carried. The two kitchen photographs are only
+  /// meant to ride along on the move to `ready_for_pickup`, and these are how a
+  /// test sees whether they did.
+  String? lastCookedPhotoUrl;
+  String? lastPackedPhotoUrl;
+
   final List<OrderLine> lines = const <OrderLine>[
     OrderLine(name: 'Chicken Biryani', quantity: 2, lineTotal: 640),
     OrderLine(name: 'Raita', quantity: 1, lineTotal: 40),
@@ -184,8 +190,13 @@ class FakeVendorOrderDataSource implements VendorOrderDataSource {
     required OrderStatus status,
     String? reason,
     int? prepMinutes,
+    String? cookedPhotoUrl,
+    String? packedPhotoUrl,
   }) async {
     if (refusal != null) throw OrderStatusFailure(refusal!);
+
+    lastCookedPhotoUrl = cookedPhotoUrl;
+    lastPackedPhotoUrl = packedPhotoUrl;
 
     _orders = _orders
         .map(
@@ -788,9 +799,16 @@ class FakeImageUploader implements ImageUploader {
   final bool fail;
   int calls = 0;
 
+  /// What the last call asked for. The proof photos ask for the camera and the
+  /// dish editor asks for the gallery, and that difference is worth asserting.
+  PhotoSource? lastSource;
+
   @override
-  Future<String?> pickAndUpload() async {
+  Future<String?> pickAndUpload({
+    PhotoSource source = PhotoSource.gallery,
+  }) async {
     calls++;
+    lastSource = source;
     if (fail) throw const ImageUploadFailure();
     return url;
   }
