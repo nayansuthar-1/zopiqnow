@@ -154,6 +154,28 @@ without a device or a browser. **None has been exercised by a human.**
 - [ ] **A5 — Install the three AABs on a real Android 10 device and a current
       one, and smoke them** before anything is uploaded. Bundles are built and
       signed; the device half is yours.
+
+      > **Rebuild the customer bundle before you smoke it, or checkout is dead
+      > in your hand.** The bundles were built with a plain
+      > `flutter build appbundle --release`, and in a release build with no
+      > `ALLOW_MOCK_PAYMENTS` the payment gateway is `LockedPaymentGateway` —
+      > every attempt to pay answers *"Payments aren't available in this build
+      > yet."* and no order can be placed. That is correct for a production
+      > bundle and wrong for a test one. For anything you install to try the
+      > product on, build it as:
+      >
+      > ```
+      > flutter build appbundle --release --dart-define=ALLOW_MOCK_PAYMENTS=true
+      > ```
+      >
+      > This is safe to keep using until Razorpay is live and needs no undoing
+      > afterwards: the flag only decides what happens when `razorpay-order`
+      > answers `configured: false`. The day the keys are set as function
+      > secrets it answers `configured: true`, and the same bundle starts taking
+      > real payments without a rebuild. **Do not ship the flagged bundle to
+      > production** — that is the one thing it must not be used for.
+      >
+      > A debug build (`flutter run`) already gets the mock and needs no flag.
 - [ ] **Phase 5 — the full regression list**, on release builds, both platforms.
       It is in the ship plan and it is 19 lines long.
 - [ ] **All of Phase 3 (iOS)** — signing, APNs key, device run, dSYM phase,
