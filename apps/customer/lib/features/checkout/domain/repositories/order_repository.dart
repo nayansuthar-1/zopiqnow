@@ -4,6 +4,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
@@ -144,6 +145,20 @@ abstract interface class OrderRepository {
   /// order. Never throws: a read that failed shows no refund line, which is what
   /// the overwhelming majority of receipts show anyway.
   Future<List<OrderRefund>> getRefunds(String orderId);
+
+  /// What this customer has already reported about the order (0095). Empty on
+  /// any failure, like [getRefunds]: a complaint list that could not load must
+  /// not take the receipt down with it.
+  Future<List<OrderIssue>> getIssues(String orderId);
+
+  /// Reports a problem. Rethrows [OrderIssueFailure] — unlike the reads above,
+  /// this one is a thing the customer just did, and it has to say whether it
+  /// worked.
+  Future<void> raiseIssue({
+    required String orderId,
+    required IssueCategory category,
+    String? body,
+  });
 
   /// Rates the food, and optionally the rider.
   ///

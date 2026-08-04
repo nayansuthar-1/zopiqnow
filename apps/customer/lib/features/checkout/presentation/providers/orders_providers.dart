@@ -8,6 +8,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
@@ -235,6 +236,21 @@ orderRefundsProvider =
       String orderId,
     ) {
       return ref.watch(orderRepositoryProvider).getRefunds(orderId);
+    });
+
+/// What this customer has already reported about the order (0095), newest
+/// first.
+///
+/// Empty for almost every order, like the refunds above, and the widget renders
+/// nothing when it is. Watched rather than read once so that raising a complaint
+/// can invalidate it and the receipt updates itself.
+final AutoDisposeFutureProviderFamily<List<OrderIssue>, String>
+orderIssuesProvider =
+    FutureProvider.autoDispose.family<List<OrderIssue>, String>((
+      Ref ref,
+      String orderId,
+    ) {
+      return ref.watch(orderRepositoryProvider).getIssues(orderId);
     });
 
 /// The tax invoice for a delivered order (0063).

@@ -8,6 +8,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
@@ -109,6 +110,47 @@ class OrderMockDataSource implements OrderDataSource {
       ];
     }
     return const <OrderRefund>[];
+  }
+
+  /// Reported complaints, per order. In memory and not persisted, like every
+  /// other write on this datasource.
+  final Map<String, List<OrderIssue>> _issues = <String, List<OrderIssue>>{};
+
+  @override
+  Future<List<OrderIssue>> fetchIssues(String orderId) async {
+    await Future<void>.delayed(latency);
+    return List<OrderIssue>.unmodifiable(
+      _issues[orderId] ?? const <OrderIssue>[],
+    );
+  }
+
+  @override
+  Future<void> raiseIssue({
+    required String orderId,
+    required IssueCategory category,
+    String? body,
+  }) async {
+    await Future<void>.delayed(latency);
+    final List<OrderIssue> raised = _issues[orderId] ?? <OrderIssue>[];
+
+    // The same cap 0095 applies, and in the same words, so the sheet's refusal
+    // path can be seen without a database.
+    if (raised.length >= 3) {
+      throw const OrderIssueFailure(
+        'You have already reported this order. We are looking at it.',
+      );
+    }
+
+    _issues[orderId] = <OrderIssue>[
+      OrderIssue(
+        id: raised.length + 1,
+        category: category,
+        body: body ?? '',
+        isResolved: false,
+        createdAt: DateTime.now(),
+      ),
+      ...raised,
+    ];
   }
 
   @override

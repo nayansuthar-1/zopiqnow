@@ -432,6 +432,30 @@ export const api = {
       p_offset: f.offset ?? 0,
     }),
 
+  /// The complaint queue (0095), oldest first — this is a worklist, and the
+  /// complaint that has waited longest is the one that has waited longest.
+  /// `status` null means every ticket, open and closed.
+  supportTickets: (f: {
+    status?: 'open' | 'resolved' | null
+    limit?: number
+    offset?: number
+  }) =>
+    rpc<SupportTicketRow[]>('admin_support_tickets', {
+      p_status: f.status ?? null,
+      p_limit: f.limit ?? 50,
+      p_offset: f.offset ?? 0,
+    }),
+
+  /// Closes a ticket, with a note that goes back to the customer. One-way:
+  /// there is no reopen, so a complaint that comes back is a new one and the
+  /// queue stays honest about how many times somebody had to ask.
+  ///
+  /// This settles nothing on its own. If money is owed, `issueRefund` is still
+  /// the call that owes it — a complaint that refunded itself would be a
+  /// complaint worth making up.
+  resolveTicket: (id: number, note: string) =>
+    rpc<string>('admin_resolve_ticket', { p_id: id, p_note: note }),
+
   /// The three photographs of an order (0094): cooked and packed by the
   /// kitchen, the handover by the rider.
   ///
@@ -619,6 +643,55 @@ export type AllOrderRow = {
   item_count: number
   /// The size of the full match, repeated on every row — the pager reads it.
   total_count: number
+}
+
+/// What a customer said went wrong (0095).
+///
+/// The category is the database's value, not a label — `ISSUE_LABEL` below
+/// turns it into English. Keeping the two apart means the wording can change
+/// without a migration and without breaking a filter.
+export type SupportTicketRow = {
+  id: number
+  order_id: string
+  category: IssueCategory
+  body: string | null
+  status: 'open' | 'resolved'
+  created_at: string
+  resolved_at: string | null
+  resolved_by: string | null
+  /// What was written back. The customer reads this on their own receipt.
+  admin_note: string | null
+  restaurant_name: string
+  order_status: OrderStatus
+  order_total: number
+  customer_phone: string
+  /// The size of the full match, repeated on every row — the pager reads it.
+  total_count: number
+}
+
+export type IssueCategory =
+  | 'missing_item'
+  | 'wrong_item'
+  | 'quality'
+  | 'damaged'
+  | 'late'
+  | 'never_arrived'
+  | 'rider'
+  | 'payment'
+  | 'other'
+
+/// Deliberately terser than the customer's own wording. They wrote "Something
+/// was missing"; support is triaging fifty of these and wants the noun.
+export const ISSUE_LABEL: Record<IssueCategory, string> = {
+  missing_item: 'Missing item',
+  wrong_item: 'Wrong item',
+  quality: 'Food quality',
+  damaged: 'Spilled or damaged',
+  late: 'Very late',
+  never_arrived: 'Never arrived',
+  rider: 'Delivery partner',
+  payment: 'Payment',
+  other: 'Other',
 }
 
 /// The evidence an order carries (0094). Every field is nullable and that is

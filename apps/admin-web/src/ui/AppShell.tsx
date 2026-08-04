@@ -19,6 +19,9 @@ const groups: {
     links: [
       { to: '/', label: 'Live orders', end: true },
       { to: '/orders', label: 'All orders', end: false },
+      // Under Today, not under Money: a complaint is worked the day it lands,
+      // and it is the only screen here with somebody waiting on the other end.
+      { to: '/support', label: 'Support', end: false },
       { to: '/analytics', label: 'Platform', end: false },
     ],
   },

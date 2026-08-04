@@ -8,6 +8,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
@@ -527,6 +528,42 @@ class OrderSupabaseDataSource implements OrderDataSource {
     } on PostgrestException catch (e) {
       if (e.code == _businessRuleErrorCode) throw InvoiceFailure(e.message);
       throw const InvoiceFailure();
+    }
+  }
+
+  @override
+  Future<List<OrderIssue>> fetchIssues(String orderId) async {
+    final List<dynamic> rows = await _db.rpc<List<dynamic>>(
+      'my_order_issues',
+      params: <String, dynamic>{'p_order_id': orderId},
+    );
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map(OrderIssue.fromJson)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> raiseIssue({
+    required String orderId,
+    required IssueCategory category,
+    String? body,
+  }) async {
+    try {
+      await _db.rpc<int>(
+        'raise_order_issue',
+        params: <String, dynamic>{
+          'p_order_id': orderId,
+          'p_category': category.wire,
+          'p_body': body,
+        },
+      );
+    } on PostgrestException catch (e) {
+      // The caps and the ownership check are all written for the customer —
+      // "You have already reported this order. We are looking at it." is the
+      // answer, and replacing it with an apology would lose it.
+      if (e.code == _businessRuleErrorCode) throw OrderIssueFailure(e.message);
+      throw const OrderIssueFailure();
     }
   }
 }

@@ -4,6 +4,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
@@ -186,4 +187,20 @@ abstract interface class OrderDataSource {
   /// document yet — an invoice is issued on delivery, and "your order hasn't
   /// arrived" is a better answer than an empty page.
   Future<OrderInvoice> fetchInvoice(String orderId);
+
+  /// What this customer has already reported about the order, newest first
+  /// (migration 0095). Empty for almost every order.
+  Future<List<OrderIssue>> fetchIssues(String orderId);
+
+  /// Reports a problem with the order. Moves no money and changes no status —
+  /// it lands in the support queue and somebody reads it.
+  ///
+  /// Throws [OrderIssueFailure] with the service's own sentence when it is
+  /// refused: three per order and ten an hour are the caps, and both refusals
+  /// are written for the customer to read.
+  Future<void> raiseIssue({
+    required String orderId,
+    required IssueCategory category,
+    String? body,
+  });
 }

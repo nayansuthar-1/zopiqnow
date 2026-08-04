@@ -10,6 +10,7 @@ import { HeroSlidesPage } from './content/HeroSlidesPage'
 import { PayoutsPage } from './payouts/PayoutsPage'
 import { CashPage } from './payouts/CashPage'
 import { RefundsPage } from './payouts/RefundsPage'
+import { SupportPage } from './support/SupportPage'
 import { SettingsPage } from './settings/SettingsPage'
 import { AllOrdersPage } from './orders/AllOrdersPage'
 import { LiveOrdersPage } from './orders/LiveOrdersPage'
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="/payouts" element={<PayoutsPage />} />
           <Route path="/cash" element={<CashPage />} />
           <Route path="/refunds" element={<RefundsPage />} />
+          <Route path="/support" element={<SupportPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

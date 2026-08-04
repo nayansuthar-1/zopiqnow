@@ -12,9 +12,11 @@ import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/cancel_order_sheet.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_card.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/order_issue_section.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_refund_section.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_review_section.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_tracking_card.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/report_issue_sheet.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_image.dart'
     show GradientImagePlaceholder;
 
@@ -250,6 +252,7 @@ class _OrderBodyState extends ConsumerState<_OrderBody> {
           // list is how that becomes a phone call. Renders nothing on the
           // overwhelming majority of orders, which have no refund.
           OrderRefundSection(orderId: order.id),
+          OrderIssueSection(orderId: order.id),
 
           // 2. Tracking Card or Status Banner
           if (isOpen) ...<Widget>[
@@ -597,12 +600,12 @@ class _OrderBodyState extends ConsumerState<_OrderBody> {
                       side: BorderSide(color: isDark ? Colors.white30 : const Color(0xFFCCCCCC)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Support team will connect with you shortly.')),
-                      );
-                    },
-                    child: const Text('Support', style: TextStyle(fontWeight: FontWeight.w700)),
+                    // This used to show a snackbar reading "Support team will
+                    // connect with you shortly." and then do nothing at all —
+                    // no ticket, no queue, nobody told. It now files a real
+                    // complaint (0095).
+                    onPressed: () => showReportIssueSheet(context, order.id),
+                    child: const Text('Get help', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),
               ),

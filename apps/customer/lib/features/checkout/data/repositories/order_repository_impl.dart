@@ -5,6 +5,7 @@ import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_invoice.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_message.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_review.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
@@ -239,6 +240,36 @@ class OrderRepositoryImpl implements OrderRepository {
       return await _dataSource.fetchRefunds(orderId);
     } on Object catch (_) {
       return const <OrderRefund>[];
+    }
+  }
+
+  @override
+  Future<List<OrderIssue>> getIssues(String orderId) async {
+    try {
+      return await _dataSource.fetchIssues(orderId);
+    } on Object catch (_) {
+      return const <OrderIssue>[];
+    }
+  }
+
+  @override
+  Future<void> raiseIssue({
+    required String orderId,
+    required IssueCategory category,
+    String? body,
+  }) async {
+    try {
+      await _dataSource.raiseIssue(
+        orderId: orderId,
+        category: category,
+        body: body,
+      );
+    } on OrderIssueFailure {
+      // The service's own sentence — the caps and the ownership check are all
+      // written to be read. Passed straight through.
+      rethrow;
+    } on Object catch (_) {
+      throw const OrderIssueFailure();
     }
   }
 
