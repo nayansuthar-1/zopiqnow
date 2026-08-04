@@ -144,6 +144,26 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
       > three upload SHA-1s — otherwise restricting the key is what takes the
       > maps out, and it will look like G11 broke them rather than completed
       > them.
+- [ ] **G15 — Publish the OAuth consent screen before the closed test starts.**
+      *(Added 4 Aug, alongside G14 and for the same reason: it fails in a way
+      that is indistinguishable from a certificate problem.)*
+
+      Cloud project **789936942272** → APIs & Services → OAuth consent screen →
+      *Publishing status*. **While it reads "Testing", only accounts on the
+      test-user list can sign in at all** — 100 maximum, each added by hand. Your
+      own account works because it is on that list or owns the project, which is
+      exactly why this stays invisible until somebody else tries.
+
+      **Twelve testers who cannot sign in burn days of the 14-day clock that
+      cannot be got back**, and the symptom — sheet opens, account picked,
+      nothing happens — is the same sentence as G14's. Diagnosing it as a
+      fingerprint problem a second time is the trap.
+
+      **Publish it** rather than listing twelve accounts. Google's verification
+      review applies to *sensitive* and *restricted* scopes; this app asks for
+      `openid`, `email` and `profile`, which are neither, so publishing is
+      immediate and needs no review.
+
 - [ ] **G12 — Cap the Cloudinary unsigned preset** (audit SEC-004): allowed
       formats, max file size, folder. The preset ships inside every binary by
       design — it carries no secret, but it lets a stranger upload to your
