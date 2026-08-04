@@ -245,6 +245,47 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
       > three upload SHA-1s — otherwise restricting the key is what takes the
       > maps out, and it will look like G11 broke them rather than completed
       > them.
+- [ ] **G16 — SMS sign-in: DLT registration, then four values.** *(Parked by you
+      on 5 Aug. The app code is done and pushed (`ac5fe18`); nothing below is
+      code.)*
+
+      **⚠️ The sign-in screen now leads with a mobile field that cannot work
+      yet.** Phone is the primary path with the focus and the orange button;
+      email has moved down to a secondary. Until this item is closed, a customer
+      who does the obvious thing gets an error and has to notice the smaller
+      button underneath. **Do not put an AAB built from `main` in front of the
+      twelve testers without either closing this or gating the field** — the gate
+      is one boolean and is offered below.
+
+      **Step 1, the long pole: DLT registration.** India delivers no
+      transactional SMS without a registered entity, an approved header (sender
+      id) and an approved content template. Credit in MSG91 is necessary and not
+      sufficient — an unregistered send is *accepted by the API and dropped by
+      the operator*, which reads exactly like a bug in our code. MSG91 will walk
+      you through it; it is days, not minutes.
+
+      **Step 2, what I need from you when it clears:**
+
+      | | |
+      |---|---|
+      | `MSG91_AUTHKEY` | the account auth key |
+      | `MSG91_TEMPLATE_ID` | the **DLT-approved** flow template id |
+      | The template's variable name | `send-sms-otp` sends the code as `otp`; if the approved template calls it something else, one key in the function changes |
+      | Confirmation the function is deployed | `supabase functions deploy send-sms-otp --no-verify-jwt` |
+
+      **Step 3, mine once those exist:** enable the Phone provider, enable the
+      Send SMS hook against that function, store its `v1,whsec_…` as
+      `SEND_SMS_HOOK_SECRET`, and raise `sms_otp_exp` from **60 seconds** — which
+      is shorter than an SMS often takes to arrive — to 300, matching email.
+      `rate_limit_sms_sent` is 30/hour and has G13's problem.
+
+      > **A consequence that is permanent and is not a bug.** Supabase keys a
+      > user on phone *or* email, so a customer who signed up with an address and
+      > later signs in with their number arrives as **a different user id**, with
+      > none of their orders, addresses or saved restaurants. Cheap at 13 users,
+      > expensive later. Linking them is separate work and is worth doing before
+      > real customers arrive.
+
 - [ ] **G15 — Publish the OAuth consent screen before the closed test starts.**
       *(Added 4 Aug, alongside G14 and for the same reason: it fails in a way
       that is indistinguishable from a certificate problem.)*
