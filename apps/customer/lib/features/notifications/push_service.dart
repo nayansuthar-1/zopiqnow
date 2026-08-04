@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:zopiq_live_card/zopiq_live_card.dart';
 
+import 'package:zopiqnow/core/observability/crash_reporter.dart';
 import 'package:zopiqnow/features/notifications/order_live_card.dart';
 
 /// The wake: getting an order update to a customer who isn't looking at the app.
@@ -57,43 +58,61 @@ class PushService {
       return;
     }
 
-    await _initLocalNotifications();
+    // **Everything below this point used to be unguarded**, and the paragraph
+    // above claiming this class is guarded end to end was false because of it.
+    // Only `initializeApp` had a catch. A throw anywhere in here — a platform
+    // channel that is not there, a permission prompt that fails on an OEM build
+    // — skipped the two lines that matter most: the token registration and the
+    // `onAuthStateChange` subscription. The device would then never register,
+    // not on this launch and not on any sign-in for the life of the process,
+    // and **nothing anywhere would say so**. That is the exact shape of a device
+    // that is signed in and invisible to a broadcast.
+    try {
+      await _initLocalNotifications();
 
-    final FirebaseMessaging messaging = FirebaseMessaging.instance;
-    // On Android 13+ this raises the POST_NOTIFICATIONS prompt; on older
-    // Androids it is a no-op that returns authorized.
-    await messaging.requestPermission();
+      final FirebaseMessaging messaging = FirebaseMessaging.instance;
+      // On Android 13+ this raises the POST_NOTIFICATIONS prompt; on older
+      // Androids it is a no-op that returns authorized.
+      await messaging.requestPermission();
 
-    FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
+      FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
 
-    // A message that arrives while the app is foregrounded is *not* posted to the
-    // tray by Android — we draw it ourselves or the customer never sees it.
-    FirebaseMessaging.onMessage.listen(_showForeground);
+      // A message that arrives while the app is foregrounded is *not* posted to
+      // the tray by Android — we draw it ourselves or the customer never sees it.
+      FirebaseMessaging.onMessage.listen(_showForeground);
 
-    // Tapping a tray notification the OS drew itself. Two entry points, because
-    // Android has two: one for a running app, one for a cold start.
-    FirebaseMessaging.onMessageOpenedApp.listen(_openFromMessage);
-    final RemoteMessage? launch = await messaging.getInitialMessage();
-    if (launch != null) _openFromMessage(launch);
+      // Tapping a tray notification the OS drew itself. Two entry points, because
+      // Android has two: one for a running app, one for a cold start.
+      FirebaseMessaging.onMessageOpenedApp.listen(_openFromMessage);
+      final RemoteMessage? launch = await messaging.getInitialMessage();
+      if (launch != null) _openFromMessage(launch);
 
-    // The token can change (reinstall, restore, periodic refresh); each new one
-    // has to be re-registered or the sender rings a dead address.
-    messaging.onTokenRefresh.listen(_registerToken);
+      // The token can change (reinstall, restore, periodic refresh); each new one
+      // has to be re-registered or the sender rings a dead address.
+      messaging.onTokenRefresh.listen(_registerToken);
 
-    // Register now if already signed in, and follow the session from here on:
-    // a device only belongs to the customer signed into it.
-    await _syncTokenToSession();
-    Supabase.instance.client.auth.onAuthStateChange.listen((AuthState s) {
-      switch (s.event) {
-        case AuthChangeEvent.signedIn:
-        case AuthChangeEvent.tokenRefreshed:
-          _syncTokenToSession();
-        case AuthChangeEvent.signedOut:
-          _unregisterCurrentToken();
-        default:
-          break;
-      }
-    });
+      // Register now if already signed in, and follow the session from here on:
+      // a device only belongs to the customer signed into it.
+      await _syncTokenToSession();
+      Supabase.instance.client.auth.onAuthStateChange.listen((AuthState s) {
+        switch (s.event) {
+          case AuthChangeEvent.signedIn:
+          case AuthChangeEvent.tokenRefreshed:
+            _syncTokenToSession();
+          case AuthChangeEvent.signedOut:
+            _unregisterCurrentToken();
+          default:
+            break;
+        }
+      });
+    } on Object catch (e, stack) {
+      debugPrint('Push setup failed after Firebase came up: $e');
+      CrashReporter.recordHandled(
+        e,
+        stack,
+        reason: 'PushService.start failed after Firebase init',
+      );
+    }
   }
 
   /// Two entry points, because a tap has two shapes: one for an app that was
