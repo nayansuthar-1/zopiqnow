@@ -65,6 +65,8 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
   const [adding, setAdding] = useState(false)
   const [importing, setImporting] = useState(false)
   const [deleting, setDeleting] = useState<MenuItemRow | null>(null)
+  const [deletingSection, setDeletingSection] = useState<Section | null>(null)
+  const [clearing, setClearing] = useState(false)
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null)
   const [dragging, setDragging] = useState<{ section: number; item: number } | null>(null)
 
@@ -159,6 +161,11 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
           </p>
         </div>
         <div className="flex gap-2">
+          {total > 0 && (
+            <Button variant="ghost" disabled={busy} onClick={() => setClearing(true)}>
+              Delete menu
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => setImporting(true)}>
             Import CSV
           </Button>
@@ -255,6 +262,14 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
                   >
                     {section.available ? 'Hide section' : 'Show section'}
                   </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setDeletingSection(section)}
+                    className="text-sm font-medium text-ink-muted hover:text-non-veg"
+                  >
+                    Delete section
+                  </button>
                 </>
               )}
             </div>
@@ -345,16 +360,8 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
             setAdding(false)
             setEditing(null)
           }}
-          onSave={(payload, groups) =>
-            void run(async () => {
-              // The options need an id, and a new dish has none until it is
-              // written — so the upsert always goes first and hands one back.
-              const itemId = await api.upsertMenuItem(id, payload)
-              // Undefined means the dialog has nothing to say about groups; an
-              // array means make them exactly this. Never conflated, because
-              // "no groups" and "don't touch the groups" are opposite writes.
-              if (groups) await api.setMenuItemOptions(itemId, groups)
-            }).then((ok) => {
+          onSave={(payload) =>
+            void run(() => api.upsertMenuItem(id, payload)).then((ok) => {
               if (ok) {
                 setAdding(false)
                 setEditing(null)
@@ -392,6 +399,42 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
             void run(() => api.deleteMenuItem(deleting.id)).then(
               (ok) => ok && setDeleting(null),
             )
+          }
+        />
+      )}
+
+      {deletingSection && (
+        <ConfirmDialog
+          title={`Delete ${deletingSection.name}?`}
+          tone="danger"
+          body={`All ${deletingSection.items.length} ${
+            deletingSection.items.length === 1 ? 'dish' : 'dishes'
+          } in this section go with it, and this cannot be undone. If any of them appears on a past order the whole section is kept — hide it instead.`}
+          confirmLabel="Delete section"
+          busy={busy}
+          onCancel={() => setDeletingSection(null)}
+          onConfirm={() =>
+            void run(() => api.deleteCategory(id, deletingSection.name)).then(
+              (ok) => ok && setDeletingSection(null),
+            )
+          }
+        />
+      )}
+
+      {clearing && (
+        <ConfirmDialog
+          title="Delete the entire menu?"
+          tone="danger"
+          body={`Every one of the ${total} ${
+            total === 1 ? 'dish' : 'dishes'
+          } on this menu is deleted, across all ${sections.length} ${
+            sections.length === 1 ? 'section' : 'sections'
+          }. This cannot be undone, and a published restaurant with no menu has nothing for a customer to order.`}
+          confirmLabel="Delete menu"
+          busy={busy}
+          onCancel={() => setClearing(false)}
+          onConfirm={() =>
+            void run(() => api.deleteMenu(id)).then((ok) => ok && setClearing(false))
           }
         />
       )}
