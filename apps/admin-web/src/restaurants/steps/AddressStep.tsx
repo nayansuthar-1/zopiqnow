@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { api } from '../../lib/api'
 import type { RestaurantDetail } from '../../lib/api'
-import { Field } from '../../ui/primitives'
+import { Button, Field } from '../../ui/primitives'
+import { MapPicker, mapPickerAvailable } from '../../ui/MapPicker'
 import { StepFrame } from './StepFrame'
 
 /// Where the kitchen is and who to call about it. None of this reaches the
@@ -32,6 +33,7 @@ export function AddressStep({
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [picking, setPicking] = useState(false)
 
   /// Checked here so the admin gets a sentence instead of a constraint violation
   /// from `restaurants_pincode_is_indian`. The database still refuses bad values —
@@ -137,11 +139,44 @@ export function AddressStep({
           placeholder="72.5714"
         />
       </div>
-      <p className="-mt-2 text-sm text-ink-muted">
-        Optional for now. Right-click the kitchen in Google Maps and copy the pair it
-        shows. The feed&apos;s &ldquo;2.1 km away&rdquo; is still a typed-in number for
-        every restaurant — these coordinates are what will eventually replace it.
-      </p>
+
+      {mapPickerAvailable ? (
+        <div className="-mt-2">
+          <Button variant="secondary" onClick={() => setPicking(true)}>
+            {latitude && longitude ? 'Move the pin on the map' : 'Pick on the map'}
+          </Button>
+          <p className="mt-1.5 text-sm text-ink-muted">
+            Required before publishing. Riders are paid by road distance from this
+            point and each job is offered to the nearest one, so a digit typed wrong
+            here is somebody&apos;s pay and somebody&apos;s dinner.
+          </p>
+        </div>
+      ) : (
+        <p className="-mt-2 text-sm text-ink-muted">
+          Required before publishing. Right-click the kitchen in Google Maps and copy
+          the pair it shows. <em>Set VITE_GOOGLE_MAPS_BROWSER_KEY to pick it on a map
+          here instead of transcribing it.</em>
+        </p>
+      )}
+
+      {picking && (
+        <MapPicker
+          initial={
+            latitude && longitude
+              ? { lat: Number(latitude), lng: Number(longitude) }
+              : null
+          }
+          onCancel={() => setPicking(false)}
+          onPick={(p) => {
+            // Six decimals is about 11 cm — past the point where more digits
+            // describe anything a rider could find, and it keeps the field
+            // readable next to a hand-typed one.
+            setLatitude(p.lat.toFixed(6))
+            setLongitude(p.lng.toFixed(6))
+            setPicking(false)
+          }}
+        />
+      )}
     </StepFrame>
   )
 }

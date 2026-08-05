@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { api } from '../../lib/api'
 import type { RestaurantDetail } from '../../lib/api'
-import { uploadPhoto, UploadFailure } from '../../lib/uploads'
 import { ChipsInput, Field, Toggle } from '../../ui/primitives'
+import { PhotoField } from '../../ui/PhotoField'
 import { StepFrame } from './StepFrame'
 
 /// Everything a customer sees on the restaurant card, and nothing else. Address,
@@ -32,20 +32,11 @@ export function StorefrontStep({
   const [imageUrl, setImageUrl] = useState(r?.image_url ?? '')
 
   const [busy, setBusy] = useState(false)
+  /// Save is blocked while a photo is uploading. It was not before, and that was
+  /// a real hole rather than a tidy-up: saving mid-upload wrote the *old*
+  /// `image_url`, so the photo the admin had just picked vanished with no error.
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  async function pickPhoto(file: File) {
-    setUploading(true)
-    setError(null)
-    try {
-      setImageUrl(await uploadPhoto(file))
-    } catch (e) {
-      setError(e instanceof UploadFailure ? e.message : 'That photo could not be uploaded.')
-    } finally {
-      setUploading(false)
-    }
-  }
 
   async function save() {
     setBusy(true)
@@ -85,7 +76,7 @@ export function StorefrontStep({
           : 'A name is all it takes to start. Everything else — here and in the later steps — can be filled in whenever, in any order.'
       }
       error={error}
-      busy={busy}
+      busy={busy || uploading}
       saveLabel={r ? 'Save and continue' : 'Create draft'}
       onSave={() => void save()}
     >
@@ -127,40 +118,17 @@ export function StorefrontStep({
         hint="Leave it empty for no badge. This is display text — it does not create a coupon."
       />
 
-      <div>
-        <span className="mb-1.5 block text-sm font-medium text-ink">Cover photo</span>
-        <div className="flex items-center gap-4">
-          <div className="h-24 w-36 shrink-0 overflow-hidden rounded-[8px] border border-line bg-canvas">
-            {imageUrl ? (
-              <img src={imageUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full items-center justify-center text-xs text-ink-muted">
-                No photo
-              </div>
-            )}
-          </div>
-          <div>
-            <label className="inline-flex h-10 cursor-pointer items-center rounded-[8px] border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas">
-              {uploading ? 'Uploading…' : imageUrl ? 'Replace photo' : 'Upload photo'}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                disabled={uploading}
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  // Cleared so picking the same file twice still fires a change.
-                  e.target.value = ''
-                  if (file) void pickPhoto(file)
-                }}
-              />
-            </label>
-            <p className="mt-1.5 text-sm text-ink-muted">
-              Required before publishing. Wide crops look best.
-            </p>
-          </div>
-        </div>
-      </div>
+      <PhotoField
+        label="Cover photo"
+        value={imageUrl}
+        onChange={setImageUrl}
+        // 16:10, which is what `restaurant_card.dart` draws it in. The adjuster
+        // frames to the same shape, so what an admin lines up here is what a
+        // customer sees rather than something the card crops again.
+        aspect={16 / 10}
+        hint="Required before publishing — and the first thing a customer sees."
+        onBusyChange={setUploading}
+      />
     </StepFrame>
   )
 }

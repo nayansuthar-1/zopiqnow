@@ -52,6 +52,71 @@ export async function uploadPhoto(file: File): Promise<string> {
   return body.secure_url
 }
 
+/// Takes a photo the admin has a *link* to, and makes it ours.
+///
+/// **It is fetched into Cloudinary rather than stored as the link.** Saving the
+/// pasted URL straight into `image_url` would look identical in the console and
+/// be three separate problems in production: the image is served by somebody
+/// else's host and vanishes the day they move it, we would be hotlinking
+/// bandwidth we do not pay for, and — because it is not a Cloudinary asset — it
+/// could never be cropped, resized or delivered at the width a phone actually
+/// needs.
+///
+/// Cloudinary's upload endpoint takes a URL in the same `file` field a browser
+/// file goes in, and fetches it server-side. So one line of difference here buys
+/// a linked photo everything an uploaded one has.
+///
+/// The fetch happens from Cloudinary's servers, which means a link that needs a
+/// login, sits behind a hotlink blocker, or is a *page* rather than an image
+/// fails there rather than here — and their sentence is passed through, because
+/// "that link is a Google Images search result, not an image" is not something
+/// this function can work out on its own.
+export async function uploadPhotoByUrl(url: string): Promise<string> {
+  const trimmed = url.trim()
+
+  let parsed: URL
+  try {
+    parsed = new URL(trimmed)
+  } catch {
+    throw new UploadFailure('That does not look like a web address.')
+  }
+  // Cloudinary will refuse anything else anyway; this is so the admin is told
+  // now, in a sentence about their link rather than about our API.
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new UploadFailure('Paste an http:// or https:// link to an image.')
+  }
+
+  const form = new FormData()
+  form.append('upload_preset', uploadPreset)
+  form.append('file', trimmed)
+
+  let body: { secure_url?: string }
+  try {
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      { method: 'POST', body: form },
+    )
+    if (!response.ok) {
+      const reason = await response
+        .json()
+        .then((e: { error?: { message?: string } }) => e.error?.message)
+        .catch(() => undefined)
+      throw new UploadFailure(
+        reason
+          ? `That link could not be fetched: ${reason}`
+          : "We couldn't fetch an image from that link.",
+      )
+    }
+    body = await response.json()
+  } catch (e) {
+    if (e instanceof UploadFailure) throw e
+    throw new UploadFailure("We couldn't fetch an image from that link.")
+  }
+
+  if (!body.secure_url) throw new UploadFailure()
+  return body.secure_url
+}
+
 // ---------------------------------------------------------------------------
 // Hero motion loops (P4, migration 0054).
 // ---------------------------------------------------------------------------

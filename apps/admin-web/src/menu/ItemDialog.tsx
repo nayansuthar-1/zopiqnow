@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { MenuItemRow } from '../lib/api'
-import { uploadPhoto, UploadFailure } from '../lib/uploads'
 import { Banner, Button, Field, Modal, Toggle } from '../ui/primitives'
+import { PhotoField } from '../ui/PhotoField'
 
 /// Add or edit one dish. The same dialog for both, because they are the same
 /// fields — the only difference is whether an id goes back with them.
@@ -31,23 +31,13 @@ export function ItemDialog({
   const [isAvailable, setIsAvailable] = useState(item?.is_available ?? true)
   const [imageUrl, setImageUrl] = useState(item?.image_url ?? '')
 
-  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /// Owned by the photo field now, mirrored here so Save cannot land while a
+  /// photo is still on its way up.
+  const [uploading, setUploading] = useState(false)
 
   const creatingSection = category === '__new__'
   const finalCategory = creatingSection ? newCategory.trim() : category
-
-  async function pickPhoto(file: File) {
-    setUploading(true)
-    setError(null)
-    try {
-      setImageUrl(await uploadPhoto(file))
-    } catch (e) {
-      setError(e instanceof UploadFailure ? e.message : 'That photo could not be uploaded.')
-    } finally {
-      setUploading(false)
-    }
-  }
 
   function submit() {
     if (!name.trim()) return setError('The dish needs a name.')
@@ -152,43 +142,18 @@ export function ItemDialog({
             onChange={setIsAvailable}
           />
 
-          <div>
-            <span className="mb-1.5 block text-sm font-medium text-ink">Photo</span>
-            <div className="flex items-center gap-3">
-              <div className="h-16 w-20 shrink-0 overflow-hidden rounded-[8px] border border-line bg-canvas">
-                {imageUrl ? (
-                  <img src={imageUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-xs text-ink-muted">
-                    None
-                  </div>
-                )}
-              </div>
-              <label className="inline-flex h-10 cursor-pointer items-center rounded-[8px] border border-line px-4 text-sm font-semibold text-ink hover:bg-canvas">
-                {uploading ? 'Uploading…' : imageUrl ? 'Replace' : 'Upload'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={uploading}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    e.target.value = ''
-                    if (file) void pickPhoto(file)
-                  }}
-                />
-              </label>
-              {imageUrl && (
-                <button
-                  type="button"
-                  onClick={() => setImageUrl('')}
-                  className="text-sm font-medium text-ink-muted hover:text-non-veg"
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          </div>
+          <PhotoField
+            label="Photo"
+            value={imageUrl}
+            onChange={setImageUrl}
+            // 118 × 96, the art box in `menu_item_tile.dart`. Cropping to the
+            // tile's own shape is what stops a tall photo of a thali arriving
+            // as a centre-cut of rice.
+            aspect={118 / 96}
+            previewClassName="h-16 w-20"
+            onRemove={() => setImageUrl('')}
+            onBusyChange={setUploading}
+          />
         </div>
 
         {error && (

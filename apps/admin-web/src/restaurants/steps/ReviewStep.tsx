@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import type { MenuItemRow, RestaurantDetail } from '../../lib/api'
-import { Button, ConfirmDialog } from '../../ui/primitives'
+import { Button, ConfirmDialog, Modal, TextArea } from '../../ui/primitives'
 
 /// Everything collected, in one place, with what is still missing said plainly.
 ///
@@ -100,6 +100,8 @@ export function ReviewStep({
   const [error, setError] = useState<string | null>(null)
   const [published, setPublished] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [forcing, setForcing] = useState(false)
+  const [reason, setReason] = useState('')
 
   useEffect(() => {
     api
@@ -116,19 +118,21 @@ export function ReviewStep({
   const checks = checksFor(detail, menu)
   const outstanding = checks.filter((c) => !c.done)
 
-  async function publish() {
+  async function publish(force = false) {
     setBusy(true)
     setError(null)
     try {
-      await api.publishRestaurant(id)
+      await api.publishRestaurant(id, force, force ? reason : undefined)
       await onSaved()
       setConfirming(false)
+      setForcing(false)
       setPublished(true)
     } catch (e) {
       // The gate's own sentence — "Add at least one dish before publishing." —
       // shown as written. It knows more than the checklist above does.
       setError(e instanceof Error ? e.message : String(e))
       setConfirming(false)
+      setForcing(false)
     } finally {
       setBusy(false)
     }
@@ -235,17 +239,27 @@ export function ReviewStep({
           <p className="mt-1 text-sm text-ink-muted">
             This puts the restaurant in front of every customer on Zopiqnow.
           </p>
-          <Button
-            className="mt-4"
-            disabled={outstanding.length > 0}
-            onClick={() => setConfirming(true)}
-          >
-            Publish restaurant
-          </Button>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Button
+              disabled={outstanding.length > 0}
+              onClick={() => setConfirming(true)}
+            >
+              Publish restaurant
+            </Button>
+            {outstanding.length > 0 && (
+              // The override. Deliberately the quieter of the two buttons, and
+              // deliberately not the one that looks like the way forward.
+              <Button variant="secondary" onClick={() => setForcing(true)}>
+                Publish anyway
+              </Button>
+            )}
+          </div>
           {outstanding.length > 0 && (
             <p className="mt-2 text-sm text-ink-muted">
               Finish the {outstanding.length} outstanding{' '}
-              {outstanding.length === 1 ? 'item' : 'items'} above first.
+              {outstanding.length === 1 ? 'item' : 'items'} above, or publish anyway
+              and finish them later. Publishing anyway is recorded against your name
+              with what was missing.
             </p>
           )}
         </div>
@@ -266,6 +280,65 @@ export function ReviewStep({
           onCancel={() => setConfirming(false)}
           onConfirm={() => void publish()}
         />
+      )}
+
+      {forcing && (
+        <Modal
+          title={`Publish ${r.name} without finishing it?`}
+          busy={busy}
+          onClose={() => setForcing(false)}
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setForcing(false)}
+                disabled={busy}
+              >
+                Cancel
+              </Button>
+              <Button variant="danger" loading={busy} onClick={() => void publish(true)}>
+                Publish anyway
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-ink-muted">
+              It goes in front of every customer straight away with{' '}
+              {outstanding.length === 1 ? 'this still missing' : 'these still missing'}:
+            </p>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
+              {outstanding.map((c) => (
+                <li key={c.label}>{c.label}</li>
+              ))}
+            </ul>
+
+            {/* Named rather than left to the general warning, because these two
+                are the ones with a consequence outside the console. */}
+            {!checks.find((c) => c.label.startsWith('At least one dish'))?.done && (
+              <p className="rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
+                With no orderable dish, a customer who opens this restaurant sees an
+                empty menu — which reads as a broken app rather than as a kitchen
+                that has not finished onboarding.
+              </p>
+            )}
+            {!checks.find((c) => c.label === 'FSSAI licence')?.done && (
+              <p className="rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
+                Listing a kitchen with no valid FSSAI licence on file is a legal
+                exposure for the platform, not just an incomplete record.
+              </p>
+            )}
+
+            <TextArea
+              label="Why (optional)"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Owner opens today; licence is with the FSSAI office."
+              hint="Recorded against your name in the audit trail, with the list above."
+              rows={2}
+            />
+          </div>
+        </Modal>
       )}
     </div>
   )

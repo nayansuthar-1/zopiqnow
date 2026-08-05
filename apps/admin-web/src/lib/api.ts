@@ -170,8 +170,18 @@ export const api = {
   unpublishRestaurant: (id: string) =>
     rpc<void>('admin_unpublish_restaurant', { p_id: id }),
 
-  publishRestaurant: (id: string) =>
-    rpc<void>('admin_publish_restaurant', { p_id: id }),
+  /// Publishes, or refuses with the first thing that is missing.
+  ///
+  /// `force` (migration 0105) publishes anyway — the admin's judgement over the
+  /// checklist — and writes a row to the audit trail naming every check that was
+  /// outstanding at the moment it went live, plus [reason]. There is no way to
+  /// force one quietly, which is the point.
+  publishRestaurant: (id: string, force = false, reason?: string) =>
+    rpc<void>('admin_publish_restaurant', {
+      p_id: id,
+      p_force: force,
+      p_reason: reason ?? null,
+    }),
 
   /// Only ever succeeds for a delisted restaurant that has never taken an order
   /// (migration 0044). The refusal names which of the two rules stopped it.
