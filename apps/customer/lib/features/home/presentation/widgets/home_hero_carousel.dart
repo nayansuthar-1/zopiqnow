@@ -78,14 +78,67 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
   DateTime _lastInteract = DateTime.fromMillisecondsSinceEpoch(0);
   bool _reduceMotion = false;
 
+  /// Image URLs that have finished decoding, and the ones still in flight.
+  ///
+  /// **A published slide does not enter the carousel until its art is on the
+  /// device.** `ZopiqNetworkImage` draws a shimmer while it loads, which is the
+  /// right answer for a restaurant card in a list and the wrong one for the
+  /// first thing on the home screen: the hero is 396pt of skeleton where the
+  /// brand should be, and it arrives *after* the in-app art has already drawn,
+  /// so the customer watches the hero flick from finished artwork to a grey
+  /// rectangle. Holding the slide back until it can be painted in one frame
+  /// costs nothing — the in-app set is bundled and always ready, so the
+  /// carousel is never empty while we wait.
+  ///
+  /// A slide whose image never loads simply never appears, which is the same
+  /// promise read the other way: fully loaded, or not shown.
+  final Set<String> _ready = <String>{};
+  final Set<String> _pending = <String>{};
+
+  /// The published slides that can be drawn right now.
+  List<HeroSlide> get _published => widget.slides
+      .where((HeroSlide s) => _ready.contains(s.imageUrl))
+      .toList(growable: false);
+
   /// How many distinct slides the carousel is paging through: everything the
-  /// admin published, plus the in-app set.
-  int get _count => widget.slides.length + _slides.length;
+  /// admin published *and ready*, plus the in-app set.
+  int get _count => _published.length + _slides.length;
+
+  /// Warm the image cache for anything not yet held. `precacheImage` resolves
+  /// when the bytes are decoded, which is exactly the moment the slide can be
+  /// painted without a placeholder — and it leaves the image in the same cache
+  /// `ZopiqNetworkImage` reads, so the build that follows finds it already
+  /// decoded and skips the shimmer branch entirely.
+  void _warm() {
+    for (final HeroSlide slide in widget.slides) {
+      final String url = slide.imageUrl;
+      if (url.isEmpty || _ready.contains(url) || _pending.contains(url)) {
+        continue;
+      }
+      _pending.add(url);
+      precacheImage(NetworkImage(url), context)
+          .then((_) {
+            if (!mounted) return;
+            setState(() {
+              _pending.remove(url);
+              _ready.add(url);
+            });
+            _syncAuto();
+          })
+          // A slide we cannot draw is a slide we do not show. Staying out of
+          // `_ready` is the whole of the handling; there is nothing to tell the
+          // customer about a campaign banner that did not arrive.
+          .catchError((Object _) {
+            if (mounted) _pending.remove(url);
+          });
+    }
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _reduceMotion = MediaQuery.disableAnimationsOf(context);
+    _warm();
     _syncAuto();
   }
 
@@ -96,7 +149,10 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
     // rebuilds this widget on every pixel of its collapse, and restarting the
     // timer each time would reset the five seconds forever — the carousel would
     // never advance on its own.
-    if (oldWidget.slides.length != widget.slides.length) _syncAuto();
+    if (oldWidget.slides.length != widget.slides.length) {
+      _warm();
+      _syncAuto();
+    }
   }
 
   void _syncAuto() {
@@ -179,9 +235,12 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
                     // distance from *this page* to the controller's position,
                     // which has nothing to do with which list the slide is in.
                     final int at = i % _count;
-                    if (at < widget.slides.length) {
+                    // `_published`, not `widget.slides`: a slide whose art has
+                    // not decoded yet is not in the rotation at all.
+                    final List<HeroSlide> published = _published;
+                    if (at < published.length) {
                       return _PublishedSlideView(
-                        slide: widget.slides[at],
+                        slide: published[at],
                         index: i,
                         page: _page,
                         headlineSize: headlineSize,
@@ -192,7 +251,7 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
                       );
                     }
                     return _HeroSlideView(
-                      slide: _slides[at - widget.slides.length],
+                      slide: _slides[at - published.length],
                       index: i,
                       page: _page,
                       headlineSize: headlineSize,
