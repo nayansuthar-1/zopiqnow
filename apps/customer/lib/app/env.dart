@@ -58,7 +58,7 @@ abstract final class Env {
   /// preset, not to ship inside a decompilable binary.
   static const String cloudinaryCloudName = String.fromEnvironment(
     'CLOUDINARY_CLOUD_NAME',
-    defaultValue: 'mqppsahn',
+    defaultValue: 'w69i7qes',
   );
 
   static const String cloudinaryUploadPreset = String.fromEnvironment(

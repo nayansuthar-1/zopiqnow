@@ -29,7 +29,7 @@ abstract final class Env {
   /// secret; that is why neither is here.
   static const String cloudinaryCloudName = String.fromEnvironment(
     'CLOUDINARY_CLOUD_NAME',
-    defaultValue: 'mqppsahn',
+    defaultValue: 'w69i7qes',
   );
 
   static const String cloudinaryUploadPreset = String.fromEnvironment(
