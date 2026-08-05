@@ -249,13 +249,13 @@ Ordered by lead time. The first has a queue and gates the entire iOS half.
       on 5 Aug. The app code is done and pushed (`ac5fe18`); nothing below is
       code.)*
 
-      **⚠️ The sign-in screen now leads with a mobile field that cannot work
-      yet.** Phone is the primary path with the focus and the orange button;
-      email has moved down to a secondary. Until this item is closed, a customer
-      who does the obvious thing gets an error and has to notice the smaller
-      button underneath. **Do not put an AAB built from `main` in front of the
-      twelve testers without either closing this or gating the field** — the gate
-      is one boolean and is offered below.
+      **The gate offered here was taken (`686c12d`, 5 Aug): `smsSignInEnabled =
+      false`.** With it off the mobile field is not drawn at all, email takes
+      back the headline, the focus and the orange button, and the sign-in screen
+      is the one that shipped for the last three months. **So an AAB from `main`
+      is safe in front of the twelve testers**, and closing G16 is now a
+      one-boolean flip rather than a blocker. The datasource, the OTP screen and
+      the router already carry the phone path in full.
 
       **Step 1, the long pole: DLT registration.** India delivers no
       transactional SMS without a registered entity, an approved header (sender
