@@ -71,6 +71,7 @@ class LiveDeliveryMap extends ConsumerWidget {
           children: <Widget>[
             ZopiqMapView(
               encodedPolyline: route.encodedPath,
+              liveEncodedPolyline: route.livePath,
               pins: orderMapPins(route: route, live: live),
               // A glance, not a map you drive: gestures off so the page can
               // still be scrolled, and no layer switcher because a control that

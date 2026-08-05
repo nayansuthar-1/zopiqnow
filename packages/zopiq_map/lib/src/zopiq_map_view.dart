@@ -110,6 +110,7 @@ enum ZopiqMapLayer {
 class ZopiqMapView extends StatefulWidget {
   const ZopiqMapView({
     this.encodedPolyline,
+    this.liveEncodedPolyline,
     this.pins = const <ZopiqMapPin>[],
     this.showLayerSwitcher = true,
     this.showMyLocation = false,
@@ -125,6 +126,15 @@ class ZopiqMapView extends StatefulWidget {
   /// Null draws a map framed on the pins alone — the right picture for a job
   /// whose route lookup has not come back yet.
   final String? encodedPolyline;
+
+  /// The road the rider is *actually* on, fetched when they were found to be
+  /// off [encodedPolyline] (migration 0103). Null in the ordinary case.
+  ///
+  /// When it is present it replaces the coloured "ahead" line, and the quoted
+  /// road stays on screen in grey as the journey that was planned. That is the
+  /// honest picture of a diversion: this is the way they are going, and that is
+  /// the way we thought they would.
+  final String? liveEncodedPolyline;
 
   final List<ZopiqMapPin> pins;
 
@@ -403,6 +413,8 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
   /// quoted route is still in frame rather than off the edge of it.
   List<LatLng> get _framed => <LatLng>[
     ...decodePolyline(widget.encodedPolyline),
+    // The diversion too, or the opening fit would frame the road they left.
+    ...decodePolyline(widget.liveEncodedPolyline),
     ...widget.pins.map((ZopiqMapPin p) => p.position),
   ];
 
@@ -459,11 +471,19 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
   }).toSet();
 
   /// The road: a casing under everything, then behind-the-rider, then ahead.
-  Set<Polyline> _road(List<LatLng> road) {
+  ///
+  /// [live] is the road the rider turned out to be on. When there is one it
+  /// takes over the coloured line and the quoted road is left grey underneath
+  /// it — so the picture is "here is the way they are going" rather than a
+  /// confident orange line down a street nobody is riding.
+  Set<Polyline> _road(List<LatLng> road, List<LatLng> live) {
     if (road.length < 2) return const <Polyline>{};
 
+    final bool hasLive = live.length >= 2;
     final ZopiqMapPin? rider = _rider;
-    final RouteProgress? progress = rider == null
+    // With a live road there is nothing to split: it starts where the rider was
+    // when we asked for it, so all of it is ahead of them by construction.
+    final RouteProgress? progress = rider == null || hasLive
         ? null
         : splitRoute(road, _positionOf(rider));
 
@@ -480,7 +500,21 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
         endCap: Cap.roundCap,
         jointType: JointType.round,
       ),
-      if (progress != null && progress.travelled.length >= 2)
+      // The part already ridden, or — when the rider has left the route
+      // entirely — the whole of the road we quoted, which is now the plan
+      // rather than the journey.
+      if (hasLive)
+        Polyline(
+          polylineId: const PolylineId('route-quoted'),
+          points: road,
+          color: ZopiqPalette.textMuted,
+          width: 6,
+          startCap: Cap.roundCap,
+          endCap: Cap.roundCap,
+          jointType: JointType.round,
+          zIndex: 1,
+        )
+      else if (progress != null && progress.travelled.length >= 2)
         Polyline(
           polylineId: const PolylineId('route-travelled'),
           points: progress.travelled,
@@ -493,7 +527,7 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
         ),
       Polyline(
         polylineId: const PolylineId('route'),
-        points: progress?.remaining ?? road,
+        points: hasLive ? live : (progress?.remaining ?? road),
         color: ZopiqPalette.primary,
         width: 6,
         startCap: Cap.buttCap,
@@ -508,6 +542,7 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
     final List<LatLng> road = decodePolyline(widget.encodedPolyline);
+    final List<LatLng> live = decodePolyline(widget.liveEncodedPolyline);
     final List<LatLng> points = _framed;
     final bool canFollow = widget.interactive && widget.followPinId != null;
 
@@ -549,7 +584,7 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
             rotateGesturesEnabled: widget.interactive,
             tiltGesturesEnabled: widget.interactive,
             onTap: widget.onTap == null ? null : (LatLng _) => widget.onTap!(),
-            polylines: _road(road),
+            polylines: _road(road, live),
             markers: _markers,
             onMapCreated: (GoogleMapController controller) {
               if (!_controller.isCompleted) _controller.complete(controller);

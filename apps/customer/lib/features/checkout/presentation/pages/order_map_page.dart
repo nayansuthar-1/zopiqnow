@@ -43,6 +43,7 @@ class OrderMapPage extends ConsumerWidget {
           Expanded(
             child: ZopiqMapView(
               encodedPolyline: route.encodedPath,
+              liveEncodedPolyline: route.livePath,
               pins: orderMapPins(route: route, live: live),
               // The customer's own position is not what this screen is about,
               // and asking for it would raise a location prompt with nothing

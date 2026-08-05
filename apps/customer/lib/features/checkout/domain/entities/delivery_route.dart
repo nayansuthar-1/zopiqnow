@@ -42,6 +42,7 @@ class DeliveryRoute {
     required this.deliverTo,
     required this.destination,
     required this.encodedPath,
+    required this.livePath,
     required this.routeKm,
     required this.etaAt,
     required this.etaReason,
@@ -59,6 +60,7 @@ class DeliveryRoute {
       deliverTo: json['deliver_to'] as String? ?? '',
       destination: dLat == null || dLng == null ? null : GeoPoint(dLat, dLng),
       encodedPath: json['route_polyline'] as String?,
+      livePath: json['live_polyline'] as String?,
       routeKm: (json['route_km'] as num?)?.toDouble(),
       etaAt: DateTime.parse(json['eta_at'] as String).toLocal(),
       etaReason: json['eta_reason'] as String?,
@@ -83,6 +85,17 @@ class DeliveryRoute {
   /// then framed on the two pins with no road between them, which is honest —
   /// we do not know the road yet.
   final String? encodedPath;
+
+  /// The road from where the rider actually was to the door, fetched when they
+  /// were found to be off [encodedPath] by more than 250 m (0103) — a diversion,
+  /// a one-way, a closure, or simply a better road than the one quoted an hour
+  /// ago.
+  ///
+  /// Null in the ordinary case, which is a rider following the route. Null too
+  /// when the last one is more than fifteen minutes old: the server withholds a
+  /// stale live road rather than letting the map draw a street the rider left
+  /// long ago.
+  final String? livePath;
 
   final double? routeKm;
 
