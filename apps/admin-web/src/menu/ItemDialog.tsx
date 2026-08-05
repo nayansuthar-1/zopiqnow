@@ -36,6 +36,25 @@ export function ItemDialog({
   const [isAvailable, setIsAvailable] = useState(item?.is_available ?? true)
   const [imageUrl, setImageUrl] = useState(item?.image_url ?? '')
 
+  // --- The optional half (0068, 0078; reachable from here since 0108) --------
+  /// Held as strings, all of them, including the numbers. A number input that is
+  /// empty is not zero and not NaN — it is unanswered, and a string is the only
+  /// one of the three that says so. `admin_upsert_menu_item` turns '' back into
+  /// null, so blank round-trips as blank rather than as a 0 nobody typed.
+  const [originalPrice, setOriginalPrice] = useState(
+    item?.original_price != null ? String(item.original_price) : '',
+  )
+  const [prepMinutes, setPrepMinutes] = useState(
+    item?.prep_minutes != null ? String(item.prep_minutes) : '',
+  )
+  const [serveFrom, setServeFrom] = useState(item?.serve_from ?? '')
+  const [serveTo, setServeTo] = useState(item?.serve_to ?? '')
+  const [gstRateBps, setGstRateBps] = useState(String(item?.gst_rate_bps ?? 500))
+  const [hsnCode, setHsnCode] = useState(item?.hsn_code ?? '')
+  const [unavailableReason, setUnavailableReason] = useState(
+    item?.unavailable_reason ?? '',
+  )
+
   const [error, setError] = useState<string | null>(null)
   /// Owned by the photo field now, mirrored here so Save cannot land while a
   /// photo is still on its way up.
@@ -62,6 +81,17 @@ export function ItemDialog({
       is_bestseller: isBestseller,
       is_available: isAvailable,
       image_url: imageUrl,
+      // Sent as typed. The RPC reads '' as "not set" and answers the four ways
+      // these can be wrong in sentences an admin can act on — checking them
+      // again here would be a second copy of those rules, free to drift from
+      // the one the database actually enforces.
+      original_price: originalPrice.trim(),
+      prep_minutes: prepMinutes.trim(),
+      serve_from: serveFrom,
+      serve_to: serveTo,
+      unavailable_reason: unavailableReason.trim(),
+      gst_rate_bps: gstRateBps,
+      hsn_code: hsnCode.trim(),
     })
   }
 
@@ -147,6 +177,98 @@ export function ItemDialog({
             checked={isAvailable}
             onChange={setIsAvailable}
           />
+
+          {/* Only when it is off, because "why is it off" is not a question a
+              dish that is on has an answer to. */}
+          {!isAvailable && (
+            <Field
+              label="Why it's off"
+              value={unavailableReason}
+              onChange={(e) => setUnavailableReason(e.target.value)}
+              placeholder="Out of paneer until Thursday"
+              hint="For the kitchen and the console. The customer never sees it — the dish is simply not on their menu."
+            />
+          )}
+
+          <div className="rounded-[8px] border border-line p-4">
+            <div className="flex items-baseline justify-between gap-4">
+              <span className="text-sm font-medium text-ink">More details</span>
+              <span className="text-sm text-ink-muted">All optional</span>
+            </div>
+            <p className="mt-1 text-sm text-ink-muted">
+              Leave any of these blank. A dish is complete without them.
+            </p>
+
+            <div className="mt-4 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Was priced at (₹)"
+                  type="number"
+                  min={1}
+                  value={originalPrice}
+                  onChange={(e) => setOriginalPrice(e.target.value)}
+                  placeholder="399"
+                  hint="Shown struck through beside the price. Never charged — it has to be a price this dish really was."
+                />
+                <Field
+                  label="Prep time (minutes)"
+                  type="number"
+                  min={1}
+                  max={240}
+                  value={prepMinutes}
+                  onChange={(e) => setPrepMinutes(e.target.value)}
+                  placeholder="20"
+                  hint="What this dish takes. The kitchen's accept screen suggests it."
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Served from"
+                  type="time"
+                  value={serveFrom}
+                  onChange={(e) => setServeFrom(e.target.value)}
+                />
+                <Field
+                  label="Served until"
+                  type="time"
+                  value={serveTo}
+                  onChange={(e) => setServeTo(e.target.value)}
+                />
+              </div>
+              <p className="-mt-1 text-sm text-ink-muted">
+                Both or neither. Breakfast at 08:00–11:30 disappears from the menu
+                outside those hours; an end before the start reads as overnight.
+              </p>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-ink">GST</span>
+                  <select
+                    value={gstRateBps}
+                    onChange={(e) => setGstRateBps(e.target.value)}
+                    className="h-11 w-full rounded-[8px] border border-line bg-white px-3 text-sm outline-none focus:border-brand"
+                  >
+                    <option value="500">5% — restaurant food</option>
+                    <option value="0">0% — exempt</option>
+                    <option value="1200">12%</option>
+                    <option value="1800">18%</option>
+                  </select>
+                  <p className="mt-1.5 text-sm text-ink-muted">
+                    5% unless somebody says otherwise, which is every dish on every
+                    menu today.
+                  </p>
+                </label>
+                <Field
+                  label="HSN code"
+                  value={hsnCode}
+                  onChange={(e) => setHsnCode(e.target.value)}
+                  placeholder="2106"
+                  hint="Printed on the tax invoice. Blank leaves the line off it."
+                />
+              </div>
+            </div>
+          </div>
 
           <PhotoField
             label="Photo"

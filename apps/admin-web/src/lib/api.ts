@@ -59,6 +59,23 @@ export type MenuItemRow = {
   item_rank: number
   is_available: boolean
   category_available: boolean
+
+  /// The optional half (0068, 0078 — reachable from the console since 0108).
+  /// Every one of these is null when the restaurant has not said, which is the
+  /// normal case and not a gap to be filled in.
+  ///
+  /// `serve_from`/`serve_to` arrive as `HH:MM` rather than a time, because the
+  /// only thing that reads them is an `<input type="time">`, which speaks
+  /// exactly that.
+  original_price: number | null
+  prep_minutes: number | null
+  serve_from: string | null
+  serve_to: string | null
+  /// Why a dish is off. Kitchen-facing — a customer never reads it, because RLS
+  /// has already removed the dish it would have appeared on.
+  unavailable_reason: string
+  gst_rate_bps: number
+  hsn_code: string | null
 }
 
 /// The shape `admin_get_restaurant` returns. `bank` never carries the account
