@@ -412,6 +412,37 @@ without a device or a browser. **None has been exercised by a human.**
       > the R8 mapping rather than inferred from a successful build: the six
       > registrars survive un-renamed in every app and `void <init>()` is still
       > on them. Use the bundles in §5; the 4 Aug ones are dead.
+- [ ] **Live tracking: the three-second promise, on two real phones.** *(Added
+      5 Aug, with the tracking work below it.)* Everything in that change is
+      arithmetic and rolled-back SQL until a bike is actually moving. Put the
+      rider build on one phone and the customer build on another, start a
+      delivery, and watch:
+
+      1. **The dot keeps up.** Walk or ride; the customer's pin should follow
+         within about three seconds, not twenty. If it lurches every twenty
+         seconds, the Android `intervalDuration` is being ignored and the
+         watchdog is doing the reporting.
+      2. **A parked bike still says so.** Stand still for a minute. The map must
+         *not* fall back to "Live location paused — reconnecting", which is what
+         a position older than two minutes looks like.
+      3. **The estimate moves with the road.** The arrival time should change as
+         the rider closes in, and never jump later without a sentence beside it.
+      4. **A diversion redraws the line.** Deliberately take a different street
+         for a few hundred metres. Within about a minute the coloured line
+         should become the road actually being ridden, with the planned one left
+         in grey behind it. **This is the only part of the change that spends
+         money** — one Ola Directions call per minute per diverted order — so it
+         is worth watching the Ola dashboard the first time.
+      5. **The map stays smooth** while all of that happens, on the Android 10
+         device rather than the fast one.
+
+      > **Battery is the trade and it was a deliberate one.** The rider's phone
+      > now asks for a fix every two seconds while carrying, which is what a
+      > navigation app does and only lasts as long as the delivery. If a real
+      > shift shows it costing too much, the number to move is `_interval` in
+      > `location_reporter.dart` — and moving it to 5 s breaks the three-second
+      > promise, which is the whole point of the change.
+
 - [ ] **The S4 pricing check over HTTP, with a real signed-in session.** Place one
       order and compare `orders.total` against the cart's own figure. The pricing
       was attacked and held, but in `psql` as role `authenticated` rather than
@@ -432,21 +463,29 @@ without a device or a browser. **None has been exercised by a human.**
       one, and smoke them** before anything is uploaded. Bundles are built and
       signed; the device half is yours.
 
-      **The current bundles, built 5 Aug from committed `main` (`61b92c8`) in a
-      clean clone, are here:**
+      **The current bundles, all built 5 Aug from committed `main` in a clean
+      clone, are here:**
 
           D:\siteonlab\zopiq-safe\bundles\2026-08-05\
-            zopiqnow-customer-1.0.0+5.aab   69.1 MB
-            zopiqnow-vendor-1.0.0+1.aab     56.4 MB
-            zopiqnow-rider-1.0.0+1.aab      54.1 MB
+            zopiqnow-customer-1.0.0+6.aab   (b286fd4 — live tracking)
+            zopiqnow-rider-1.0.0+1.aab      (b286fd4 — live tracking)
+            zopiqnow-vendor-1.0.0+1.aab     (61b92c8 — unchanged since)
             mapping-{customer,vendor,rider}.txt
 
-      **The customer one is the first bundle carrying today's five fixes** — the
-      rider fee, the delivery boundary, per-order prep time, the live-order nav
-      and the hero slide — and the first at versionCode 5, so it can go straight
-      onto the closed track. **Vendor and rider are the first of either with
-      working Firebase.** Keep the mappings: without them a native crash in
-      Crashlytics is unreadable, and they are not in git.
+      **Take the +6 customer bundle, not the +5** — that one was built earlier
+      the same day and superseded within the hour by the tracking work. The
+      rider bundle is superseded too and its version code did not move, because
+      neither rider bundle has ever been uploaded; if you did upload one, bump
+      `apps/rider/pubspec.yaml` before trying again.
+
+      **The vendor bundle is deliberately not rebuilt.** Nothing in that app or
+      its dependencies changed after `61b92c8` — it does not depend on
+      `zopiq_map` — so rebuilding it would produce a different binary with the
+      same source, which is a worse thing to hand a store than the one already
+      verified.
+
+      Keep the mappings: without them a native crash in Crashlytics is
+      unreadable, and they are not in git.
 
       > **`ALLOW_MOCK_PAYMENTS` is gone (5 Aug) and no build needs a flag any
       > more.** Every build — debug, release, and a bundle installed from Play —
