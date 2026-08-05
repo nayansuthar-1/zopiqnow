@@ -125,23 +125,34 @@ export function MapPicker({
           fullscreenControl: false,
         })
 
-        const marker = new maps.Marker({
-          position: centre,
-          map,
-          draggable: true,
-        })
+        // Dragging needs something to drag, so the pin exists from the start
+        // *only* when the restaurant already has coordinates. With none, the
+        // map opens bare: a pin drawn on the default centre would sit there
+        // looking placed while "Use this location" stayed dead, because nobody
+        // had chosen anything — and the one thing worse than no pin is a pin
+        // that means nothing and is one click from becoming a kitchen's
+        // official location.
+        let marker: GMarker | null = null
+
+        function place(p: LatLngLiteral) {
+          if (marker) {
+            marker.setPosition(p)
+          } else {
+            marker = new maps.Marker({ position: p, map, draggable: true })
+            marker.addListener('dragend', () => {
+              const q = marker?.getPosition()
+              if (q) setPin({ lat: q.lat(), lng: q.lng() })
+            })
+          }
+          setPin(p)
+        }
+
+        if (initial) place(initial)
 
         // Two ways to place it, because both are things people try: drag the
         // pin, or click where it should be.
-        marker.addListener('dragend', () => {
-          const p = marker.getPosition()
-          if (p) setPin({ lat: p.lat(), lng: p.lng() })
-        })
         map.addListener('click', (e) => {
-          if (!e.latLng) return
-          const p = { lat: e.latLng.lat(), lng: e.latLng.lng() }
-          marker.setPosition(p)
-          setPin(p)
+          if (e.latLng) place({ lat: e.latLng.lat(), lng: e.latLng.lng() })
         })
       },
       (e: Error) => {
