@@ -56,6 +56,17 @@ export function Button({
   children,
   className = '',
   disabled,
+  /// **`button`, not the HTML default.** A `<button>` with no type is a *submit*
+  /// button, and most of this console's buttons live inside a `<form>` — every
+  /// wizard step is one (`StepFrame`), and a dialog opened from a step renders
+  /// inside it too. So a plainly-named button that opened a sheet also saved the
+  /// step and advanced the wizard: the Storefront step's "Use a link" and
+  /// "Adjust" flashed their modal open and landed the admin on Address.
+  ///
+  /// Every button that genuinely submits already says `type="submit"` — all
+  /// thirteen of them, checked before this default was changed — so nothing
+  /// relies on the HTML one.
+  type = 'button',
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
@@ -78,6 +89,7 @@ export function Button({
   return (
     <button
       className={`${base} ${sizes} ${styles} ${className}`}
+      type={type}
       disabled={disabled || loading}
       // The label stays put while loading. Swapping it for "Please wait…"
       // changes the button's width mid-click and loses the one piece of

@@ -149,6 +149,16 @@ export function PhotoField({
                   label="Image link"
                   value={link}
                   onChange={(e) => setLink(e.target.value)}
+                  // Enter in a single-line input submits the surrounding form,
+                  // and this field is inside a wizard step's form — so pressing
+                  // it after pasting a URL would save the step and move on
+                  // instead of fetching the photo. Fetch is what Enter means
+                  // here.
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return
+                    e.preventDefault()
+                    if (link.trim() && !busy) void run(() => uploadPhotoByUrl(link))
+                  }}
                   placeholder="https://example.com/photo.jpg"
                   hint="We fetch a copy and host it ourselves, so it keeps working if the original moves."
                 />
