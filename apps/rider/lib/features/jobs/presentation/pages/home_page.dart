@@ -861,6 +861,58 @@ class _RunJobCardState extends ConsumerState<_RunJobCard> {
             ),
 
             const SizedBox(height: ZopiqSpacing.md),
+
+            // What the job pays — the same panel the offer card draws, in the
+            // same place, so the number a rider decided on does not vanish the
+            // moment they accept. It used to: the only rupee figure left on
+            // this card was the order total below, which reads as a fee that
+            // collapsed from ₹672 to ₹114. Labelled for the same reason —
+            // two amounts on one card, and only one of them is theirs.
+            //
+            // `riderPay` is `deliveries.rider_pay`, frozen at claim time and
+            // never recomputed, which is why it can be shown at the doorstep
+            // and still be the sum that gets paid.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: ZopiqSpacing.md,
+                vertical: ZopiqSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                color: zc.primary.withValues(alpha: 0.07),
+                borderRadius: ZopiqRadii.rSm,
+              ),
+              child: Row(
+                children: <Widget>[
+                  Text(
+                    'YOU EARN',
+                    style: t.labelSmall?.copyWith(
+                      color: zc.primary,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const SizedBox(width: ZopiqSpacing.sm),
+                  Text(
+                    '₹${job.riderPay}',
+                    style: t.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: zc.primary,
+                    ),
+                  ),
+                  const SizedBox(width: ZopiqSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      job.payExplained,
+                      textAlign: TextAlign.end,
+                      style: t.bodySmall?.copyWith(color: zc.textMuted),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: ZopiqSpacing.md),
             Divider(height: 1, color: zc.divider.withValues(alpha: 0.5)),
             const SizedBox(height: ZopiqSpacing.md),
 
@@ -889,9 +941,12 @@ class _RunJobCardState extends ConsumerState<_RunJobCard> {
                   ? RiderSvgType.cashCollect
                   : RiderSvgType.verifiedShield,
               iconColor: job.isCash ? Colors.amber.shade700 : zc.veg,
+              // "Order value", not a bare amount: this is the customer's bill
+              // and the panel above is the rider's fee. Naming it is what stops
+              // the two being read as the same number.
               text: job.isCash
                   ? 'Collect Cash: ₹${job.total}'
-                  : 'Paid Online • ₹${job.total}',
+                  : 'Order value ₹${job.total} • prepaid online',
               emphasis: job.isCash,
             ),
 
