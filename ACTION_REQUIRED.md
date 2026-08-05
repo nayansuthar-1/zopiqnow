@@ -405,10 +405,13 @@ without a device or a browser. **None has been exercised by a human.**
       { <init>(); }`. Verified in the rebuilt R8 mapping: the registrars survive
       un-renamed and `void <init>()` is still on them.
 
-      > **The vendor and rider bundles built on 4 Aug carry this bug too.** All
-      > three apps were minified with no Firebase rules, so their release builds
-      > have no push and no crash reporting either. Rebuild both before they go
-      > anywhere near a track.
+      > **The vendor and rider bundles built on 4 Aug carried this bug too** —
+      > all three apps were minified with no Firebase rules, so those release
+      > builds had no push and no crash reporting either. **Rebuilt 5 Aug from
+      > `61b92c8`, all three, from a clean clone**, and the rule was checked in
+      > the R8 mapping rather than inferred from a successful build: the six
+      > registrars survive un-renamed in every app and `void <init>()` is still
+      > on them. Use the bundles in §5; the 4 Aug ones are dead.
 - [ ] **The S4 pricing check over HTTP, with a real signed-in session.** Place one
       order and compare `orders.total` against the cart's own figure. The pricing
       was attacked and held, but in `psql` as role `authenticated` rather than
@@ -428,6 +431,22 @@ without a device or a browser. **None has been exercised by a human.**
 - [ ] **A5 — Install the three AABs on a real Android 10 device and a current
       one, and smoke them** before anything is uploaded. Bundles are built and
       signed; the device half is yours.
+
+      **The current bundles, built 5 Aug from committed `main` (`61b92c8`) in a
+      clean clone, are here:**
+
+          D:\siteonlab\zopiq-safe\bundles\2026-08-05\
+            zopiqnow-customer-1.0.0+5.aab   69.1 MB
+            zopiqnow-vendor-1.0.0+1.aab     56.4 MB
+            zopiqnow-rider-1.0.0+1.aab      54.1 MB
+            mapping-{customer,vendor,rider}.txt
+
+      **The customer one is the first bundle carrying today's five fixes** — the
+      rider fee, the delivery boundary, per-order prep time, the live-order nav
+      and the hero slide — and the first at versionCode 5, so it can go straight
+      onto the closed track. **Vendor and rider are the first of either with
+      working Firebase.** Keep the mappings: without them a native crash in
+      Crashlytics is unreadable, and they are not in git.
 
       > **`ALLOW_MOCK_PAYMENTS` is gone (5 Aug) and no build needs a flag any
       > more.** Every build — debug, release, and a bundle installed from Play —

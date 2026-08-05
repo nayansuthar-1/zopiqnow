@@ -799,6 +799,30 @@ the rest, and it is folded into Phase 5.**
       in 177.4s, rider 53.4 MB in 165.0s — each signed with its own release
       certificate, read back out of the bundle. **`main` builds from a clone.**
 
+      > **Rebuilt 5 Aug from `61b92c8`, and the rebuild was owed rather than
+      > routine:** five commits had landed since, and the 4 Aug vendor and rider
+      > bundles predate the Firebase keep rule, so **their release builds had no
+      > push and no crash reporting.** Customer 69.1 MB in 430s (versionCode
+      > **5**), vendor 56.4 MB in 177s, rider 54.1 MB in 164s, each signed with
+      > its own certificate read back out of the bundle — vendor `FF:60:1D:6E:…`
+      > and rider `43:37:B4:B4:…`, the same values A2 recorded. `main` still
+      > builds from a clone; analyze is clean of errors in all three (17 lint
+      > issues customer, 0 vendor, 9 rider).
+      >
+      > **The keep rule was verified in the mapping, not assumed from the build
+      > succeeding.** All six Firebase registrars survive un-renamed in all three
+      > apps and `void <init>()` is still on them — the exact member R8 deleted
+      > before. The bundles and their mappings are at
+      > `D:\siteonlab\zopiq-safe\bundles\2026-08-05\`; keep the mappings, they
+      > are what makes a native crash readable.
+      >
+      > **A trap left in place, noted not fixed:** each app's `local.properties`
+      > pins a `flutter.versionCode` (customer still says 4) and it is **not what
+      > the build uses** — `build.gradle.kts` reads `flutter.versionCode` from
+      > the Flutter extension, which the tool fills from `pubspec.yaml`. The
+      > bundle's merged manifest says 5. Edit the pubspec; the other number is
+      > decoration.
+
       **What the clone proved that an in-place build cannot.** Nine files a
       checkout cannot have were copied in deliberately and listed as they were
       copied: three `local.properties`, three `key.properties`, three `.jks`.
