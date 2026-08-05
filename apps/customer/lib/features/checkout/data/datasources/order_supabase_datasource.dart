@@ -199,13 +199,13 @@ class OrderSupabaseDataSource implements OrderDataSource {
   }
 
   @override
-  Stream<OrderStatus> watchOrderStatus(String orderId) {
+  Stream<OrderProgress> watchOrderProgress(String orderId) {
     // `.stream()` selects the row and then holds a Realtime subscription open,
-    // so the first event is the status as it stands and every later one is a
-    // write to the row. Only the status is read off it — the rest of the order
-    // is immutable once `place_order` has written it, and re-parsing a whole
-    // receipt on every kitchen update would be work for a field that cannot
-    // have changed.
+    // so the first event is the order as it stands and every later one is a
+    // write to the row. Three fields are read off it — the rest of the order is
+    // immutable once `place_order` has written it, and re-parsing a whole
+    // receipt on every kitchen update would be work for fields that cannot have
+    // changed.
     return _db
         .from('orders')
         .stream(primaryKey: const <String>['id'])
@@ -213,10 +213,17 @@ class OrderSupabaseDataSource implements OrderDataSource {
         // An empty list means the row is gone or was never ours. There is no
         // status to report, so report none rather than inventing one.
         .where((List<Map<String, dynamic>> rows) => rows.isNotEmpty)
-        .map(
-          (List<Map<String, dynamic>> rows) =>
-              OrderStatus.fromWire(rows.first['status'] as String),
-        );
+        .map((List<Map<String, dynamic>> rows) {
+          final Map<String, dynamic> row = rows.first;
+          final String? eta = row['eta_at'] as String?;
+          return OrderProgress(
+            status: OrderStatus.fromWire(row['status'] as String),
+            // Local, like every other time this app shows: the column is
+            // timestamptz and the customer reads a clock, not a UTC offset.
+            etaAt: eta == null ? null : DateTime.parse(eta).toLocal(),
+            etaReason: row['eta_reason'] as String?,
+          );
+        });
   }
 
   @override

@@ -44,10 +44,13 @@ Widget _card({
   OrderRider? rider,
 }) => ProviderScope(
   overrides: <Override>[
-    orderStatusProvider('ZPQ-1042').overrideWith(
+    // The status now rides on `orderProgressProvider`, which carries the
+    // arrival time beside it; `orderStatusProvider` is derived from it and so
+    // cannot be overridden directly. The card reads only the status.
+    orderProgressProvider('ZPQ-1042').overrideWith(
       (Ref ref) => live == null
-          ? const Stream<OrderStatus>.empty()
-          : Stream<OrderStatus>.value(live),
+          ? const Stream<OrderProgress>.empty()
+          : Stream<OrderProgress>.value(OrderProgress(status: live)),
     ),
     // Null is the ordinary answer — nobody has picked the order up, or the
     // restaurant delivers with its own staff.

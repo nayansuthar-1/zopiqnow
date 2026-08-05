@@ -77,17 +77,36 @@ final AutoDisposeFutureProviderFamily<CustomerOrder?, String> orderByIdProvider 
       return ref.watch(orderRepositoryProvider).getOrder(id);
     });
 
-/// The order's status, live.
+/// The order's status *and* its arrival time, live, on one subscription.
 ///
 /// Only ever watched for an order that is still open — a delivered receipt has
 /// nothing left to report, and a subscription to it is a socket held open for an
 /// event that will never come.
-final AutoDisposeStreamProviderFamily<OrderStatus, String> orderStatusProvider =
-    StreamProvider.autoDispose.family<OrderStatus, String>((
+final AutoDisposeStreamProviderFamily<OrderProgress, String>
+orderProgressProvider =
+    StreamProvider.autoDispose.family<OrderProgress, String>((
       Ref ref,
       String id,
     ) {
-      return ref.watch(orderRepositoryProvider).watchOrderStatus(id);
+      return ref.watch(orderRepositoryProvider).watchOrderProgress(id);
+    });
+
+/// Just the status, for the screens that only ever cared about that.
+///
+/// Derived rather than subscribed: it is the same socket as
+/// [orderProgressProvider], narrowed. Because [OrderProgress] has value
+/// equality and `AsyncValue` compares its contents, an arrival time moving on
+/// its own leaves this provider's value *equal* to what it was — so nothing
+/// listening here rebuilds for news it does not read.
+final AutoDisposeProviderFamily<AsyncValue<OrderStatus>, String>
+orderStatusProvider =
+    Provider.autoDispose.family<AsyncValue<OrderStatus>, String>((
+      Ref ref,
+      String id,
+    ) {
+      return ref
+          .watch(orderProgressProvider(id))
+          .whenData((OrderProgress p) => p.status);
     });
 
 /// Who is carrying the order.
@@ -124,10 +143,19 @@ final AutoDisposeFutureProviderFamily<String?, String> deliveryCodeProvider =
 
 /// The map's fixed parts: two pins, the road between them, and the live ETA.
 ///
-/// Fetched rather than streamed, and refetched whenever the *status* stream
-/// moves — which is exactly when the arrival time can have been recomputed
-/// (0057 re-estimates on every status and delivery-state change). One round trip
-/// per real event beats a socket held open on a row that changes twice an hour.
+/// Fetched rather than streamed, and refetched whenever the order's *progress*
+/// moves — its status or its arrival time. It used to watch the status alone,
+/// which was wrong in a way nobody could see: 0057 re-estimates the arrival on
+/// every position the rider reports, and none of those recomputes reached this
+/// screen unless the kitchen happened to change the status at the same moment.
+/// A customer could watch a fixed "arriving by 8:40" for a whole delivery the
+/// server knew was running late.
+///
+/// The refetch is deliberate rather than reading the time straight off the
+/// stream: `order_route` is the one thing that decides what this screen shows,
+/// and two sources for one number is how a map and a card start disagreeing.
+/// It costs a small round trip a handful of times per delivery, because an
+/// estimate that moves by less than two minutes is never written at all.
 ///
 /// Null is a real answer and the screen draws no map for it: an order with no
 /// delivery coordinates, or a mock one.
@@ -137,7 +165,7 @@ orderRouteProvider =
       Ref ref,
       String orderId,
     ) {
-      ref.watch(orderStatusProvider(orderId));
+      ref.watch(orderProgressProvider(orderId));
       return ref.watch(orderRepositoryProvider).getRoute(orderId);
     });
 

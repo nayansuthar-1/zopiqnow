@@ -208,11 +208,16 @@ class OrderMockDataSource implements OrderDataSource {
   /// would be testing its own timer. What this *does* model is the contract the
   /// screen is built against: a stream that opens with the current status.
   @override
-  Stream<OrderStatus> watchOrderStatus(String orderId) {
+  Stream<OrderProgress> watchOrderProgress(String orderId) {
     for (final CustomerOrder o in _history) {
-      if (o.id == orderId) return Stream<OrderStatus>.value(o.status);
+      if (o.id == orderId) {
+        // No estimate: a mock order has no rider moving towards anything, and
+        // inventing an arrival time here would be the fake teaching the screen
+        // something untrue.
+        return Stream<OrderProgress>.value(OrderProgress(status: o.status));
+      }
     }
-    return const Stream<OrderStatus>.empty();
+    return const Stream<OrderProgress>.empty();
   }
 
   /// Nobody is ever carrying a mock order.

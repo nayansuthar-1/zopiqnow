@@ -78,12 +78,12 @@ abstract interface class OrderRepository {
   /// about each.
   Future<CustomerOrder?> getOrder(String orderId);
 
-  /// The order's status, now and as the kitchen changes it.
+  /// The order's status and its arrival time, now and as they change.
   ///
   /// Errors are left on the stream rather than translated: the screen already
   /// holds the order, so a broken subscription costs it live updates, not the
   /// receipt. It falls back to the status it fetched.
-  Stream<OrderStatus> watchOrderStatus(String orderId);
+  Stream<OrderProgress> watchOrderProgress(String orderId);
 
   /// The rider carrying this order, or null when there is nobody to name.
   ///

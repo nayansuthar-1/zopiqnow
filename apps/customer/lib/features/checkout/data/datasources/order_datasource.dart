@@ -82,7 +82,7 @@ abstract interface class OrderDataSource {
   /// and again on every write to the row. The same row-level policy answers
   /// "whose?" here as everywhere else — a subscription is a select that stays
   /// open, and it is filtered by exactly the rule that filters one.
-  Stream<OrderStatus> watchOrderStatus(String orderId);
+  Stream<OrderProgress> watchOrderProgress(String orderId);
 
   /// Who is carrying the order, or null when nobody is.
   ///

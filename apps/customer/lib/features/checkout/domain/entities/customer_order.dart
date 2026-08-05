@@ -86,6 +86,49 @@ enum OrderStatus {
   int get step => journey.indexOf(this);
 }
 
+/// The two things about an open order that change while somebody is watching it:
+/// where it is in its life, and when it is now expected.
+///
+/// **Why they travel together.** Both live in the same `orders` row and both
+/// arrive on the same subscription, so carrying them as one value is one socket
+/// rather than two. It also fixes a real gap: the arrival time is recomputed on
+/// the server every time the rider moves (0057, and along the road since 0102),
+/// and until this existed the only thing that could make the screen re-read it
+/// was a *status* change — so a customer could watch a stationary "arriving by
+/// 8:40" for the whole of a delivery that the server knew was running late.
+///
+/// **Value equality is the load-bearing part.** Riverpod does not notify
+/// listeners when a provider re-emits an equal value, so a row written for some
+/// other reason costs nothing, and the screen redraws exactly when one of these
+/// two actually moved.
+@immutable
+class OrderProgress {
+  const OrderProgress({required this.status, this.etaAt, this.etaReason});
+
+  final OrderStatus status;
+
+  /// When the order is now expected, or null on an order that has no estimate
+  /// to give — a delivered one, or one placed before there was anywhere to put
+  /// the number.
+  final DateTime? etaAt;
+
+  /// Why the estimate moved *later*, in the words the customer reads, or null.
+  /// Never set when the news is good: 0057 writes a reason only in the direction
+  /// that costs the customer something.
+  final String? etaReason;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrderProgress &&
+          other.status == status &&
+          other.etaAt == etaAt &&
+          other.etaReason == etaReason;
+
+  @override
+  int get hashCode => Object.hash(status, etaAt, etaReason);
+}
+
 /// One line of a past order, priced **as it was charged**.
 ///
 /// Not a [MenuItem]: the dish may since have been renamed, repriced, or delisted,

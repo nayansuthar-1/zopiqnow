@@ -100,11 +100,11 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
-  Stream<OrderStatus> watchOrderStatus(String orderId) =>
+  Stream<OrderProgress> watchOrderProgress(String orderId) =>
       // Passed through untouched. A dropped subscription is not a failure the
       // customer needs a sentence about: the order still renders from what was
       // fetched, and the only thing lost is the live-ness.
-      _dataSource.watchOrderStatus(orderId);
+      _dataSource.watchOrderProgress(orderId);
 
   @override
   Future<String?> getDeliveryCode(String orderId) async {
