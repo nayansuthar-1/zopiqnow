@@ -30,6 +30,30 @@ final AutoDisposeFutureProvider<List<CustomerOrder>> ordersProvider =
       return ref.watch(orderRepositoryProvider).getOrders();
     });
 
+/// The order still on its way, or null when nothing is running.
+///
+/// Newest wins, because [ordersProvider] is newest-first and somebody with two
+/// orders open cares about the one they just placed. Only one is surfaced: this
+/// drives a single nav pill, and a pill cannot point at two places.
+///
+/// Derived rather than fetched — it is a read of a list the app already loads,
+/// so it costs nothing and cannot disagree with the history screen about which
+/// orders are live. `isOpen` is the entity's own word for it, so this and the
+/// order card can never draw different conclusions.
+///
+/// Null while the history is still loading or has failed. A nav bar is the wrong
+/// place to report either: the pill simply stays as the cart until an answer
+/// arrives.
+final AutoDisposeProvider<CustomerOrder?> liveOrderProvider =
+    Provider.autoDispose<CustomerOrder?>((Ref ref) {
+      final List<CustomerOrder>? orders = ref.watch(ordersProvider).valueOrNull;
+      if (orders == null) return null;
+      for (final CustomerOrder order in orders) {
+        if (order.status.isOpen) return order;
+      }
+      return null;
+    });
+
 /// A single order, fetched by id.
 ///
 /// It used to be a lookup into the already-loaded history, on the reasoning that

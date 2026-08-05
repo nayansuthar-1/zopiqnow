@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/providers/bottom_nav_provider.dart';
+import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
 
 /// The persistent bottom-navigation shell.
 ///
@@ -82,6 +85,15 @@ class _ShellNavBar extends ConsumerWidget {
     final int itemCount = ref.watch(cartProvider.select((c) => c.itemCount));
     final bool isVisible = ref.watch(bottomNavVisibilityProvider);
     final ZopiqColors zc = context.zc;
+
+    // An empty cart with an order already on its way: the pill has nothing to
+    // offer as a cart and exactly one thing to offer as a shortcut. Both
+    // conditions matter — a cart with items in it is a thing the customer is
+    // part-way through, and burying it under a shortcut to something else would
+    // lose work they have done.
+    final CustomerOrder? liveOrder = itemCount == 0
+        ? ref.watch(liveOrderProvider)
+        : null;
 
     final int currentIndex = navigationShell.currentIndex;
     // The four pill tabs are indices 0–3; Cart is the one after them. When Cart
@@ -246,7 +258,18 @@ class _ShellNavBar extends ConsumerWidget {
                   curve: Curves.easeInOutCubic,
                   offset: isVisible ? Offset.zero : const Offset(1.5, 0), // Slide right
                   child: GestureDetector(
-                    onTap: () => _onTap(ref, AppShell.cartBranchIndex),
+                    // Pushed, not a branch switch: the order lives on the
+                    // Orders stack rather than in a tab of its own, and a
+                    // shortcut that swapped branches would strand the customer
+                    // in a tab they never chose when they hit back.
+                    onTap: liveOrder == null
+                        ? () => _onTap(ref, AppShell.cartBranchIndex)
+                        : () => context.pushNamed(
+                            Routes.orderDetail,
+                            pathParameters: <String, String>{
+                              'id': liveOrder.id,
+                            },
+                          ),
                     child: Container(
                       height: _pillHeight,
                       padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.lg),
@@ -285,15 +308,17 @@ class _ShellNavBar extends ConsumerWidget {
                             const SizedBox(width: ZopiqSpacing.sm),
                           ],
                           Text(
-                            'Cart',
+                            liveOrder == null ? 'Cart' : 'My Order',
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(width: ZopiqSpacing.xs),
-                          const Icon(
-                            Icons.shopping_cart_outlined,
+                          Icon(
+                            liveOrder == null
+                                ? Icons.shopping_cart_outlined
+                                : Icons.receipt_long_outlined,
                             color: Colors.white,
                             size: 20,
                           ),

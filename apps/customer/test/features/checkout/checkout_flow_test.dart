@@ -197,10 +197,15 @@ void main() {
 
     await tester.tap(find.text('Back to home'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Cart'));
-    await tester.pumpAndSettle();
 
-    expect(find.text('Your cart is empty'), findsOneWidget);
+    // This used to tap "Cart" and read "Your cart is empty". There is no Cart
+    // pill to tap any more: the cart emptied and the order just placed is still
+    // running, so the pill is now the shortcut to it. That swap *is* the
+    // assertion — it only happens when the item count is zero, so the pill
+    // reading "My Order" proves the cart emptied and proves the shortcut
+    // appears, which the old tap could not tell apart from an empty screen.
+    expect(find.text('Cart'), findsNothing);
+    expect(find.text('My Order'), findsOneWidget);
   });
 
   testWidgets('a valid coupon discounts the bill and can be removed', (
