@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:zopiqnow/features/location/data/datasources/address_datasource.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/location/domain/entities/delivery_area.dart';
 
 /// The address book, on Postgres.
 ///
@@ -90,6 +91,33 @@ class AddressSupabaseDataSource implements AddressDataSource {
   @override
   Future<void> deleteAddress(String id) =>
       _db.from('addresses').delete().eq('id', id);
+
+  /// One `set returning` row from `delivery_area_check` (0098). PostgREST hands
+  /// a `returns table` function back as a list, so the single row is read off
+  /// the front rather than expected as a bare object.
+  ///
+  /// Callable signed out on purpose: "do you deliver to me?" is a question worth
+  /// answering before anybody makes an account.
+  @override
+  Future<DeliveryAreaVerdict> checkDeliveryArea({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final List<dynamic> rows =
+        await _db.rpc<List<dynamic>>(
+          'delivery_area_check',
+          params: <String, dynamic>{'p_lat': latitude, 'p_lng': longitude},
+        );
+
+    final Map<String, dynamic> row =
+        (rows.first as Map<String, dynamic>);
+
+    return DeliveryAreaVerdict(
+      serviceable: row['serviceable'] as bool,
+      headline: row['headline'] as String,
+      detail: row['detail'] as String,
+    );
+  }
 
   static Address _addressFrom(Map<String, dynamic> row) => Address(
     id: row['id'] as String,

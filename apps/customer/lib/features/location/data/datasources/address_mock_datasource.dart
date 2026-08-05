@@ -1,5 +1,6 @@
 import 'package:zopiqnow/features/location/data/datasources/address_datasource.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/location/domain/entities/delivery_area.dart';
 
 /// In-memory address book — the tests' data source.
 ///
@@ -84,5 +85,37 @@ class AddressMockDataSource implements AddressDataSource {
   Future<void> deleteAddress(String id) async {
     await Future<void>.delayed(latency);
     _addresses.removeWhere((Address a) => a.id == id);
+  }
+
+  /// Always yes, and deliberately so.
+  ///
+  /// The boundary is two rows in `service_areas` (0098) and the database is the
+  /// only thing that knows them. A copy of the circles here would be a second
+  /// source of truth that goes stale the first time somebody widens a radius —
+  /// and the fixtures above are in Hyderabad, so a faithful mock would refuse
+  /// every order in every test for a reason no test is about.
+  ///
+  /// Set [refuseDeliveryArea] to exercise the other branch.
+  bool refuseDeliveryArea = false;
+
+  @override
+  Future<DeliveryAreaVerdict> checkDeliveryArea({
+    required double latitude,
+    required double longitude,
+  }) async {
+    await Future<void>.delayed(latency);
+    return refuseDeliveryArea
+        ? const DeliveryAreaVerdict(
+            serviceable: false,
+            headline: "We'll be there soon",
+            detail:
+                "We're not delivering to this address yet — we're still only "
+                'in Ranakpur and Sadri.',
+          )
+        : const DeliveryAreaVerdict(
+            serviceable: true,
+            headline: 'We deliver here',
+            detail: "You're inside our delivery area.",
+          );
   }
 }

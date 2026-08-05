@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:zopiqnow/core/storage/key_value_store.dart';
 import 'package:zopiqnow/features/location/data/datasources/address_datasource.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/location/domain/entities/delivery_area.dart';
 import 'package:zopiqnow/features/location/domain/repositories/address_repository.dart';
 
 /// Default [AddressRepository]: the saved list from the address service, the
@@ -95,5 +96,33 @@ class AddressRepositoryImpl implements AddressRepository {
     // A deleted address must not linger in the header, and must not quietly
     // become the delivery address of the next order.
     if (selectedAddress()?.id == id) await _store.remove(_selectedKey);
+  }
+
+  /// Fails **open**, unlike every other method here.
+  ///
+  /// The others throw [AddressBookFailure] and the screen shows it. This one
+  /// cannot: it stands between a customer and the Pay button, and a dropped
+  /// request would otherwise read as "we do not deliver to you" to somebody
+  /// standing in Sadri. The boundary is enforced by a trigger on `orders`
+  /// regardless of what this returns, so the cost of answering yes on a network
+  /// error is a refusal one step later with the money not yet taken — and the
+  /// cost of answering no is turning away an order we could have delivered.
+  @override
+  Future<DeliveryAreaVerdict> deliveryArea({
+    required double latitude,
+    required double longitude,
+  }) async {
+    try {
+      return await _dataSource.checkDeliveryArea(
+        latitude: latitude,
+        longitude: longitude,
+      );
+    } on Object catch (_) {
+      return const DeliveryAreaVerdict(
+        serviceable: true,
+        headline: 'We deliver here',
+        detail: "You're inside our delivery area.",
+      );
+    }
   }
 }

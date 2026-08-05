@@ -1,4 +1,5 @@
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/location/domain/entities/delivery_area.dart';
 
 /// The customer's address book, plus which address is currently selected.
 ///
@@ -49,6 +50,18 @@ abstract interface class AddressRepository {
   ///
   /// Past orders are unaffected — an order stores the address it shipped to.
   Future<void> deleteAddress(String id);
+
+  /// Whether we deliver to a point (migration 0098), and the wording to show
+  /// when we do not.
+  ///
+  /// Does **not** throw on a transport error — it answers "yes" and says so in
+  /// the implementation's own words. A customer inside the delivery area whose
+  /// network blinked must not be told we do not deliver to them, and the trigger
+  /// on `orders` is the thing that actually enforces the boundary.
+  Future<DeliveryAreaVerdict> deliveryArea({
+    required double latitude,
+    required double longitude,
+  });
 }
 
 /// Domain-level failure for reading or writing the address book.

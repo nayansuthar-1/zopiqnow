@@ -1,4 +1,5 @@
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/location/domain/entities/delivery_area.dart';
 
 /// The address-book contract, implemented by the mock and by Supabase.
 ///
@@ -21,4 +22,13 @@ abstract interface class AddressDataSource {
   Future<Address> updateAddress(Address address);
 
   Future<void> deleteAddress(String id);
+
+  /// Whether we deliver to a point, with the wording to show if we do not.
+  ///
+  /// Asked before the gateway runs, never after: an order refused at insert is
+  /// a customer who has already paid. See [DeliveryAreaVerdict].
+  Future<DeliveryAreaVerdict> checkDeliveryArea({
+    required double latitude,
+    required double longitude,
+  });
 }

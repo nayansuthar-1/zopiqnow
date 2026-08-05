@@ -7,6 +7,7 @@ import 'package:zopiqnow/features/location/data/datasources/address_supabase_dat
 import 'package:zopiqnow/features/location/data/repositories/address_repository_impl.dart';
 import 'package:zopiqnow/features/location/data/services/geolocator_location_service.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/location/domain/entities/delivery_area.dart';
 import 'package:zopiqnow/features/location/domain/repositories/address_repository.dart';
 import 'package:zopiqnow/features/location/domain/services/device_location_service.dart';
 
@@ -27,6 +28,25 @@ final Provider<AddressRepository> addressRepositoryProvider =
 /// Overridden in tests with a fake — the real one talks to GPS.
 final Provider<DeviceLocationService> deviceLocationServiceProvider =
     Provider<DeviceLocationService>((Ref ref) => GeolocatorLocationService());
+
+/// Do we deliver to this point? (Migration 0098.)
+///
+/// Keyed on the coordinates rather than the address, so re-selecting the same
+/// place does not re-ask and two addresses in the same courtyard share one
+/// answer. A Dart record gives that structural equality for free.
+///
+/// `autoDispose` because the answer is only interesting while a screen is asking
+/// — and because a widened radius should reach a customer who reopens checkout,
+/// not be cached for the life of the process.
+final AutoDisposeFutureProviderFamily<DeliveryAreaVerdict,
+        ({double lat, double lng})>
+    deliveryAreaProvider =
+    FutureProvider.autoDispose
+        .family<DeliveryAreaVerdict, ({double lat, double lng})>(
+          (Ref ref, ({double lat, double lng}) point) => ref
+              .watch(addressRepositoryProvider)
+              .deliveryArea(latitude: point.lat, longitude: point.lng),
+        );
 
 /// The signed-in customer's saved addresses.
 ///

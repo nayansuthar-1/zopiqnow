@@ -17,6 +17,7 @@ import 'package:zopiqnow/features/checkout/domain/gateways/payment_gateway.dart'
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/location/domain/entities/delivery_area.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/delivery_notes_sheet.dart';
 import 'package:zopiqnow/features/location/presentation/widgets/address_picker_sheet.dart';
@@ -88,12 +89,44 @@ class CheckoutPage extends ConsumerWidget {
     final bool needsAddress = address == null;
     final bool needsPhone = phone == null;
 
+    // Do we deliver there? (Migration 0098.) Asked here and not in `place_order`
+    // because the gateway runs *first* — an order the trigger refuses is an
+    // order somebody has already paid for.
+    //
+    // Only `false` blocks. While the answer is in flight, and if it never
+    // arrives, the button stays live: the check fails open by design (see
+    // `AddressRepositoryImpl.deliveryArea`), and a customer standing in Sadri on
+    // a bad connection must not be told we do not deliver to them.
+    final DeliveryAreaVerdict? area = address == null
+        ? null
+        : ref
+              .watch(
+                deliveryAreaProvider((
+                  lat: address.latitude,
+                  lng: address.longitude,
+                )),
+              )
+              .valueOrNull;
+    // The refusal itself rather than a bool, so every use below carries the
+    // wording with it and the compiler promotes it without a `!`.
+    final DeliveryAreaVerdict? refusal = area != null && !area.serviceable
+        ? area
+        : null;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),
           children: <Widget>[
+            // Above everything, because it decides whether any of the rest is
+            // worth reading. Its own card rather than a snackbar: a customer who
+            // has just been told we do not reach them will want to read the
+            // sentence twice, and a snackbar is gone in four seconds.
+            if (refusal != null) ...<Widget>[
+              ZopiqReveal(child: _OutOfAreaCard(verdict: refusal)),
+              const SizedBox(height: ZopiqSpacing.md),
+            ],
             ZopiqReveal(
               child: ZopiqCard(
                 padding: EdgeInsets.zero,
@@ -159,15 +192,22 @@ class CheckoutPage extends ConsumerWidget {
         // a dead button.
         label: needsAddress
             ? 'Select delivery address'
+            : refusal != null
+            ? 'Choose an address we deliver to'
             : needsPhone
             ? 'Add a delivery number'
             : 'Pay ₹${bill.total}',
-        caption:
-            'Test gateway — no money moves until the Razorpay keys are live.',
+        caption: refusal != null
+            ? refusal.headline
+            : 'Test gateway — no money moves until the Razorpay keys are live.',
         isLoading: checkout.isPlacingOrder,
         // The route is auth-guarded, so `auth` is AuthSignedIn here. The pattern
         // match is what proves it rather than a `!`.
-        onPressed: needsAddress || auth is! AuthSignedIn
+        //
+        // Out of area sends them back to the picker rather than going dead —
+        // the same rule the rest of this bar follows: a tap with something
+        // missing opens the thing that fills it in.
+        onPressed: needsAddress || refusal != null || auth is! AuthSignedIn
             ? () => showAddressPicker(context)
             : needsPhone
             ? () => showDeliveryPhoneSheet(context)
@@ -547,6 +587,64 @@ class _PaymentMethods extends StatelessWidget {
                   ),
                 ),
                 Icon(Icons.check_circle_rounded, size: 22, color: zc.primary),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "We'll be there soon" — the delivery area, stated once and plainly.
+///
+/// Both sentences come from `delivery_area_check` (0098) rather than from here,
+/// so the towns named in the copy are the towns in `service_areas` and adding a
+/// third is an INSERT rather than a release.
+///
+/// Warm, not alarming: this is not an error the customer made. The restrained
+/// treatment is deliberate — a red banner for "we don't reach your street yet"
+/// reads as a fault, and the honest tone is closer to an apology than a warning.
+class _OutOfAreaCard extends StatelessWidget {
+  const _OutOfAreaCard({required this.verdict});
+
+  final DeliveryAreaVerdict verdict;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return ZopiqCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            padding: const EdgeInsets.all(ZopiqSpacing.sm),
+            decoration: BoxDecoration(
+              color: zc.primary.withValues(alpha: 0.1),
+              borderRadius: ZopiqRadii.rSm,
+            ),
+            child: Icon(
+              Icons.pin_drop_outlined,
+              color: zc.primary,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: ZopiqSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  verdict.headline,
+                  style: t.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  verdict.detail,
+                  style: t.bodySmall?.copyWith(color: zc.textMuted),
+                ),
               ],
             ),
           ),
