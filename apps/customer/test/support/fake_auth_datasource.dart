@@ -28,7 +28,7 @@ class FakeAuthDataSource implements AuthDataSource {
   @override
   Future<void> sendEmailOtp(String email) async {
     sentTo.add(email);
-    _challenge = _Challenge(email: email, issuedAt: DateTime.now());
+    _challenge = _Challenge(to: email, issuedAt: DateTime.now());
   }
 
   @override
@@ -36,8 +36,45 @@ class FakeAuthDataSource implements AuthDataSource {
     required String email,
     required String code,
   }) async {
+    _checkCode(sentTo: email, code: code);
+    return _user = AuthUser(
+      id: 'usr_${email.hashCode.toUnsigned(32)}',
+      email: email,
+    );
+  }
+
+  /// The SMS half, which the real transport routes through MSG91 and this one
+  /// routes nowhere. Same challenge machinery as the email side because GoTrue
+  /// enforces the same rules on both — one code at a time, a TTL, an attempt
+  /// cap — and a fake that was stricter or laxer on one channel would test a
+  /// product we do not ship.
+  @override
+  Future<void> sendPhoneOtp(String phone) async {
+    sentTo.add(phone);
+    _challenge = _Challenge(to: phone, issuedAt: DateTime.now());
+  }
+
+  @override
+  Future<AuthUser> verifyPhoneOtp({
+    required String phone,
+    required String code,
+  }) async {
+    _checkCode(sentTo: phone, code: code);
+    // Empty rather than invented: a phone-only GoTrue user genuinely has no
+    // email, and `AuthUser.email` is not nullable. A fake that made one up
+    // would hide the one case that behaves differently on the profile screen.
+    return _user = AuthUser(
+      id: 'usr_${phone.hashCode.toUnsigned(32)}',
+      email: '',
+      phone: phone,
+    );
+  }
+
+  /// Spends one attempt against the standing challenge, or throws exactly what
+  /// the real endpoint throws. Returns normally only when [code] is good.
+  void _checkCode({required String sentTo, required String code}) {
     final _Challenge? challenge = _challenge;
-    if (challenge == null || challenge.email != email) {
+    if (challenge == null || challenge.to != sentTo) {
       throw const OtpExpired();
     }
     if (DateTime.now().difference(challenge.issuedAt) > ttl) {
@@ -53,10 +90,6 @@ class FakeAuthDataSource implements AuthDataSource {
     }
 
     _challenge = null;
-    return _user = AuthUser(
-      id: 'usr_${email.hashCode.toUnsigned(32)}',
-      email: email,
-    );
   }
 
   /// Signs in as [googleUser] unless [googleCancels] is set, in which case it
@@ -113,9 +146,11 @@ class FakeAuthDataSource implements AuthDataSource {
 }
 
 class _Challenge {
-  _Challenge({required this.email, required this.issuedAt});
+  _Challenge({required this.to, required this.issuedAt});
 
-  final String email;
+  /// The address or number the code went to. Neutrally named because there is
+  /// one challenge at a time and either channel may own it.
+  final String to;
   final DateTime issuedAt;
   int attempts = 0;
 }
