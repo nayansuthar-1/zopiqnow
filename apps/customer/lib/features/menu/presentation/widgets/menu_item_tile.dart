@@ -7,13 +7,14 @@ import 'package:zopiqnow/features/cart/presentation/widgets/add_to_cart_control.
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_image.dart'
     show GradientImagePlaceholder;
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
-import 'package:zopiqnow/features/menu/domain/entities/menu_option.dart';
-import 'package:zopiqnow/features/menu/presentation/widgets/dish_options_sheet.dart';
+import 'package:zopiqnow/features/menu/presentation/widgets/dish_add_flow.dart';
+import 'package:zopiqnow/features/menu/presentation/widgets/dish_detail_sheet.dart';
 
 /// One dish row: details on the left, art + the ADD control on the right.
 ///
-/// Owns the "this cart belongs to another restaurant" prompt, because that
-/// decision belongs to the moment of adding, not to the cart screen.
+/// A summary, and kept one — tapping it opens [showDishDetailSheet] for the
+/// photo at a readable size, the whole description, and anything else the
+/// restaurant has said about the dish.
 class MenuItemTile extends ConsumerWidget {
   const MenuItemTile({
     required this.item,
@@ -31,60 +32,6 @@ class MenuItemTile extends ConsumerWidget {
   /// ADD control is inert, though the real refusal lives in `place_order`.
   final bool enabled;
 
-  /// The plain-dish add, or — for a customisable dish — the add after the
-  /// choice sheet returns a selection.
-  Future<void> _add(BuildContext context, WidgetRef ref) async {
-    List<MenuOption> options = const <MenuOption>[];
-    if (item.isCustomizable) {
-      final List<MenuOption>? chosen = await showDishOptionsSheet(
-        context,
-        item: item,
-      );
-      if (chosen == null) return; // dismissed
-      options = chosen;
-    }
-    if (!context.mounted) return;
-
-    final CartNotifier cart = ref.read(cartProvider.notifier);
-    final AddToCartResult result = cart.add(
-      restaurantId: restaurantId,
-      restaurantName: restaurantName,
-      item: item,
-      options: options,
-    );
-    if (result == AddToCartResult.added) return;
-
-    final String? existing = ref.read(cartProvider).restaurantName;
-    final bool? replace = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('Start a new cart?'),
-        content: Text(
-          'Your cart has items from $existing. Adding this dish will empty it.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep my cart'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Start new cart'),
-          ),
-        ],
-      ),
-    );
-
-    if (replace ?? false) {
-      cart.startNewCartWith(
-        restaurantId: restaurantId,
-        restaurantName: restaurantName,
-        item: item,
-        options: options,
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ZopiqColors zc = context.zc;
@@ -94,88 +41,108 @@ class MenuItemTile extends ConsumerWidget {
       cartProvider.select((c) => c.quantityOf(item.id)),
     );
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.lg),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                ZopiqVegIndicator(isVeg: item.isVeg),
-                if (item.isBestseller) ...<Widget>[
-                  const SizedBox(height: ZopiqSpacing.xs),
-                  _BestsellerTag(color: zc.primaryDeep),
-                ],
-                const SizedBox(height: ZopiqSpacing.xs),
-                Text(item.name, style: t.titleMedium),
-                const SizedBox(height: ZopiqSpacing.xxs),
-                Row(
-                  children: <Widget>[
-                    Text(
-                      // A customisable dish's price is a floor — options add to it.
-                      item.isCustomizable
-                          ? '₹${item.price} onwards'
-                          : '₹${item.price}',
-                      style: t.titleSmall,
-                    ),
-                    // The restaurant's stated former price. Struck through and
-                    // muted, after the live price, so the number that is charged
-                    // is the one the eye lands on first.
-                    if (item.originalPrice != null) ...<Widget>[
-                      const SizedBox(width: ZopiqSpacing.xs),
-                      Text(
-                        '₹${item.originalPrice}',
-                        style: t.bodySmall?.copyWith(
-                          color: zc.textMuted,
-                          decoration: TextDecoration.lineThrough,
-                        ),
-                      ),
-                    ],
+    return InkWell(
+      // The ADD control sits inside this row and handles its own taps, so it
+      // wins over this one — tapping ADD adds, tapping anywhere else opens the
+      // dish. The whole row is the target because a two-line description clipped
+      // mid-sentence is the thing that makes somebody want a closer look.
+      onTap: () => showDishDetailSheet(
+        context,
+        item: item,
+        restaurantId: restaurantId,
+        restaurantName: restaurantName,
+        enabled: enabled,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.lg),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  ZopiqVegIndicator(isVeg: item.isVeg),
+                  if (item.isBestseller) ...<Widget>[
+                    const SizedBox(height: ZopiqSpacing.xs),
+                    _BestsellerTag(color: zc.primaryDeep),
                   ],
-                ),
-                if (item.rating != null || item.prepMinutes != null) ...<Widget>[
                   const SizedBox(height: ZopiqSpacing.xs),
+                  Text(item.name, style: t.titleMedium),
+                  const SizedBox(height: ZopiqSpacing.xxs),
                   Row(
                     children: <Widget>[
-                      if (item.rating != null)
-                        _ItemRating(rating: item.rating!, color: zc.rating),
-                      if (item.rating != null && item.prepMinutes != null)
-                        const SizedBox(width: ZopiqSpacing.sm),
-                      if (item.prepMinutes != null)
+                      Text(
+                        // A customisable dish's price is a floor — options add to it.
+                        item.isCustomizable
+                            ? '₹${item.price} onwards'
+                            : '₹${item.price}',
+                        style: t.titleSmall,
+                      ),
+                      // The restaurant's stated former price. Struck through and
+                      // muted, after the live price, so the number that is charged
+                      // is the one the eye lands on first.
+                      if (item.originalPrice != null) ...<Widget>[
+                        const SizedBox(width: ZopiqSpacing.xs),
                         Text(
-                          '${item.prepMinutes} min',
-                          style: t.labelMedium?.copyWith(color: zc.textMuted),
+                          '₹${item.originalPrice}',
+                          style: t.bodySmall?.copyWith(
+                            color: zc.textMuted,
+                            decoration: TextDecoration.lineThrough,
+                          ),
                         ),
+                      ],
                     ],
                   ),
+                  if (item.rating != null ||
+                      item.prepMinutes != null) ...<Widget>[
+                    const SizedBox(height: ZopiqSpacing.xs),
+                    Row(
+                      children: <Widget>[
+                        if (item.rating != null)
+                          _ItemRating(rating: item.rating!, color: zc.rating),
+                        if (item.rating != null && item.prepMinutes != null)
+                          const SizedBox(width: ZopiqSpacing.sm),
+                        if (item.prepMinutes != null)
+                          Text(
+                            '${item.prepMinutes} min',
+                            style: t.labelMedium?.copyWith(color: zc.textMuted),
+                          ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: ZopiqSpacing.sm),
+                  Text(
+                    item.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: t.bodySmall?.copyWith(color: zc.textMuted),
+                  ),
                 ],
-                const SizedBox(height: ZopiqSpacing.sm),
-                Text(
-                  item.description,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: t.bodySmall?.copyWith(color: zc.textMuted),
-                ),
-              ],
+              ),
             ),
-          ),
-          const SizedBox(width: ZopiqSpacing.lg),
-          _ItemArtAndControl(
-            item: item,
-            // A customisable dish always shows ADD (each tap re-opens the choice
-            // sheet, since taps may build different configurations); the tile's
-            // stepper is for plain dishes, whose single line is keyed by the id.
-            quantity: item.isCustomizable ? 0 : quantity,
-            enabled: enabled,
-            onAdd: () => _add(context, ref),
-            onIncrement: () =>
-                ref.read(cartProvider.notifier).increment(item.id),
-            onDecrement: () =>
-                ref.read(cartProvider.notifier).decrement(item.id),
-          ),
-        ],
+            const SizedBox(width: ZopiqSpacing.lg),
+            _ItemArtAndControl(
+              item: item,
+              // A customisable dish always shows ADD (each tap re-opens the choice
+              // sheet, since taps may build different configurations); the tile's
+              // stepper is for plain dishes, whose single line is keyed by the id.
+              quantity: item.isCustomizable ? 0 : quantity,
+              enabled: enabled,
+              onAdd: () => addDishToCart(
+                context,
+                ref,
+                item: item,
+                restaurantId: restaurantId,
+                restaurantName: restaurantName,
+              ),
+              onIncrement: () =>
+                  ref.read(cartProvider.notifier).increment(item.id),
+              onDecrement: () =>
+                  ref.read(cartProvider.notifier).decrement(item.id),
+            ),
+          ],
+        ),
       ),
     );
   }
