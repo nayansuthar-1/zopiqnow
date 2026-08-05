@@ -61,6 +61,30 @@ export type MenuItemRow = {
   category_available: boolean
 }
 
+/// A question a dish asks before it can be ordered (migration 0048).
+///
+/// A size and an add-on are the same thing wearing different rules: both are a
+/// group of priced options, and `min_select`/`max_select` are the whole of the
+/// difference. (1, 1) means "must pick exactly one"; (0, 1) means "may pick one".
+/// There is no type column, and adding one would be a second answer to a
+/// question the pair already answers.
+export type MenuOption = {
+  name: string
+  /// Whole rupees **added** to the dish's price. The base price is defined as
+  /// the cheapest configuration, so this is never negative.
+  price_delta: number
+  is_available?: boolean
+  rank?: number
+}
+
+export type OptionGroup = {
+  name: string
+  min_select: number
+  max_select: number
+  rank?: number
+  options: MenuOption[]
+}
+
 /// The shape `admin_get_restaurant` returns. `bank` never carries the account
 /// number — only its last four digits — so there is no field here to leak one.
 export type RestaurantDetail = {
@@ -148,6 +172,20 @@ export const api = {
 
   deleteMenuItem: (itemId: string) =>
     rpc<void>('admin_delete_menu_item', { p_item_id: itemId }),
+
+  /// Every option group on a dish — sizes and anything else — in rank order
+  /// (migration 0106).
+  menuItemOptions: (itemId: string) =>
+    rpc<OptionGroup[]>('admin_menu_item_options', { p_item_id: itemId }),
+
+  /// Replaces **all** of a dish's option groups. That is the RPC's contract and
+  /// not a detail: sending only the sizes deletes the vendor's add-on groups. Read
+  /// with `menuItemOptions`, change the one group, send the whole list back.
+  setMenuItemOptions: (itemId: string, groups: OptionGroup[]) =>
+    rpc<void>('admin_set_menu_item_options', {
+      p_item_id: itemId,
+      p_groups: groups,
+    }),
 
   /// The menu's whole running order, not just the rows that moved — ranks are only
   /// meaningful relative to each other, and dragging one dish renumbers everything

@@ -69,6 +69,16 @@ class _DishOptionsSheetState extends State<_DishOptionsSheet> {
           ..add(o.id);
       } else if (sel.contains(o.id)) {
         sel.remove(o.id);
+      } else if (g.maxSelect == 1) {
+        // A group that allows one but demands none — an *optional* size, which
+        // the console can now write (0106). It is still a single choice, so
+        // tapping another one swaps rather than doing nothing: without this the
+        // customer has to untick Small before Large will tick, and a tap that
+        // appears to do nothing reads as a broken sheet. Unticking still works,
+        // because "no size" is a real answer here.
+        sel
+          ..clear()
+          ..add(o.id);
       } else if (sel.length < g.maxSelect) {
         sel.add(o.id);
       }
@@ -171,6 +181,11 @@ class _GroupSection extends StatelessWidget {
             Text(
               group.isVariant
                   ? 'Required'
+                  // "Up to 1" is arithmetic, not English. A group that allows
+                  // one and demands none is simply optional, and that is the
+                  // word for it.
+                  : group.maxSelect == 1
+                  ? 'Optional'
                   : 'Up to ${group.maxSelect}',
               style: t.labelSmall?.copyWith(color: zc.textMuted),
             ),
