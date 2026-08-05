@@ -70,7 +70,11 @@ void main() {
     expect(find.byType(MenuPage), findsOneWidget);
     expect(find.text('Signature Chicken Biryani'), findsOneWidget);
     // Vitals strip from the fetched restaurant, not from route `extra`.
-    expect(find.textContaining('for two'), findsWidgets);
+    // This asserted on "for two" until 0101 took the cost-for-two line off the
+    // header; the rating count proves the same thing — it is only ever read off
+    // the fetched restaurant — and does not depend on a number the admin is no
+    // longer asked for.
+    expect(find.textContaining('ratings'), findsWidgets);
   });
 
   testWidgets('adding a dish reveals the cart bar and reaches the cart',

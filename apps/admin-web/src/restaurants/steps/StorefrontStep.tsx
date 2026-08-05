@@ -27,8 +27,6 @@ export function StorefrontStep({
   const r = detail?.restaurant
   const [name, setName] = useState(r?.name ?? '')
   const [cuisines, setCuisines] = useState<string[]>(r?.cuisines ?? [])
-  const [priceForTwo, setPriceForTwo] = useState(r ? String(r.price_for_two) : '')
-  const [etaMinutes, setEtaMinutes] = useState(r ? String(r.eta_minutes) : '')
   const [isVeg, setIsVeg] = useState(r?.is_veg ?? false)
   const [promo, setPromo] = useState(r?.promo_text ?? '')
   const [imageUrl, setImageUrl] = useState(r?.image_url ?? '')
@@ -52,11 +50,13 @@ export function StorefrontStep({
   async function save() {
     setBusy(true)
     setError(null)
+    // No `price_for_two` and no `eta_minutes` (0101). Omitted rather than sent
+    // as zero: the update RPC leaves a field it was not given alone, so a
+    // restaurant onboarded before this keeps whatever it had instead of having
+    // it quietly wiped by a form that no longer asks.
     const profile = {
       name,
       cuisines,
-      price_for_two: Number(priceForTwo),
-      eta_minutes: Number(etaMinutes),
       is_veg: isVeg,
       promo_text: promo,
       image_url: imageUrl,
@@ -105,30 +105,12 @@ export function StorefrontStep({
         suggestions={commonCuisines}
       />
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        {/* Neither is required to create the draft (migration 0044): a cost for
-            two is a number you work out after the menu exists, and a prep time
-            is a guess until the kitchen has run a service. Both are required to
-            publish, because both are printed on the customer's card. */}
-        <Field
-          label="Cost for two (₹)"
-          type="number"
-          min={0}
-          value={priceForTwo}
-          onChange={(e) => setPriceForTwo(e.target.value)}
-          placeholder="400"
-          hint="An estimate shown on the card, not a charge. Needed before publishing."
-        />
-        <Field
-          label="Prep time (minutes)"
-          type="number"
-          min={0}
-          value={etaMinutes}
-          onChange={(e) => setEtaMinutes(e.target.value)}
-          placeholder="30"
-          hint="Becomes the ETA on the customer's order. Needed before publishing."
-        />
-      </div>
+      {/* Cost for two and prep time used to sit here, and both are gone in
+          0101. Prep time depends on what was ordered, and the kitchen answers
+          it per order when it accepts — a single number invented during
+          onboarding was a worse answer competing with a better one. Cost for
+          two is a made-up average on any menu with both chai and thalis. The
+          columns still exist; nobody is asked for them and nobody shows them. */}
 
       <Toggle
         label="Pure vegetarian"

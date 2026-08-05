@@ -88,17 +88,9 @@ class MenuVitals extends StatelessWidget {
                   '(${restaurant.ratingCount}+ ratings)',
                   style: t.titleSmall,
                 ),
-                const SizedBox(width: ZopiqSpacing.sm),
-                Text('•', style: t.bodyMedium?.copyWith(color: zc.textMuted)),
-                const SizedBox(width: ZopiqSpacing.sm),
-                Flexible(
-                  child: Text(
-                    '₹${restaurant.priceForTwo} for two',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: t.titleSmall,
-                  ),
-                ),
+                // "₹X for two" stood here and is gone in 0101: on a menu with
+                // both ₹40 chai and ₹400 thalis it was a made-up average that
+                // read as a promise, and the admin is no longer asked for it.
               ],
             ),
             const SizedBox(height: ZopiqSpacing.xs),

@@ -266,7 +266,10 @@ class _CardImage extends StatelessWidget {
                   borderRadius: ZopiqRadii.rSm,
                 ),
                 child: Text(
-                  '${restaurant.cuisines.take(1).join()} · ₹${restaurant.priceForTwo} for one',
+                  // Cuisine alone since 0101. "₹400 for one" was a number an
+                  // admin invented once during onboarding, and it is no longer
+                  // asked for — printing it would be printing a zero.
+                  restaurant.cuisines.take(1).join(),
                   style: t.labelSmall?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,

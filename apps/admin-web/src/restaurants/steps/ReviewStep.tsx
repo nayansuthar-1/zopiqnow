@@ -197,8 +197,9 @@ export function ReviewStep({
           {[
             ['Name', r.name],
             ['Cuisines', r.cuisines.join(', ') || '—'],
-            ['Cost for two', `₹${r.price_for_two}`],
-            ['Prep time', `${r.eta_minutes} min`],
+            // Cost for two and prep time are gone (0101) — neither is asked for
+            // on the Storefront step any more, so reviewing them would be
+            // reviewing a number nobody entered.
             ['Pure veg', r.is_veg ? 'Yes' : 'No'],
             ['Offer line', r.promo_text ?? '—'],
             ['Commission', `${r.commission_bps / 100}%`],
