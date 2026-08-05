@@ -261,8 +261,9 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
     super.initState();
     _mover = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: _glide,
     )..addListener(_onMoveTick);
+    _rebuildRoad();
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => unawaited(_loadImages()),
     );
@@ -291,7 +292,64 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
       _startMoves(old.pins);
       unawaited(_loadImages());
     }
+    // A new fix, a new road, or both. This is the only place either is
+    // recomputed — see [_rebuildRoad].
+    _rebuildRoad();
   }
+
+  /// Decodes the roads and rebuilds the three polylines, once per *fix* rather
+  /// than once per frame.
+  ///
+  /// **Why this is a method and not two lines in `build`, which is where it
+  /// used to live.** [_onMoveTick] calls `setState` on every frame of the
+  /// rider's 1.2-second glide, so `build` runs about seventy times per reported
+  /// position — and it was decoding both polylines twice over (once to draw,
+  /// once to frame) and re-running [splitRoute] across the whole road each
+  /// time. On a real 174 km route that is 1,744 points decoded four times and
+  /// projected once, sixty times a second.
+  ///
+  /// It was survivable when a position arrived every twenty seconds, because it
+  /// ran for 1.2 of them. The rider app now reports every two seconds, so the
+  /// same work would run most of the time the map is open — on the Android 10
+  /// phones this app promises to be smooth on.
+  ///
+  /// The decode is skipped entirely unless the encoded string actually changed,
+  /// which for the quoted road is *never* after the first frame. The split is
+  /// recomputed per fix, which is the only rate at which its answer can change:
+  /// the glide moves the marker, and where the road divides is a fact about the
+  /// position that was reported, not about the animation drawing it.
+  void _rebuildRoad() {
+    if (_roadKey != widget.encodedPolyline) {
+      _roadKey = widget.encodedPolyline;
+      _roadPts = decodePolyline(_roadKey);
+    }
+    if (_liveKey != widget.liveEncodedPolyline) {
+      _liveKey = widget.liveEncodedPolyline;
+      _livePts = decodePolyline(_liveKey);
+    }
+    _polylines = _road(_roadPts, _livePts);
+  }
+
+  /// How long the rider's pin takes to glide from its last drawn position to
+  /// the new one.
+  ///
+  /// It was 1.2 s, chosen when a position arrived every twenty seconds and the
+  /// pin had a long way to travel each time. Positions now arrive every two, so
+  /// a glide that long spends most of its time chasing a fix that is already
+  /// superseded — and it is the last term in the promise that the customer sees
+  /// the bike within three seconds: two to report, a fraction to reach the
+  /// phone, and this to finish drawing. Short enough to land inside the budget,
+  /// long enough that a scooter still moves rather than teleports.
+  static const Duration _glide = Duration(milliseconds: 900);
+
+  /// The decoded roads and the lines drawn from them, held rather than derived.
+  /// `_roadKey` and `_liveKey` are the encoded strings they came from, which is
+  /// how [_rebuildRoad] knows whether the decode can be skipped.
+  String? _roadKey;
+  List<LatLng> _roadPts = const <LatLng>[];
+  String? _liveKey;
+  List<LatLng> _livePts = const <LatLng>[];
+  Set<Polyline> _polylines = const <Polyline>{};
 
   static bool _samePins(List<ZopiqMapPin> a, List<ZopiqMapPin> b) {
     if (a.length != b.length) return false;
@@ -412,9 +470,9 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
   /// Every point that has to be visible, so a rider who has wandered off the
   /// quoted route is still in frame rather than off the edge of it.
   List<LatLng> get _framed => <LatLng>[
-    ...decodePolyline(widget.encodedPolyline),
+    ..._roadPts,
     // The diversion too, or the opening fit would frame the road they left.
-    ...decodePolyline(widget.liveEncodedPolyline),
+    ..._livePts,
     ...widget.pins.map((ZopiqMapPin p) => p.position),
   ];
 
@@ -483,9 +541,16 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
     final ZopiqMapPin? rider = _rider;
     // With a live road there is nothing to split: it starts where the rider was
     // when we asked for it, so all of it is ahead of them by construction.
+    // Split at the position that was *reported*, not the one being drawn.
+    // [_rebuildRoad] runs from `didUpdateWidget`, where the glide has only just
+    // been started and `_drawnAt` still holds where the pin was before this
+    // fix — splitting there would leave the road a whole fix behind the marker
+    // travelling along it. The marker trails the split for the length of the
+    // glide, which is the right way round: the line is current and the scooter
+    // is catching up to it.
     final RouteProgress? progress = rider == null || hasLive
         ? null
-        : splitRoute(road, _positionOf(rider));
+        : splitRoute(road, rider.position);
 
     return <Polyline>{
       // A dark outline under the whole road. Without it an orange line over
@@ -541,8 +606,6 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
-    final List<LatLng> road = decodePolyline(widget.encodedPolyline);
-    final List<LatLng> live = decodePolyline(widget.liveEncodedPolyline);
     final List<LatLng> points = _framed;
     final bool canFollow = widget.interactive && widget.followPinId != null;
 
@@ -584,7 +647,7 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
             rotateGesturesEnabled: widget.interactive,
             tiltGesturesEnabled: widget.interactive,
             onTap: widget.onTap == null ? null : (LatLng _) => widget.onTap!(),
-            polylines: _road(road, live),
+            polylines: _polylines,
             markers: _markers,
             onMapCreated: (GoogleMapController controller) {
               if (!_controller.isCompleted) _controller.complete(controller);
@@ -631,7 +694,7 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
                 ),
               ],
               // Only when there is actually a third party's route on the map.
-              if (road.length >= 2) ...<Widget>[
+              if (_roadPts.length >= 2) ...<Widget>[
                 const SizedBox(height: ZopiqSpacing.xs),
                 const _RoutingCredit(),
               ],
