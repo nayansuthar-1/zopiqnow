@@ -34,6 +34,14 @@ dependencies:
 
   supabase_flutter: 2.8.0
 
+  # Native Google sign-in, so getting in does not depend on relaying a 6-digit
+  # code out of a mailbox — which a Play reviewer cannot do, and which fails
+  # whenever OTP mail is slow or rate-limited.
+  #
+  # **The same pinned version the customer app already carries.** This adds the
+  # package to another app; it does not move anyone's version.
+  google_sign_in: 7.2.0
+
   # Photo upload (approved 2026-07-17). Picks a dish/restaurant photo off the
   # device; the bytes go straight to Cloudinary, only the URL comes back.
   #

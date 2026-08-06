@@ -85,6 +85,25 @@ class RiderAuthController extends Notifier<RiderAuthState> {
     state = rider == null ? AuthNotPartner(email) : AuthSignedIn(rider);
   }
 
+  /// Google sign-in, landing in the same states the OTP path does.
+  ///
+  /// A Google account belonging to nobody who rides for us is [AuthNotPartner],
+  /// not an error — the same distinction the OTP path draws, because "that code
+  /// was wrong" and "you don't ride for us" are different conversations, and so
+  /// are "Google failed" and "you don't ride for us".
+  ///
+  /// [RiderGoogleCancelled] propagates: the screen swallows it, since dismissing
+  /// the account sheet deserves no message.
+  Future<void> signInWithGoogle() async {
+    final ({Rider? rider, String email}) result = await ref
+        .read(riderAuthDataSourceProvider)
+        .signInWithGoogle();
+    // The address Google vouched for, not one that was typed.
+    state = result.rider == null
+        ? AuthNotPartner(result.email)
+        : AuthSignedIn(result.rider!);
+  }
+
   Future<void> signOut() async {
     await ref.read(riderAuthDataSourceProvider).signOut();
     state = const AuthSignedOut();

@@ -126,6 +126,32 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     }
   }
 
+  Future<void> _google() async {
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    try {
+      await ref.read(riderAuthControllerProvider.notifier).signInWithGoogle();
+      // No navigation on success: signing in changes the auth state, and the
+      // shell above this screen decides where that lands — including on the
+      // "you don't ride for us" screen, which is not a failure to report.
+    } on RiderGoogleCancelled {
+      // The account sheet was closed. Saying anything would be arguing with a
+      // decision just made.
+    } on RiderAuthFailure catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } on Object {
+      if (mounted) {
+        setState(
+          () => _error = 'We couldn\'t reach Zopiqnow. Check your connection.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
@@ -233,6 +259,32 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                         variant: ZopiqButtonVariant.cta,
                         isLoading: _sending,
                         onPressed: _send,
+                      ),
+                      const SizedBox(height: ZopiqSpacing.lg),
+                      Row(
+                        children: <Widget>[
+                          Expanded(child: Divider(color: zc.divider)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: ZopiqSpacing.md,
+                            ),
+                            child: Text(
+                              'or',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: zc.textMuted),
+                            ),
+                          ),
+                          Expanded(child: Divider(color: zc.divider)),
+                        ],
+                      ),
+                      const SizedBox(height: ZopiqSpacing.lg),
+                      // The same delivery_partners row decides both routes, so
+                      // this is a second door into one house, not a second key.
+                      ZopiqButton(
+                        label: 'Continue with Google',
+                        icon: Icons.account_circle_outlined,
+                        variant: ZopiqButtonVariant.outline,
+                        onPressed: _sending ? null : _google,
                       ),
                     ],
                   ),

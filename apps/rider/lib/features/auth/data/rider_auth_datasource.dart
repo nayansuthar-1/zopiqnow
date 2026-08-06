@@ -1,5 +1,9 @@
+import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:zopiq_rider/app/env.dart';
+import 'package:zopiq_rider/core/observability/crash_reporter.dart';
 import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
 import 'package:zopiq_rider/features/auth/domain/entities/rider_kyc.dart';
 
@@ -25,6 +29,19 @@ abstract interface class RiderAuthDataSource {
   /// when the code was wrong.
   Future<Rider?> verifyEmailOtp({required String email, required String code});
 
+  /// Signs in with the device's Google account, then answers the same question
+  /// [verifyEmailOtp] does.
+  ///
+  /// **The gate is unchanged.** Google says who you are; `delivery_partners`
+  /// says whether that is anybody who rides for Zopiqnow. A new front door, not
+  /// a new authority — an account with no row there still reads nothing.
+  ///
+  /// Returns the address Google vouched for alongside the rider, because on the
+  /// null branch the caller has to name it and, unlike the OTP path, never had
+  /// it. Throws [RiderGoogleCancelled] when the sheet was dismissed — a choice,
+  /// not a failure — and [RiderAuthFailure] for everything else.
+  Future<({Rider? rider, String email})> signInWithGoogle();
+
   Future<Rider?> restoreSession();
 
   /// Where this rider stands on documents (0080). Status and a sentence — never
@@ -43,6 +60,13 @@ class RiderAuthFailure implements Exception {
 
   @override
   String toString() => 'RiderAuthFailure: $message';
+}
+
+/// The account sheet was dismissed. Its own type because it is not an error: the
+/// screen says nothing at all, where a [RiderAuthFailure] would put a red
+/// sentence under a button in answer to somebody changing their mind.
+class RiderGoogleCancelled implements Exception {
+  const RiderGoogleCancelled();
 }
 
 class RiderAuthSupabaseDataSource implements RiderAuthDataSource {
@@ -85,6 +109,85 @@ class RiderAuthSupabaseDataSource implements RiderAuthDataSource {
       throw RiderAuthFailure(e.message);
     }
     return _resolveRider();
+  }
+
+  @override
+  Future<({Rider? rider, String email})> signInWithGoogle() async {
+    try {
+      await _ensureGoogleReady();
+      final GoogleSignInAccount account = await GoogleSignIn.instance
+          .authenticate();
+
+      // The id token *is* the credential. Supabase verifies its signature and
+      // audience against the Google client it is configured with, so nothing
+      // here has to be trusted: a forged token fails at the server.
+      final String? idToken = account.authentication.idToken;
+      if (idToken == null) throw const RiderAuthFailure(_googleFailed);
+
+      // Experimental in gotrue 2.10, and the only way to exchange a *native* id
+      // token for a session. The version is pinned, so it cannot move under us.
+      // ignore: experimental_member_use
+      final AuthResponse response = await _client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+      );
+      if (response.user == null) throw const RiderAuthFailure(_googleFailed);
+    } on GoogleSignInException catch (e, stack) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw const RiderGoogleCancelled();
+      }
+      // One sentence on screen; which failure it was goes here. Otherwise
+      // telling a wrong signing certificate (`Invalid key value:
+      // <sha1>:com.siteonlab.zopiq_rider`) from a dead network needs `adb
+      // logcat` on a device you are holding — no use for a rider at a kerb.
+      _reportGoogleFailure(e, stack, 'sign-in failed (${e.code.name})');
+      throw const RiderAuthFailure(_googleFailed);
+    } on AuthException catch (e, stack) {
+      // Google vouched and Supabase would not take it: `aud` mismatch, or the
+      // provider is off. A different bug, identical on screen.
+      _reportGoogleFailure(e, stack, 'id token rejected (${e.message})');
+      throw const RiderAuthFailure(_googleFailed);
+    } on RiderGoogleCancelled {
+      rethrow;
+    } on RiderAuthFailure {
+      rethrow;
+    } on Object catch (e, stack) {
+      // `_ensureGoogleReady` raises here — no Play services, a plugin that never
+      // registered. Uncaught, the button stops with nothing said.
+      _reportGoogleFailure(e, stack, 'sign-in failed unexpectedly');
+      throw const RiderAuthFailure(_googleFailed);
+    }
+
+    // Outside the try: a *partner* lookup that fails is not a Google problem,
+    // and reporting it as one sends somebody hunting a certificate over a
+    // dropped connection.
+    return (
+      rider: await _resolveRider(),
+      email: _client.auth.currentUser?.email ?? '',
+    );
+  }
+
+  static const String _googleFailed =
+      'Google sign-in didn\'t work. Try again, or use your email.';
+
+  /// One initialise per process, and never a cached failure — caching one would
+  /// leave the button dead for the rest of the run over a transient fault.
+  static Future<void>? _googleReady;
+
+  Future<void> _ensureGoogleReady() async {
+    try {
+      await (_googleReady ??= GoogleSignIn.instance.initialize(
+        serverClientId: Env.googleWebClientId,
+      ));
+    } on Object {
+      _googleReady = null;
+      rethrow;
+    }
+  }
+
+  static void _reportGoogleFailure(Object e, StackTrace stack, String what) {
+    debugPrint('Google $what: $e');
+    CrashReporter.recordHandled(e, stack, reason: 'Google $what');
   }
 
   @override

@@ -89,6 +89,23 @@ android {
     }
 
     buildTypes {
+        // **A debug build is signed with the release certificate, and that is
+        // not a convenience.** Google reserves the pair (package name, signing
+        // certificate) globally to one OAuth client, so Google sign-in only
+        // works for a build signed with a certificate registered against this
+        // package. Signing debug with the release key means one registration
+        // covers both, instead of a second fingerprint per app that somebody
+        // has to remember to add.
+        //
+        // Falls back to Gradle's debug key when there is no keystore — a
+        // contributor without one still gets a build, it just cannot do Google
+        // sign-in, exactly as the release block below already concedes.
+        debug {
+            if (hasReleaseKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+
         release {
             signingConfig = if (hasReleaseKeystore) {
                 signingConfigs.getByName("release")

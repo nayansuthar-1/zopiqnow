@@ -72,6 +72,25 @@ class VendorAuthController extends Notifier<VendorAuthState> {
   Future<void> sendEmailOtp(String email) =>
       ref.read(vendorAuthDataSourceProvider).sendEmailOtp(email);
 
+  /// Google sign-in, landing in exactly the same three states the OTP path does.
+  ///
+  /// A Google account that is nobody's staff is [AuthNotStaff], not an error —
+  /// the same distinction the OTP path draws, because "wrong code" and "not a
+  /// partner" are different conversations and so are "Google failed" and "you
+  /// don't work here".
+  ///
+  /// [VendorGoogleCancelled] is left to propagate: the screen swallows it, since
+  /// dismissing the account sheet deserves no message at all.
+  Future<void> signInWithGoogle() async {
+    final ({Vendor? vendor, String email}) result = await ref
+        .read(vendorAuthDataSourceProvider)
+        .signInWithGoogle();
+    // The address Google vouched for, not one that was typed.
+    state = result.vendor == null
+        ? AuthNotStaff(result.email)
+        : AuthSignedIn(result.vendor!);
+  }
+
   /// Throws [VendorAuthFailure] on a bad or expired code — the OTP screen
   /// renders the message. A *valid* code for a non-staff address is not a
   /// failure and does not throw: it lands on [AuthNotStaff], which is a screen,

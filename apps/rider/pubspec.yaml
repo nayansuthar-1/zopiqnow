@@ -53,6 +53,15 @@ dependencies:
 
   supabase_flutter: 2.8.0
 
+  # Native Google sign-in, so getting in does not depend on relaying a 6-digit
+  # code out of a mailbox — which a Play reviewer cannot do, and which fails
+  # whenever OTP mail is slow or rate-limited. A rider signing in at a kerb has
+  # the same problem for the same reason.
+  #
+  # **The same pinned version the customer app already carries.** This adds the
+  # package to another app; it does not move anyone's version.
+  google_sign_in: 7.2.0
+
   # For the one thing a rider does that nobody else does: they go somewhere.
   # Until now the app showed an address and a phone number and left the rider to
   # retype both into other apps, at a kerb, holding a helmet.

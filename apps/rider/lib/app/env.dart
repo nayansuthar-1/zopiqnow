@@ -37,6 +37,21 @@ abstract final class Env {
     'CLOUDINARY_UPLOAD_PRESET',
     defaultValue: 'zopiqnow_unsigned',
   );
+
+  /// The **web** OAuth client, shared with the customer and vendor apps.
+  ///
+  /// Shared deliberately, and it is not a shortcut: this is the audience the id
+  /// token is minted for and the value Supabase checks it against, so all three
+  /// apps must present the same one. What is *not* shared is the Android client
+  /// — Google reserves the pair (package name, signing certificate) globally to
+  /// one client, so `com.siteonlab.zopiq_rider` needs its own registration with
+  /// this app's own fingerprints. Getting that wrong fails on the device with
+  /// `Invalid key value: <sha1>:com.siteonlab.zopiq_rider` and nowhere else.
+  static const String googleWebClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+    defaultValue:
+        '789936942272-82up4pgu8v6in4vmvnogqhiqa8legtl5.apps.googleusercontent.com',
+  );
 }
 
 // The Maps key is deliberately absent from this file. Google's Maps SDK reads

@@ -1,5 +1,9 @@
+import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:zopiq_vendor/app/env.dart';
+import 'package:zopiq_vendor/core/observability/crash_reporter.dart';
 import 'package:zopiq_vendor/features/auth/domain/entities/vendor.dart';
 
 /// Sign-in, and the question that follows it: *do you work here?*
@@ -27,6 +31,24 @@ abstract interface class VendorAuthDataSource {
   /// conversations.
   Future<Vendor?> verifyEmailOtp({required String email, required String code});
 
+  /// Signs in with the device's Google account, then answers the same question
+  /// [verifyEmailOtp] does: null when this is a real Google account belonging to
+  /// nobody who works here.
+  ///
+  /// **The gate is unchanged.** Google says who you are; `restaurant_staff` says
+  /// whether that is anyone at Zopiqnow. A new front door, not a new authority —
+  /// an account with no row there can still read exactly nothing.
+  ///
+  /// Throws [VendorGoogleCancelled] when the account sheet was dismissed, which
+  /// is a choice and not a failure, and [VendorAuthFailure] for everything else.
+  ///
+  /// Returns the address Google vouched for alongside the vendor, because on the
+  /// null branch the caller has to name it — "zopiq@gmail.com isn't a partner" —
+  /// and unlike the OTP path it never had it to begin with. Reading it back off
+  /// the Supabase client in the provider layer would put the SDK somewhere tests
+  /// deliberately keep it out of.
+  Future<({Vendor? vendor, String email})> signInWithGoogle();
+
   /// The signed-in vendor, or null — for no session, or a session belonging to
   /// someone who is not staff.
   Future<Vendor?> restoreSession();
@@ -53,6 +75,13 @@ class VendorAuthFailure implements Exception {
 
   @override
   String toString() => 'VendorAuthFailure: $message';
+}
+
+/// The account sheet was dismissed. Its own type because it is not an error:
+/// the screen shows nothing at all, where a [VendorAuthFailure] would put a red
+/// sentence under a button in answer to somebody changing their mind.
+class VendorGoogleCancelled implements Exception {
+  const VendorGoogleCancelled();
 }
 
 class VendorAuthSupabaseDataSource implements VendorAuthDataSource {
@@ -85,6 +114,93 @@ class VendorAuthSupabaseDataSource implements VendorAuthDataSource {
     }
 
     return _resolveVendor();
+  }
+
+  @override
+  Future<({Vendor? vendor, String email})> signInWithGoogle() async {
+    try {
+      await _ensureGoogleReady();
+      final GoogleSignInAccount account = await GoogleSignIn.instance
+          .authenticate();
+
+      // The id token *is* the credential. Supabase verifies its signature and
+      // audience against the Google client it is configured with, so nothing
+      // here has to be trusted: a forged token fails at the server, not in this
+      // method.
+      final String? idToken = account.authentication.idToken;
+      if (idToken == null) {
+        throw const VendorAuthFailure(_googleFailed);
+      }
+
+      // Experimental in gotrue 2.10, and the only way to exchange a *native* id
+      // token for a session — the alternative is the browser OAuth flow, which
+      // this app deliberately does not use. The version is pinned, so it cannot
+      // change under us.
+      // ignore: experimental_member_use
+      final AuthResponse response = await _client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+      );
+      if (response.user == null) throw const VendorAuthFailure(_googleFailed);
+    } on GoogleSignInException catch (e, stack) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw const VendorGoogleCancelled();
+      }
+      // One sentence on screen; which failure it actually was goes here. Without
+      // it, telling a wrong signing certificate (`Invalid key value:
+      // <sha1>:com.siteonlab.zopiq_vendor`) from a dead network needs `adb
+      // logcat` on a device you happen to be holding — no use at all when a
+      // restaurant reports it from their own counter.
+      _reportGoogleFailure(e, stack, 'sign-in failed (${e.code.name})');
+      throw const VendorAuthFailure(_googleFailed);
+    } on AuthException catch (e, stack) {
+      // Google vouched and Supabase would not take it: the `aud` does not match
+      // the configured client, or the provider is off. A different bug from the
+      // above and indistinguishable from it on screen.
+      _reportGoogleFailure(e, stack, 'id token rejected (${e.message})');
+      throw const VendorAuthFailure(_googleFailed);
+    } on VendorGoogleCancelled {
+      rethrow;
+    } on VendorAuthFailure {
+      rethrow;
+    } on Object catch (e, stack) {
+      // `_ensureGoogleReady` raises here — a device with no Play services, a
+      // plugin that never registered. Uncaught, the button would simply stop
+      // with nothing said and nothing shown.
+      _reportGoogleFailure(e, stack, 'sign-in failed unexpectedly');
+      throw const VendorAuthFailure(_googleFailed);
+    }
+
+    // Outside the try: a *staff* lookup that fails is not a Google problem, and
+    // reporting it as one would send somebody hunting a certificate over a
+    // dropped connection.
+    return (
+      vendor: await _resolveVendor(),
+      email: _client.auth.currentUser?.email ?? '',
+    );
+  }
+
+  static const String _googleFailed =
+      'Google sign-in didn\'t work. Try again, or use your email.';
+
+  /// One initialise per process, and never a cached failure — caching one would
+  /// leave the button dead for the rest of the run over a transient fault.
+  static Future<void>? _googleReady;
+
+  Future<void> _ensureGoogleReady() async {
+    try {
+      await (_googleReady ??= GoogleSignIn.instance.initialize(
+        serverClientId: Env.googleWebClientId,
+      ));
+    } on Object {
+      _googleReady = null;
+      rethrow;
+    }
+  }
+
+  static void _reportGoogleFailure(Object e, StackTrace stack, String what) {
+    debugPrint('Google $what: $e');
+    CrashReporter.recordHandled(e, stack, reason: 'Google $what');
   }
 
   @override
