@@ -19,10 +19,15 @@
 // its versionCode, commit the edit. Nothing is visible on Play until the commit
 // — an edit that fails halfway leaves the listing exactly as it was.
 
+import { createReadStream } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
+import https from 'node:https'
 import path from 'node:path'
 
 import { accessToken } from './play_auth.mjs'
+import { loadEnv } from './env.mjs'
+
+await loadEnv()
 
 const APPS = ['customer', 'vendor', 'rider']
 const TRACKS = ['internal', 'alpha', 'beta', 'production']
@@ -54,8 +59,18 @@ if (!built) {
   console.error(`No bundle at ${aab}\nRun: flutter build appbundle --release`)
   process.exit(1)
 }
+//
+// **Skipped when ship.mjs says it just built this**, and that is a correctness
+// fix rather than a convenience. Gradle is incremental: if the inputs have not
+// changed it leaves the existing .aab alone, mtime and all. So a build that
+// legitimately succeeded seconds ago can leave a file an hour old, and this
+// check would refuse the very bundle it was asked to ship. "The build I just
+// ran succeeded against this exact pubspec" is a stronger guarantee than a
+// timestamp anyway; the timestamp is only here for a human running this script
+// on its own, where there is no such guarantee to be had.
+const justBuilt = process.argv.includes('--just-built')
 const ageMinutes = (Date.now() - built.mtimeMs) / 60000
-if (ageMinutes > 10) {
+if (!justBuilt && ageMinutes > 10) {
   console.error(
     `That bundle is ${Math.round(ageMinutes)} minutes old — older than this run.\n` +
       'Rebuild it before uploading, or you will ship the previous build.',
@@ -98,19 +113,68 @@ async function api(url, { method = 'GET', body, headers = {} } = {}) {
   return parsed
 }
 
+/// Streams the .aab up.
+///
+/// **Not `fetch`, and that is the whole reason this function exists.** Node's
+/// fetch is undici, whose headers timeout starts when the request does — but
+/// Google sends no headers until the last byte of a 69 MB body has arrived, so
+/// on any ordinary upstream connection the timeout fires mid-upload and the
+/// whole thing fails with `UND_ERR_HEADERS_TIMEOUT`. `node:https` has no such
+/// clock, and streaming the file keeps 69 MB out of memory besides.
+function uploadBundle(editId) {
+  return new Promise((resolve, reject) => {
+    const request = https.request(
+      {
+        hostname: 'androidpublisher.googleapis.com',
+        path:
+          `/upload/androidpublisher/v3/applications/${packageName}` +
+          `/edits/${editId}/bundles?uploadType=media`,
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': built.size,
+        },
+      },
+      (res) => {
+        let text = ''
+        res.on('data', (chunk) => (text += chunk))
+        res.on('end', () => {
+          const parsed = text ? JSON.parse(text) : {}
+          if (res.statusCode >= 300) {
+            reject(new Error(parsed.error?.message ?? `HTTP ${res.statusCode}`))
+          } else {
+            resolve(parsed)
+          }
+        })
+      },
+    )
+    request.on('error', reject)
+
+    // Progress, because 69 MB on a domestic uplink is minutes of silence
+    // otherwise, and silence is indistinguishable from a hang.
+    let sent = 0
+    let lastShown = 0
+    const file = createReadStream(aab)
+    file.on('data', (chunk) => {
+      sent += chunk.length
+      const percent = Math.floor((sent / built.size) * 100)
+      if (percent >= lastShown + 10) {
+        lastShown = percent
+        console.log(`  ${percent}%`)
+      }
+    })
+    file.on('error', reject)
+    file.pipe(request)
+  })
+}
+
 console.log(`${app} → ${track} (${packageName})`)
 
 const edit = await api(`${base}/edits`, { method: 'POST' })
 console.log(`  edit ${edit.id}`)
 
-const bundle = await api(
-  `https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/${packageName}/edits/${edit.id}/bundles?uploadType=media`,
-  {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/octet-stream' },
-    body: await readFile(aab),
-  },
-)
+const bundle = await uploadBundle(edit.id)
 console.log(`  uploaded versionCode ${bundle.versionCode}`)
 
 await api(`${base}/edits/${edit.id}/tracks/${track}`, {

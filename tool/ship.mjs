@@ -18,6 +18,8 @@ import { spawn } from 'node:child_process'
 import { readFile, writeFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 
+import { loadEnv } from './env.mjs'
+
 const APPS = ['customer', 'vendor', 'rider']
 /// The four Play creates for you. **Not a whitelist** — a closed test can be a
 /// track you named yourself ("qa", "friends-and-family"), and the API takes that
@@ -35,26 +37,17 @@ const check = args.includes('--check')
 const noUpload = args.includes('--no-upload')
 const [app, track] = args.filter((a) => !a.startsWith('--'))
 
-// --- .env -------------------------------------------------------------------
-// Loaded here rather than assumed in the environment: every other tool in this
-// repo reads .env, and a release that only worked from a shell that happened to
-// have sourced it would fail exactly once, at the worst moment.
-async function loadEnv() {
-  const text = await readFile(path.join(root, '.env'), 'utf8').catch(() => '')
-  for (const line of text.split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/)
-    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim().replace(/^"|"$/g, '')
-  }
-}
 await loadEnv()
 
-function run(command, cmdArgs, cwd) {
+/// Runs a child process to completion, resolving with its exit code.
+///
+/// [shell] defaults on for Windows because `flutter` and `git` are `.bat`
+/// wrappers there and cannot be executed directly. It must be **off** for
+/// `process.execPath`, which is `C:\Program Files\nodejs\node.exe` — a shell
+/// splits that on the space and tries to run `C:\Program`.
+function run(command, cmdArgs, cwd, { shell = process.platform === 'win32' } = {}) {
   return new Promise((resolve) => {
-    const child = spawn(command, cmdArgs, {
-      cwd,
-      stdio: 'inherit',
-      shell: process.platform === 'win32',
-    })
+    const child = spawn(command, cmdArgs, { cwd, stdio: 'inherit', shell })
     child.on('close', resolve)
   })
 }
@@ -218,15 +211,25 @@ if (noUpload) {
 }
 
 // --- 3. Upload --------------------------------------------------------------
-const uploaded = await run(process.execPath, [path.join(root, 'tool/play_upload.mjs'), app, track], root)
+const uploaded = await run(
+  process.execPath,
+  [path.join(root, 'tool/play_upload.mjs'), app, track, '--just-built'],
+  root,
+  { shell: false },
+)
 if (uploaded !== 0) {
   console.error('Upload failed. The version bump is NOT committed.')
   process.exit(1)
 }
 
 // --- 4. Record --------------------------------------------------------------
-await run('git', ['add', `apps/${app}/pubspec.yaml`], root)
-await run('git', ['commit', '-m', `chore(${app}): release ${name}+${newCode} to ${track}`], root)
-await run('git', ['push'], root)
+// `shell: false` for git, like the node call above: git.exe is a real
+// executable, and a Windows shell concatenates arguments without quoting — so
+// `-m "release 1.0.0+8 to internal"` arrives as five separate pathspecs and the
+// commit fails after the upload has already happened.
+const gitOpts = { shell: false }
+await run('git', ['add', `apps/${app}/pubspec.yaml`], root, gitOpts)
+await run('git', ['commit', '-m', `chore(${app}): release ${name}+${newCode} to ${track}`], root, gitOpts)
+await run('git', ['push'], root, gitOpts)
 
 console.log(`\nDone. ${app} ${name}+${newCode} is in review for ${track}.`)
