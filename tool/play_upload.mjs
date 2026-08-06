@@ -19,9 +19,10 @@
 // its versionCode, commit the edit. Nothing is visible on Play until the commit
 // — an edit that fails halfway leaves the listing exactly as it was.
 
-import { createSign } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
+
+import { accessToken } from './play_auth.mjs'
 
 const APPS = ['customer', 'vendor', 'rider']
 const TRACKS = ['internal', 'alpha', 'beta', 'production']
@@ -77,43 +78,8 @@ if (!applicationId) {
 }
 const packageName = applicationId
 
-// --- Auth: a self-signed JWT, exchanged for an access token -----------------
-function base64url(input) {
-  return Buffer.from(input).toString('base64url')
-}
-
-async function accessToken() {
-  const now = Math.floor(Date.now() / 1000)
-  const claims = {
-    iss: key.client_email,
-    scope: 'https://www.googleapis.com/auth/androidpublisher',
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-  }
-  const unsigned =
-    `${base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.` +
-    `${base64url(JSON.stringify(claims))}`
-  const signature = createSign('RSA-SHA256')
-    .update(unsigned)
-    .sign(key.private_key)
-    .toString('base64url')
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: `${unsigned}.${signature}`,
-    }),
-  })
-  const body = await res.json()
-  if (!res.ok) throw new Error(`Token: ${body.error_description ?? res.status}`)
-  return body.access_token
-}
-
 // --- The API ----------------------------------------------------------------
-const token = await accessToken()
+const token = await accessToken(key)
 const base = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${packageName}`
 
 async function api(url, { method = 'GET', body, headers = {} } = {}) {

@@ -2,10 +2,15 @@
 
 ## The short version
 
-```powershell
-powershell -File tool/release.ps1 -App customer -Track internal   # live in ~minutes
-powershell -File tool/release.ps1 -App customer -Track production # hours to days
+```bash
+node tool/ship.mjs --check                 # what is set up, what is missing
+node tool/ship.mjs customer internal      # a test build, live in ~minutes
+node tool/ship.mjs customer production    # the real thing, hours to days
 ```
+
+One Node entry point rather than a PowerShell script, so it runs from any shell
+on this machine — **including the one Claude runs**. Once the credential below is
+in place, Claude can ship a build without you touching anything.
 
 That bumps the versionCode, builds the bundle, uploads it, and commits the bump —
 in that order, so a failed build never burns a version number.
@@ -68,11 +73,12 @@ If you want the fastest possible loop while we work, it is:
 
 1. You tell me what to change.
 2. I make the change and commit it.
-3. You run `powershell -File tool/release.ps1 -App customer -Track internal`.
+3. Claude runs `node tool/ship.mjs customer internal` — or you do; same command.
 4. A few minutes later it is on your phone, from the Play internal-testing link.
 
-Step 3 is the only thing that needs your hands, and only because the signing key
-and the Play credential are yours.
+Once the service account exists, **step 3 needs nobody's hands** — Claude can run
+it. The signing key already lives on this machine, so the only thing that was
+ever yours to do is creating the credential, once.
 
 ---
 
@@ -102,8 +108,9 @@ You need a service account so the script can upload without a browser.
 
 Test it end to end with a throwaway internal build:
 
-```powershell
-powershell -File tool/release.ps1 -App customer -Track internal
+```bash
+node tool/ship.mjs --check      # should end in "Ready."
+node tool/ship.mjs customer internal
 ```
 
 ---
@@ -131,3 +138,19 @@ phones can install the app.
 This will come round again roughly every August. When it does it is usually a
 one-line change per app in `android/app/build.gradle.kts`, plus checking that
 year's behaviour changes.
+
+---
+
+## Who presses the button
+
+Once the service account is in place, Claude can run `ship.mjs` unattended. Two
+standing rules, unless you say otherwise:
+
+- **`internal` — Claude ships it freely.** Up to 100 testers you chose, reviewed
+  in minutes, and every build replaces the last. Nothing about it is hard to undo.
+- **`production` — Claude asks first, every time.** That is a release to everyone
+  who has the app, it cannot be unpublished cleanly, and a bad one is a bad one in
+  public. "Ship it" said once is not a standing order for every release after it.
+
+If you want production to be hands-off too, say so explicitly and I will treat it
+that way.
