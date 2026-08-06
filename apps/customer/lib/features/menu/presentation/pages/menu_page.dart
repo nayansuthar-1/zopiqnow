@@ -10,6 +10,7 @@ import 'package:zopiqnow/features/menu/domain/entities/menu_category.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
 import 'package:zopiqnow/features/menu/domain/repositories/menu_repository.dart';
 import 'package:zopiqnow/features/menu/presentation/providers/menu_providers.dart';
+import 'package:zopiqnow/features/menu/presentation/widgets/menu_filter_bar.dart';
 import 'package:zopiqnow/features/menu/presentation/widgets/menu_header.dart';
 import 'package:zopiqnow/features/menu/presentation/widgets/menu_item_tile.dart';
 import 'package:zopiqnow/features/menu/presentation/widgets/review_wall.dart';
@@ -77,72 +78,229 @@ class _MenuBody extends ConsumerWidget {
       filteredMenuProvider(restaurant.id),
     );
 
-    return CustomScrollView(
-      slivers: <Widget>[
-        MenuSliverAppBar(restaurant: restaurant),
-        SliverToBoxAdapter(child: MenuVitals(restaurant: restaurant)),
-        // What people said (0062), directly under the rating it explains.
-        // Renders nothing when there is nothing to show.
-        SliverToBoxAdapter(child: ReviewWall(restaurantId: restaurant.id)),
-        if (!restaurant.acceptingOrders)
-          SliverToBoxAdapter(
-            child: _ClosedBanner(reason: restaurant.pauseReason),
-          ),
-        const SliverToBoxAdapter(child: _VegOnlyToggle()),
-        menu.when(
-          loading: () => const SliverToBoxAdapter(child: _MenuLoading()),
-          error: (Object error, _) => SliverToBoxAdapter(
-            child: _MenuError(
-              message: error is MenuLoadFailure
-                  ? error.message
-                  : 'Please check your connection and try again.',
-              onRetry: () => ref.invalidate(menuProvider(restaurant.id)),
+    return Stack(
+      children: <Widget>[
+        CustomScrollView(
+          slivers: <Widget>[
+            MenuTopBar(restaurant: restaurant),
+            SliverToBoxAdapter(child: MenuVitals(restaurant: restaurant)),
+            SliverToBoxAdapter(
+              child: MenuOffersStrip(restaurantId: restaurant.id),
             ),
-          ),
-          data: (List<MenuCategory> categories) {
-            if (categories.isEmpty) {
-              return const SliverToBoxAdapter(child: _NoVegItems());
-            }
-            return SliverList.builder(
-              itemCount: categories.length,
-              itemBuilder: (BuildContext context, int i) =>
-                  _MenuSection(category: categories[i], restaurant: restaurant),
-            );
-          },
+            // What people said (0062), directly under the rating it explains.
+            // Renders nothing when there is nothing to show.
+            SliverToBoxAdapter(child: ReviewWall(restaurantId: restaurant.id)),
+            if (!restaurant.acceptingOrders)
+              SliverToBoxAdapter(
+                child: _ClosedBanner(reason: restaurant.pauseReason),
+              ),
+            const MenuFilterBar(),
+            const SliverToBoxAdapter(child: _FocusedCategoryBanner()),
+            menu.when(
+              loading: () => const SliverToBoxAdapter(child: _MenuLoading()),
+              error: (Object error, _) => SliverToBoxAdapter(
+                child: _MenuError(
+                  message: error is MenuLoadFailure
+                      ? error.message
+                      : 'Please check your connection and try again.',
+                  onRetry: () => ref.invalidate(menuProvider(restaurant.id)),
+                ),
+              ),
+              data: (List<MenuCategory> categories) {
+                if (categories.isEmpty) {
+                  return const SliverToBoxAdapter(child: _NothingMatches());
+                }
+                return SliverList.builder(
+                  itemCount: categories.length,
+                  itemBuilder: (BuildContext context, int i) => _MenuSection(
+                    category: categories[i],
+                    restaurant: restaurant,
+                  ),
+                );
+              },
+            ),
+            // Breathing room so neither the cart bar nor the Menu button ever
+            // covers the last dish.
+            const SliverToBoxAdapter(child: SizedBox(height: 96)),
+          ],
         ),
-        // Breathing room so the cart bar never covers the last dish.
-        const SliverToBoxAdapter(child: SizedBox(height: ZopiqSpacing.xxl)),
+        Positioned(
+          right: ZopiqSpacing.pageGutter,
+          bottom: ZopiqSpacing.lg,
+          child: _MenuJumpButton(restaurantId: restaurant.id),
+        ),
       ],
     );
   }
 }
 
-class _MenuSection extends StatelessWidget {
+/// The floating "Menu" button — the way out of a hundred-dish scroll.
+class _MenuJumpButton extends ConsumerWidget {
+  const _MenuJumpButton({required this.restaurantId});
+
+  final String restaurantId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The *whole* menu, not the filtered one: this is how a customer reaches a
+    // section, so it has to list the sections a filter has hidden.
+    final List<MenuCategory> categories =
+        ref.watch(menuProvider(restaurantId)).valueOrNull ??
+        const <MenuCategory>[];
+    // One section is not a menu to navigate.
+    if (categories.length < 2) return const SizedBox.shrink();
+
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Material(
+      color: context.zc.textStrong,
+      borderRadius: ZopiqRadii.rMd,
+      elevation: 6,
+      child: InkWell(
+        borderRadius: ZopiqRadii.rMd,
+        onTap: () async {
+          final int? picked = await showMenuJumpSheet(
+            context,
+            categories: categories,
+          );
+          if (picked == null) return;
+          ref.read(focusedCategoryProvider.notifier).state =
+              categories[picked].title;
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: ZopiqSpacing.lg,
+            vertical: ZopiqSpacing.md,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(
+                Icons.restaurant_menu_rounded,
+                size: 20,
+                color: ZopiqPalette.white,
+              ),
+              const SizedBox(width: ZopiqSpacing.sm),
+              Text(
+                'Menu',
+                style: t.titleSmall?.copyWith(
+                  color: ZopiqPalette.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Says which section is being shown alone, and how to stop.
+///
+/// Without it the customer is looking at a menu that has silently lost sixteen
+/// of its seventeen sections, which reads as a broken restaurant rather than as
+/// a choice they made.
+class _FocusedCategoryBanner extends ConsumerWidget {
+  const _FocusedCategoryBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final String? focused = ref.watch(focusedCategoryProvider);
+    if (focused == null) return const SizedBox.shrink();
+
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ZopiqSpacing.pageGutter,
+        ZopiqSpacing.md,
+        ZopiqSpacing.pageGutter,
+        0,
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              'Showing $focused only',
+              style: t.bodySmall?.copyWith(color: zc.textMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () =>
+                ref.read(focusedCategoryProvider.notifier).state = null,
+            child: const Text('Show full menu'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One section, with a header that folds it away.
+///
+/// Collapsing matters more the longer the menu is: seventeen sections of pizza
+/// variants is a lot of scrolling to get past something you are not eating
+/// today. Expanded by default, because a menu that arrives closed is a menu the
+/// customer has to open before they can read it.
+class _MenuSection extends StatefulWidget {
   const _MenuSection({required this.category, required this.restaurant});
 
   final MenuCategory category;
   final Restaurant restaurant;
 
   @override
+  State<_MenuSection> createState() => _MenuSectionState();
+}
+
+class _MenuSectionState extends State<_MenuSection> {
+  bool _expanded = true;
+
+  @override
   Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.pageGutter),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const SizedBox(height: ZopiqSpacing.xl),
-          Text(
-            '${category.title} (${category.items.length})',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          for (final MenuItem item in category.items)
-            MenuItemTile(
-              key: ValueKey<String>(item.id),
-              item: item,
-              restaurantId: restaurant.id,
-              restaurantName: restaurant.name,
-              enabled: restaurant.acceptingOrders,
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    '${widget.category.title} (${widget.category.items.length})',
+                    style: t.headlineMedium,
+                  ),
+                ),
+                // Points the way it will move: down to open, up to close.
+                Icon(
+                  _expanded
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                  color: zc.textMuted,
+                ),
+              ],
             ),
+          ),
+          if (_expanded)
+            for (final MenuItem item in widget.category.items)
+              MenuItemTile(
+                key: ValueKey<String>(item.id),
+                item: item,
+                restaurantId: widget.restaurant.id,
+                restaurantName: widget.restaurant.name,
+                enabled: widget.restaurant.acceptingOrders,
+              )
+          else
+            // A closed section still shows the divider the open one ends on, so
+            // two collapsed headings do not run together into one block of text.
+            Divider(height: ZopiqSpacing.xl, color: zc.divider),
         ],
       ),
     );
@@ -206,36 +364,6 @@ class _ClosedBanner extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _VegOnlyToggle extends ConsumerWidget {
-  const _VegOnlyToggle();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bool vegOnly = ref.watch(vegOnlyProvider);
-    final ZopiqColors zc = context.zc;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        ZopiqSpacing.pageGutter,
-        ZopiqSpacing.lg,
-        ZopiqSpacing.pageGutter,
-        0,
-      ),
-      child: Row(
-        children: <Widget>[
-          Switch.adaptive(
-            value: vegOnly,
-            activeTrackColor: zc.veg,
-            onChanged: (_) => ref.read(vegOnlyProvider.notifier).toggle(),
-          ),
-          const SizedBox(width: ZopiqSpacing.sm),
-          Text('Veg only', style: Theme.of(context).textTheme.titleSmall),
-        ],
       ),
     );
   }
@@ -306,25 +434,45 @@ class _MenuError extends StatelessWidget {
   }
 }
 
-class _NoVegItems extends StatelessWidget {
-  const _NoVegItems();
+/// Nothing survived the filters. One message for all of them, because the
+/// customer can see which ones are on — they are pinned to the top of the
+/// screen — and a message that named them would be reading the chips back.
+class _NothingMatches extends ConsumerWidget {
+  const _NothingMatches();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ZopiqColors zc = context.zc;
 
     return Padding(
       padding: const EdgeInsets.all(ZopiqSpacing.xxl),
       child: Column(
         children: <Widget>[
-          Icon(Icons.eco_outlined, size: 48, color: zc.textMuted),
+          Icon(Icons.search_off_rounded, size: 48, color: zc.textMuted),
           const SizedBox(height: ZopiqSpacing.lg),
           Text(
-            'No vegetarian dishes on this menu.',
+            'Nothing on this menu matches.',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: zc.textMuted),
             textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: ZopiqSpacing.lg),
+          ZopiqButton(
+            label: 'Clear filters',
+            expand: false,
+            variant: ZopiqButtonVariant.outline,
+            onPressed: () {
+              // `toggle` is the only thing the veg notifier exposes, and that is
+              // deliberate on its side — nothing else should be able to set a
+              // dietary filter to an arbitrary value.
+              if (ref.read(vegOnlyProvider)) {
+                ref.read(vegOnlyProvider.notifier).toggle();
+              }
+              ref.read(bestsellersOnlyProvider.notifier).state = false;
+              ref.read(menuSearchProvider.notifier).state = '';
+              ref.read(focusedCategoryProvider.notifier).state = null;
+            },
           ),
         ],
       ),

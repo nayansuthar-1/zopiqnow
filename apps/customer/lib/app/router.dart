@@ -33,6 +33,8 @@ import 'package:zopiqnow/features/home/presentation/home_page.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/presentation/pages/address_book_page.dart';
 import 'package:zopiqnow/features/location/presentation/pages/address_form_page.dart';
+import 'package:zopiqnow/features/location/presentation/pages/location_gate_page.dart';
+import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 import 'package:zopiqnow/features/menu/presentation/pages/menu_page.dart';
 import 'package:zopiqnow/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:zopiqnow/features/search/presentation/pages/search_page.dart';
@@ -70,6 +72,7 @@ abstract final class Routes {
   static const String splash = 'splash';
   static const String login = 'login';
   static const String otp = 'otp';
+  static const String locationGate = 'locationGate';
 }
 
 /// Paths that require a signed-in user.
@@ -98,6 +101,7 @@ const List<String> _protectedPrefixes = <String>[
 
 const String _splashPath = '/splash';
 const String _loginPath = '/login';
+const String _locationGatePath = '/welcome/location';
 
 bool _isProtected(String location) =>
     _protectedPrefixes.any((String p) => location.startsWith(p));
@@ -169,6 +173,22 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         return _loginRedirect(state.uri.toString());
       }
 
+      // 5. Where are we delivering? Asked once a run, and **only on the way to
+      //    Home** — that is what makes this "at the start of the app" rather
+      //    than a toll booth on every navigation. A push notification opening
+      //    an order, a deep link to a restaurant, and the trip back from the
+      //    address book all pass straight through; none of them is a customer
+      //    arriving at a screen whose every number depends on an address they
+      //    have not given.
+      //
+      //    After the auth guard deliberately: a protected deep link should reach
+      //    sign-in first, because that is the thing actually stopping it.
+      if (location == '/' &&
+          !ref.read(locationGateProvider) &&
+          ref.read(selectedAddressProvider) == null) {
+        return _locationGatePath;
+      }
+
       return null;
     },
     routes: <RouteBase>[
@@ -176,6 +196,13 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: _splashPath,
         name: Routes.splash,
         builder: (_, _) => const SplashPage(),
+      ),
+      // Outside the shell: the bottom pills would offer four tabs the customer
+      // cannot usefully reach yet.
+      GoRoute(
+        path: _locationGatePath,
+        name: Routes.locationGate,
+        builder: (_, _) => const LocationGatePage(),
       ),
       GoRoute(
         path: _loginPath,

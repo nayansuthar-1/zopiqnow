@@ -53,8 +53,14 @@ class MenuItemTile extends ConsumerWidget {
         restaurantName: restaurantName,
         enabled: enabled,
       ),
-      child: Padding(
+      // A hairline under every row, rather than rows floating in whitespace.
+      // On a menu where a dish is a photo, a price and three lines of text, the
+      // line is what tells the eye where one dish ends and the next begins.
+      child: Container(
         padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.lg),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: zc.divider)),
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -68,7 +74,10 @@ class MenuItemTile extends ConsumerWidget {
                     _BestsellerTag(color: zc.primaryDeep),
                   ],
                   const SizedBox(height: ZopiqSpacing.xs),
-                  Text(item.name, style: t.titleMedium),
+                  Text(
+                    item.name,
+                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: ZopiqSpacing.xxs),
                   Row(
                     children: <Widget>[
@@ -111,13 +120,31 @@ class MenuItemTile extends ConsumerWidget {
                       ],
                     ),
                   ],
-                  const SizedBox(height: ZopiqSpacing.sm),
-                  Text(
-                    item.description,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: t.bodySmall?.copyWith(color: zc.textMuted),
-                  ),
+                  if (item.description.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: ZopiqSpacing.sm),
+                    // Two lines and then "more" — the ellipsis alone says the
+                    // text was cut, and says nothing about there being anywhere
+                    // to read the rest. Tapping anywhere on the row opens it, so
+                    // this is a label on the gesture rather than a second target
+                    // that would compete with it.
+                    RichText(
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        text: item.description,
+                        style: t.bodySmall?.copyWith(color: zc.textMuted),
+                        children: <InlineSpan>[
+                          TextSpan(
+                            text: '  more',
+                            style: t.bodySmall?.copyWith(
+                              color: zc.textStrong,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
