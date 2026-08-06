@@ -16,8 +16,13 @@ click-by-click version for the two apps that have no listing yet.
 
 ## 0. The one thing to create first: a demo mailbox
 
-Both apps sign in with an **email OTP and nothing else**. So Google's reviewer
-cannot get in unless they can *read the mailbox*. Supabase has no fixed test-OTP
+~~Both apps sign in with an email OTP and nothing else.~~ **Superseded — both
+apps now have Google Sign-In.** A reviewer signs in with a demo Google account
+from the system picker, with no code to relay out of a mailbox. You still supply
+that account and its password in App access, but the fragile step is gone. See
+OAUTH_SETUP_VENDOR_RIDER.md for the two client registrations this needs.
+
+The original problem, for the record: Supabase has no fixed test-OTP
 for email (it has one for SMS only — checked, `sms_test_otp`), so there is no way
 to hand out a code that always works.
 
