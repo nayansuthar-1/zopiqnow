@@ -135,13 +135,13 @@ people out, because uploading to the wrong one succeeds silently:
 
 | Play Console says | The API calls it |
 |---|---|
-| Internal testing |  |
-| Closed testing |  — **unless you named the track yourself** |
-| Open testing |  |
-| Production |  |
+| Internal testing | `internal` |
+| Closed testing | `alpha` — **unless you named the track yourself** |
+| Open testing | `beta` |
+| Production | `production` |
 
-A closed test can be a track you named (qa, friends-and-family), and then that
-name *is* the API name. Do not guess —  lists the
+A closed test can be a track you named ("qa", "friends-and-family"), and then that
+name *is* the API name. Do not guess — `node tool/ship.mjs --check` lists the
 tracks Play actually holds for each app, read from your console rather than
 assumed.
 
