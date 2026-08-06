@@ -108,9 +108,41 @@ async function api(url, { method = 'GET', body, headers = {} } = {}) {
   if (!res.ok) {
     // Play's own sentence. "APK specifies a version code that has already been
     // used" is a one-line fix if you can read it and a mystery if you cannot.
-    throw new Error(parsed.error?.message ?? `${res.status} ${text.slice(0, 300)}`)
+    throw new Error(explain(parsed.error?.message ?? `${res.status} ${text.slice(0, 300)}`))
   }
   return parsed
+}
+
+/// Play's sentence, plus what to do about it when the sentence does not say.
+///
+/// These three are the ones that arrive with no hint of a cause, and each has
+/// exactly one fix. "This Edit has been deleted" in particular reads like data
+/// loss and is nothing of the kind — it means somebody else committed an edit on
+/// this app while ours was open, which is what happens the moment two people run
+/// this script at once.
+function explain(message) {
+  if (/Edit has been deleted/i.test(message)) {
+    return (
+      `${message}\n\n` +
+      'Play allows one open edit per app, so a second release running at the same\n' +
+      'time deletes the first. Nothing was uploaded and nothing was broken — wait\n' +
+      'for the other run to finish, then run this again.'
+    )
+  }
+  if (/version code.*already been used|already exists/i.test(message)) {
+    return (
+      `${message}\n\n` +
+      'That versionCode is already on Play. Run again — the bump takes the next one.'
+    )
+  }
+  if (/not found/i.test(message)) {
+    return (
+      `${message}\n\n` +
+      'The app has to exist in the Play Console before anything can be uploaded to\n' +
+      'it. Create it there first; there is no API for that step.'
+    )
+  }
+  return message
 }
 
 /// Streams the .aab up.
@@ -142,7 +174,7 @@ function uploadBundle(editId) {
         res.on('end', () => {
           const parsed = text ? JSON.parse(text) : {}
           if (res.statusCode >= 300) {
-            reject(new Error(parsed.error?.message ?? `HTTP ${res.statusCode}`))
+            reject(new Error(explain(parsed.error?.message ?? `HTTP ${res.statusCode}`)))
           } else {
             resolve(parsed)
           }
