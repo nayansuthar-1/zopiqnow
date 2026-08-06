@@ -19,7 +19,15 @@ import { readFile, writeFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 const APPS = ['customer', 'vendor', 'rider']
-const TRACKS = ['internal', 'alpha', 'beta', 'production']
+/// The four Play creates for you. **Not a whitelist** — a closed test can be a
+/// track you named yourself ("qa", "friends-and-family"), and the API takes that
+/// name verbatim. `--check` lists what this app actually has, which is the only
+/// answer that is true for *your* console rather than for Play in general.
+///
+/// The mapping is worth stating because the Console and the API use different
+/// words for the same thing: Console "Closed testing" is `alpha` unless renamed,
+/// and Console "Open testing" is `beta`.
+const KNOWN_TRACKS = ['internal', 'alpha', 'beta', 'production']
 const root = path.resolve(import.meta.dirname, '..')
 
 const args = process.argv.slice(2)
@@ -49,6 +57,32 @@ function run(command, cmdArgs, cwd) {
     })
     child.on('close', resolve)
   })
+}
+
+/// The track names Play holds for one app.
+///
+/// Listing tracks needs an edit to hang the read off, so one is opened and then
+/// abandoned. Abandoning is the point: an edit that is never committed changes
+/// nothing on the listing, so this stays a read however often it is run.
+async function tracksOf(appName, token) {
+  const gradle = await readFile(
+    path.join(root, 'apps', appName, 'android/app/build.gradle.kts'),
+    'utf8',
+  )
+  const id = gradle.match(/applicationId\s*=\s*"([^"]+)"/)?.[1]
+  const base = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${id}`
+  const auth = { Authorization: `Bearer ${token}` }
+
+  const editRes = await fetch(`${base}/edits`, { method: 'POST', headers: auth })
+  const edit = await editRes.json().catch(() => ({}))
+  if (!editRes.ok) throw new Error(edit.error?.message ?? `HTTP ${editRes.status}`)
+
+  const res = await fetch(`${base}/edits/${edit.id}/tracks`, { headers: auth })
+  const body = await res.json().catch(() => ({}))
+  await fetch(`${base}/edits/${edit.id}`, { method: 'DELETE', headers: auth })
+  if (!res.ok) throw new Error(body.error?.message ?? `HTTP ${res.status}`)
+
+  return (body.tracks ?? []).map((t) => t.track)
 }
 
 // --- Preflight --------------------------------------------------------------
@@ -104,6 +138,15 @@ async function doctor() {
         ready = false
       } else {
         play += '\n  Play API      token granted'
+        // What tracks this app really has, read from Play rather than assumed.
+        // A closed test can be a track somebody named, and guessing `alpha` when
+        // it is called something else uploads to a track nobody is testing on.
+        for (const a of APPS) {
+          const names = await tracksOf(a, token).catch((e) => e)
+          play += names instanceof Error
+            ? `\n  ${a.padEnd(13)} could not list tracks — ${names.message}`
+            : `\n  ${a.padEnd(13)} tracks: ${names.join(', ') || '(none yet)'}`
+        }
       }
     }
   }
@@ -121,13 +164,20 @@ async function doctor() {
 
 if (check) await doctor()
 
-if (!APPS.includes(app) || !TRACKS.includes(track)) {
+if (!APPS.includes(app) || !track) {
   console.error(
     'usage:\n' +
       '  node tool/ship.mjs --check\n' +
-      '  node tool/ship.mjs <customer|vendor|rider> <internal|alpha|beta|production> [--no-upload]',
+      '  node tool/ship.mjs <customer|vendor|rider> <track> [--no-upload]\n' +
+      `\n  track: ${KNOWN_TRACKS.join(' | ')}, or a custom one — run --check to list this app's.`,
   )
   process.exit(1)
+}
+if (!KNOWN_TRACKS.includes(track)) {
+  // Not refused: a custom closed track is a legitimate name. Said out loud,
+  // because a typo here uploads to a track that quietly springs into existence
+  // with nobody testing on it.
+  console.log(`Track "${track}" is not one of Play's standard four — assuming a custom track.`)
 }
 
 // --- 1. Bump ----------------------------------------------------------------

@@ -128,6 +128,25 @@ node tool/ship.mjs customer internal
 
 ---
 
+## Track names: the Console and the API disagree
+
+The Play Console and the API use different words for the same track. This catches
+people out, because uploading to the wrong one succeeds silently:
+
+| Play Console says | The API calls it |
+|---|---|
+| Internal testing |  |
+| Closed testing |  — **unless you named the track yourself** |
+| Open testing |  |
+| Production |  |
+
+A closed test can be a track you named (qa, friends-and-family), and then that
+name *is* the API name. Do not guess —  lists the
+tracks Play actually holds for each app, read from your console rather than
+assumed.
+
+---
+
 ## Target API level
 
 Play requires the target API to be within one year of the latest Android release.
