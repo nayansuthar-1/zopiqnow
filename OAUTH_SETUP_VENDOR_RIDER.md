@@ -69,17 +69,30 @@ second client (Google allows several per package, one per certificate).
 
 | Field | Value |
 |---|---|
-| Name | `Zopiq Partner (Play)` |
+| Name | `Partner (Play, v2)` |
 | Package name | `com.siteonlab.zopiq_vendor` |
-| SHA-1 | `8A:F1:77:21:12:D4:BD:AD:73:62:6A:F0:FD:45:1D:22:AF:5D:1A:F9` |
+| SHA-1 | `3D:A2:73:22:45:1B:C3:7F:B5:78:1F:4C:82:ED:05:58:27:6C:70:47` |
 
 ### Client 4 — Zopiq Rider, as Play signs it
 
 | Field | Value |
 |---|---|
-| Name | `Rider (Play)` |
+| Name | `Rider (Play, v2)` |
 | Package name | `com.siteonlab.zopiq_rider` |
-| SHA-1 | `54:53:54:BF:19:5F:85:63:0A:08:0B:7C:3E:87:07:B1:1C:C1:09:AE` |
+| SHA-1 | `01:3F:99:14:86:F6:F9:5D:A3:2F:E6:61:AF:F8:BE:2F:8D:D6:9D:0E` |
+
+> **Why "v2".** The first pair of Play listings were created with the app IDs
+> mistyped as `com.siteonlab.zopiqVendor` / `…zopiqRider`, which Play will not
+> let you edit afterwards — the first upload is rejected with *"Your APK or
+> Android App Bundle needs to have the package name …"*. The listings were
+> deleted and remade, and **a remade listing gets a new app signing key**, so the
+> fingerprints registered against the first pair (`8A:F1:77:…` and
+> `54:53:54:…`) are dead. Their OAuth clients were left in place rather than
+> deleted; they authorise a certificate that no longer exists, which costs
+> nothing.
+>
+> The upload-key fingerprints in clients 1 and 2 were *not* affected — those come
+> from the `.jks` files on disk, which the Play listing has no say over.
 
 Where these two came from:
 
