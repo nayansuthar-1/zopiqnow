@@ -1,7 +1,12 @@
-# Google Sign-In — the two OAuth clients to register
+# Google Sign-In — the four OAuth clients to register
+
+> **Status: all four registered, 6 Aug 2026**, in project `789936942272` (which
+> the console displays as "My First Project"). Kept here because the fingerprints
+> are the thing to check first when sign-in fails, and because a new keystore or
+> a second Play listing means doing this again.
 
 The code is done and both apps build. Google Sign-In **will not work until these
-two clients exist**, and the failure is silent-ish: the account sheet opens, you
+clients exist**, and the failure is silent-ish: the account sheet opens, you
 pick an account, and the device refuses with
 
     Invalid key value: <sha1>:com.siteonlab.zopiq_vendor
@@ -18,7 +23,19 @@ Google Cloud project **789936942272** — the same one the customer app uses:
 https://console.cloud.google.com/apis/credentials?project=789936942272
 ```
 
-**Create credentials → OAuth client ID → Application type: Android.** Twice.
+**Create credentials → OAuth client ID → Application type: Android.** Four times
+(two per app — see below).
+
+> **Check the project, not the project's name.** The console opens on whatever
+> was last used, often "My First Project", and it will happily create an Android
+> client in the wrong one. Google issues the id token for the `serverClientId`
+> audience only when the Android client lives in the *same* project. The check
+> that cannot lie: the new client's ID must start with `789936942272-`.
+
+> **"The Android package name and fingerprint are already in use"** on a form you
+> only filled once usually means Create was clicked twice. Look for the
+> `OAuth client created` toast underneath the dialog — if it is there, the client
+> exists and the error is about the duplicate, not the original.
 
 ## What to paste
 
@@ -48,12 +65,36 @@ every install with *its* key, so a build installed from Play presents a differen
 certificate from the one you uploaded. Register that one too — same package name,
 second client (Google allows several per package, one per certificate).
 
-Find each app's Play certificate at:
+### Client 3 — Zopiq Partner, as Play signs it
 
-> Play Console → the app → **Test and release → Setup → App integrity** →
-> *App signing key certificate* → SHA-1
+| Field | Value |
+|---|---|
+| Name | `Zopiq Partner (Play)` |
+| Package name | `com.siteonlab.zopiq_vendor` |
+| SHA-1 | `8A:F1:77:21:12:D4:BD:AD:73:62:6A:F0:FD:45:1D:22:AF:5D:1A:F9` |
 
-Both apps now exist, so both certificates exist.
+### Client 4 — Zopiq Rider, as Play signs it
+
+| Field | Value |
+|---|---|
+| Name | `Rider (Play)` |
+| Package name | `com.siteonlab.zopiq_rider` |
+| SHA-1 | `54:53:54:BF:19:5F:85:63:0A:08:0B:7C:3E:87:07:B1:1C:C1:09:AE` |
+
+Where these two came from:
+
+> Play Console → the app → **Test and release → Setup → App signing** →
+> *App signing key certificate* → **SHA-1 certificate fingerprint**
+
+Take the **Classical key** column. The *Post-quantum cryptography key* beside it
+is not what Google Sign-In matches against, and pasting it registers a
+certificate no device will ever present.
+
+The **Upload key certificate** panel lower down that page reads *"Certificate
+fingerprints will be shown here after you upload your first app bundle"* until a
+release exists. That is why clients 1 and 2 take their fingerprints from the
+`.jks` files instead — `keytool -list -v -keystore <path>` — rather than waiting
+on a release that is itself waiting on sign-in working.
 
 **This repo has already been bitten by exactly this.** It is why the customer app
 has three registrations, not one, and why its notes say to read fingerprints off
