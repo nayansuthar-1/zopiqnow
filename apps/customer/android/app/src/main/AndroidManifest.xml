@@ -29,11 +29,17 @@
          crash loop at worst. A session is re-established by signing in, not
          carried in a backup, so opting out is the honest position rather than a
          precaution. -->
+    <!-- Targeting API 36 (Android 16) turns predictive back on by default.
+         Declared here rather than inherited, so the gesture is something these
+         apps opted into rather than a behaviour that arrived with an SDK bump.
+         Nothing overrides back in any of the three — no PopScope, no
+         WillPopScope — so there is nothing for it to break. -->
     <application
         android:label="Zopiq"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:allowBackup="false">
+        android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true">
 
         <!-- The Maps SDK reads its key from here and nowhere else. The value is
              substituted by Gradle from `android/local.properties`, which is

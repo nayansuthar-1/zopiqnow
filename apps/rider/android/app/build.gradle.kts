@@ -69,7 +69,7 @@ android {
         // oldest device in this system by some margin — this is the last app to
         // raise a minimum on.
         minSdk = 24        // Android 7.0 — broad reach
-        targetSdk = 35     // Android 15 — Play 2026 requirement
+        targetSdk = 36     // Android 16 — Play requires it from 31 Aug 2026
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         ndk {

@@ -51,7 +51,7 @@ android {
         // The same floor as the customer app. A kitchen tablet is, if anything,
         // older than a customer's phone — this is not the app to raise it on.
         minSdk = 24        // Android 7.0 — broad reach
-        targetSdk = 35     // Android 15 — Play 2026 requirement
+        targetSdk = 36     // Android 16 — Play requires it from 31 Aug 2026
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         ndk {

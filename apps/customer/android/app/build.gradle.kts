@@ -80,7 +80,7 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
         // Locked per ENGINEERING_RULES.md Rule 1 (Android 10+ broad reach) & DEVELOPMENT_SETUP.md.
         minSdk = 24        // Android 7.0 — broad reach
-        targetSdk = 35     // Android 15 — Play 2026 requirement
+        targetSdk = 36     // Android 16 — Play requires it from 31 Aug 2026
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         // Only ship the ABIs we actually support (keeps APK/AAB lean).

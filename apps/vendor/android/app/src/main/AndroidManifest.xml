@@ -11,11 +11,17 @@
     <!-- See the customer app's manifest for the reasoning: a Keystore-backed
          session survives a Drive backup as ciphertext whose key does not, so a
          restored device would hold bytes nothing can open. -->
+    <!-- Targeting API 36 (Android 16) turns predictive back on by default.
+         Declared here rather than inherited, so the gesture is something these
+         apps opted into rather than a behaviour that arrived with an SDK bump.
+         Nothing overrides back in any of the three — no PopScope, no
+         WillPopScope — so there is nothing for it to break. -->
     <application
         android:label="Zopiq Partner"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:allowBackup="false">
+        android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
