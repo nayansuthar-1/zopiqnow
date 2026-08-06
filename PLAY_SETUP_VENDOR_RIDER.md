@@ -84,12 +84,18 @@ Paste the URL above. Both apps.
 Choose *All or some functionality is restricted*, add one instruction set:
 
 - **Name:** `Demo login`
-- **Username:** the demo Gmail from step 0
-- **Password:** that Gmail's password
+- **Username:** the demo Google account from step 0
+- **Password:** that account's password
 - **Instructions:**
-  > Enter this email on the sign-in screen and tap Continue. A 6-digit code is
-  > emailed to it. Sign in to Gmail with the same address and password to read the
-  > code, then enter it in the app.
+  > Add this Google account to the device (Settings → Accounts → Add account →
+  > Google), then open the app and tap **Continue with Google** and choose it.
+  > No emailed code is needed.
+  >
+  > An emailed 6-digit code also works if you prefer: enter the same address on
+  > the sign-in screen, tap Send code, and read the code from that mailbox.
+
+The Google route is the one to lead with — it is the one that does not depend on
+mail arriving during review.
 
 ### Ads
 **No**, both apps. There is no ad SDK in either.
@@ -149,7 +155,7 @@ Both bundles already build, are signed, and target API 36.
    listing is publicly installable by anyone — they just cannot sign in. Most
    delivery platforms accept that. If you would rather they never went public,
    keep both on a closed track for ever and skip production entirely.
-2. **The demo mailbox password goes to Google.** That is the cost of OTP-only
-   sign-in. The alternative is adding password login to both apps for a demo
-   account, which is more code and one more way in. Throwaway mailbox is the
-   cheaper answer, but it is your call.
+2. **The demo account's password goes to Google either way.** App access requires
+   credentials for an app behind a login, and no sign-in method avoids that.
+   Google Sign-In removed the *fragile* half — the mailbox round-trip — not the
+   password. Which is why it should be a throwaway account that owns nothing.
