@@ -247,27 +247,27 @@ class _DayRow extends StatelessWidget {
             ),
           ),
           Expanded(
+            // Wrap, not Row. The day name and the switch take a fixed ~156dp
+            // between them, and two chips reading "10:00 AM" and "11:30 PM"
+            // want more than the ~170dp left on a 360dp phone — so a Row here
+            // overflows before "next day" is even considered. A Wrap has
+            // somewhere to put the excess.
             child: day.open
-                ? Row(
+                ? Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: ZopiqSpacing.sm,
+                    runSpacing: ZopiqSpacing.xs,
                     children: <Widget>[
                       _TimeChip(label: day.opens.format(context), onTap: onPickOpen),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: ZopiqSpacing.sm,
-                        ),
-                        child: Text('–', style: t.bodyMedium),
-                      ),
+                      Text('–', style: t.bodyMedium),
                       _TimeChip(label: day.closes.format(context), onTap: onPickClose),
                       // A window that ends before it starts runs past midnight.
                       // Said out loud, because "18:00 – 01:00" on one row reads
                       // like a typo until you are told it is not.
                       if (day.closesNextDay)
-                        Padding(
-                          padding: const EdgeInsets.only(left: ZopiqSpacing.sm),
-                          child: Text(
-                            'next day',
-                            style: t.labelSmall?.copyWith(color: zc.textMuted),
-                          ),
+                        Text(
+                          'next day',
+                          style: t.labelSmall?.copyWith(color: zc.textMuted),
                         ),
                     ],
                   )
@@ -300,8 +300,11 @@ class _TimeChip extends StatelessWidget {
       borderRadius: ZopiqRadii.rSm,
       onTap: onTap,
       child: Container(
+        // Tighter than the usual md so that a full "10:00 AM – 11:30 PM" still
+        // fits on one line beside the day name; the Wrap above is the safety
+        // net for the cases where it does not.
         padding: const EdgeInsets.symmetric(
-          horizontal: ZopiqSpacing.md,
+          horizontal: ZopiqSpacing.sm,
           vertical: ZopiqSpacing.xs,
         ),
         decoration: BoxDecoration(
