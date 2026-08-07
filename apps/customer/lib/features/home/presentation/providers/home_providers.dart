@@ -131,6 +131,67 @@ final Provider<AsyncValue<List<Restaurant>>> filteredRestaurantsProvider =
           .whenData((List<Restaurant> all) => effective.apply(all));
     });
 
+/// Restaurants serving one category, keyed by its label ("Pizza", "Biryani").
+///
+/// Filtered out of [nearbyRestaurantsProvider] rather than through
+/// `searchRestaurants`, and the difference matters. The server search is an
+/// `ilike` over `search_text`, which is name + cuisines — the same two fields
+/// matched here — but it searches *every* restaurant on the platform, including
+/// ones that do not deliver to this address. The nearby feed has already applied
+/// the delivery radius, so filtering it keeps the promise the section header
+/// makes: these are restaurants delivering to you.
+///
+/// It also costs no round trip, so switching categories is instant.
+final ProviderFamily<AsyncValue<List<Restaurant>>, String>
+categoryRestaurantsProvider =
+    Provider.family<AsyncValue<List<Restaurant>>, String>((
+      Ref ref,
+      String label,
+    ) {
+      final HomeFilters filters = ref.watch(homeFiltersProvider);
+      final HomeFilters effective = ref.watch(vegModeProvider)
+          ? filters.copyWith(pureVeg: true)
+          : filters;
+
+      return ref
+          .watch(nearbyRestaurantsProvider)
+          .whenData(
+            (List<Restaurant> all) => effective.apply(_inCategory(all, label)),
+          );
+    });
+
+/// The "Recommended for you" rail on a category page. Highest-rated in that
+/// category, and — like [topRatedRestaurantsProvider], which it mirrors — it
+/// ignores the chip row, so the rail does not empty out as filters are tried.
+final ProviderFamily<AsyncValue<List<Restaurant>>, String>
+categoryTopRatedProvider =
+    Provider.family<AsyncValue<List<Restaurant>>, String>((
+      Ref ref,
+      String label,
+    ) {
+      return ref.watch(nearbyRestaurantsProvider).whenData((
+        List<Restaurant> all,
+      ) {
+        final List<Restaurant> sorted = _inCategory(all, label)
+          ..sort((Restaurant a, Restaurant b) => b.rating.compareTo(a.rating));
+        return sorted.take(_topChainCount).toList(growable: false);
+      });
+    });
+
+/// Name or cuisine tag contains the label. Deliberately the same two fields the
+/// server's `search_text` column is generated from, so a category page and a
+/// typed search for the same word agree with each other.
+List<Restaurant> _inCategory(List<Restaurant> all, String label) {
+  final String needle = label.toLowerCase();
+  return all
+      .where(
+        (Restaurant r) =>
+            r.name.toLowerCase().contains(needle) ||
+            r.cuisines.any((String c) => c.toLowerCase().contains(needle)),
+      )
+      .toList();
+}
+
 /// "Top restaurant chains" rail — highest-rated first, ignores the chip row.
 final Provider<AsyncValue<List<Restaurant>>> topRatedRestaurantsProvider =
     Provider<AsyncValue<List<Restaurant>>>((Ref ref) {

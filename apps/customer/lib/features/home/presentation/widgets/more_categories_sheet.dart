@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/account/presentation/providers/veg_mode_provider.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
@@ -169,9 +171,15 @@ class _CategoryGridTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ZopiqPressable(
-      // The dish listing this opens onto does not exist yet; closing is the
-      // honest thing to do until it does.
-      onTap: () => Navigator.of(context).pop(),
+      // Closed first, then pushed — a sheet left open behind a page it opened is
+      // still there when Back returns.
+      onTap: () {
+        Navigator.of(context).pop();
+        context.pushNamed(
+          Routes.category,
+          pathParameters: <String, String>{'id': category.id},
+        );
+      },
       child: Column(
         children: <Widget>[
           // The Home rail's disc, at the Home rail's size. It used to be sized

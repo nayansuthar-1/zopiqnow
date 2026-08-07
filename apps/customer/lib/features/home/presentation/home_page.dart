@@ -20,7 +20,6 @@ import 'package:zopiqnow/features/home/presentation/widgets/top_chains_rail.dart
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 import 'package:zopiqnow/features/location/presentation/widgets/address_picker_sheet.dart';
-import 'package:zopiqnow/features/search/presentation/providers/search_providers.dart';
 
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/app/providers/bottom_nav_provider.dart';
@@ -118,25 +117,29 @@ class _HomePageState extends ConsumerState<HomePage>
     }
   }
 
-  /// A tap on the "What's on your mind?" rail. Every tile in it was wired to an
-  /// empty callback, so the whole rail was decoration: pressing one gave the ink
-  /// ripple and then nothing.
+  /// A tap on the "What's on your mind?" rail.
   ///
   /// Two destinations, because the rail has two kinds of tile. "View More" opens
   /// [showMoreCategoriesSheet], which is the screen built for it. Every other
-  /// tile goes to search: `searchRestaurants` matches name *or cuisine*, so
-  /// seeding the query with the tile's label ("Biryani") is a real dish search,
-  /// not a name match that happens to work.
+  /// tile opens [CategoryPage].
   ///
-  /// Pushed, not `go`: search sits outside the shell, so a `go` would leave it
-  /// with no bottom bar and no back arrow — a screen with no way out.
+  /// It used to type the label into the search field and hand over to search.
+  /// That was wrong twice: search queries every restaurant on the platform, so
+  /// the results included kitchens that do not deliver here, and arriving on the
+  /// search screen left no rail to switch categories with. The category page
+  /// filters the *nearby* feed and brings the rail along.
+  ///
+  /// Pushed, not `go`: it sits outside the shell, so a `go` would leave it with
+  /// no bottom bar and no back arrow — a screen with no way out.
   void _openCategory(FoodCategory category) {
     if (category.id == 'view_more') {
       showMoreCategoriesSheet(context);
       return;
     }
-    ref.read(searchQueryProvider.notifier).set(category.label);
-    context.pushNamed(Routes.search);
+    context.pushNamed(
+      Routes.category,
+      pathParameters: <String, String>{'id': category.id},
+    );
   }
 
   /// The hero's "Order now": advance the feed by roughly one viewport, which

@@ -10,11 +10,15 @@ class FoodCategoryRail extends StatelessWidget {
   const FoodCategoryRail({
     required this.categories,
     this.onTapCategory,
+    this.selectedId,
     super.key,
   });
 
   final List<FoodCategory> categories;
   final ValueChanged<FoodCategory>? onTapCategory;
+
+  /// Which tile is currently being browsed, or null on Home where none is.
+  final String? selectedId;
 
   /// The diameter of a category disc, everywhere it is drawn. Public because
   /// the "View More" sheet draws the same discs and has to draw them the same
@@ -24,8 +28,21 @@ class FoodCategoryRail extends StatelessWidget {
 
   static const double _tileWidth = 66;
 
-  /// Art + top pad + gap + one line of label, so the rail never reflows on long names.
-  static const double railHeight = artSize + ZopiqSpacing.lg + ZopiqSpacing.sm + 18;
+  /// The bar under the selected tile. Reserved on Home too, where nothing is
+  /// selected — the rail is the same widget on both screens, and a height that
+  /// changed with selection would make the whole feed jump on the way in.
+  static const double indicatorHeight = 3;
+  static const double _indicatorGap = 5;
+
+  /// Art + top pad + gap + one line of label + the selection bar, so the rail
+  /// never reflows on long names.
+  static const double railHeight =
+      artSize +
+      ZopiqSpacing.lg +
+      ZopiqSpacing.sm +
+      18 +
+      _indicatorGap +
+      indicatorHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +64,7 @@ class FoodCategoryRail extends StatelessWidget {
           return RepaintBoundary(
             child: _CategoryTile(
               category: category,
+              selected: category.id == selectedId,
               onTap: onTapCategory == null
                   ? null
                   : () => onTapCategory!(category),
@@ -59,13 +77,24 @@ class FoodCategoryRail extends StatelessWidget {
 }
 
 class _CategoryTile extends StatelessWidget {
-  const _CategoryTile({required this.category, this.onTap});
+  const _CategoryTile({
+    required this.category,
+    this.selected = false,
+    this.onTap,
+  });
 
   final FoodCategory category;
+  final bool selected;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    // The bar carries two facts at once: which category is open, and whether it
+    // is vegetarian. Same green and red the veg indicator uses on every dish, so
+    // it needs no explaining.
+    final Color accent = category.isVeg ? zc.veg : zc.nonVeg;
+
     return ZopiqPressable(
       onTap: onTap,
       child: SizedBox(
@@ -80,7 +109,23 @@ class _CategoryTile extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelMedium,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                fontWeight: selected ? FontWeight.w700 : null,
+                color: selected ? zc.textStrong : null,
+              ),
+            ),
+            const SizedBox(height: FoodCategoryRail._indicatorGap),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              height: FoodCategoryRail.indicatorHeight,
+              width: selected ? FoodCategoryRail._tileWidth * 0.62 : 0,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(
+                  FoodCategoryRail.indicatorHeight,
+                ),
+              ),
             ),
           ],
         ),

@@ -29,6 +29,7 @@ import 'package:zopiqnow/features/gifts/presentation/pages/gift_placed_page.dart
 import 'package:zopiqnow/features/gifts/presentation/pages/gift_shop_page.dart';
 import 'package:zopiqnow/features/gifts/presentation/pages/gifts_page.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
+import 'package:zopiqnow/features/home/presentation/category_page.dart';
 import 'package:zopiqnow/features/home/presentation/home_page.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/presentation/pages/address_book_page.dart';
@@ -73,6 +74,7 @@ abstract final class Routes {
   static const String login = 'login';
   static const String otp = 'otp';
   static const String locationGate = 'locationGate';
+  static const String category = 'category';
 }
 
 /// Paths that require a signed-in user.
@@ -426,6 +428,15 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       //
       // Path-based, not `extra`-based: a cold deep link to a restaurant must
       // resolve from the id alone, with no Home feed in memory.
+      // One dish category. Outside the shell and pushed, like search and the
+      // menu — it needs a back arrow, and on iOS there is no system Back to
+      // fall back on.
+      GoRoute(
+        path: '/category/:id',
+        name: Routes.category,
+        builder: (BuildContext context, GoRouterState state) =>
+            CategoryPage(categoryId: state.pathParameters['id']!),
+      ),
       GoRoute(
         path: '/restaurant/:id',
         name: Routes.menu,

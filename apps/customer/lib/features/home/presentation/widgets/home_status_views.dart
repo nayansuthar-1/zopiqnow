@@ -76,7 +76,13 @@ class HomeEmptyView extends StatelessWidget {
 /// The feed had restaurants, but the active filter chips excluded all of them.
 /// Distinct from [HomeEmptyView]: the fix here is the user's, not ours.
 class HomeNoMatchesView extends StatelessWidget {
-  const HomeNoMatchesView({super.key});
+  const HomeNoMatchesView({this.message, super.key});
+
+  /// Overrides the second line. A category page reaches this state for a
+  /// different reason than Home does — nothing nearby serves that dish, which no
+  /// amount of removing filters will fix — and telling someone to drop a filter
+  /// they never set is advice that cannot work.
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +100,7 @@ class HomeNoMatchesView extends StatelessWidget {
         ),
         const SizedBox(height: ZopiqSpacing.xs),
         Text(
-          'Try removing a filter to see more results.',
+          message ?? 'Try removing a filter to see more results.',
           style: t.bodyMedium?.copyWith(color: zc.textMuted),
           textAlign: TextAlign.center,
         ),
