@@ -190,16 +190,42 @@ Future<int?> showMenuJumpSheet(
             ),
           ),
           Expanded(
+            // Rows built by hand rather than with `ListTile`, which is ~56 tall
+            // whatever you put in it — most of that being padding around one
+            // line of text. At 48 the sheet shows two or three more sections
+            // for the same height, and 48 is exactly the minimum comfortable
+            // tap target, so nothing is traded for it.
             child: ListView.builder(
               padding: const EdgeInsets.only(bottom: ZopiqSpacing.lg),
               itemCount: categories.length,
-              itemBuilder: (BuildContext context, int i) => ListTile(
-                title: Text(categories[i].title, style: t.bodyLarge),
-                trailing: Text(
-                  '${categories[i].items.length}',
-                  style: t.bodyMedium?.copyWith(color: zc.textMuted),
-                ),
+              itemBuilder: (BuildContext context, int i) => InkWell(
                 onTap: () => Navigator.of(context).pop(i),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ZopiqSpacing.pageGutter,
+                    vertical: ZopiqSpacing.md,
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      // Expanded and clipped: a section called "Chinese Starters
+                      // and Soups" beside its count is the one thing on this
+                      // sheet that can overflow a row.
+                      Expanded(
+                        child: Text(
+                          categories[i].title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.bodyLarge,
+                        ),
+                      ),
+                      const SizedBox(width: ZopiqSpacing.sm),
+                      Text(
+                        '${categories[i].items.length}',
+                        style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
