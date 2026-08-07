@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:zopiqnow/features/account/presentation/providers/veg_mode_provider.dart';
@@ -129,6 +130,20 @@ final Provider<AsyncValue<List<Restaurant>>> filteredRestaurantsProvider =
       return ref
           .watch(nearbyRestaurantsProvider)
           .whenData((List<Restaurant> all) => effective.apply(all));
+    });
+
+/// Home's feed scroll position, owned here rather than by [HomePage].
+///
+/// The shell needs it: system Back on the Delivery tab returns the feed to the
+/// top before it will leave the app, and the shell is the widget that hears
+/// Back. A controller created inside `HomePage.initState` is unreachable from
+/// there, and lifting it into a provider is cheaper than threading a callback
+/// up through a route the shell does not own.
+final Provider<ScrollController> homeScrollControllerProvider =
+    Provider<ScrollController>((Ref ref) {
+      final ScrollController controller = ScrollController();
+      ref.onDispose(controller.dispose);
+      return controller;
     });
 
 /// Restaurants serving one category, keyed by its label ("Pizza", "Biryani").

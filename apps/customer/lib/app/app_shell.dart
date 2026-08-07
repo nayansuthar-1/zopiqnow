@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
@@ -6,6 +7,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 import 'package:zopiqnow/app/providers/bottom_nav_provider.dart';
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
+import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
 
@@ -18,7 +20,7 @@ import 'package:zopiqnow/features/checkout/presentation/providers/orders_provide
 /// Only the tabs that exist are here. Account arrives with the feature behind it
 /// (DEVELOPMENT_PLAN step 5) as one more [StatefulShellBranch]. A tab that
 /// navigates to nothing reads as broken.
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({required this.navigationShell, super.key});
 
   final StatefulNavigationShell navigationShell;
@@ -28,8 +30,43 @@ class AppShell extends StatelessWidget {
   /// pill rather than the pill row.
   static const int cartBranchIndex = 4;
 
+  /// System Back, on the tab that is showing.
+  ///
+  /// Three steps before the app closes, each of which undoes the last thing the
+  /// user did rather than the whole session:
+  ///
+  ///   1. Not on Delivery → go to Delivery. A tab switch is navigation, and Back
+  ///      should undo it. Leaving from Gifts used to close the app outright.
+  ///   2. On Delivery, scrolled → return the feed to the top.
+  ///   3. At the top of Delivery → leave.
+  ///
+  /// This also settles *whether Flutter hears Back at all*. `PopScope` with
+  /// `canPop: false` makes the framework tell the engine it handles Back, which
+  /// registers the `OnBackInvokedCallback` the manifest opted into. Without a
+  /// declared interest, a shell route with nothing above it to pop lets Android
+  /// finish the activity — which is the app closing from the one screen that
+  /// should be hardest to leave by accident.
+  void _onBack(WidgetRef ref) {
+    if (navigationShell.currentIndex != 0) {
+      navigationShell.goBranch(0);
+      return;
+    }
+
+    final ScrollController scroll = ref.read(homeScrollControllerProvider);
+    if (scroll.hasClients && scroll.offset > 0) {
+      scroll.animateTo(
+        0,
+        duration: ZopiqDurations.slow,
+        curve: ZopiqCurves.emphasized,
+      );
+      return;
+    }
+
+    SystemNavigator.pop();
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     // The cart carries its own bottom bar — the total and "Proceed to
     // checkout" — so the pills are not drawn over it, and (because
     // `extendBody` hands their height to the body as padding) do not reserve
@@ -38,12 +75,22 @@ class AppShell extends StatelessWidget {
     // hidden state, which is how they arrive here from a scrolled Home.
     final bool onCart = navigationShell.currentIndex == cartBranchIndex;
 
-    return Scaffold(
-      extendBody: true,
-      body: navigationShell,
-      bottomNavigationBar: onCart
-          ? null
-          : _ShellNavBar(navigationShell: navigationShell),
+    return PopScope(
+      // Never pops on its own — there is nothing under the shell to pop *to*,
+      // so a real pop is the app closing. `_onBack` decides when that is what
+      // was meant.
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (didPop) return;
+        _onBack(ref);
+      },
+      child: Scaffold(
+        extendBody: true,
+        body: navigationShell,
+        bottomNavigationBar: onCart
+            ? null
+            : _ShellNavBar(navigationShell: navigationShell),
+      ),
     );
   }
 }

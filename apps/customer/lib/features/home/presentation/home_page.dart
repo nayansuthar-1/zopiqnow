@@ -48,7 +48,10 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage>
     with SingleTickerProviderStateMixin {
-  final ScrollController _scroll = ScrollController();
+  /// Lives in [homeScrollControllerProvider], not here — the shell returns this
+  /// feed to the top on system Back and cannot reach a controller owned by a
+  /// widget it does not build. Riverpod disposes it, so this page must not.
+  late final ScrollController _scroll = ref.read(homeScrollControllerProvider);
   AnimationController? _filterAnimCtrl;
   Animation<double>? _filterAnim;
 
@@ -97,8 +100,10 @@ class _HomePageState extends ConsumerState<HomePage>
   @override
   void dispose() {
     _filterAnimCtrl?.dispose();
+    // Listener off, controller left alone: the provider owns it, and disposing
+    // it here would leave the shell holding a dead controller the next time
+    // Home is built.
     _scroll.removeListener(_onScroll);
-    _scroll.dispose();
     super.dispose();
   }
 
