@@ -221,7 +221,7 @@ class _HomePageState extends ConsumerState<HomePage>
               pinned: true,
               delegate: _FoodCategoryRailDelegate(categories, _openCategory),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: ZopiqSpacing.lg)),
+            const SliverToBoxAdapter(child: SizedBox(height: ZopiqSpacing.xs)),
             AnimatedBuilder(
               animation: _filterAnim ?? const AlwaysStoppedAnimation(1.0),
               builder: (BuildContext context, Widget? child) {

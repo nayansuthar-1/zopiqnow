@@ -11,9 +11,12 @@ class SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
+      // Tighter above than below: the heading belongs to the rail underneath it,
+      // and an equal gap on both sides left it floating between two sections
+      // rather than introducing one.
       padding: const EdgeInsets.fromLTRB(
         ZopiqSpacing.pageGutter,
-        ZopiqSpacing.lg,
+        ZopiqSpacing.sm,
         ZopiqSpacing.pageGutter,
         ZopiqSpacing.md,
       ),

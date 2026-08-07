@@ -10,7 +10,11 @@ import 'package:zopiqnow/features/home/presentation/providers/home_providers.dar
 class HomeFilterChips extends ConsumerWidget {
   const HomeFilterChips({super.key});
 
-  static const double height = 60;
+  /// A chip is ~34 tall (label + `sm` padding + border), so 60 left roughly 13
+  /// of dead air above and below it. 48 leaves the chips breathing without the
+  /// band reading as an empty stripe between the category rail and the first
+  /// section.
+  static const double height = 48;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
