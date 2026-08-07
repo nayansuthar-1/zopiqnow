@@ -99,37 +99,28 @@ class _LocationGatePageState extends ConsumerState<LocationGatePage> {
         child: Padding(
           padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Spacer(),
+              const SizedBox(height: ZopiqSpacing.xxl),
 
-              Container(
-                padding: const EdgeInsets.all(ZopiqSpacing.lg),
-                decoration: BoxDecoration(
-                  color: zc.primary.withValues(alpha: 0.10),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.location_on_rounded,
-                  size: 40,
-                  color: zc.primary,
+              // Centred, and the only text on the screen. The paragraph that
+              // used to sit under it explained *why* we were asking, which is a
+              // reasonable thing to say and the wrong moment to say it: there is
+              // one decision here and two buttons that make it.
+              Text(
+                'Set your location to start exploring\nrestaurants near you',
+                textAlign: TextAlign.center,
+                style: t.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
                 ),
               ),
-              const SizedBox(height: ZopiqSpacing.xl),
 
-              Text(
-                'Where should we deliver?',
-                style: t.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: ZopiqSpacing.sm),
-              Text(
-                'Restaurants, delivery times and fees all depend on where you '
-                'are. Set it once and the whole app follows.',
-                style: t.bodyMedium?.copyWith(color: zc.textMuted),
-              ),
+              // Takes whatever is left between the heading and the buttons, so
+              // the art shrinks on a short screen rather than pushing the
+              // buttons off it.
+              const Expanded(child: Center(child: _LocationArt())),
 
               if (_error != null) ...<Widget>[
-                const SizedBox(height: ZopiqSpacing.lg),
                 Container(
                   padding: const EdgeInsets.all(ZopiqSpacing.md),
                   decoration: BoxDecoration(
@@ -154,35 +145,124 @@ class _LocationGatePageState extends ConsumerState<LocationGatePage> {
                     ],
                   ),
                 ),
+                const SizedBox(height: ZopiqSpacing.lg),
               ],
 
-              const Spacer(),
-
               ZopiqButton(
-                label: _detecting ? 'Finding you…' : 'Use my current location',
-                icon: Icons.my_location_rounded,
+                label: _detecting ? 'Finding you…' : 'Enable Device Location',
                 variant: ZopiqButtonVariant.cta,
                 onPressed: _detecting ? null : _useCurrentLocation,
               ),
               const SizedBox(height: ZopiqSpacing.sm),
               ZopiqButton(
-                label: 'Enter address manually',
+                label: 'Enter Your Location Manually',
                 variant: ZopiqButtonVariant.outline,
                 onPressed: _detecting ? null : _enterManually,
               ),
               const SizedBox(height: ZopiqSpacing.xs),
-              Center(
-                child: TextButton(
-                  onPressed: _detecting ? null : _done,
-                  child: Text(
-                    'Skip for now',
-                    style: t.labelLarge?.copyWith(color: zc.textMuted),
-                  ),
+              // Kept, though the reference has no equivalent. Someone who denies
+              // the OS permission and has no saved address would otherwise be
+              // held on this screen with no way past it — and denying is an
+              // answer the disclosure explicitly invites. Muted and last, so it
+              // is available without competing with the two real choices.
+              TextButton(
+                onPressed: _detecting ? null : _done,
+                child: Text(
+                  'Skip for now',
+                  style: t.labelLarge?.copyWith(color: zc.textMuted),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The illustration between the heading and the buttons.
+///
+/// Drawn rather than shipped: there is no artwork in `assets/` for this, and a
+/// flat icon on its own read as an empty state rather than an invitation. The
+/// pieces are a soft tinted field, the pin, and two dishes lifted from the
+/// category art already in the bundle — so it says "restaurants near you" with
+/// nothing new to download and nothing to keep in sync.
+class _LocationArt extends StatelessWidget {
+  const _LocationArt();
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+
+    return AspectRatio(
+      aspectRatio: 1,
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final double side = constraints.biggest.shortestSide;
+          return Stack(
+            alignment: Alignment.center,
+            children: <Widget>[
+              Container(
+                width: side * 0.82,
+                height: side * 0.82,
+                decoration: BoxDecoration(
+                  color: zc.primary.withValues(alpha: 0.06),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              Container(
+                width: side * 0.56,
+                height: side * 0.56,
+                decoration: BoxDecoration(
+                  color: zc.primary.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              Icon(
+                Icons.location_on_rounded,
+                size: side * 0.30,
+                color: zc.primary,
+              ),
+              Positioned(
+                left: side * 0.04,
+                top: side * 0.30,
+                child: _Dish(asset: 'assets/categories/burger.png', size: side * 0.20),
+              ),
+              Positioned(
+                right: side * 0.04,
+                top: side * 0.22,
+                child: _Dish(asset: 'assets/categories/pizza.png', size: side * 0.20),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _Dish extends StatelessWidget {
+  const _Dish({required this.asset, required this.size});
+
+  final String asset;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      padding: EdgeInsets.all(size * 0.16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: context.zc.divider),
+      ),
+      // A missing category file must not take the whole gate down with it.
+      child: Image.asset(
+        asset,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
       ),
     );
   }
