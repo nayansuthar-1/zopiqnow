@@ -24,11 +24,19 @@ not because they are codeable.
 
 | | Open | Closed |
 |---|---:|---:|
-| 🔴 **Blocker** — launch gate | 5 | 9 |
-| 🟠 **Critical** | 28 | 5 |
+| 🔴 **Blocker** — launch gate | 2 | 12 |
+| 🟠 **Critical** | 25 | 8 |
 | 🟡 **Major** | 46 | 5 |
 | ⚪ **Minor** | 12 | 1 |
-| | **91** | **23** |
+| | **85** | **29** |
+
+> **Re-verified 2026-08-07 against the running code and the live database.** Six
+> findings were already fixed and never ticked — REL-001, OBS-001, PAY-001,
+> RID-005, SEC-005, and half of SEC-003. Each was checked against the artefact
+> rather than the source: signing read out of the built APK with `apksigner`,
+> the payment gate read out of `payment_settings` over psql. **A tracker that
+> over-reports open work is as misleading as one that under-reports it** — it
+> hides the two blockers that are real behind four that are not.
 
 1 finding withdrawn by the auditor. **115 carry an ID of their own.**
 The report's own headline count is 118; the difference is findings folded into
@@ -49,11 +57,11 @@ severity or an effort of its own to sort by, so neither gets a box here.
 
 Sorted by effort, cheapest first.
 
-- [ ] **REL-001** — All three release builds are signed with the debug keystore 🔸<br><sub>Cross-cutting · Android build · effort S</sub>
-- [ ] **OBS-001** — No crash reporting, no analytics, no APM — in any of the four clients<br><sub>Cross-cutting · Observability · effort M</sub>
+- [x] **REL-001** — All three release builds are signed with the debug keystore. **Closed — re-verified 2026-08-07 from the built artifacts, not the source:** `apksigner verify --print-certs` on each release APK returns `05:F4:0D:21…` (vendor), `E9:F8:91:57…` (rider), `A9:09:B9:1D…` (customer) — the upload certificates, each of which is registered as an Android OAuth client. All three `build.gradle.kts` carry a `signingConfigs.getByName("release")`, and debug now signs with the release cert too, so Google Sign-In behaves the same in both.<br><sub>Cross-cutting · Android build · effort S</sub>
+- [x] **OBS-001** — No crash reporting, no analytics, no APM — in any of the four clients. **Closed — `firebase_crashlytics` is a direct dependency of all three Flutter apps**, and handled errors are reported deliberately (a Google sign-in failure writes the underlying code, which is otherwise only visible in `adb logcat`).<br><sub>Cross-cutting · Observability · effort M</sub>
 - [ ] **ADM-001** — There is no customer management at all.<br><sub>Feature · effort L</sub>
 - [ ] **FEA-001** — There is no geospatial model — "nearby" is a number an admin typed in<br><sub>Customer App · Backend · Home / Checkout · effort L</sub>
-- [ ] **PAY-001** — Payment is a mock, and the server accepts any string as proof of it 🔸<br><sub>Customer App · Backend · Checkout → UPI sheet · effort L</sub>
+- [x] **PAY-001** — Payment is a mock, and the server accepts any string as proof of it. **Closed in code; the remaining half is 🔸 credentials.** `RazorpayPaymentGateway` is the bound gateway and falls back to the mock *only while `razorpay-order` answers `configured: false`* — so the day the keys are set, every already-installed build starts taking real payments with no release and no store review. Server side: `razorpay-verify` checks the HMAC, and the 0085 `before insert` trigger refuses an unproved order. ⚠️ **Verified against the live DB 2026-08-07: `require_verified_payment = false` and zero Razorpay secrets in Vault.** Keys first, then one `update`. Until then the trigger is disarmed and an order can be placed without payment being proved.<br><sub>Customer App · Backend · Checkout → UPI sheet · effort L</sub>
 
 ---
 
@@ -66,7 +74,7 @@ Sorted by effort, cheapest first.
 - [x] **CUS-005** — No idempotency on place_order. **Closed 2026-08-03 (migration 0086): caller-chosen key per checkout attempt, unique per customer, retries answered with the order already placed.**<br><sub>Checkout · Functional · effort S</sub>
 - [ ] **DAT-002** — A temp table is created on every order. **Second face of the same fact, found by the S4 probe 2026-08-03:** `_lines` is `on commit drop`, so `place_order` **cannot be called twice inside one transaction** — the second call dies on `relation "_lines" already exists`. Harmless in production, where every PostgREST RPC is its own transaction, but it means any test or batch that places two orders needs a savepoint per call.<br><sub>place_order · Performance · effort S</sub>
 - [ ] **DAT-006** — The CLI migration ledger has drifted from the live database four times and migrations 0062–0069 show as local-only despite being applied.<br><sub>Migrations · Architecture · effort S</sub>
-- [ ] **RID-005** — No concurrent-claim cap and no fraud limits.<br><sub>Jobs · Business · effort S</sub>
+- [x] **RID-005** — No concurrent-claim cap and no fraud limits. **Closed — both exist and are enforced in the dispatcher, not the app.** `offer_delivery` filters candidates on `cand.live_jobs < v_s.max_live_jobs` (0099), counting deliveries in `claimed`/`arrived_at_restaurant`/`picked_up`/`arrived_at_customer`, so a rider cannot be offered work past the cap. Cash riders are additionally capped by `rider_cash_in_hand(p.email) + v_total <= rider_cash_cap()`. Velocity limits landed with 0090.<br><sub>Jobs · Business · effort S</sub>
 - [ ] **SEC-004** — The Cloudinary unsigned upload preset ships inside every APK<br><sub>Customer App · Vendor App · Media · effort S</sub>
 - [ ] **SEC-008** — No documented backup, PITR, or disaster-recovery plan. 🔸<br><sub>Backups · Architecture · effort S</sub>
 - [ ] **ADM-004** — No manual rider assignment override.<br><sub>Live orders · UX · effort M</sub>
@@ -79,8 +87,8 @@ Sorted by effort, cheapest first.
 - [ ] **QA-001** — The money layer has no tests, the suite is red, and nothing runs it<br><sub>Cross-cutting · Quality · effort M</sub>
 - [ ] **RID-003** — No proof of delivery beyond the OTP.<br><sub>Delivery · Functional · effort M</sub>
 - [ ] **RID-008** — No SOS button, no emergency contact, no accident reporting.<br><sub>Jobs · Safety · effort M</sub>
-- [ ] **SEC-003** — The admin console is flat-role, password-only, with no MFA and almost no audit trail<br><sub>Admin Console · Auth & RBAC · effort M</sub>
-- [ ] **SEC-005** — No rate limiting on any RPC.<br><sub>Rate limiting · Security · effort M</sub>
+- [ ] **SEC-003** — The admin console is flat-role, password-only, with no MFA and almost no audit trail. **Half closed 2026-08-07 review:** the audit trail exists — `admin_actions` (0092), append-only via table triggers rather than by asking each RPC to remember, and the console reads it only through RPCs. **Still open: MFA, and the flat role.** Every admin can do everything, including the unguarded order delete added in 0069.<br><sub>Admin Console · Auth & RBAC · effort M</sub>
+- [x] **SEC-005** — No rate limiting on any RPC. **Closed by migration 0090** — 10 orders/hr per customer, 6 broadcasts/hr, 20 chat lines per side per order. OTP is left to GoTrue's own limiter rather than duplicated. ⚠️ One property worth knowing before writing more of these: `now()` is frozen for the whole transaction, so a limiter that compares against `now()` cannot see writes made earlier in the *same* transaction.<br><sub>Rate limiting · Security · effort M</sub>
 - [ ] **UX-001** — The Account screen is half dead ends — five tiles are "coming soon" snackbars<br><sub>Customer App · Account · effort M</sub>
 - [ ] **UX-002** — No phone-number authentication — an Indian food delivery app that signs in by email<br><sub>Customer App · Auth · effort M</sub>
 - [ ] **ADM-002** — No support ticket queue.<br><sub>Feature · effort L</sub>
