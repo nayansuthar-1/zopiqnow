@@ -145,8 +145,12 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.sm),
               physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-              itemCount: data.length,
+              // One past the end, for the footer — which draws nothing at all
+              // once the history has run out.
+              itemCount: data.length + 1,
               itemBuilder: (BuildContext context, int i) {
+                if (i == data.length) return const _LoadMoreFooter();
+
                 final CustomerOrder order = data[i];
                 // One tile's spinner must not repaint the rest of the list.
                 return RepaintBoundary(
@@ -164,6 +168,87 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// The end of the list: a button, a spinner, or nothing.
+///
+/// It owns its own "loading" flag rather than reading one off the notifier.
+/// Watching `ordersProvider.notifier` would not rebuild when a plain field on it
+/// changed — only a new *state* does that — so a flag kept there would light the
+/// spinner and never put it out.
+class _LoadMoreFooter extends ConsumerStatefulWidget {
+  const _LoadMoreFooter();
+
+  @override
+  ConsumerState<_LoadMoreFooter> createState() => _LoadMoreFooterState();
+}
+
+class _LoadMoreFooterState extends ConsumerState<_LoadMoreFooter> {
+  bool _busy = false;
+  bool _failed = false;
+
+  Future<void> _load() async {
+    setState(() {
+      _busy = true;
+      _failed = false;
+    });
+    try {
+      await ref.read(ordersProvider.notifier).loadMore();
+    } on Object {
+      // The orders already on screen are still correct; only the *next* page
+      // failed. Say so here rather than replacing the whole list with an error.
+      if (mounted) setState(() => _failed = true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Rebuilt whenever a page lands, which is how this learns the history has
+    // run out and stops drawing itself.
+    ref.watch(ordersProvider);
+    if (!ref.read(ordersProvider.notifier).hasMore) {
+      return const SizedBox(height: ZopiqSpacing.lg);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ZopiqSpacing.pageGutter,
+        ZopiqSpacing.sm,
+        ZopiqSpacing.pageGutter,
+        ZopiqSpacing.xl,
+      ),
+      child: Column(
+        children: <Widget>[
+          if (_failed) ...<Widget>[
+            Text(
+              'Couldn\'t load older orders.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: context.zc.nonVeg),
+            ),
+            const SizedBox(height: ZopiqSpacing.sm),
+          ],
+          if (_busy)
+            const Padding(
+              padding: EdgeInsets.all(ZopiqSpacing.sm),
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            ZopiqButton(
+              label: _failed ? 'Try again' : 'Show older orders',
+              variant: ZopiqButtonVariant.outline,
+              onPressed: _load,
+            ),
+        ],
       ),
     );
   }

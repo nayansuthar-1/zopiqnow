@@ -69,7 +69,10 @@ abstract interface class OrderRepository {
   /// caller gets an empty list, not a failure: having no orders and having no
   /// account look the same from here, and the screen behind an auth guard will
   /// never ask.
-  Future<List<CustomerOrder>> getOrders();
+  ///
+  /// A page shorter than [limit] is the end of the history — there is no count,
+  /// deliberately.
+  Future<List<CustomerOrder>> getOrders({int offset = 0, int limit = 25});
 
   /// One order, by id, or null when the customer has no such order.
   ///

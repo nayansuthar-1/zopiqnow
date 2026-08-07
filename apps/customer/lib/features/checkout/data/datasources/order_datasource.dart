@@ -62,13 +62,18 @@ abstract interface class OrderDataSource {
   /// honouring one — that is `applyCoupon`'s job, and it re-checks the scope.
   Future<List<RestaurantOffer>> fetchOffers(String restaurantId);
 
-  /// The signed-in customer's orders, newest first.
+  /// The signed-in customer's orders, newest first, one page at a time.
   ///
   /// No user id here either, and for the same reason: the caller does not say
   /// whose orders it wants. `auth.uid()` does, through the row-level policy on
   /// `orders` — a client that could name the buyer could read someone else's
   /// receipts, which carry a phone number and a home address.
-  Future<List<CustomerOrder>> fetchOrders();
+  ///
+  /// A short page means there is nothing after it. That is the only end-of-list
+  /// signal, and it is deliberately not a count: `count: exact` on a
+  /// policy-filtered table costs a second scan on every page to answer a
+  /// question the screen does not ask.
+  Future<List<CustomerOrder>> fetchOrders({int offset = 0, int limit = 25});
 
   /// One order, by id. Null when there is no such order *or* it belongs to
   /// someone else — from here those are the same answer, and they should be:

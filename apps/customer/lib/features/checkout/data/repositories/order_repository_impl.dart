@@ -75,9 +75,9 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
-  Future<List<CustomerOrder>> getOrders() async {
+  Future<List<CustomerOrder>> getOrders({int offset = 0, int limit = 25}) async {
     try {
-      return await _dataSource.fetchOrders();
+      return await _dataSource.fetchOrders(offset: offset, limit: limit);
     } on Object catch (_) {
       // Unlike a missing coupon hint, an empty list here is a *statement* —
       // "you have never ordered" — and the screen renders it as one. A failed

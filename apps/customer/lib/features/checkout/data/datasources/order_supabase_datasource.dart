@@ -148,10 +148,8 @@ class OrderSupabaseDataSource implements OrderDataSource {
     }
   }
 
-  /// How far back "your orders" goes. A customer with a thousand orders does not
-  /// want a thousand cards, and an unbounded select is how a screen that was
-  /// fast in testing gets slow in production. Paging arrives if anyone asks.
-  static const int _historyLimit = 25;
+  /// Kept as the default page size. It used to be a hard ceiling — order 26 was
+  /// simply unreachable, with nothing on screen to say so (audit CUS-001).
 
   /// Everything an order renders from. One constant, because the list and the
   /// detail screen show the same order and a column the detail screen forgot to
@@ -170,16 +168,22 @@ class OrderSupabaseDataSource implements OrderDataSource {
       'order_item_options(name, price_delta))';
 
   @override
-  Future<List<CustomerOrder>> fetchOrders() async {
+  Future<List<CustomerOrder>> fetchOrders({int offset = 0, int limit = 25}) async {
     // No `.eq('user_id', …)`. The row-level policy on `orders` already answers
     // "whose?" from the JWT, and a filter here would only be a second, weaker
     // copy of that rule — one that a bug could get wrong and that an attacker
     // could simply omit.
+    //
+    // `range` is inclusive at both ends, so the last index is one short of the
+    // page size. Ordering by `created_at` alone would be unstable for two orders
+    // written in the same millisecond — a row could appear on two pages or on
+    // none — so `id` breaks the tie and makes the sequence total.
     final List<Map<String, dynamic>> rows = await _db
         .from('orders')
         .select(_orderColumns)
         .order('created_at', ascending: false)
-        .limit(_historyLimit);
+        .order('id', ascending: false)
+        .range(offset, offset + limit - 1);
 
     return rows.map(_orderFrom).toList(growable: false);
   }

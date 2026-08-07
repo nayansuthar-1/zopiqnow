@@ -24,11 +24,71 @@ import 'package:zopiqnow/features/menu/presentation/providers/menu_providers.dar
 /// instead of serving the previous account's receipts out of the cache. Auto-
 /// disposed: history is worth a round trip on open and not worth holding for a
 /// session.
-final AutoDisposeFutureProvider<List<CustomerOrder>> ordersProvider =
-    FutureProvider.autoDispose<List<CustomerOrder>>((Ref ref) {
-      ref.watch(authControllerProvider);
-      return ref.watch(orderRepositoryProvider).getOrders();
-    });
+/// Paged, because it used to stop dead at 25 with nothing on screen to say so
+/// (audit CUS-001). The first page arrives with the screen; the rest are asked
+/// for.
+final AutoDisposeAsyncNotifierProvider<OrdersNotifier, List<CustomerOrder>>
+ordersProvider =
+    AsyncNotifierProvider.autoDispose<OrdersNotifier, List<CustomerOrder>>(
+      OrdersNotifier.new,
+    );
+
+class OrdersNotifier extends AutoDisposeAsyncNotifier<List<CustomerOrder>> {
+  static const int pageSize = 25;
+
+  /// A page shorter than [pageSize] was the last one. No count is fetched:
+  /// `count: exact` on a policy-filtered table pays for a second scan on every
+  /// page to answer a question no part of this screen asks.
+  bool _reachedEnd = false;
+
+  /// Guards against a second request while one is in flight — the button can be
+  /// pressed again before the page lands.
+  bool _loadingMore = false;
+
+  bool get hasMore => !_reachedEnd;
+
+  @override
+  Future<List<CustomerOrder>> build() async {
+    ref.watch(authControllerProvider);
+    _reachedEnd = false;
+    _loadingMore = false;
+    final List<CustomerOrder> first = await ref
+        .watch(orderRepositoryProvider)
+        .getOrders(limit: pageSize);
+    _reachedEnd = first.length < pageSize;
+    return first;
+  }
+
+  /// Appends the next page.
+  ///
+  /// Throws on failure rather than folding the error into [state], and that is
+  /// deliberate: the pages already on screen are still true, so replacing them
+  /// with an error would throw away good data to report that there might be
+  /// more of it. The footer catches it and offers the button again.
+  ///
+  /// State is reassigned even when the page comes back empty — a *new list
+  /// instance* is what tells listeners to rebuild, and that rebuild is how the
+  /// footer learns [hasMore] has become false and takes itself off the screen.
+  Future<void> loadMore() async {
+    if (_reachedEnd || _loadingMore) return;
+    final List<CustomerOrder>? current = state.valueOrNull;
+    if (current == null) return;
+
+    _loadingMore = true;
+    try {
+      final List<CustomerOrder> next = await ref
+          .read(orderRepositoryProvider)
+          .getOrders(offset: current.length, limit: pageSize);
+      _reachedEnd = next.length < pageSize;
+      state = AsyncData<List<CustomerOrder>>(<CustomerOrder>[
+        ...current,
+        ...next,
+      ]);
+    } finally {
+      _loadingMore = false;
+    }
+  }
+}
 
 /// The order still on its way, or null when nothing is running.
 ///

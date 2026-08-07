@@ -185,9 +185,11 @@ class OrderMockDataSource implements OrderDataSource {
   }
 
   @override
-  Future<List<CustomerOrder>> fetchOrders() async {
+  Future<List<CustomerOrder>> fetchOrders({int offset = 0, int limit = 25}) async {
     await Future<void>.delayed(latency);
-    return _history.reversed.toList(growable: false);
+    final List<CustomerOrder> all = _history.reversed.toList(growable: false);
+    if (offset >= all.length) return const <CustomerOrder>[];
+    return all.sublist(offset, (offset + limit).clamp(0, all.length));
   }
 
   @override
