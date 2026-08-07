@@ -41,7 +41,11 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlaps) {
     return Container(
-      color: background,
+      // The colour belongs *inside* the decoration. Passing both is an assertion
+      // failure, not a warning — and because this is a pinned sliver header, the
+      // throw takes the viewport's layout with it and the whole restaurant page
+      // renders white.
+      //
       // The line is what stops the chips floating over the dish they are pinned
       // above; without it they read as part of whatever has scrolled under them.
       decoration: BoxDecoration(
