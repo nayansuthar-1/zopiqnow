@@ -20,9 +20,42 @@ class TopChainsRail extends StatelessWidget {
   static const double _cardHeight = 180;
   static const double _railHeight = (_cardHeight * 2) + ZopiqSpacing.md;
 
+  /// Below this the rail stops being a rail.
+  ///
+  /// Two 112pt cards pinned to the left of a 360pt screen, under a heading, read
+  /// as a section that failed to finish loading — there is nothing to scroll and
+  /// most of the row is empty. So one or two restaurants widen to fill it
+  /// instead, which is a deliberate layout rather than an accident of how few
+  /// there are. A category page hits this constantly; Home rarely does.
+  static const int _minimumForRail = 3;
+
   @override
   Widget build(BuildContext context) {
     final List<Restaurant> items = restaurants.take(8).toList();
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    if (items.length < _minimumForRail) {
+      return Padding(
+        padding: ZopiqSpacing.pagePadding,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            for (int i = 0; i < items.length; i++) ...<Widget>[
+              if (i > 0) const SizedBox(width: ZopiqSpacing.md),
+              Expanded(
+                child: _ChainCard(
+                  restaurant: items[i],
+                  onTap: onTapRestaurant == null
+                      ? null
+                      : () => onTapRestaurant!(items[i]),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
     return SizedBox(
       height: _railHeight,
       child: GridView.builder(
@@ -39,6 +72,7 @@ class TopChainsRail extends StatelessWidget {
         itemBuilder: (BuildContext context, int i) => RepaintBoundary(
           child: _ChainCard(
             restaurant: items[i],
+            width: _cardWidth,
             onTap: onTapRestaurant == null
                 ? null
                 : () => onTapRestaurant!(items[i]),
@@ -50,9 +84,15 @@ class TopChainsRail extends StatelessWidget {
 }
 
 class _ChainCard extends StatelessWidget {
-  const _ChainCard({required this.restaurant, this.onTap});
+  const _ChainCard({required this.restaurant, this.width, this.onTap});
 
   final Restaurant restaurant;
+
+  /// Fixed in the rail, null when the card is sharing a row — a null width on
+  /// [SizedBox] imposes no constraint, so the card takes whatever the `Expanded`
+  /// above it hands down.
+  final double? width;
+
   final VoidCallback? onTap;
 
   @override
@@ -63,8 +103,11 @@ class _ChainCard extends StatelessWidget {
     return ZopiqPressable(
       onTap: onTap,
       child: SizedBox(
-        width: TopChainsRail._cardWidth,
+        width: width,
         child: Column(
+          // The rail gives each cell a fixed 180pt; a shared row gives unbounded
+          // height, and a `max` Column in unbounded height is a layout error.
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             _ChainImage(restaurant: restaurant),
