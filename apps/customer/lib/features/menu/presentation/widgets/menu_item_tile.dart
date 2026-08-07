@@ -194,20 +194,20 @@ class _ItemArtAndControl extends StatelessWidget {
 
   static const double _width = 118;
   static const double _imageHeight = 96;
-  static const double _totalHeight = 118;
 
   @override
   Widget build(BuildContext context) {
+    // Stacked, the control used to straddle the bottom edge of the photo. Now
+    // it sits under it: the column takes its own height rather than a fixed
+    // one, so nothing has to be kept in step with the control's 36px.
     return SizedBox(
       width: _width,
-      height: _totalHeight,
-      child: Stack(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
+          SizedBox(
             height: _imageHeight,
+            width: double.infinity,
             child: ClipRRect(
               borderRadius: ZopiqRadii.rMd,
               child: ZopiqNetworkImage(
@@ -221,17 +221,13 @@ class _ItemArtAndControl extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(
-            bottom: 0,
-            left: 7,
-            right: 7,
-            child: AddToCartControl(
-              quantity: quantity,
-              enabled: enabled,
-              onAdd: onAdd,
-              onIncrement: onIncrement,
-              onDecrement: onDecrement,
-            ),
+          const SizedBox(height: ZopiqSpacing.sm),
+          AddToCartControl(
+            quantity: quantity,
+            enabled: enabled,
+            onAdd: onAdd,
+            onIncrement: onIncrement,
+            onDecrement: onDecrement,
           ),
         ],
       ),
