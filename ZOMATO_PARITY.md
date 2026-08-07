@@ -52,7 +52,10 @@ Everything in `PUSH_NOTIFICATIONS.md`. **B3's dispatch is now unblocked** — an
 push with Accept/Decline is buildable, and the 20s board poll can go.
 
 Still owed, small:
-- [ ] `supabase functions delete send-order-push` — the superseded function is still
+- [x] `supabase functions delete send-order-push` ✅ **DONE** — verified 2026-08-07 by
+      calling it: `POST /functions/v1/send-order-push` → **404**, while
+      `send-notification` → 403 (deployed, refusing an unauthenticated caller). The
+      local source folder is all that remains of it. ~~The superseded function is still~~
       ACTIVE beside `send-notification`, and a dead endpoint nobody calls is one
       somebody wires back up. Unwired since 0058 dropped `on_new_order_push`, so this
       is a deployment to remove, not a behaviour to change. **The source folder stays
@@ -116,10 +119,14 @@ Today only a vendor can end an order early, and no money ever comes back.
 ledger with nothing behind it: checkout still runs on `MockPaymentGateway` and no money
 has ever moved. Building it against a real gateway once beats building it twice.
 
-- [ ] `refunds` table + state machine (requested → approved → paid), FK to the order
-- [ ] Refund on cancel-after-payment and on vendor rejection
-- [ ] Customer: order issue / report screen, feeding a support queue
-- [ ] Admin: refund management console
+✅ **DONE — verified 2026-08-07.** It was built after B4, exactly as this note planned.
+
+- [x] `refunds` table + state machine (requested → approved → paid), FK to the order
+- [x] Refund on cancel-after-payment and on vendor rejection
+- [x] Customer: order issue / report screen, feeding a support queue —
+      `order_issue_section.dart`, `order_refund_section.dart`, `report_issue_sheet.dart`,
+      backed by `support_tickets`
+- [x] Admin: refund management console — `apps/admin-web/src/payouts/RefundsPage.tsx`
 
 **A hole found and closed on the way:** 0050 did not do what it says. 0015 had widened
 `set_order_status` to four arguments (`p_prep_minutes`); 0050 wrote a *three*-argument
@@ -202,12 +209,33 @@ expression collapse to the original number: no new information, no new estimate.
 
 ---
 
-### B4 — Payments, for real
-- [ ] Razorpay checkout (dep approved + pinned since 2026-07-10)
-- [ ] Server-created payment order — the client must never name an amount
-- [ ] **Signature verification** server-side before an order is placed
-- [ ] Payment status on the order; a failed payment must not create a half-order
-- [ ] Refund path wired to B2
+### B4 — Payments, for real ✅ *built (migrations 0085–0086) — **not yet armed***
+- [x] Razorpay checkout — `razorpay_flutter: 1.4.5`, pinned
+- [x] Server-created payment order — edge function `razorpay-order`; the client never
+      names an amount
+- [x] **Signature verification** server-side — edge function `razorpay-verify`, HMAC
+- [x] Payment status on the order; a failed payment must not create a half-order —
+      `payment_intents`, plus the 0086 idempotency key so a retried checkout cannot
+      place a second order
+- [x] Refund path wired to B2
+
+⚠️ **The gate is built and switched OFF, and that is the last thing standing between
+this repo and taking real money.** Verified against the live database on 2026-08-07:
+
+```
+require_verified_payment = false
+razorpay keys in vault   = 0
+```
+
+`orders_require_verified_payment` (0085) is a `before insert` trigger that consults
+`payment_settings`. Until the flag is true, an order can be placed without a payment
+having been proved. Turning it on before Razorpay keys exist would stop the product
+taking orders at all — which is why it ships off — so the order is: **keys into Vault
+first, then one statement.**
+
+```sql
+update public.payment_settings set require_verified_payment = true;
+```
 
 ---
 
@@ -409,15 +437,32 @@ it again); and no overload was created (0051's).
 ---
 
 ### B8 — Hardening (runs last, but the rules apply from B1 onward)
-- [ ] Rider identity verification / KYC — documents on the roster, admin-verified
-- [ ] Fraud: velocity limits, a cap on concurrent claims, OTP attempt caps
-- [ ] `/security-review` over every new RPC and policy
-- [ ] **`revoke all on function X from public, anon, authenticated`** on every ops-only
-      function — the 0045 lesson; revoking from PUBLIC alone is not enough on Supabase
+- [x] Rider identity verification / KYC — migration **0080**; documents gate five work
+      paths, expiry recomputed rather than stored
+- [x] Fraud: velocity limits, a cap on concurrent claims, OTP attempt caps — migration
+      **0090** (10 orders/hr, 6 broadcasts/hr, 20 chat lines per side)
+- [x] `/security-review` over every new RPC and policy — the AUDIT_REPORT_2026-07-30
+      pass and the remediation queue behind it
+- [x] **`revoke all on function X from public, anon, authenticated`** on every ops-only
+      function — migration **0093**. The 0045 lesson, and the sharper one behind it:
+      there are *two* routes in, PUBLIC **and** a default grant to `authenticated`, so
+      revoking from PUBLIC alone leaves it open
+- [x] **Release-APK manifest check for every app** — read out of the built APK with
+      `aapt2`, not off the manifest source. The customer app declares 4 permissions and
+      ships 16; the extra 12 arrive through the manifest merger
 - [ ] Edge-case matrix per phase, run against the live DB in a rolled-back transaction
+      — *a standing practice, never "finished"*
 - [ ] Perf: rebuild/scroll profiling on the Android 10 floor, pagination, image caching
-- [ ] **Release-APK manifest check for every app** — the rider's missing `INTERNET`
-      permission shipped dead for four phases. "It builds" is not "it runs"
+      — **the one item with real work left in it, and it needs a decision first:**
+      - *Pagination* is premature. The feed loads every nearby restaurant and there are
+        ten of them; `.range()` on ten rows is complexity bought against a problem that
+        does not exist yet. Revisit at a few hundred.
+      - *Disk image caching* needs `cached_network_image`, which is a new dependency and
+        therefore an explicit approved request under the version freeze. `ZopiqNetworkImage`
+        already decodes at draw size (`cacheWidth`), so what is missing is survival
+        across an app restart — every food photo is re-downloaded on every cold start,
+        which on Indian mobile data is the part that actually costs a customer money.
+      - *Profiling* wants an Android 10 device, and the one on the desk is Android 13.
 
 ---
 
