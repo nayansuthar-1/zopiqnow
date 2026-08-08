@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+10
+version: 1.0.0+11
 # Part of the zopiqnow pub workspace: shares the single root lockfile (Rule 3).
 resolution: workspace
 
@@ -72,6 +72,20 @@ dependencies:
   # Reverse-geocode via Android's *native* Geocoder — no Maps API key, no
   # billing. Google Places autocomplete (SAD 14) arrives with the backend.
   geocoding: 5.0.0
+
+  # --- In-app "turn on location" dialog (approved Rule 3 change request,
+  # 2026-08-08) ---------------------------------------------------------------
+  # Here for exactly one call: `requestService()`, the Google Play Services
+  # dialog that switches GPS on in place. geolocator has no equivalent — the
+  # most it can do is `openLocationSettings()`, which throws the customer out of
+  # the app into Android Settings, and that is where a location prompt gets
+  # abandoned.
+  #
+  # It is *not* a second way to read a position. Every coordinate in this app
+  # still comes from geolocator; this package is confined to the one method, in
+  # one file (`GeolocatorLocationService`), so the two plugins cannot disagree
+  # about what the device's location is.
+  location: 8.0.1
 
   # --- Payments (approved Step 6, Rule 3 change request, 2026-07-10) ----------
   # Razorpay checkout for UPI/cards. Declares minSdk 19 — under our floor of 24.
