@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:zopiq_ui/src/components/zopiq_shimmer.dart';
+import 'package:zopiq_ui/src/images/zopiq_disk_image.dart';
 import 'package:zopiq_ui/src/tokens/zopiq_durations.dart';
 
 /// The one way feature code renders a remote image.
@@ -14,9 +15,10 @@ import 'package:zopiq_ui/src/tokens/zopiq_durations.dart';
 /// classic Android jank-and-OOM source; `cacheWidth` fixes it at the cost of one
 /// [LayoutBuilder].
 ///
-/// Caching is Flutter's in-memory [ImageCache] only — images survive a scroll,
-/// not an app restart. Disk caching needs `cached_network_image`, a dependency
-/// we have not taken; see DEVELOPMENT_PLAN.md.
+/// Caching is two layers: Flutter's in-memory [ImageCache] for a scroll, and
+/// [ZopiqDiskImage] for everything after that — the encoded bytes survive an app
+/// restart, so a cold launch draws the catalogue without touching the network.
+/// See [ZopiqImageStore] for why that is not `cached_network_image`.
 class ZopiqNetworkImage extends StatelessWidget {
   const ZopiqNetworkImage({
     required this.url,
@@ -47,10 +49,15 @@ class ZopiqNetworkImage extends StatelessWidget {
             ? (constraints.maxWidth * dpr).round()
             : null;
 
-        return Image.network(
-          url,
+        return Image(
+          // `resizeIfNeeded` is what `Image.network` wraps `cacheWidth` in; it
+          // returns the provider untouched when there is no hint to apply.
+          image: ResizeImage.resizeIfNeeded(
+            cacheWidth,
+            null,
+            ZopiqDiskImage(url),
+          ),
           fit: fit,
-          cacheWidth: cacheWidth,
           errorBuilder: (_, _, _) => fallback,
           loadingBuilder:
               (BuildContext context, Widget child, ImageChunkEvent? progress) {

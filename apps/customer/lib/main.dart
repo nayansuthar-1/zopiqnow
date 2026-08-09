@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/env.dart';
 import 'package:zopiqnow/app/zopiq_app.dart';
@@ -80,4 +81,9 @@ Future<void> main() async {
   // call is idempotent and whichever arrives first wins.
   await CrashReporter.enable();
   await PushService.start();
+
+  // Last, and behind a painted screen: the image cache is what makes a cold
+  // launch draw the catalogue without downloading it again, and this is the one
+  // thing that keeps it from growing without a ceiling. It never throws.
+  await ZopiqImageStore.instance.sweep();
 }

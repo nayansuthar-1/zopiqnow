@@ -27,3 +27,6 @@ export 'src/components/zopiq_network_image.dart';
 export 'src/components/zopiq_pressable.dart';
 export 'src/components/zopiq_shimmer.dart';
 export 'src/components/zopiq_veg_indicator.dart';
+
+// Images
+export 'src/images/zopiq_disk_image.dart';

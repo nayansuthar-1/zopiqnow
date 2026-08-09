@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_vendor/app/env.dart';
 import 'package:zopiq_vendor/app/vendor_app.dart';
@@ -47,4 +48,9 @@ Future<void> main() async {
   // modes. Both bring Firebase up and the call is idempotent.
   await CrashReporter.enable();
   await PushService.start();
+
+  // Same ceiling as the customer app. This one caches menu photography rather
+  // than a catalogue, so it will rarely have anything to sweep — but an
+  // unbounded cache on a tablet that never restarts is worth the one call.
+  await ZopiqImageStore.instance.sweep();
 }

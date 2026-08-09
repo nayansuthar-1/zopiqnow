@@ -98,9 +98,11 @@ gradient) once, so no call site reinvents them. Bitmaps decode at draw size via
 `INTERNET` added to the release manifest — Flutter only declares it for debug, so
 release builds were silently going to fail every image.
 
-**Still owed here:** caching is Flutter's in-memory `ImageCache` only. Images survive
-a scroll, not an app restart. Disk caching needs `cached_network_image`, a new
-dependency and therefore an explicit, approved decision.
+**Closed 2026-08-09 (ZOMATO_PARITY B8):** caching is now two layers. Flutter's
+in-memory `ImageCache` carries a scroll; `ZopiqDiskImage` keeps the encoded bytes in
+the OS cache directory, so a cold start draws the catalogue without touching the
+network. It took **no new dependency** — `crypto` and `path_provider` were already in
+the root lockfile, and the resolve left `pubspec.lock` byte-identical.
 
 ### ~~Step 4 — Search~~ ✅ done
 Debounced query (300ms) against the repository, matching restaurant names and

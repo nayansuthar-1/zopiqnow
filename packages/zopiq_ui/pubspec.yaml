@@ -14,6 +14,20 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # --- The disk image cache (ZOMATO_PARITY B8 perf, 2026-08-09) ---------------
+  # **Not new versions** (Rule 3). Both were already resolved in the root
+  # lockfile as transitive dependencies at exactly these numbers; this is the
+  # transitive-to-direct move `url_launcher` made in B5 and `http` made for the
+  # profile upload, and it changes no pin. Neither declares a minSdk above our
+  # floor of 24.
+  #
+  # `path_provider` for the OS cache directory — the one thing `dart:io` cannot
+  # answer on its own, because only the platform knows where a cache belongs.
+  # `crypto` to name a file after its URL; a hand-rolled hash here would be more
+  # code and less proven.
+  crypto: 3.0.7
+  path_provider: 2.1.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

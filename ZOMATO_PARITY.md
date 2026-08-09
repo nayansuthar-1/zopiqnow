@@ -452,17 +452,56 @@ it again); and no overload was created (0051's).
       ships 16; the extra 12 arrive through the manifest merger
 - [ ] Edge-case matrix per phase, run against the live DB in a rolled-back transaction
       — *a standing practice, never "finished"*
-- [ ] Perf: rebuild/scroll profiling on the Android 10 floor, pagination, image caching
-      — **the one item with real work left in it, and it needs a decision first:**
-      - *Pagination* is premature. The feed loads every nearby restaurant and there are
-        ten of them; `.range()` on ten rows is complexity bought against a problem that
-        does not exist yet. Revisit at a few hundred.
-      - *Disk image caching* needs `cached_network_image`, which is a new dependency and
-        therefore an explicit approved request under the version freeze. `ZopiqNetworkImage`
-        already decodes at draw size (`cacheWidth`), so what is missing is survival
-        across an app restart — every food photo is re-downloaded on every cold start,
-        which on Indian mobile data is the part that actually costs a customer money.
-      - *Profiling* wants an Android 10 device, and the one on the desk is Android 13.
+- [~] Perf: rebuild/scroll profiling on the Android 10 floor, pagination, image caching
+      — **the caching half is done (2026-08-09); the other two stand as written:**
+      - [x] *Disk image caching* — `ZopiqDiskImage`, an `ImageProvider` over an
+        on-disk store, behind the `ZopiqNetworkImage` every call site already uses.
+        Nothing in feature code changed. `ZopiqNetworkImage` already decoded at draw
+        size (`cacheWidth`); what was missing was survival across a restart, and
+        every food photo being re-downloaded on every cold start is the part that
+        actually costs a customer money on Indian mobile data.
+      - [ ] *Pagination* is premature. The feed loads every nearby restaurant and there
+        are ten of them; `.range()` on ten rows is complexity bought against a problem
+        that does not exist yet. Revisit at a few hundred.
+      - [ ] *Profiling* wants an Android 10 device, and the one on the desk is Android 13.
+
+**The dependency question this item had been parked on turned out to have a third
+answer.** It was written as a choice between taking `cached_network_image` — a new
+package, and therefore an approved Rule 3 request — and shipping without disk caching.
+But `crypto` and `path_provider` were **already in the root lockfile as transitive
+dependencies**, at 3.0.7 and 2.1.6, so `zopiq_ui` declares them at the versions already
+frozen and the whole feature costs **no new package and no moved pin**. Proven, not
+asserted: `pubspec.lock` is byte-for-byte identical after the resolve. The same
+transitive-to-direct move `url_launcher` made in B5 and `http` made for the profile
+upload.
+
+**The cache directory is the OS *cache* directory, not documents.** Android and iOS are
+both free to delete it under storage pressure, which is exactly the contract a cache
+should have — the alternative is an app that quietly grows a private hoard the system
+cannot reclaim when the phone fills up.
+
+**Three things that would each have been a bug, written down because none is obvious
+from the feature description:**
+- *A partial write must never be readable.* Bytes go to `<name>.part` and are renamed,
+  because a rename is atomic. A truncated file that decodes is worse than no cache: it
+  is a corrupt photo on every launch from then on, with nothing to invalidate it.
+- *Two decode widths for one URL are two cache keys.* The rail draws a dish small and
+  the detail sheet draws it large, so `ResizeImage` produces two providers — which
+  without an in-flight map is two downloads racing to write one file. Deduplicated on
+  the URL, which is the thing that is actually the same.
+- *A failure must not be cached.* On error the key is evicted from the memory cache in
+  a microtask, so the next build is free to try again rather than being handed the same
+  error for the life of the process. That is what `NetworkImage` does, for this reason.
+
+**And a ceiling, because an unbounded cache is a bug with a long fuse:** 50 MB and 30
+days, swept once after the first frame in the customer and vendor apps. There is no LRU
+touch on read — a disk write on every image draw costs more than the occasional
+re-download of a photo that is genuinely still in use.
+
+**Not yet seen on a device.** `flutter analyze` is clean in all three apps and the
+customer and rider debug APKs both build (the rider gains `path_provider` through
+`zopiq_ui` without using it, which is the build worth checking). What no build can show
+is the second cold start actually drawing from disk — that is a Phase 5 device check.
 
 ---
 
