@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:zopiqnow/core/observability/crash_reporter.dart';
+import 'package:zopiqnow/core/storage/json_disk_cache.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
@@ -112,6 +113,12 @@ class OrderSupabaseDataSource implements OrderDataSource {
             },
           );
 
+      // The list this customer is about to look at is now wrong by exactly one
+      // order — their own, the one they will go straight to. Dropped rather than
+      // waited out, because a minute of "your order isn't there" on the screen
+      // you land on after paying is the worst minute this cache could cause.
+      await JsonDiskCache.invalidate('orders_recent');
+
       return PlacedOrder(
         id: receipt['id'] as String,
         restaurantName: receipt['restaurant_name'] as String,
@@ -178,12 +185,30 @@ class OrderSupabaseDataSource implements OrderDataSource {
     // page size. Ordering by `created_at` alone would be unstable for two orders
     // written in the same millisecond — a row could appear on two pages or on
     // none — so `id` breaks the tie and makes the sequence total.
-    final List<Map<String, dynamic>> rows = await _db
+    Future<List<Map<String, dynamic>>> fetch() async => _db
         .from('orders')
         .select(_orderColumns)
         .order('created_at', ascending: false)
         .order('id', ascending: false)
         .range(offset, offset + limit - 1);
+
+    // Only the first page is cached, and deliberately. It is the one a customer
+    // opens to see "where is my food" on a bad connection; page two is a
+    // deliberate scroll back through history and can afford to need a network.
+    // Caching every page would also mean a cache key per offset, each ageing
+    // separately, and a list that could show page one from today above page two
+    // from last week.
+    //
+    // One minute, because a status moves. The order *screen* is a live
+    // `.stream()` (0052), so this staleness never reaches the tracking card —
+    // only the row in the list, for at most a minute.
+    final List<Map<String, dynamic>> rows = offset == 0
+        ? await JsonDiskCache.rows(
+            key: 'orders_recent',
+            freshFor: const Duration(minutes: 1),
+            fetch: fetch,
+          )
+        : await fetch();
 
     return rows.map(_orderFrom).toList(growable: false);
   }

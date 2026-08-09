@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:zopiqnow/core/storage/json_disk_cache.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_row.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
@@ -16,15 +17,24 @@ class RestaurantSupabaseDataSource implements RestaurantDataSource {
   /// after `Supabase.initialize` in `main`, and widget tests never call it.
   SupabaseClient get _db => Supabase.instance.client;
 
+  /// Cached to disk: this is the first screen, and on a slow or dead connection
+  /// it is the difference between the app opening with the catalogue and the app
+  /// opening with a spinner. Five minutes is well inside how often a kitchen
+  /// opens or closes, and a vendor pausing orders reaches the card through the
+  /// live `accepting_orders` column on the next refresh either way.
   @override
   Future<List<Restaurant>> fetchNearby() async {
-    final List<Map<String, dynamic>> rows = await _db
-        .from('restaurants')
-        .select(restaurantColumns)
-        // `ascending: true` is not decoration: postgrest-dart's `order()`
-        // defaults to DESCENDING, so the bare call put the farthest restaurants
-        // at the top of the feed. Every `order` in this app states its direction.
-        .order('distance_km', ascending: true);
+    final List<Map<String, dynamic>> rows = await JsonDiskCache.rows(
+      key: 'restaurants_nearby',
+      fetch: () async => _db
+          .from('restaurants')
+          .select(restaurantColumns)
+          // `ascending: true` is not decoration: postgrest-dart's `order()`
+          // defaults to DESCENDING, so the bare call put the farthest
+          // restaurants at the top of the feed. Every `order` in this app
+          // states its direction.
+          .order('distance_km', ascending: true),
+    );
     return rows.map(restaurantFromRow).toList(growable: false);
   }
 

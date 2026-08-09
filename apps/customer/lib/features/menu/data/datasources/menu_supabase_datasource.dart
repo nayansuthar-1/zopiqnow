@@ -1,9 +1,10 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:zopiqnow/core/storage/json_disk_cache.dart';
 import 'package:zopiqnow/features/menu/data/datasources/menu_datasource.dart';
+import 'package:zopiqnow/features/menu/data/datasources/menu_item_row.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_category.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
-import 'package:zopiqnow/features/menu/domain/entities/menu_option.dart';
 import 'package:zopiqnow/features/menu/domain/entities/restaurant_review.dart';
 
 /// The real menu: `public.menu_items` over PostgREST.
@@ -16,27 +17,34 @@ class MenuSupabaseDataSource implements MenuDataSource {
 
   SupabaseClient get _db => Supabase.instance.client;
 
+  /// Cached per restaurant. A menu is the heaviest read in the app and the one
+  /// a customer returns to most — reopening the kitchen they ordered from last
+  /// week should not wait on the network.
+  ///
+  /// Two minutes rather than the catalogue's five: a dish going out of stock is
+  /// the change a customer notices, and they notice it by adding it to a cart
+  /// that then refuses at checkout. `place_order` reprices and revalidates every
+  /// line server-side (S4), so a stale menu can never sell anything at the wrong
+  /// price — but it can waste somebody's time, and two minutes bounds that.
   @override
   Future<List<MenuCategory>> fetchMenu(String restaurantId) async {
-    final List<Map<String, dynamic>> rows = await _db
-        .from('menu_items')
-        .select(
-          'id, name, description, price, is_veg, is_bestseller, rating, '
-          'image_url, category, original_price, prep_minutes, gst_rate_bps, '
-          // Variants & add-ons (0048). RLS returns only available options of a
-          // visible dish, so nothing sold-out reaches the menu. Ordered in Dart.
-          'menu_option_groups(id, name, min_select, max_select, rank, '
-          'menu_options(id, name, price_delta, rank))',
-        )
-        .eq('restaurant_id', restaurantId)
-        // The vendor's merchandising order, not ours: "Recommended" leads
-        // because they ranked it first, and sorting by price would overrule them.
-        //
-        // `ascending: true` is load-bearing — postgrest-dart's `order()` defaults
-        // to DESCENDING, and the bare version shipped Desserts above Recommended
-        // to the device.
-        .order('category_rank', ascending: true)
-        .order('item_rank', ascending: true);
+    final List<Map<String, dynamic>> rows = await JsonDiskCache.rows(
+      key: 'menu_$restaurantId',
+      freshFor: const Duration(minutes: 2),
+      fetch: () async => _db
+          .from('menu_items')
+          .select('$menuItemColumns, category')
+          .eq('restaurant_id', restaurantId)
+          // The vendor's merchandising order, not ours: "Recommended" leads
+          // because they ranked it first, and sorting by price would overrule
+          // them.
+          //
+          // `ascending: true` is load-bearing — postgrest-dart's `order()`
+          // defaults to DESCENDING, and the bare version shipped Desserts above
+          // Recommended to the device.
+          .order('category_rank', ascending: true)
+          .order('item_rank', ascending: true),
+    );
 
     // Insertion-ordered: sections come out in the order their first dish
     // appeared, which is the vendor's category order.
@@ -44,7 +52,7 @@ class MenuSupabaseDataSource implements MenuDataSource {
     for (final Map<String, dynamic> row in rows) {
       sections
           .putIfAbsent(row['category'] as String, () => <MenuItem>[])
-          .add(_toMenuItem(row));
+          .add(menuItemFromRow(row));
     }
 
     return sections.entries
@@ -54,22 +62,6 @@ class MenuSupabaseDataSource implements MenuDataSource {
         )
         .toList(growable: false);
   }
-
-  MenuItem _toMenuItem(Map<String, dynamic> row) => MenuItem(
-    id: row['id'] as String,
-    name: row['name'] as String,
-    description: row['description'] as String,
-    price: (row['price'] as num).toInt(),
-    isVeg: row['is_veg'] as bool,
-    isBestseller: row['is_bestseller'] as bool,
-    // Null stays null: "unrated" is not "rated zero".
-    rating: (row['rating'] as num?)?.toDouble(),
-    imageUrl: row['image_url'] as String,
-    originalPrice: (row['original_price'] as num?)?.toInt(),
-    prepMinutes: (row['prep_minutes'] as num?)?.toInt(),
-    gstRateBps: (row['gst_rate_bps'] as num?)?.toInt() ?? 500,
-    optionGroups: _toGroups(row['menu_option_groups']),
-  );
 
   /// An RPC and not a select: `reviews` has RLS on with no select policy at all
   /// (0062), so there is nothing to read from. `restaurant_reviews` returns four
@@ -83,25 +75,6 @@ class MenuSupabaseDataSource implements MenuDataSource {
     return rows
         .cast<Map<String, dynamic>>()
         .map(RestaurantReview.fromJson)
-        .toList(growable: false);
-  }
-
-  /// The dish's option groups, ranked, with any group left empty by RLS (all its
-  /// options sold out) dropped — a group with no answers is one the customer
-  /// could never satisfy.
-  static List<MenuOptionGroup> _toGroups(Object? raw) {
-    final List<Map<String, dynamic>> rows =
-        (raw as List<dynamic>? ?? const <dynamic>[])
-            .cast<Map<String, dynamic>>()
-            .toList()
-          ..sort(
-            (Map<String, dynamic> a, Map<String, dynamic> b) =>
-                ((a['rank'] as num?)?.toInt() ?? 0)
-                    .compareTo((b['rank'] as num?)?.toInt() ?? 0),
-          );
-    return rows
-        .map(MenuOptionGroup.fromJson)
-        .where((MenuOptionGroup g) => g.options.isNotEmpty)
         .toList(growable: false);
   }
 }
