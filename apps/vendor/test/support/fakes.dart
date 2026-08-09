@@ -72,6 +72,15 @@ class FakeVendorAuthDataSource implements VendorAuthDataSource {
     return staff ? testVendor : null;
   }
 
+  /// The same question the OTP path asks — does the address Google vouched for
+  /// work at a restaurant — so [staff] drives both and a test setting it once
+  /// gets a consistent answer whichever door it comes through. The email is
+  /// returned on the null branch too, because that is the branch where the
+  /// caller has to name the address and never had it.
+  @override
+  Future<({Vendor? vendor, String email})> signInWithGoogle() async =>
+      (vendor: staff ? testVendor : null, email: testVendor.email);
+
   @override
   Future<Vendor?> restoreSession() async => signedInAs;
 

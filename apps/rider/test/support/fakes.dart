@@ -49,6 +49,15 @@ class FakeRiderAuthDataSource implements RiderAuthDataSource {
     return isPartner ? testRider : null;
   }
 
+  /// The same question the OTP path asks — does the address Google vouched for
+  /// ride for Zopiqnow — so [isPartner] drives both and a test setting it once
+  /// gets a consistent answer whichever door it comes through. The email is
+  /// returned on the null branch too, because that is the branch where the
+  /// caller has to name the address and never had it.
+  @override
+  Future<({Rider? rider, String email})> signInWithGoogle() async =>
+      (rider: isPartner ? testRider : null, email: testRider.email);
+
   @override
   Future<Rider?> restoreSession() async => signedInAs;
 
