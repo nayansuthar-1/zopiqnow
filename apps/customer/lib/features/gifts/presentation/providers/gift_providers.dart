@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiqnow/features/gifts/data/datasources/gift_datasource.dart';
 import 'package:zopiqnow/features/gifts/data/datasources/gift_supabase_datasource.dart';
 import 'package:zopiqnow/features/gifts/data/repositories/gift_repository_impl.dart';
+import 'package:zopiqnow/features/gifts/domain/entities/gift_cart.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_item.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_shop.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_order.dart';
 import 'package:zopiqnow/features/gifts/domain/repositories/gift_repository.dart';
+import 'package:zopiqnow/features/gifts/presentation/providers/gift_cart_providers.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
 
 /// Data source binding — Supabase. Tests override it with a fake to inject
@@ -57,6 +59,20 @@ final Provider<GiftOrderDataSource> giftOrderDataSourceProvider =
     Provider<GiftOrderDataSource>(
       (Ref ref) => const GiftOrderSupabaseDataSource(),
     );
+
+/// What the bag currently in hand costs, priced by the service (0112).
+///
+/// Watches the bag, so editing it reprices rather than leaving the checkout
+/// screen quoting a total for something else. A `loading` here is the reason the
+/// Pay button waits — an amount is not something to guess at while it arrives.
+final AutoDisposeFutureProvider<GiftQuote?> giftQuoteProvider =
+    FutureProvider.autoDispose<GiftQuote?>((Ref ref) {
+      final GiftCart bag = ref.watch(giftCartProvider);
+      if (bag.isEmpty) return null;
+      return ref
+          .watch(giftOrderDataSourceProvider)
+          .quoteBag(shopId: bag.shopId, items: bag.toOrderItems());
+    });
 
 /// This customer's gift orders, newest first.
 ///

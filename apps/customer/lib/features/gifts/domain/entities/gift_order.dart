@@ -77,6 +77,36 @@ class GiftOrderLine {
   final int taxAmount;
 }
 
+/// What a gift bag costs, priced by the service before a rupee is charged
+/// (`gift_bag_quote`, migration 0112).
+///
+/// The bag knows its own subtotal and deliberately nothing else: the GST rate is
+/// per item and the rounding is per slab, so a total worked out on the phone
+/// would be an estimate of the receipt rather than the receipt. This is the
+/// receipt, fetched before the gateway is opened, and [total] is the amount the
+/// gateway is asked for.
+@immutable
+class GiftQuote {
+  const GiftQuote({
+    required this.subtotal,
+    required this.deliveryFee,
+    required this.taxes,
+    required this.total,
+  });
+
+  factory GiftQuote.fromJson(Map<String, dynamic> json) => GiftQuote(
+    subtotal: (json['subtotal'] as num).toInt(),
+    deliveryFee: (json['delivery_fee'] as num).toInt(),
+    taxes: (json['taxes'] as num).toInt(),
+    total: (json['total'] as num).toInt(),
+  );
+
+  final int subtotal;
+  final int deliveryFee;
+  final int taxes;
+  final int total;
+}
+
 /// A gift somebody bought.
 @immutable
 class GiftOrder {

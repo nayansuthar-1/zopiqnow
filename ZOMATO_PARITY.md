@@ -237,6 +237,17 @@ first, then one statement.**
 update public.payment_settings set require_verified_payment = true;
 ```
 
+⚠️ **And the gate does not cover gifts.** `orders_require_verified_payment` is a
+trigger on `orders`; `gift_orders` has exactly one trigger and it is the audit one.
+`place_gift_order` requires a non-empty `p_payment_id` and takes it entirely on trust
+— it is never checked against `payment_intents` or against Razorpay. So the statement
+above arms the food path and leaves the gift path exactly as open as it is today.
+Found by the 2026-08-09 sweep (B8); **not** fixed by 0112, which is about charging the
+right amount rather than proving it was charged. Two different jobs, and doing the
+second one properly means `payment_intents` learning about `gift_orders` — a schema
+question, not a flag. Written down here so it is armed with the rest rather than
+discovered afterwards.
+
 ---
 
 ### B5 — Communication ✅ **DONE 2026-07-29** (migration 0061)
@@ -451,7 +462,26 @@ it again); and no overload was created (0051's).
       `aapt2`, not off the manifest source. The customer app declares 4 permissions and
       ships 16; the extra 12 arrive through the manifest merger
 - [ ] Edge-case matrix per phase, run against the live DB in a rolled-back transaction
-      — *a standing practice, never "finished"*
+      — *a standing practice, never "finished"*. **Last swept 2026-08-09, over
+      0094–0111** — the eighteen migrations that had shipped since the audit that
+      closed this item's sibling above. What the sweep read off the live database
+      rather than off the migrations:
+      - Every `security definer` function in `public` pins `search_path`. No
+        exceptions, so 0093's rule has held through eighteen migrations.
+      - **No overloads anywhere in `public`** — 0051's lesson, still true.
+      - `anon` can execute five application functions: `serviceable_point`,
+        `delivery_area_check`, `menu_item_is_servable_now`, `restaurant_reviews`,
+        `restaurant_offers`. Every one is a browsing surface and intended. The
+        other 33 `anon`-executable functions are `pg_trgm`'s own.
+      - All 52 tables have RLS on. The only write grants to `authenticated` are
+        `addresses`, `favourites` and `menu_items` — the last scoped to
+        `restaurant_id = staff_restaurant_id()` on insert, update *and* delete.
+      - 27 refusals checked by calling them: `anon` reaches none of the gift,
+        support-ticket, admin-menu or order-photo surfaces; a signed-in
+        non-admin gets *"You are not a Zopiqnow admin."* from all 15 admin
+        functions added since 0093; `my_order_issues` is scoped to `auth.uid()`.
+
+      **And one thing it found.** See the gift bag, below.
 - [~] Perf: rebuild/scroll profiling on the Android 10 floor, pagination, image caching
       — **the caching half is done (2026-08-09); the other two stand as written:**
       - [x] *Disk image caching* — `ZopiqDiskImage`, an `ImageProvider` over an
@@ -502,6 +532,40 @@ re-download of a photo that is genuinely still in use.
 customer and rider debug APKs both build (the rider gains `path_provider` through
 `zopiq_ui` without using it, which is the build worth checking). What no build can show
 is the second cold start actually drawing from disk — that is a Phase 5 device check.
+
+**What the 2026-08-09 sweep found: the gift bag was charged before it was priced**
+*(migration 0112)*. `gift_checkout_page.dart` asked the gateway for `bag.subtotal` —
+the bag's own arithmetic, which 0096 deliberately made **items only**, because tax is
+the server's to add. `place_gift_order` then priced the same bag at `subtotal + GST`
+and wrote *that* on the order. So the customer was charged the pre-tax figure, the
+order recorded the tax-inclusive one, and the difference — 18% of every gift sold —
+was booked as collected and never was. The screen was not even quietly wrong: the
+button read **"Pay ₹500 + GST"** and then charged ₹500.
+
+The food side has never had this because `bill.total` is tax-inclusive and the cart
+mirrors `place_order` line for line (0082). Gifts had no mirror **on purpose**, and no
+quote either — which left the client with nothing to pay but the subtotal. The fix is
+not to teach the Dart cart the tax arithmetic: the rounding is once per slab and then
+down to the lines of that slab by largest remainder, and two implementations of that
+disagree the first time a bag holds an 18% mug and a 12% scarf — showing up as a
+receipt that does not match the amount charged, which is the same bug in a smaller
+size. So `gift_bag_quote` is the pricing block lifted *out* of `place_gift_order`, and
+`place_gift_order` now calls it rather than keeping a second copy. **One
+implementation, called twice**: once to show the customer what they are about to pay,
+once to write it down. The checkout screen shows the real breakdown instead of a
+sentence promising one, and the Pay button waits for the quote rather than guessing.
+
+Two things fell out on the way. 0096's `_lines` temp table is gone — the arithmetic is
+CTEs now, so the "second call in one transaction" trap its own comment warned about
+stops existing, which matters precisely because a quote *is* a second call. And a
+missing or null `quantity` used to fall through the range check (null is not `<= 0`)
+and die three statements later on a not-null violation; it is checked before the join
+now and gets the sentence it was always meant to get.
+
+Verified in a rolled-back transaction against the live database, on a real two-slab
+bag: quoted total == order total == `subtotal + fee + taxes`, `cgst + sgst == taxes`,
+the per-line tax amounts sum to the order's, an idempotent retry returns the same
+order and creates only one, `anon` cannot call the quote, and no overload was created.
 
 ---
 

@@ -81,6 +81,24 @@ class GiftOrderSupabaseDataSource implements GiftOrderDataSource {
   static const String _businessRuleErrorCode = 'P0001';
 
   @override
+  Future<GiftQuote> quoteBag({
+    required String shopId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    try {
+      final Map<String, dynamic> quote = await _db
+          .rpc<Map<String, dynamic>>(
+            'gift_bag_quote',
+            params: <String, dynamic>{'p_shop_id': shopId, 'p_items': items},
+          );
+      return GiftQuote.fromJson(quote);
+    } on PostgrestException catch (e) {
+      if (e.code == _businessRuleErrorCode) throw GiftOrderFailure(e.message);
+      throw const GiftOrderFailure();
+    }
+  }
+
+  @override
   Future<GiftOrder> placeOrder({
     required String shopId,
     required List<Map<String, dynamic>> items,

@@ -49,7 +49,7 @@ class _GiftCheckoutPageState extends ConsumerState<GiftCheckoutPage> {
   /// lost response safe to retry without buying the gift twice (0086, 0096).
   String? _idempotencyKey;
 
-  Future<void> _pay(GiftCart bag, Address address) async {
+  Future<void> _pay(GiftCart bag, Address address, GiftQuote quote) async {
     if (_placing) return;
     setState(() {
       _placing = true;
@@ -60,14 +60,16 @@ class _GiftCheckoutPageState extends ConsumerState<GiftCheckoutPage> {
         'gift-${DateTime.now().microsecondsSinceEpoch}-${bag.shopId}';
 
     try {
-      // The gateway is asked to charge the bag's subtotal. The server reprices
-      // and its number is the one that counts — the two can differ by a rupee
-      // and that is a refund, not a refusal (0085's reasoning, and gifts inherit
-      // it because the same gate will one day cover them).
+      // The gateway is asked for the **quoted** total, tax included. It used to
+      // be asked for `bag.subtotal`, which is items only — so the customer was
+      // charged the pre-tax figure while the order recorded the tax-inclusive
+      // one, and the GST on every gift sold was booked as collected and never
+      // was (0112). The quote comes from the same function that prices the
+      // order, so the two numbers cannot disagree.
       final PaymentOutcome outcome = await ref
           .read(paymentGatewayProvider)
           .pay(
-            amount: bag.subtotal,
+            amount: quote.total,
             description: 'Zopiqnow gift · ${bag.shopName}',
           );
 
@@ -119,6 +121,7 @@ class _GiftCheckoutPageState extends ConsumerState<GiftCheckoutPage> {
   Widget build(BuildContext context) {
     final GiftCart bag = ref.watch(giftCartProvider);
     final Address? address = ref.watch(selectedAddressProvider);
+    final AsyncValue<GiftQuote?> quote = ref.watch(giftQuoteProvider);
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
 
@@ -223,26 +226,43 @@ class _GiftCheckoutPageState extends ConsumerState<GiftCheckoutPage> {
           const SizedBox(height: ZopiqSpacing.sm),
           Divider(color: zc.divider, height: 1),
           const SizedBox(height: ZopiqSpacing.md),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  'Subtotal',
-                  style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                ),
+          _BillRow(label: 'Subtotal', amount: bag.subtotal),
+          // Fetched, not computed. The rate is per item and the rounding is per
+          // slab (0096), so these are the service's figures — the same ones the
+          // receipt will carry, because the same function produced both (0112).
+          switch (quote) {
+            AsyncData<GiftQuote?>(value: final GiftQuote q) => Column(
+              children: <Widget>[
+                const SizedBox(height: ZopiqSpacing.xs),
+                if (q.deliveryFee > 0)
+                  _BillRow(label: 'Delivery', amount: q.deliveryFee),
+                _BillRow(label: 'GST', amount: q.taxes),
+                const SizedBox(height: ZopiqSpacing.sm),
+                Divider(color: zc.divider, height: 1),
+                const SizedBox(height: ZopiqSpacing.sm),
+                _BillRow(label: 'To pay', amount: q.total, strong: true),
+              ],
+            ),
+            AsyncError<GiftQuote?>(:final Object error) => Padding(
+              padding: const EdgeInsets.only(top: ZopiqSpacing.sm),
+              child: Text(
+                error is GiftOrderFailure
+                    ? error.message
+                    : 'We couldn\'t work out the total just now.',
+                style: t.bodySmall?.copyWith(color: zc.nonVeg),
               ),
-              Text(
-                '₹${bag.subtotal}',
-                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            _ => Padding(
+              padding: const EdgeInsets.only(top: ZopiqSpacing.sm),
+              child: Text(
+                'Working out the total…',
+                style: t.bodySmall?.copyWith(color: zc.textMuted),
               ),
-            ],
-          ),
+            ),
+          },
           const SizedBox(height: ZopiqSpacing.xs),
-          // Said, not computed. The rate is per item and the rounding is per
-          // slab (0096); a number guessed here would disagree with the receipt.
           Text(
-            'GST is added when the order is placed, and the exact amount is on '
-            'your receipt. Delivery by the Zopiqnow team is free.',
+            'Delivery by the Zopiqnow team is free.',
             style: t.bodySmall?.copyWith(color: zc.textMuted),
           ),
 
@@ -256,14 +276,54 @@ class _GiftCheckoutPageState extends ConsumerState<GiftCheckoutPage> {
         child: Padding(
           padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),
           child: ZopiqButton(
-            label: 'Pay ₹${bag.subtotal} + GST',
+            label: switch (quote) {
+              AsyncData<GiftQuote?>(value: final GiftQuote q) =>
+                'Pay ₹${q.total}',
+              _ => 'Pay',
+            },
             variant: ZopiqButtonVariant.cta,
-            isLoading: _placing,
+            isLoading: _placing || quote.isLoading,
             // No address, no order. The server refuses one anyway — this is the
-            // wall being where the finger is.
-            onPressed: address == null ? null : () => _pay(bag, address),
+            // wall being where the finger is. And no quote, no order either:
+            // the amount charged has to be a number somebody was shown, not a
+            // guess made while it was still arriving.
+            onPressed:
+                address == null || quote.valueOrNull == null
+                    ? null
+                    : () => _pay(bag, address, quote.value!),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// One line of the bill. Four of these on this screen and they have to line up.
+class _BillRow extends StatelessWidget {
+  const _BillRow({
+    required this.label,
+    required this.amount,
+    this.strong = false,
+  });
+
+  final String label;
+  final int amount;
+  final bool strong;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme t = Theme.of(context).textTheme;
+    final TextStyle? style = strong
+        ? t.titleMedium?.copyWith(fontWeight: FontWeight.w800)
+        : t.bodyMedium?.copyWith(color: context.zc.textMuted);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: ZopiqSpacing.xs),
+      child: Row(
+        children: <Widget>[
+          Expanded(child: Text(label, style: style)),
+          Text('₹$amount', style: style),
+        ],
       ),
     );
   }

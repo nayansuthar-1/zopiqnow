@@ -21,6 +21,18 @@ abstract interface class GiftDataSource {
 /// above. Separate methods rather than a separate interface because the shop
 /// page, the bag and the receipt are one feature and one Supabase client.
 abstract interface class GiftOrderDataSource {
+  /// What this bag costs, priced by the service (`gift_bag_quote`, 0112).
+  ///
+  /// Called before the gateway is opened, because the amount charged has to be
+  /// the amount the order records and only the service knows the tax. Throws
+  /// [GiftOrderFailure] with the service's own sentence when something in the
+  /// bag can no longer be bought — which is the same sentence placing it would
+  /// have produced, one screen earlier.
+  Future<GiftQuote> quoteBag({
+    required String shopId,
+    required List<Map<String, dynamic>> items,
+  });
+
   /// Places the order and returns the receipt. Takes no prices — ids and
   /// quantities only, and `place_gift_order` prices them.
   ///
