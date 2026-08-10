@@ -8,7 +8,9 @@ import 'package:zopiqnow/core/dialler.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
+import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/cancel_order_sheet.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_card.dart';
@@ -252,7 +254,11 @@ class _OrderBodyState extends ConsumerState<_OrderBody> {
           // list is how that becomes a phone call. Renders nothing on the
           // overwhelming majority of orders, which have no refund.
           OrderRefundSection(orderId: order.id),
-          OrderIssueSection(orderId: order.id),
+          OrderIssueSection(
+            issues:
+                ref.watch(orderIssuesProvider(order.id)).valueOrNull ??
+                const <OrderIssue>[],
+          ),
 
           // 2. Tracking Card or Status Banner
           if (isOpen) ...<Widget>[
@@ -604,7 +610,23 @@ class _OrderBodyState extends ConsumerState<_OrderBody> {
                     // connect with you shortly." and then do nothing at all —
                     // no ticket, no queue, nobody told. It now files a real
                     // complaint (0095).
-                    onPressed: () => showReportIssueSheet(context, order.id),
+                    onPressed: () => showReportIssueSheet(
+                      context,
+                      orderId: order.id,
+                      submit: (IssueCategory category, String? body) async {
+                        await ref
+                            .read(orderRepositoryProvider)
+                            .raiseIssue(
+                              orderId: order.id,
+                              category: category,
+                              body: body,
+                            );
+                        // The receipt above reads this to show what was
+                        // reported, so it is stale for no longer than it takes
+                        // the sheet to pop.
+                        ref.invalidate(orderIssuesProvider(order.id));
+                      },
+                    ),
                     child: const Text('Get help', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),

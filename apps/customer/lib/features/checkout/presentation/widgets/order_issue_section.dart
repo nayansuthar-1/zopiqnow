@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
-import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
 
-/// What the customer already told us about this order (migration 0095).
+/// What the customer already told us about this order (migrations 0095, 0114).
 ///
 /// It exists for one reason: somebody who has complained wants to know the
 /// complaint landed. Without this the report sheet takes a tap, closes, and
@@ -16,16 +14,18 @@ import 'package:zopiqnow/features/checkout/presentation/providers/orders_provide
 /// while the read is in flight, so a receipt does not jump. There is nothing to
 /// tap: raising one is the "Get help" button's job, and answering one is not the
 /// customer's.
-class OrderIssueSection extends ConsumerWidget {
-  const OrderIssueSection({required this.orderId, super.key});
+///
+/// **Takes the list rather than fetching it**, because a food order and a gift
+/// order read two different functions (`my_order_issues`, `my_gift_order_issues`)
+/// and a complaint looks identical either way. The caller watches its own
+/// provider; this draws whatever it is handed.
+class OrderIssueSection extends StatelessWidget {
+  const OrderIssueSection({required this.issues, super.key});
 
-  final String orderId;
+  final List<OrderIssue> issues;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final List<OrderIssue> issues =
-        ref.watch(orderIssuesProvider(orderId)).valueOrNull ??
-        const <OrderIssue>[];
+  Widget build(BuildContext context) {
     if (issues.isEmpty) return const SizedBox.shrink();
 
     final TextTheme t = Theme.of(context).textTheme;

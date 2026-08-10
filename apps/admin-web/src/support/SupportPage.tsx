@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { api, ISSUE_LABEL, STATUS_LABEL } from '../lib/api'
-import type { OrderPhotoRow, SupportTicketRow } from '../lib/api'
+import { api, GIFT_STATUS_LABEL, ISSUE_LABEL, STATUS_LABEL } from '../lib/api'
+import type {
+  GiftOrderStatus,
+  OrderPhotoRow,
+  OrderStatus,
+  SupportTicketRow,
+} from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
@@ -57,6 +62,16 @@ function waited(iso: string) {
   return `${Math.floor(mins / (60 * 24))}d`
 }
 
+/// The order's status in words. Two label maps, because the two kinds of order
+/// have two sets of statuses (0114): a gift is `dispatched`, which is not a food
+/// status at all, and reading it out of `STATUS_LABEL` would print nothing —
+/// a blank where support needs to know the parcel has left.
+function orderStatusLabel(tk: SupportTicketRow) {
+  return tk.kind === 'gift'
+    ? GIFT_STATUS_LABEL[tk.order_status as GiftOrderStatus]
+    : STATUS_LABEL[tk.order_status as OrderStatus]
+}
+
 export function SupportPage() {
   const [rows, setRows] = useState<SupportTicketRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -106,6 +121,10 @@ export function SupportPage() {
     setAnswering(ticket)
     setReply('')
     setPhotos(null)
+    // A gift has no photographs to fetch: 0094's three are `orders` columns
+    // written by a kitchen and a rider, and a gift is couriered with neither.
+    // Asking anyway would spend a round trip to be told nothing.
+    if (ticket.kind === 'gift') return
     try {
       const found = await api.orderPhotos(ticket.order_id)
       setPhotos(found[0] ?? null)
@@ -206,9 +225,19 @@ export function SupportPage() {
                         )}
                       </td>
                       <td className="px-5 py-4 align-top">
-                        <p className="text-ink">{tk.order_id}</p>
+                        <p className="text-ink">
+                          {tk.order_id}
+                          {tk.kind === 'gift' && (
+                            // Said out loud rather than left to be inferred from
+                            // the id prefix. A gift complaint is answered
+                            // differently — no kitchen to call, no rider to ask.
+                            <span className="ml-2 align-middle">
+                              <Pill tone="neutral">Gift</Pill>
+                            </span>
+                          )}
+                        </p>
                         <p className="text-xs text-ink-muted">
-                          {tk.restaurant_name} · {STATUS_LABEL[tk.order_status]}
+                          {tk.seller_name} · {orderStatusLabel(tk)}
                         </p>
                       </td>
                       <td className="px-5 py-4 align-top text-ink">
@@ -289,13 +318,15 @@ export function SupportPage() {
               <dd className="text-ink">{answering.customer_phone}</dd>
             </div>
             <div>
-              <dt className="text-ink-muted">Restaurant</dt>
-              <dd className="text-ink">{answering.restaurant_name}</dd>
+              <dt className="text-ink-muted">
+                {answering.kind === 'gift' ? 'Gift shop' : 'Restaurant'}
+              </dt>
+              <dd className="text-ink">{answering.seller_name}</dd>
             </div>
             <div>
               <dt className="text-ink-muted">Order</dt>
               <dd className="text-ink">
-                {STATUS_LABEL[answering.order_status]} · ₹{answering.order_total}
+                {orderStatusLabel(answering)} · ₹{answering.order_total}
               </dd>
             </div>
             <div>
@@ -310,14 +341,23 @@ export function SupportPage() {
             </p>
           )}
 
-          <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            The order&rsquo;s photographs
-          </p>
-          <div className="mt-2 grid grid-cols-3 gap-3">
-            <Shot label="Cooked" url={photos?.cooked_photo_url ?? null} />
-            <Shot label="Packed" url={photos?.packed_photo_url ?? null} />
-            <Shot label="Handover" url={photos?.delivery_photo_url ?? null} />
-          </div>
+          {/* Food only. A gift is couriered by the Zopiqnow team with no kitchen
+              and no rider, so 0094's three `orders` columns do not exist for it
+              — and three empty frames would read as "the photographs are
+              missing", which is a different and much worse thing to tell
+              somebody triaging a complaint than "there are none". */}
+          {answering.kind === 'food' && (
+            <>
+              <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                The order&rsquo;s photographs
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-3">
+                <Shot label="Cooked" url={photos?.cooked_photo_url ?? null} />
+                <Shot label="Packed" url={photos?.packed_photo_url ?? null} />
+                <Shot label="Handover" url={photos?.delivery_photo_url ?? null} />
+              </div>
+            </>
+          )}
 
           {answering.status === 'open' ? (
             <Field

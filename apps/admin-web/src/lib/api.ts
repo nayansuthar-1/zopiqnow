@@ -724,6 +724,11 @@ export type AllOrderRow = {
 /// without a migration and without breaking a filter.
 export type SupportTicketRow = {
   id: number
+  /// Which kind of order this is about (0114). Read it before the rest of the
+  /// row: a gift has no restaurant, no rider and no photographs, and its status
+  /// values are its own set.
+  kind: 'food' | 'gift'
+  /// Whichever id the ticket points at — `ZPQ-…` for food, `ZPG-…` for a gift.
   order_id: string
   category: IssueCategory
   body: string | null
@@ -733,8 +738,10 @@ export type SupportTicketRow = {
   resolved_by: string | null
   /// What was written back. The customer reads this on their own receipt.
   admin_note: string | null
-  restaurant_name: string
-  order_status: OrderStatus
+  /// The restaurant, or the gift shop. Named for what it is rather than
+  /// `restaurant_name`, which would have been a lie on half the rows.
+  seller_name: string
+  order_status: OrderStatus | GiftOrderStatus
   order_total: number
   customer_phone: string
   /// The size of the full match, repeated on every row — the pager reads it.

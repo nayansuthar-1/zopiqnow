@@ -126,6 +126,71 @@ has ever moved. Building it against a real gateway once beats building it twice.
 - [x] Customer: order issue / report screen, feeding a support queue —
       `order_issue_section.dart`, `order_refund_section.dart`, `report_issue_sheet.dart`,
       backed by `support_tickets`
+- [x] **…and the same door for a gift** — migration **0114**, 2026-08-11.
+      `support_tickets.order_id` was `not null references orders (id)`, so a gift
+      order could not have a ticket even in principle: `raise_order_issue` looks
+      the id up in `orders`, a `ZPG-…` is not there, and the customer was told
+      *"We couldn't find that order on your account."* about an order they were
+      looking at. Cancelling is refused once a parcel is with the courier
+      (0096) — which is exactly when things go wrong — so the entire in-app
+      recourse for an undelivered gift was the support email on the Account
+      screen, the state 0095 opened by calling "a different company's inbox as
+      far as this database is concerned".
+
+      Same shape as 0113: `order_id` goes nullable, `gift_order_id` joins it,
+      and `check (num_nonnulls(order_id, gift_order_id) = 1)` says exactly one —
+      never both, and never neither, which is what a nullable column added
+      without a constraint eventually allows. **One queue, not two**, because
+      one queue is what support works, one pair of caps is what protects it
+      (three per order, ten an hour per account counted across *both* kinds —
+      counting them separately would hand anyone wanting to bury the queue twice
+      the budget), and `admin_resolve_ticket` should not have to know which kind
+      of thing it is closing.
+
+      **`raise_gift_issue` refuses `rider`.** Nobody rides a gift — Zopiqnow
+      couriers them, there is no `deliveries` row and no partner to complain
+      about. Refused in the database and not merely absent from the app's chip
+      list, because the app is not where that is decided.
+
+      **The queue had to stop being blind.** `admin_support_tickets` *inner
+      joined* `orders`, so a gift ticket would have landed in the table and been
+      invisible to the people whose job is to answer it — worse than refusing
+      it, because the customer is told it was filed. It is left joins and a
+      `kind` column now, `restaurant_name` is `seller_name` (filling a column
+      called `restaurant_name` with a gift shop is how a report comes to say
+      something untrue), and the console reads gift statuses out of
+      `GIFT_STATUS_LABEL` — `dispatched` is not a food status and would have
+      printed a blank exactly where support needs to know the parcel has left.
+      The photograph strip is hidden for gifts: three empty frames read as "the
+      photographs are missing", which is a different and much worse thing to
+      tell somebody triaging than "there are none". The return type changed, so
+      it is a `drop`+`create` with the grants restated — `create or replace`
+      cannot change OUT columns, and 0051's lesson is that a changed signature
+      makes a new function.
+
+      Customer side, both platforms: the food sheet and the reported-issues
+      section are now **shared** rather than copied — `showReportIssueSheet`
+      takes the submit and the category list, `OrderIssueSection` takes the list
+      it draws. Two call sites is when that is a generalisation rather than a
+      speculation, and a second copy of a 140-line sheet is two screens that
+      drift the first time one is reworded.
+
+      **What this deliberately does not do: refund a gift.** A ticket is a
+      statement, not a transaction (0095's rule). `refunds.order_id` is also a
+      not-null FK to `orders`, so a gift is refunded in Razorpay's dashboard and
+      is not written down in the ledger. That is the same schema question 0113
+      answered for `payment_intents`, and doing it in the same breath would mean
+      two ledgers changing shape in one migration. **Owed, and written here so
+      it is found rather than discovered.**
+
+      16 edge cases against the live database in a rolled-back transaction:
+      both-set and neither-set refused by the constraint; the food path
+      unchanged; another customer's gift order refused with the *same words* as
+      "no such order"; `rider` refused; three per order then refused; a
+      non-owner reads nothing; the queue returning both kinds with the right
+      seller, status and total; closing one naming the gift order; closing it
+      twice refused; a signed-in non-admin refused from both admin functions;
+      and deleting a gift order taking its tickets with it.
 - [x] Admin: refund management console — `apps/admin-web/src/payouts/RefundsPage.tsx`
 
 **A hole found and closed on the way:** 0050 did not do what it says. 0015 had widened

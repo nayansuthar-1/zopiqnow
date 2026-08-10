@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/order_issue_section.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/report_issue_sheet.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_order.dart';
 import 'package:zopiqnow/features/gifts/presentation/pages/gift_orders_page.dart'
     show GiftStatusPill;
@@ -63,6 +66,27 @@ class GiftOrderDetailPage extends ConsumerWidget {
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(failure.message)));
     }
+  }
+
+  /// Files a complaint against this gift order (0114).
+  ///
+  /// The same sheet the food receipt opens, with the gift's own submit and the
+  /// gift's own category list — no `rider`, because nobody rides a gift. The
+  /// sheet prints the service's refusals itself, so there is nothing to catch
+  /// here.
+  Future<void> _report(BuildContext context, WidgetRef ref, String id) {
+    return showReportIssueSheet(
+      context,
+      orderId: id,
+      categories: IssueCategory.forGifts,
+      hint: 'The frame arrived cracked at one corner.',
+      submit: (IssueCategory category, String? body) async {
+        await ref
+            .read(giftOrderDataSourceProvider)
+            .raiseIssue(orderId: id, category: category, body: body);
+        ref.invalidate(giftOrderIssuesProvider(id));
+      },
+    );
   }
 
   @override
@@ -195,6 +219,19 @@ class GiftOrderDetailPage extends ConsumerWidget {
           const SizedBox(height: ZopiqSpacing.xs),
           _Money(label: 'Paid', amount: order.total, strong: true),
 
+          // What they have already told us, if anything. Above the buttons for
+          // the same reason the food receipt puts it above them: somebody who
+          // has complained is looking for their complaint, not for the button
+          // that raises another one.
+          if (ref
+              .watch(giftOrderIssuesProvider(order.id))
+              .valueOrNull
+              case final List<OrderIssue> issues
+              when issues.isNotEmpty) ...<Widget>[
+            const SizedBox(height: ZopiqSpacing.xl),
+            OrderIssueSection(issues: issues),
+          ],
+
           if (order.status.canCancel) ...<Widget>[
             const SizedBox(height: ZopiqSpacing.xxl),
             ZopiqButton(
@@ -203,6 +240,20 @@ class GiftOrderDetailPage extends ConsumerWidget {
               onPressed: () => _cancel(context, ref),
             ),
           ],
+
+          // **The one door that is always open.** Cancelling is refused once a
+          // parcel is with the courier (0096), which is exactly when things go
+          // wrong — so before 0114 an undelivered gift had no route back into
+          // this system at all, only the support address on the Account screen.
+          // Offered on every gift order, including a cancelled one: "you
+          // cancelled it and the money never came back" is a complaint, and the
+          // screen that refuses to hear it is the screen somebody phones about.
+          const SizedBox(height: ZopiqSpacing.md),
+          ZopiqButton(
+            label: 'Report a problem',
+            variant: ZopiqButtonVariant.outline,
+            onPressed: () => _report(context, ref, order.id),
+          ),
           const SizedBox(height: ZopiqSpacing.xl),
         ],
       );

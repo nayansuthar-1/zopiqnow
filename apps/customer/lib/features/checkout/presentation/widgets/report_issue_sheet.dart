@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
-import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
-import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
+
+/// Files one complaint. Throws [OrderIssueFailure] with the service's own
+/// sentence, which is what the sheet renders in place.
+typedef IssueSubmit =
+    Future<void> Function(IssueCategory category, String? body);
 
 /// What went wrong, asked at the one moment somebody is angry enough to say.
 ///
@@ -20,19 +23,46 @@ import 'package:zopiqnow/features/checkout/presentation/providers/orders_provide
 ///   • It **submits from here** rather than handing a value back. The refusals
 ///     ("You have already reported this order.") are written for the customer
 ///     and belong on the screen that asked, not translated into a bool.
-Future<bool?> showReportIssueSheet(BuildContext context, String orderId) {
+///
+/// **Two kinds of order share this sheet**, which is why [submit] and
+/// [categories] are arguments rather than things it reaches for itself. A food
+/// order goes to `raise_order_issue` and may name the rider; a gift goes to
+/// `raise_gift_issue` and may not (0114). Everything a complaint *looks* like —
+/// the chips, the optional note, the mandatory category, the refusal in place —
+/// is the same for both, and a second copy of this file would be two screens
+/// that drift the first time one of them is reworded.
+Future<bool?> showReportIssueSheet(
+  BuildContext context, {
+  required String orderId,
+  required IssueSubmit submit,
+  List<IssueCategory> categories = IssueCategory.forFood,
+  String hint = 'The biryani was missing, only the raita arrived.',
+}) {
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (BuildContext context) => _ReportIssueSheet(orderId: orderId),
+    builder: (BuildContext context) => _ReportIssueSheet(
+      orderId: orderId,
+      submit: submit,
+      categories: categories,
+      hint: hint,
+    ),
   );
 }
 
 class _ReportIssueSheet extends ConsumerStatefulWidget {
-  const _ReportIssueSheet({required this.orderId});
+  const _ReportIssueSheet({
+    required this.orderId,
+    required this.submit,
+    required this.categories,
+    required this.hint,
+  });
 
   final String orderId;
+  final IssueSubmit submit;
+  final List<IssueCategory> categories;
+  final String hint;
 
   @override
   ConsumerState<_ReportIssueSheet> createState() => _ReportIssueSheetState();
@@ -60,16 +90,13 @@ class _ReportIssueSheetState extends ConsumerState<_ReportIssueSheet> {
     });
 
     try {
-      await ref
-          .read(orderRepositoryProvider)
-          .raiseIssue(
-            orderId: widget.orderId,
-            category: category,
-            body: _body.text.trim().isEmpty ? null : _body.text.trim(),
-          );
-      // The receipt reads this to show what was reported, so it has to be stale
-      // for no longer than it takes to pop.
-      ref.invalidate(orderIssuesProvider(widget.orderId));
+      // The caller owns both the call and the invalidation that follows it: the
+      // receipt behind this sheet reads its own provider, and only the caller
+      // knows which one that is.
+      await widget.submit(
+        category,
+        _body.text.trim().isEmpty ? null : _body.text.trim(),
+      );
       if (mounted) Navigator.of(context).pop(true);
     } on OrderIssueFailure catch (failure) {
       if (mounted) {
@@ -116,7 +143,7 @@ class _ReportIssueSheetState extends ConsumerState<_ReportIssueSheet> {
                 spacing: ZopiqSpacing.sm,
                 runSpacing: ZopiqSpacing.sm,
                 children: <Widget>[
-                  for (final IssueCategory c in IssueCategory.values)
+                  for (final IssueCategory c in widget.categories)
                     ChoiceChip(
                       label: Text(c.label),
                       selected: _selected == c,
@@ -135,10 +162,10 @@ class _ReportIssueSheetState extends ConsumerState<_ReportIssueSheet> {
                 maxLines: 3,
                 maxLength: 1000,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Anything else? (optional)',
-                  hintText: 'The biryani was missing, only the raita arrived.',
-                  border: OutlineInputBorder(),
+                  hintText: widget.hint,
+                  border: const OutlineInputBorder(),
                 ),
               ),
 

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
 import 'package:zopiqnow/features/gifts/data/datasources/gift_datasource.dart';
 import 'package:zopiqnow/features/gifts/data/datasources/gift_row.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_item.dart';
@@ -178,6 +179,43 @@ class GiftOrderSupabaseDataSource implements GiftOrderDataSource {
     } on PostgrestException catch (e) {
       if (e.code == _businessRuleErrorCode) throw GiftOrderFailure(e.message);
       throw const GiftOrderFailure();
+    }
+  }
+
+  @override
+  Future<List<OrderIssue>> fetchIssues(String orderId) async {
+    final List<dynamic> rows = await _db.rpc<List<dynamic>>(
+      'my_gift_order_issues',
+      params: <String, dynamic>{'p_gift_order_id': orderId},
+    );
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map(OrderIssue.fromJson)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> raiseIssue({
+    required String orderId,
+    required IssueCategory category,
+    String? body,
+  }) async {
+    try {
+      await _db.rpc<int>(
+        'raise_gift_issue',
+        params: <String, dynamic>{
+          'p_gift_order_id': orderId,
+          // The wire value, never the label. The label is this app's wording and
+          // can be reworded; the value is the database's closed set.
+          'p_category': category.wire,
+          'p_body': body,
+        },
+      );
+    } on PostgrestException catch (e) {
+      // Every refusal here is written for the customer to read — the cap, the
+      // ownership check, the category the gift path does not accept.
+      if (e.code == _businessRuleErrorCode) throw OrderIssueFailure(e.message);
+      throw const OrderIssueFailure();
     }
   }
 }

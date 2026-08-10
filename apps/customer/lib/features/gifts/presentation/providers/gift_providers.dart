@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
 import 'package:zopiqnow/features/gifts/data/datasources/gift_datasource.dart';
 import 'package:zopiqnow/features/gifts/data/datasources/gift_supabase_datasource.dart';
 import 'package:zopiqnow/features/gifts/data/repositories/gift_repository_impl.dart';
@@ -108,6 +109,20 @@ giftOrderLinesProvider =
       String orderId,
     ) {
       return ref.watch(giftOrderDataSourceProvider).fetchOrderLines(orderId);
+    });
+
+/// Complaints raised about one gift order (0114), newest first.
+///
+/// The food side's `orderIssuesProvider` with a different function behind it.
+/// Invalidated by the report sheet's caller the moment one is filed, so the
+/// receipt stops looking exactly as it did before somebody complained.
+final AutoDisposeFutureProviderFamily<List<OrderIssue>, String>
+giftOrderIssuesProvider =
+    FutureProvider.autoDispose.family<List<OrderIssue>, String>((
+      Ref ref,
+      String orderId,
+    ) {
+      return ref.watch(giftOrderDataSourceProvider).fetchIssues(orderId);
     });
 
 /// The receipt the acknowledgement screen shows.

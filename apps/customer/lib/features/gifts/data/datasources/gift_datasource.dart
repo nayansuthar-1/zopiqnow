@@ -1,3 +1,7 @@
+// A complaint is a complaint whichever kind of order it is about, so gifts
+// reuse the checkout feature's entity rather than declaring a parallel one that
+// would have to be kept identical by hand.
+import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_item.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_order.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_shop.dart';
@@ -58,4 +62,20 @@ abstract interface class GiftOrderDataSource {
   /// Calls one off, while it is still callable off. Throws [GiftOrderFailure]
   /// with the service's own sentence when it is not.
   Future<void> cancelOrder({required String orderId, String? reason});
+
+  /// Complaints this customer has already raised about one of their own gift
+  /// orders (0114). Empty for almost every order.
+  Future<List<OrderIssue>> fetchIssues(String orderId);
+
+  /// Reports a problem with a gift order. Throws [OrderIssueFailure] carrying
+  /// the service's own sentence — "You have already reported this order." — so
+  /// the sheet can print it rather than a generic apology.
+  ///
+  /// Raising one moves no money and changes no status; it lands in the support
+  /// queue an admin works.
+  Future<void> raiseIssue({
+    required String orderId,
+    required IssueCategory category,
+    String? body,
+  });
 }

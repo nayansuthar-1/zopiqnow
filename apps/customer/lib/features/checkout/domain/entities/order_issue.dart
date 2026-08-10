@@ -28,6 +28,27 @@ enum IssueCategory {
     (IssueCategory c) => c.wire == wire,
     orElse: () => other,
   );
+
+  /// Everything, for a food order. The set `raise_order_issue` accepts (0095).
+  static const List<IssueCategory> forFood = values;
+
+  /// The same list without [rider], for a gift (0114). Nobody rides a gift —
+  /// Zopiqnow couriers them, there is no delivery partner to complain about, and
+  /// offering the chip would produce a complaint no one can act on.
+  ///
+  /// **The database refuses it too**, and that is the copy that counts: this
+  /// list decides what is offered, `raise_gift_issue` decides what is accepted.
+  /// A screen that only *omits* a chip is a screen, not a rule.
+  static const List<IssueCategory> forGifts = <IssueCategory>[
+    missingItem,
+    wrongItem,
+    quality,
+    damaged,
+    late,
+    neverArrived,
+    payment,
+    other,
+  ];
 }
 
 /// One complaint the customer raised about one order.
