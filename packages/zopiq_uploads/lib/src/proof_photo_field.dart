@@ -9,8 +9,22 @@ import 'package:zopiq_uploads/src/image_uploader.dart';
 /// Deliberately not [PhotoField]'s sibling in the vendor app. That one edits a
 /// dish's picture — an optional field on a form the vendor saves as a whole, and
 /// a gallery pick is exactly right for it. This one is evidence: it is taken at
-/// a moment, it gates a button, and it asks where the picture came from rather
-/// than assuming.
+/// a moment, and it gates a button.
+///
+/// **The camera, and nothing else.** This field used to offer the gallery beside
+/// it, on the reasoning that a refused camera permission should not be a dead
+/// end. That reasoning was backwards for evidence: a photograph chosen from a
+/// roll can be of anything, taken anywhere, at any time — including a shot of
+/// last Tuesday's bag reused for tonight's order. A proof photo that can be
+/// picked is not proof, it is a formality, and a formality that gates a button
+/// is worse than no gate at all because it looks like one. The dead end is real
+/// and it is the correct dead end: a phone that cannot open its camera cannot
+/// produce this evidence, and the way through is to fix the permission.
+///
+/// The gallery is still there for the pictures that are *illustrations* rather
+/// than evidence — a dish photo, a restaurant cover — which is why
+/// [ImageUploader.pickAndUpload] keeps taking a [PhotoSource] and this widget
+/// simply never passes anything but [PhotoSource.camera].
 ///
 /// Takes an [ImageUploader] rather than reading a provider, so the package stays
 /// free of Riverpod and each app wires its own.
@@ -45,40 +59,18 @@ class ProofPhotoField extends StatefulWidget {
 class _ProofPhotoFieldState extends State<ProofPhotoField> {
   bool _uploading = false;
 
+  /// Straight to the camera. There is no "where from?" sheet any more, because
+  /// there is only one answer — and a chooser with one item is a tap somebody
+  /// has to make for no reason, in a kitchen mid-rush or at a customer's door.
   Future<void> _start() async {
     if (_uploading) return;
-
-    final PhotoSource? source = await showModalBottomSheet<PhotoSource>(
-      context: context,
-      builder: (BuildContext sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            // Camera first, and it is the one that belongs here — a photograph
-            // taken now is the only kind that proves anything. The gallery stays
-            // because a refused camera permission must not be a dead end, and
-            // because a phone that has just crashed out of the camera still has
-            // the shot in its roll.
-            ListTile(
-              leading: const Icon(Icons.photo_camera_rounded),
-              title: const Text('Take a photo'),
-              onTap: () => Navigator.of(sheetContext).pop(PhotoSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_rounded),
-              title: const Text('Choose from gallery'),
-              onTap: () => Navigator.of(sheetContext).pop(PhotoSource.gallery),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (source == null || !mounted) return;
 
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     setState(() => _uploading = true);
     try {
-      final String? url = await widget.uploader.pickAndUpload(source: source);
+      final String? url = await widget.uploader.pickAndUpload(
+        source: PhotoSource.camera,
+      );
       if (url != null) widget.onChanged(url);
     } on ImageUploadFailure catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
@@ -147,7 +139,7 @@ class _ProofPhotoFieldState extends State<ProofPhotoField> {
                     ),
                   )
                 else
-                  _Prompt(zc: zc, t: t, label: 'Tap to add'),
+                  _Prompt(zc: zc, t: t, label: 'Tap to take a photo'),
 
                 if (_uploading)
                   ColoredBox(

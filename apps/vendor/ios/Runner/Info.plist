@@ -77,15 +77,22 @@
 	     photographs of food.
 	     =================================================================== -->
 
-	<!-- image_picker, for dish and restaurant photos. Both keys are required
-	     even though the vendor takes only one of the two routes: iOS resolves
-	     them when the picker is constructed, not when the source is chosen.
+	<!-- image_picker, for two different kinds of picture, which is why this app
+	     keeps both keys where the rider app now keeps only the camera one:
+
+	       * the order photo is **evidence**, camera-only, and never reaches the
+	         library (ProofPhotoField in `zopiq_uploads`);
+	       * a dish or restaurant photo is an **illustration**, and choosing the
+	         good shot of the biryani from the roll is exactly right for it.
+
+	     iOS resolves these when the picker is constructed rather than when a
+	     source is chosen, so both are required as long as either route exists.
 	     NSPhotoLibraryAddUsageDescription is deliberately absent — we read a
 	     photo and never write one back. -->
 	<key>NSCameraUsageDescription</key>
-	<string>Zopiq Partner needs the camera so you can photograph your dishes, and photograph each order as it is cooked and packed.</string>
+	<string>Zopiq Partner needs the camera so you can photograph your dishes, and photograph each order as it is packed.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Zopiq Partner needs your photo library so you can choose dish and restaurant photos, and attach order photos you have already taken.</string>
+	<string>Zopiq Partner needs your photo library so you can choose dish and restaurant photos.</string>
 
 	<!-- POST_NOTIFICATIONS has no plist counterpart; the prompt is a runtime
 	     call the app already makes. This is the half with no Android analogue:

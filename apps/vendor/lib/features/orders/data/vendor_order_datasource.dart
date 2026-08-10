@@ -38,15 +38,14 @@ abstract interface class VendorOrderDataSource {
   ///
   /// [reason] rides along on a rejection or cancellation — the kitchen's note on
   /// why an order was turned away. [prepMinutes] rides along on an *accept* and
-  /// sets when the food is due. [cookedPhotoUrl] and [packedPhotoUrl] ride along
-  /// on *ready for pickup*. Each is ignored by the database on any transition it
-  /// does not belong to.
+  /// sets when the food is due. [packedPhotoUrl] rides along on *ready for
+  /// pickup*. Each is ignored by the database on any transition it does not
+  /// belong to.
   Future<OrderStatus> setStatus({
     required String orderId,
     required OrderStatus status,
     String? reason,
     int? prepMinutes,
-    String? cookedPhotoUrl,
     String? packedPhotoUrl,
   });
 }
@@ -176,16 +175,22 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
     required OrderStatus status,
     String? reason,
     int? prepMinutes,
-    String? cookedPhotoUrl,
     String? packedPhotoUrl,
   }) async {
     try {
-      // An id, a status, a reason, and now two photographs. Not an order — there
-      // is no update grant on `orders` at all, so this function is the only way a
+      // An id, a status, a reason, and a photograph. Not an order — there is no
+      // update grant on `orders` at all, so this function is the only way a
       // vendor can write to one, and the only columns it can reach are `status`,
-      // `status_reason`, `ready_by` and the two photo URLs (migrations 0014,
-      // 0094). A restaurant that could `update` the row could edit the total of
-      // an order the customer has already agreed to.
+      // `status_reason`, `ready_by` and the photo URLs (migrations 0014, 0094).
+      // A restaurant that could `update` the row could edit the total of an
+      // order the customer has already agreed to.
+      //
+      // `p_cooked_photo_url` is deliberately not sent. The kitchen takes one
+      // photograph now, of the sealed bag; the parameter and its column stay
+      // where they are because orders placed before this change still carry a
+      // cooked photo and the admin console still shows it. Omitted rather than
+      // passed null for the same result and a clearer intent — 0094 coalesces a
+      // null onto whatever is already there, so neither can blank one.
       final String written = await _db.rpc<String>(
         'set_order_status',
         params: <String, dynamic>{
@@ -193,7 +198,6 @@ class VendorOrderSupabaseDataSource implements VendorOrderDataSource {
           'p_status': status.wire,
           'p_reason': reason,
           'p_prep_minutes': prepMinutes,
-          'p_cooked_photo_url': cookedPhotoUrl,
           'p_packed_photo_url': packedPhotoUrl,
         },
       );

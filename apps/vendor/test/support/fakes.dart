@@ -111,10 +111,9 @@ class FakeVendorOrderDataSource implements VendorOrderDataSource {
   /// transition — with a sentence written for a human.
   String? refusal;
 
-  /// What the last [setStatus] carried. The two kitchen photographs are only
-  /// meant to ride along on the move to `ready_for_pickup`, and these are how a
-  /// test sees whether they did.
-  String? lastCookedPhotoUrl;
+  /// What the last [setStatus] carried. The kitchen photograph is only meant to
+  /// ride along on the move to `ready_for_pickup`, and this is how a test sees
+  /// whether it did.
   String? lastPackedPhotoUrl;
 
   final List<OrderLine> lines = const <OrderLine>[
@@ -199,12 +198,10 @@ class FakeVendorOrderDataSource implements VendorOrderDataSource {
     required OrderStatus status,
     String? reason,
     int? prepMinutes,
-    String? cookedPhotoUrl,
     String? packedPhotoUrl,
   }) async {
     if (refusal != null) throw OrderStatusFailure(refusal!);
 
-    lastCookedPhotoUrl = cookedPhotoUrl;
     lastPackedPhotoUrl = packedPhotoUrl;
 
     _orders = _orders

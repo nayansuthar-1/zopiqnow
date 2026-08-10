@@ -133,5 +133,18 @@
             <action android:name="android.intent.action.DIAL"/>
             <data android:scheme="tel"/>
         </intent>
+
+        <!-- The handover photo, which is camera-only and has no gallery behind
+             it any more: a camera app this app cannot see is a rider who cannot
+             finish a delivery. Same Android 11 visibility rule as the two above,
+             and `image_picker` ships no `<queries>` of its own.
+
+             Note what is deliberately *not* here: `android.permission.CAMERA`.
+             Declaring it would oblige us to request a runtime grant before
+             ACTION_IMAGE_CAPTURE; leaving it out means the camera app takes the
+             photo under its own permission and hands us back the result. -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE"/>
+        </intent>
     </queries>
 </manifest>

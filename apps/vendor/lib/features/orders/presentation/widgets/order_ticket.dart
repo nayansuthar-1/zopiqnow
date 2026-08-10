@@ -32,7 +32,6 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
     OrderStatus to, {
     String? reason,
     int? prepMinutes,
-    String? cookedPhotoUrl,
     String? packedPhotoUrl,
   }) async {
     setState(() => _refusal = null);
@@ -43,7 +42,6 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
           to,
           reason: reason,
           prepMinutes: prepMinutes,
-          cookedPhotoUrl: cookedPhotoUrl,
           packedPhotoUrl: packedPhotoUrl,
         );
     if (mounted && refusal != null) setState(() => _refusal = refusal);
@@ -61,19 +59,12 @@ class _OrderTicketState extends ConsumerState<OrderTicket> {
     if (reason != null) await _move(OrderStatus.rejected, reason: reason);
   }
 
-  /// The one forward step that asks for something first: the food off the pass
-  /// and the sealed bag, photographed, before it becomes a rider's problem.
+  /// The one forward step that asks for something first: the sealed bag,
+  /// photographed, before it becomes a rider's problem.
   Future<void> _markReady() async {
-    final KitchenPhotos? photos = await showKitchenPhotos(
-      context,
-      widget.order.id,
-    );
-    if (photos == null) return;
-    await _move(
-      OrderStatus.readyForPickup,
-      cookedPhotoUrl: photos.cookedUrl,
-      packedPhotoUrl: photos.packedUrl,
-    );
+    final String? packed = await showKitchenPhotos(context, widget.order.id);
+    if (packed == null) return;
+    await _move(OrderStatus.readyForPickup, packedPhotoUrl: packed);
   }
 
   Future<void> _cancel() async {

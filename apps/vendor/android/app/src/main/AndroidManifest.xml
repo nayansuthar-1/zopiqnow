@@ -67,5 +67,22 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+
+        <!-- The dish photo and the order photo both reach for the camera, and
+             the order photo has nowhere else to go: the proof field is
+             camera-only now, so a camera app this app cannot see is a kitchen
+             that cannot mark an order ready. Android 11 (API 30) hides other
+             apps unless they are declared here, and `image_picker` ships no
+             `<queries>` of its own — on stricter OEM builds that is a failure
+             which looks like a bug in our code and is not one.
+
+             Note what is deliberately *not* here: `android.permission.CAMERA`.
+             Declaring it would oblige us to request a runtime grant before
+             ACTION_IMAGE_CAPTURE; leaving it out means the camera app takes the
+             photo under its own permission and hands us back the result. The
+             customer app has carried exactly this pair of decisions since A4. -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE"/>
+        </intent>
     </queries>
 </manifest>
