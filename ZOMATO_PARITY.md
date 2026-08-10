@@ -237,16 +237,58 @@ first, then one statement.**
 update public.payment_settings set require_verified_payment = true;
 ```
 
-⚠️ **And the gate does not cover gifts.** `orders_require_verified_payment` is a
-trigger on `orders`; `gift_orders` has exactly one trigger and it is the audit one.
-`place_gift_order` requires a non-empty `p_payment_id` and takes it entirely on trust
-— it is never checked against `payment_intents` or against Razorpay. So the statement
-above arms the food path and leaves the gift path exactly as open as it is today.
-Found by the 2026-08-09 sweep (B8); **not** fixed by 0112, which is about charging the
-right amount rather than proving it was charged. Two different jobs, and doing the
-second one properly means `payment_intents` learning about `gift_orders` — a schema
-question, not a flag. Written down here so it is armed with the rest rather than
-discovered afterwards.
+- [x] **The gate covers gifts too** — migration **0113**, applied 2026-08-10.
+      The statement above now arms **both** paths.
+
+`orders_require_verified_payment` was a trigger on `orders` alone; `gift_orders` had
+exactly one trigger and it was the audit one, so `place_gift_order` took
+`p_payment_id` entirely on trust — never checked against `payment_intents` or against
+Razorpay. Arming the flag would have left the gift path exactly as open as it was.
+Found by the 2026-08-09 sweep (B8) and **not** fixed by 0112, which is about charging
+the right amount rather than proving it was charged; the second job needed
+`payment_intents` to learn about `gift_orders`, which is a schema question and not a
+flag. 0113 is that schema change:
+
+- `payment_intents.gift_order_id`, beside `order_id`, with a check constraint saying
+  an intent is spent on one thing or the other and never both. Not a reused
+  `order_id`: everyone who touches that column reads it as `orders.id`, and a `ZPG-…`
+  sitting in it would join to nothing while looking like it should.
+- `gift_orders_require_verified_payment`, a `before insert` trigger in the same shape
+  as 0085's — verified, unconsumed, same customer, `amount >= total`, one opaque
+  sentence for every refusal and the detail in the log.
+
+**One flag, not two, and one table, not two.** Two booleans would be two things to
+remember on the day the keys land, and the forgotten one is the one nobody is looking
+at. Two intent tables would be two ledgers holding the same Razorpay payment id, each
+satisfied and neither wrong on its own — so a single `status='consumed'` transition on
+a single row is the only thing that can stop one payment buying a dinner *and* a gift.
+That case is checked, not assumed: the run below spends an intent on a gift and then
+watches 0085's own gate refuse the food order that names it.
+
+**No `payment_method` branch, unlike 0085.** `gift_orders.payment_method` is pinned to
+`'upi'` by a check constraint (0096, following 0084), so the branch would be dead code
+— and leaving it out is the safe direction: if that constraint is ever widened, the
+gate applies to the new method until somebody decides otherwise instead of silently
+exempting it.
+
+**Nothing to build on the device, on either platform.** Gift checkout has gone through
+the same `paymentGatewayProvider` as food since 0112, so the day keys exist a gift
+payment produces a verified intent exactly as a dinner does; the refusal sentence
+already reaches the screen through the gift datasource's `P0001` mapping. The
+app-visibility half of the payment path was checked on both and needs nothing: iOS
+declares the UPI schemes in `Info.plist`, and Android gets `scheme="upi"` from the
+Razorpay AAR through the manifest merger — read out of the **merged** manifest, not
+the source, which is the same lesson the release-APK permission check learned.
+
+**15 edge cases, run against the live database in a rolled-back transaction** before
+applying. Flag off: a fabricated reference still places an order, exactly as before.
+Flag on: fabricated, unverified, another customer's, and a rupee short are all
+refused; a rupee over is placed, because overpayment is a refund and not a reason to
+withhold somebody's parcel; the happy path consumes the intent and stamps
+`gift_order_id`; the same intent a second time is refused; an idempotent retry returns
+the same order and spends only one payment. Structure too — no overload (0051), the
+search_path pinned, the trigger body executable by neither `anon` nor `authenticated`
+(0093), and the check constraint refusing both order columns at once.
 
 ---
 

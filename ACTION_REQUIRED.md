@@ -505,7 +505,10 @@ without a device or a browser. **None has been exercised by a human.**
       > 2. `payment_settings.require_verified_payment` drives the
       >    `orders_require_verified_payment` trigger (0085): server-side, and it
       >    applies to every client that has ever been installed rather than the
-      >    ones compiled with the right argument.
+      >    ones compiled with the right argument. **Since 0113 the same flag
+      >    also drives `gift_orders_require_verified_payment`**, so the one
+      >    statement now arms food and gifts together — before that migration
+      >    arming it would have left every gift purchase on trust.
       >
       > **So S5 matters more than it did.** Arming that flag the day Razorpay
       > goes live is now the only thing standing between production and an
