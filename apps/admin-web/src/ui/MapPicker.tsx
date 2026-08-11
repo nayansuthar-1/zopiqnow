@@ -49,9 +49,9 @@ const KEY = import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY as string | undefined
 
 /// Where the map opens when the restaurant has no coordinates yet.
 ///
-/// Sadri, which with Ranakpur is where Zopiqnow actually delivers today. A map
-/// that opens on the whole of India costs the admin four zoom gestures before
-/// they can see a street, every single time.
+/// Sadri, which with Ranakpur and Falna is where Zopiqnow actually delivers
+/// today. A map that opens on the whole of India costs the admin four zoom
+/// gestures before they can see a street, every single time.
 const DEFAULT_CENTRE: LatLngLiteral = { lat: 25.1846, lng: 73.4419 }
 
 /// Whether the console has a browser key at all. The button is not offered

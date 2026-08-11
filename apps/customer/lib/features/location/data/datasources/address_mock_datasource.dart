@@ -89,11 +89,11 @@ class AddressMockDataSource implements AddressDataSource {
 
   /// Always yes, and deliberately so.
   ///
-  /// The boundary is two rows in `service_areas` (0098) and the database is the
-  /// only thing that knows them. A copy of the circles here would be a second
-  /// source of truth that goes stale the first time somebody widens a radius —
-  /// and the fixtures above are in Hyderabad, so a faithful mock would refuse
-  /// every order in every test for a reason no test is about.
+  /// The boundary is a row per town in `service_areas` (0098, 0117) and the
+  /// database is the only thing that knows them. A copy of the circles here
+  /// would be a second source of truth that goes stale the first time somebody
+  /// widens a radius — and the fixtures above are in Hyderabad, so a faithful
+  /// mock would refuse every order in every test for a reason no test is about.
   ///
   /// Set [refuseDeliveryArea] to exercise the other branch.
   bool refuseDeliveryArea = false;
@@ -110,7 +110,7 @@ class AddressMockDataSource implements AddressDataSource {
             headline: "We'll be there soon",
             detail:
                 "We're not delivering to this address yet — we're still only "
-                'in Ranakpur and Sadri.',
+                'in Falna, Ranakpur and Sadri.',
           )
         : const DeliveryAreaVerdict(
             serviceable: true,
