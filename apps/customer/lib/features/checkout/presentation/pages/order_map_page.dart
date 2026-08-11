@@ -9,7 +9,7 @@ import 'package:zopiqnow/features/checkout/presentation/widgets/order_card.dart'
     show formatClockTime;
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_map_pins.dart';
 
-/// The tracking map, full screen: pan, zoom, rotate, and the satellite layer.
+/// The tracking map, full screen: pan, zoom, rotate.
 ///
 /// The card on the order screen is a glance — gestures off, because a map that
 /// claims drags inside a scrolling page steals the scroll. This is where the

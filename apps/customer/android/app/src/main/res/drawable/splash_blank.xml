@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The icon Android 12's splash screen draws — deliberately nothing.
+
+  From API 31 the system owns the launch screen and always composites an icon
+  onto it; `windowBackground` alone no longer decides what appears. There is no
+  attribute for "no icon", so the icon is a fully transparent drawable, which
+  leaves the splash as flat colour and lets SplashPage be the first thing with
+  anything on it.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+</shape>

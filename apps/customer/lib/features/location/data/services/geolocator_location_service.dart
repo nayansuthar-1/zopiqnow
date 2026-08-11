@@ -1,5 +1,6 @@
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:location/location.dart' as service_dialog;
 
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/domain/services/device_location_service.dart';
@@ -7,6 +8,17 @@ import 'package:zopiqnow/features/location/domain/services/device_location_servi
 /// GPS via `geolocator`, reverse-geocode via Android's **native** `Geocoder`
 /// (`geocoding`). No Maps API key, no billing — Google Places autocomplete
 /// arrives with the backend (SAD 14).
+///
+/// **Why a second location plugin.** [requestService] — and nothing else — comes
+/// from the `location` package, aliased `service_dialog` so no reader has to
+/// wonder which library a call belongs to. geolocator cannot switch location
+/// services on; the furthest it goes is `openLocationSettings()`, which throws
+/// the customer out to Android Settings, and being ejected from the app is where
+/// a location prompt gets abandoned. `location` wraps the Play Services dialog
+/// that flips the setting in place.
+///
+/// Every *coordinate* still comes from geolocator. The two plugins are kept from
+/// disagreeing about where the device is by never asking the second one.
 class GeolocatorLocationService implements DeviceLocationService {
   GeolocatorLocationService({Geocoding? geocoding})
     : _geocoding = geocoding ?? Geocoding();
@@ -32,6 +44,52 @@ class GeolocatorLocationService implements DeviceLocationService {
     return permission == LocationPermission.denied ||
         permission == LocationPermission.unableToDetermine;
   }
+
+  @override
+  Future<LocationReadiness> readiness() async {
+    // Services first, and the order is not arbitrary: with location switched off
+    // device-wide, a granted permission buys nothing, and asking the customer to
+    // re-grant a permission they already gave would be the wrong instruction.
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      return LocationReadiness.serviceOff;
+    }
+
+    final LocationPermission permission = await Geolocator.checkPermission();
+    return switch (permission) {
+      LocationPermission.always ||
+      LocationPermission.whileInUse => LocationReadiness.ready,
+      LocationPermission.deniedForever => LocationReadiness.permissionBlocked,
+      // `unableToDetermine` is the unknown case, treated as "not granted" — the
+      // same call `currentAddress` makes. Without a positive grant we must not
+      // touch the GPS, and offering the ask is the recoverable answer.
+      LocationPermission.denied ||
+      LocationPermission.unableToDetermine => LocationReadiness.permissionDenied,
+    };
+  }
+
+  @override
+  Future<ServiceRequestOutcome> requestService() async {
+    final service_dialog.Location location = service_dialog.Location();
+    try {
+      if (await location.serviceEnabled()) return ServiceRequestOutcome.enabled;
+      return await location.requestService()
+          ? ServiceRequestOutcome.enabled
+          : ServiceRequestOutcome.declined;
+    } on Object {
+      // iOS has no in-app way to turn location services on, and an Android
+      // build without Play Services has no dialog to show either — both surface
+      // as a throw from the platform channel. Neither is worth an error message,
+      // but both mean the caller must offer the settings screen instead of
+      // treating this as a refusal.
+      return ServiceRequestOutcome.unavailable;
+    }
+  }
+
+  @override
+  Future<void> openLocationSettings() => Geolocator.openLocationSettings();
+
+  @override
+  Future<void> openAppSettings() => Geolocator.openAppSettings();
 
   @override
   Future<Address> currentAddress() async {
@@ -71,7 +129,12 @@ class GeolocatorLocationService implements DeviceLocationService {
     );
     if (places.isEmpty) throw const AddressNotFound();
 
-    return _toAddress(places.first, position);
+    return _toAddress(
+      places.first,
+      id: 'gps',
+      latitude: position.latitude,
+      longitude: position.longitude,
+    );
   }
 
   @override
@@ -92,7 +155,65 @@ class GeolocatorLocationService implements DeviceLocationService {
     return GeoPoint(best.latitude, best.longitude);
   }
 
-  static Address _toAddress(Placemark p, Position position) {
+  @override
+  Future<List<Address>> searchPlaces(String query, {int limit = 5}) async {
+    final String text = query.trim();
+    if (text.isEmpty) return const <Address>[];
+    // No Geocoder on this device (no Play services). Nothing to search with, and
+    // an empty list is the honest answer — the sheet says "no matches" and the
+    // saved addresses above it still work.
+    if (!await _geocoding.isPresent()) return const <Address>[];
+
+    final List<Location> matches;
+    try {
+      matches = await _geocoding.locationFromAddress(text);
+    } on Object {
+      // The native Geocoder throws on half-typed text as readily as it returns
+      // nothing. Both mean the same thing to somebody still typing.
+      return const <Address>[];
+    }
+
+    final List<Address> places = <Address>[];
+    for (final Location match in matches.take(limit)) {
+      final List<Placemark> named;
+      try {
+        named = await _geocoding.placemarkFromCoordinates(
+          match.latitude,
+          match.longitude,
+        );
+      } on Object {
+        continue;
+      }
+      if (named.isEmpty) continue;
+
+      places.add(
+        _toAddress(
+          named.first,
+          // The id is what tells the rest of the app this is a picked place and
+          // not a saved one — the same trick the GPS path plays with 'gps'.
+          // Coordinates make it unique, so two searches for different places
+          // cannot collide in the selected-address store.
+          id: 'manual:${match.latitude},${match.longitude}',
+          latitude: match.latitude,
+          longitude: match.longitude,
+        ),
+      );
+    }
+    return places;
+  }
+
+  /// A named place from a placemark and the point it was resolved at.
+  ///
+  /// The point comes in rather than being read off a [Position], because the two
+  /// callers hold different things: the GPS path has a fix, and the search path
+  /// has a geocoder match. Both have a latitude and a longitude, which is all
+  /// this ever wanted.
+  static Address _toAddress(
+    Placemark p, {
+    required String id,
+    required double latitude,
+    required double longitude,
+  }) {
     // Indian addresses put the neighbourhood in `subLocality` ("Banjara Hills")
     // and the city in `locality` ("Hyderabad"). Fall back down the hierarchy
     // rather than render an empty line.
@@ -113,11 +234,11 @@ class GeolocatorLocationService implements DeviceLocationService {
         '';
 
     return Address(
-      id: 'gps',
+      id: id,
       line1: line1,
       city: city,
-      latitude: position.latitude,
-      longitude: position.longitude,
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 

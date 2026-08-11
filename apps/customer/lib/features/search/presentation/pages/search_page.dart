@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/features/home/domain/entities/dish_suggestion.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/domain/repositories/restaurant_repository.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/section_header.dart';
 import 'package:zopiqnow/features/search/presentation/providers/search_providers.dart';
+import 'package:zopiqnow/features/search/presentation/widgets/dish_result_tile.dart';
 
 /// Restaurant search. Results reuse [RestaurantCard], so a restaurant looks the
 /// same here as on Home.
@@ -45,10 +48,18 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     widget.onOpenRestaurant(restaurant);
   }
 
+  /// A dish result goes to the same place its restaurant does — the menu, where
+  /// the rest of what that kitchen makes is. The tile's own ADD button is the
+  /// route for somebody who only wanted the one dish.
+  void _openDish(DishSuggestion dish) => _open(dish.restaurant);
+
   @override
   Widget build(BuildContext context) {
     final String query = ref.watch(searchQueryProvider).trim();
     final AsyncValue<List<Restaurant>> results = ref.watch(searchResultsProvider);
+    final AsyncValue<List<DishSuggestion>> dishes = ref.watch(
+      dishSearchResultsProvider,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -69,15 +80,40 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               // The debounce lives inside the provider, so this shimmer covers
               // both the wait and the fetch. To the user they are one thing.
               loading: () => const _SearchSkeleton(),
+              // Only the restaurant query can take the screen down. A failed
+              // dish query costs the Dishes section and nothing else — the
+              // restaurants are still an answer.
               error: (Object error, _) => _SearchError(
                 message: error is RestaurantLoadFailure
                     ? error.message
                     : 'Please check your connection and try again.',
-                onRetry: () => ref.invalidate(searchResultsProvider),
+                onRetry: () {
+                  ref.invalidate(searchResultsProvider);
+                  ref.invalidate(dishSearchResultsProvider);
+                },
               ),
-              data: (List<Restaurant> found) => found.isEmpty
-                  ? _NoResults(query: query)
-                  : _Results(restaurants: found, onTap: _open),
+              data: (List<Restaurant> found) {
+                final List<DishSuggestion> foundDishes =
+                    dishes.valueOrNull ?? const <DishSuggestion>[];
+
+                // The two queries are fired together but do not land together.
+                // Saying "no results" in the gap would be wrong for the case
+                // this feature exists for — a dish everybody serves and nobody
+                // is named after — so an empty restaurant list waits for the
+                // dishes before it gives up.
+                if (found.isEmpty && dishes.isLoading) {
+                  return const _SearchSkeleton();
+                }
+                if (found.isEmpty && foundDishes.isEmpty) {
+                  return _NoResults(query: query);
+                }
+                return _Results(
+                  restaurants: found,
+                  dishes: foundDishes,
+                  onTapRestaurant: _open,
+                  onTapDish: _openDish,
+                );
+              },
             ),
     );
   }
@@ -108,7 +144,7 @@ class _SearchField extends StatelessWidget {
       textInputAction: TextInputAction.search,
       style: Theme.of(context).textTheme.bodyLarge,
       decoration: InputDecoration(
-        hintText: 'Search for restaurants or cuisines',
+        hintText: 'Search for a dish, restaurant or cuisine',
         prefixIcon: Icon(Icons.search_rounded, color: zc.textMuted, size: 22),
         suffixIcon: ValueListenableBuilder<TextEditingValue>(
           valueListenable: controller,
@@ -125,27 +161,73 @@ class _SearchField extends StatelessWidget {
   }
 }
 
+/// Dishes, then restaurants.
+///
+/// Dishes lead because they are the more specific answer: somebody who typed
+/// "paneer tikka" wants the dish, and the kitchens that happen to have the word
+/// in their name are the wider guess. Either section is dropped entirely when it
+/// has nothing — an empty heading is a promise the screen did not keep.
 class _Results extends StatelessWidget {
-  const _Results({required this.restaurants, required this.onTap});
+  const _Results({
+    required this.restaurants,
+    required this.dishes,
+    required this.onTapRestaurant,
+    required this.onTapDish,
+  });
 
   final List<Restaurant> restaurants;
-  final ValueChanged<Restaurant> onTap;
+  final List<DishSuggestion> dishes;
+  final ValueChanged<Restaurant> onTapRestaurant;
+  final ValueChanged<DishSuggestion> onTapDish;
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(ZopiqSpacing.lg),
-      itemCount: restaurants.length,
-      separatorBuilder: (_, _) => const SizedBox(height: ZopiqSpacing.lg),
-      itemBuilder: (BuildContext context, int i) => RepaintBoundary(
-        child: RestaurantCard(
-          restaurant: restaurants[i],
-          onTap: () => onTap(restaurants[i]),
-          // Home's card owns the Hero tag for this restaurant; both screens are
-          // mounted at once inside the shell. See RestaurantCard.heroic.
-          heroic: false,
-        ),
-      ),
+    return CustomScrollView(
+      slivers: <Widget>[
+        if (dishes.isNotEmpty) ...<Widget>[
+          const SliverToBoxAdapter(child: SectionHeader(title: 'Dishes')),
+          SliverPadding(
+            padding: ZopiqSpacing.pagePadding,
+            // No separator: the tile draws its own hairline, the same way the
+            // menu's dish rows do.
+            sliver: SliverList.builder(
+              itemCount: dishes.length,
+              itemBuilder: (BuildContext context, int i) => RepaintBoundary(
+                child: DishResultTile(
+                  dish: dishes[i],
+                  onTap: () => onTapDish(dishes[i]),
+                ),
+              ),
+            ),
+          ),
+        ],
+        if (restaurants.isNotEmpty) ...<Widget>[
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.only(top: ZopiqSpacing.lg),
+              child: SectionHeader(title: 'Restaurants'),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.all(ZopiqSpacing.lg),
+            sliver: SliverList.separated(
+              itemCount: restaurants.length,
+              separatorBuilder: (_, _) =>
+                  const SizedBox(height: ZopiqSpacing.lg),
+              itemBuilder: (BuildContext context, int i) => RepaintBoundary(
+                child: RestaurantCard(
+                  restaurant: restaurants[i],
+                  onTap: () => onTapRestaurant(restaurants[i]),
+                  // Home's card owns the Hero tag for this restaurant; both
+                  // screens are mounted at once inside the shell. See
+                  // RestaurantCard.heroic.
+                  heroic: false,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -165,7 +247,7 @@ class _RecentSearches extends ConsumerWidget {
       return const _Centered(
         icon: Icons.search_rounded,
         title: 'What are you craving?',
-        detail: 'Search by restaurant or cuisine — try "biryani".',
+        detail: 'Search by dish, restaurant or cuisine — try "biryani".',
       );
     }
 

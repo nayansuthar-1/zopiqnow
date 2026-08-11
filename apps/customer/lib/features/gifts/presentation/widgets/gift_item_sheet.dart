@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/app/providers/bottom_nav_provider.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_item.dart';
 import 'package:zopiqnow/features/gifts/presentation/providers/gift_cart_providers.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_image.dart';
@@ -9,15 +10,25 @@ import 'package:zopiqnow/features/gifts/presentation/widgets/gift_image.dart';
 /// Opens the detail sheet for a gift item:
 /// Features Blinkit-style express 10-min delivery banner, complimentary gift box callout,
 /// pricing breakdown, image gallery carousel, and product description.
-Future<void> showGiftItemSheet(BuildContext context, GiftItem item) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+/// The shell's pills slide away for as long as the sheet is up: this one is
+/// tall, and the Cart pill floating over its "Add to bag" row was a tap target
+/// sitting on top of another tap target.
+Future<void> showGiftItemSheet(
+  BuildContext context,
+  WidgetRef ref,
+  GiftItem item,
+) {
+  return withBottomNavHidden(
+    ref,
+    () => showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (BuildContext context) => _GiftItemSheet(item: item),
     ),
-    builder: (BuildContext context) => _GiftItemSheet(item: item),
   );
 }
 

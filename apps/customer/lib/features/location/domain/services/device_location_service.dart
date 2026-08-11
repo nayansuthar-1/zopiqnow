@@ -22,6 +22,19 @@ abstract interface class DeviceLocationService {
   /// Play services) or the text matches nothing.
   Future<GeoPoint> coordinatesOf(String query);
 
+  /// Typed text → a short list of named, selectable places.
+  ///
+  /// [coordinatesOf] answers "where is that text" with a bare point, which is
+  /// all the address *form* needs — the customer already typed the words, so
+  /// there is nothing to show them back. A search list is the other case: the
+  /// customer is choosing, and a row reading `17.4239, 78.4738` is not a choice
+  /// anyone can make. So each match is reverse-geocoded back into a name.
+  ///
+  /// Returns empty rather than throwing when nothing matches. A search that
+  /// finds nothing is a normal thing for a search to do, and half-typed text
+  /// finds nothing constantly.
+  Future<List<Address>> searchPlaces(String query, {int limit = 5});
+
   /// Whether calling [currentAddress] would put the *system* location dialog on
   /// screen.
   ///
@@ -31,6 +44,70 @@ abstract interface class DeviceLocationService {
   /// the dialog again, so a disclosure in front of either is a sheet arguing
   /// with a decision the customer has already made.
   Future<bool> needsPermissionPrompt();
+
+  /// What, if anything, is standing between us and a location right now.
+  ///
+  /// Asked *before* doing anything, so the UI can lead with the fix rather than
+  /// attempt a detect and report a failure. [currentAddress] still throws for
+  /// each of these — it is the authority — but "why can't we?" and "we tried and
+  /// couldn't" are different questions, and only the first one can be answered
+  /// without touching the GPS.
+  Future<LocationReadiness> readiness();
+
+  /// Asks the OS to switch location services on **without leaving the app**.
+  ///
+  /// On Android this is the Play Services dialog — "Turn on location? / NO,
+  /// YES" — which flips the setting in place.
+  ///
+  /// Three outcomes and not a bool, because "the customer said no" and "this
+  /// device cannot ask" must not be handled the same way. The first is an answer
+  /// and deserves silence; the second is the app failing to do the thing its
+  /// button offered, and deserves a way forward. Collapsing them is how you ship
+  /// a button that visibly does nothing.
+  Future<ServiceRequestOutcome> requestService();
+
+  /// Opens the device's location settings — the fallback when the in-place
+  /// dialog is not available (an Android build with no Play Services, or iOS,
+  /// where no app may change the setting).
+  Future<void> openLocationSettings();
+
+  /// Opens this app's OS settings page — the only route left once location has
+  /// been denied with "don't ask again", since the system dialog will not appear
+  /// again no matter how many times we ask.
+  Future<void> openAppSettings();
+}
+
+/// What came of asking the OS to turn location services on.
+enum ServiceRequestOutcome {
+  /// Services are on now.
+  enabled,
+
+  /// The dialog appeared and the customer said no. An answer, not a failure.
+  declined,
+
+  /// No dialog could be shown at all — no Play Services on this device, or the
+  /// plugin never attached. The customer has not refused anything; they tapped a
+  /// button and nothing happened, so the UI owes them the manual route.
+  unavailable,
+}
+
+/// Why a location is or is not available, without having tried to take one.
+enum LocationReadiness {
+  /// Services on and permission granted — [DeviceLocationService.currentAddress]
+  /// would go straight to the GPS.
+  ready,
+
+  /// Location is switched off for the whole device. Fixable in place with
+  /// [DeviceLocationService.requestService].
+  serviceOff,
+
+  /// Not granted, but never permanently refused — the system dialog will still
+  /// appear, so the disclosure comes first and then the ask.
+  permissionDenied,
+
+  /// Denied with "don't ask again". No dialog will ever appear again; the only
+  /// way through is [DeviceLocationService.openAppSettings].
+  permissionBlocked,
 }
 
 /// A latitude/longitude pair. Not an [Address]: this is the answer to "where is

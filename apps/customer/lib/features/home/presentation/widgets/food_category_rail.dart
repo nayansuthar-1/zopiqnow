@@ -6,7 +6,7 @@ import 'package:zopiqnow/features/home/presentation/widgets/category_art.dart';
 
 /// The "What's on your mind?" rail — a horizontally scrolling row of circular
 /// dish categories.
-class FoodCategoryRail extends StatelessWidget {
+class FoodCategoryRail extends StatefulWidget {
   const FoodCategoryRail({
     required this.categories,
     this.onTapCategory,
@@ -45,10 +45,81 @@ class FoodCategoryRail extends StatelessWidget {
       indicatorHeight;
 
   @override
+  State<FoodCategoryRail> createState() => _FoodCategoryRailState();
+}
+
+class _FoodCategoryRailState extends State<FoodCategoryRail> {
+  final ScrollController _scroll = ScrollController();
+
+  /// One tile plus the gap after it — what an index is worth in scroll offset.
+  static const double _stride =
+      FoodCategoryRail._tileWidth + ZopiqSpacing.sm;
+
+  @override
+  void initState() {
+    super.initState();
+    // After layout: the viewport has no width until the rail is measured, and
+    // the target offset is computed against it.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _revealSelected());
+  }
+
+  @override
+  void didUpdateWidget(FoodCategoryRail old) {
+    super.didUpdateWidget(old);
+    // Switching categories from the rail itself, or arriving on a different one.
+    if (old.selectedId != widget.selectedId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _revealSelected());
+    }
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Brings the open category into view, centred where there is room for it.
+  ///
+  /// Without this the rail always started at "Maggi" and the selected tile could
+  /// be anywhere off to the right — so a customer who tapped Manchurian landed on
+  /// a page whose rail showed five other categories and no sign of the one they
+  /// had chosen. The indicator bar was drawn correctly the whole time; it was
+  /// just never on screen.
+  ///
+  /// The offset is computed rather than measured. Every tile is exactly
+  /// [_stride] wide, so the arithmetic is exact and needs no per-tile keys.
+  void _revealSelected() {
+    if (!mounted || !_scroll.hasClients) return;
+
+    final String? id = widget.selectedId;
+    if (id == null) return;
+
+    final int index = widget.categories.indexWhere(
+      (FoodCategory c) => c.id == id,
+    );
+    if (index < 0) return;
+
+    final double viewport = _scroll.position.viewportDimension;
+    final double tileStart = ZopiqSpacing.md + (index * _stride);
+    final double centred =
+        tileStart - ((viewport - FoodCategoryRail._tileWidth) / 2);
+
+    _scroll.animateTo(
+      centred.clamp(
+        _scroll.position.minScrollExtent,
+        _scroll.position.maxScrollExtent,
+      ),
+      duration: ZopiqDurations.base,
+      curve: ZopiqCurves.emphasized,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: railHeight,
+      height: FoodCategoryRail.railHeight,
       child: ListView.separated(
+        controller: _scroll,
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.only(
           left: ZopiqSpacing.md,
@@ -56,18 +127,18 @@ class FoodCategoryRail extends StatelessWidget {
           top: ZopiqSpacing.lg,
         ),
         physics: const BouncingScrollPhysics(),
-        itemCount: categories.length,
+        itemCount: widget.categories.length,
         separatorBuilder: (_, _) => const SizedBox(width: ZopiqSpacing.sm),
         itemBuilder: (BuildContext context, int i) {
-          final FoodCategory category = categories[i];
+          final FoodCategory category = widget.categories[i];
           // Each tile paints independently: pressing one must not repaint the row.
           return RepaintBoundary(
             child: _CategoryTile(
               category: category,
-              selected: category.id == selectedId,
-              onTap: onTapCategory == null
+              selected: category.id == widget.selectedId,
+              onTap: widget.onTapCategory == null
                   ? null
-                  : () => onTapCategory!(category),
+                  : () => widget.onTapCategory!(category),
             ),
           );
         },

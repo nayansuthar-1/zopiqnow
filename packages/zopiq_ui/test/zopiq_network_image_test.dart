@@ -34,6 +34,18 @@ void main() {
     // flutter_test stubs HttpClient to return 400 for every request, so this
     // exercises the real errorBuilder path.
     await tester.pumpWidget(_host('https://example.invalid/missing.jpg'));
+
+    // `pumpAndSettle` alone is not enough any more, and that is a property of
+    // the provider rather than a flake. `ZopiqNetworkImage` is backed by
+    // `ZopiqDiskImage` now, which asks `path_provider` for a cache directory
+    // and then opens a socket — real I/O, on real futures, which the test
+    // binding's fake clock cannot advance. Without `runAsync` the completer
+    // simply never resolves and the `Image` sits there for ever: no frame, no
+    // error, no fallback. `runAsync` lets the miss actually happen so the
+    // failure it produces reaches `errorBuilder`.
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
     await tester.pumpAndSettle();
 
     expect(find.byKey(_fallbackKey), findsOneWidget);

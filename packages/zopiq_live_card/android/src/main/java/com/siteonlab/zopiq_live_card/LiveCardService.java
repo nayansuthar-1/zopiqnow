@@ -70,7 +70,7 @@ public final class LiveCardService extends Service {
                 @Override
                 public void run() {
                     redrawAll();
-                    if (!cards.isEmpty()) handler.postDelayed(this, TICK_MS);
+                    schedule();
                 }
             };
 
@@ -165,9 +165,39 @@ public final class LiveCardService extends Service {
 
     // ---------------------------------------------------------------- the loop
 
+    /**
+     * Queue the next redraw: the usual cadence, or sooner if a countdown is about to run out.
+     *
+     * <p><b>Why "sooner" matters.</b> The countdown is a {@link android.widget.Chronometer} in
+     * countdown mode, and a Chronometer does not stop at zero — it keeps going and renders the
+     * overshoot as a negative time. The swap to "Ready any moment" happens in
+     * {@code LiveCardNotification}, but only when the card is next rebuilt. On a flat 20-second
+     * cadence that left up to twenty seconds of "-00:14" counting downward on the lock screen,
+     * which is what a customer reported seeing.
+     *
+     * <p>So the loop lands on the deadline instead of stepping over it. The next wake is the
+     * soonest of every live card's remaining time, capped at {@link #TICK_MS} — the bar still
+     * creeps on the usual beat, and the instant a countdown expires the card is redrawn with the
+     * Chronometer hidden.
+     */
     private void schedule() {
         handler.removeCallbacks(tick);
-        if (!cards.isEmpty()) handler.postDelayed(tick, TICK_MS);
+        if (cards.isEmpty()) return;
+
+        final long now = System.currentTimeMillis();
+        long delay = TICK_MS;
+
+        for (final LiveCardSpec spec : cards.values()) {
+            final long untilDeadline = spec.windowEndMs - now;
+            // Only deadlines still ahead of us. One already passed has nothing left to schedule
+            // for, and would otherwise pin the delay at the floor forever.
+            if (untilDeadline > 0L && untilDeadline < delay) {
+                delay = untilDeadline;
+            }
+        }
+
+        // A floor, so a deadline a few milliseconds out cannot spin the handler.
+        handler.postDelayed(tick, Math.max(250L, delay));
     }
 
     private void redrawAll() {

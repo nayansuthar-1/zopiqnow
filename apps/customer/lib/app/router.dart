@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:zopiqnow/app/app_shell.dart';
+import 'package:zopiqnow/app/providers/splash_gate_provider.dart';
 import 'package:zopiqnow/features/about/presentation/licenses_page.dart';
 import 'package:zopiqnow/features/account/presentation/pages/account_page.dart';
 import 'package:zopiqnow/features/account/presentation/pages/delete_account_page.dart';
@@ -116,6 +117,11 @@ class _AuthRefreshListenable extends ChangeNotifier {
       authControllerProvider,
       (AuthState? _, AuthState _) => notifyListeners(),
     );
+    // The splash now also holds the route open on a timer of its own, and a
+    // gate nothing listens to is a gate that opens into an empty room: the
+    // timer would fire, the state would flip, and `redirect` would not re-run
+    // to notice until some unrelated navigation happened to wake it.
+    ref.listen<bool>(splashGateProvider, (bool? _, bool _) => notifyListeners());
   }
 }
 
@@ -155,6 +161,13 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       // 2. Restore finished. Leave the splash for wherever we were headed,
       //    re-applying the guard to that destination.
       if (location == _splashPath) {
+        // Not before it has been seen, though. The Keystore read usually lands
+        // in a frame or two, which is long enough to be correct and far too
+        // short to be a brand moment — leaving on it would swap the animation
+        // for Home before it had drawn. The gate is a timer, so this holds for
+        // a bounded time and then stops mattering.
+        if (!ref.read(splashGateProvider)) return null;
+
         final String target = state.uri.queryParameters['from'] ?? '/';
         if (auth is AuthSignedOut && _isProtected(target)) {
           return _loginRedirect(target);

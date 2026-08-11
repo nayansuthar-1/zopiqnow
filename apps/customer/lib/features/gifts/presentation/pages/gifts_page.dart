@@ -566,13 +566,16 @@ class _GiftShopsRail extends ConsumerWidget {
 }
 
 /// Blinkit Storefront Gift Grid.
-class _GiftGrid extends StatelessWidget {
+///
+/// A [ConsumerWidget] only so that opening an item can slide the shell's pills
+/// out of the way — the sheet itself takes the ref, so the grid must have one.
+class _GiftGrid extends ConsumerWidget {
   const _GiftGrid({required this.items});
 
   final List<GiftItem> items;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return SliverLayoutBuilder(
       builder: (BuildContext context, SliverConstraints constraints) {
         final double width = constraints.crossAxisExtent;
@@ -601,7 +604,7 @@ class _GiftGrid extends StatelessWidget {
                     return RepaintBoundary(
                       child: GiftItemCard(
                         item: items[i],
-                        onTap: () => showGiftItemSheet(context, items[i]),
+                        onTap: () => showGiftItemSheet(context, ref, items[i]),
                       ),
                     );
                   },

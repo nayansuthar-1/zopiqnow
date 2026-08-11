@@ -4,17 +4,19 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/router.dart';
+import 'package:zopiqnow/features/home/domain/entities/dish_suggestion.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/domain/repositories/restaurant_repository.dart';
+import 'package:zopiqnow/features/home/presentation/providers/dish_providers.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/dish_rail.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/food_category_rail.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_filter_chips.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_status_views.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_list_skeleton.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/section_header.dart';
-import 'package:zopiqnow/features/home/presentation/widgets/top_chains_rail.dart';
 
 /// One dish category — everything nearby that serves it.
 ///
@@ -176,6 +178,11 @@ class _CategoryRailDelegate extends SliverPersistentHeaderDelegate {
       old.selectedId != selectedId || old.categories.length != categories.length;
 }
 
+/// "Recommended for you", narrowed to the open category — the same dish rail
+/// Home shows, over dishes that are actually [label].
+///
+/// A category page is for someone who has already decided what they want to eat,
+/// so recommending them a kitchen was answering a question they had not asked.
 class _RecommendedSection extends ConsumerWidget {
   const _RecommendedSection({required this.label});
 
@@ -183,12 +190,14 @@ class _RecommendedSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final List<Restaurant> top =
-        ref.watch(categoryTopRatedProvider(label)).valueOrNull ??
-        const <Restaurant>[];
+    final List<DishSuggestion> dishes =
+        ref.watch(categoryDishesProvider(label)).valueOrNull ??
+        const <DishSuggestion>[];
     // Silent when empty: the list below already owns the empty state, and two
     // "nothing here" messages on one screen is one too many.
-    if (top.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+    if (dishes.isEmpty) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
 
     return SliverMainAxisGroup(
       slivers: <Widget>[
@@ -196,9 +205,9 @@ class _RecommendedSection extends ConsumerWidget {
           child: SectionHeader(title: 'Recommended for you'),
         ),
         SliverToBoxAdapter(
-          child: TopChainsRail(
-            restaurants: top,
-            onTapRestaurant: (Restaurant r) => _openMenu(context, r),
+          child: DishRail(
+            dishes: dishes,
+            onOpenDish: (DishSuggestion d) => _openMenu(context, d.restaurant),
           ),
         ),
       ],

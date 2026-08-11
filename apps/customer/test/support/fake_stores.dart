@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:zopiqnow/app/providers/splash_gate_provider.dart';
 import 'package:zopiqnow/core/storage/key_value_store.dart';
 import 'package:zopiqnow/core/storage/secure_store.dart';
 import 'package:zopiqnow/core/storage/storage_providers.dart';
@@ -10,6 +11,7 @@ import 'package:zopiqnow/features/favourites/data/datasources/favourites_mock_da
 import 'package:zopiqnow/features/favourites/presentation/providers/favourites_providers.dart';
 import 'package:zopiqnow/features/location/data/datasources/address_datasource.dart';
 import 'package:zopiqnow/features/location/data/datasources/address_mock_datasource.dart';
+import 'package:zopiqnow/features/location/presentation/pages/location_gate_page.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 
 import 'fake_auth_datasource.dart';
@@ -78,6 +80,14 @@ class ResolvedAuthController extends AuthController {
 /// would otherwise all need an extra `pump` for a startup path they are not
 /// testing. Tests that *are* about auth omit [authState] and drive the real
 /// restore themselves.
+/// [locationGateAnswered] is what keeps a test about the *cart* from being a
+/// test about the location gate. The router sends `/` to the gate whenever no
+/// address has been chosen this run, so without this every case that pumps the
+/// app asserts against `LocationGatePage` and finds no Home, no tabs and no
+/// cart pill. Answering it is the honest fake: the gate is in-memory and
+/// per-run by design, so "already answered" is a state the real app reaches a
+/// second after launch. Tests that *are* about the gate pass `false` and drive
+/// it themselves.
 List<Override> storageOverrides({
   KeyValueStore? keyValueStore,
   SecureStore? secureStore,
@@ -85,9 +95,17 @@ List<Override> storageOverrides({
   AddressDataSource? addressDataSource,
   FavouritesDataSource? favouritesDataSource,
   AuthState? authState = const AuthSignedOut(),
+  bool locationGateAnswered = true,
 }) => <Override>[
   keyValueStoreProvider.overrideWithValue(keyValueStore ?? FakeKeyValueStore()),
   secureStoreProvider.overrideWithValue(secureStore ?? FakeSecureStore()),
+  // The splash holds itself open for the length of its animation in the real
+  // app. That is brand, not behaviour, and a suite that waited it out on every
+  // cold start would pay for it on each case — so here the gate is open from
+  // the first frame and the splash lasts exactly as long as the session read,
+  // which is the thing these tests are actually about.
+  splashHoldProvider.overrideWithValue(Duration.zero),
+  locationGateProvider.overrideWith((Ref _) => locationGateAnswered),
   authDataSourceProvider.overrideWithValue(
     authDataSource ?? FakeAuthDataSource(),
   ),

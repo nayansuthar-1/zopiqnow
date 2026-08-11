@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      The colour of the launch window, before Flutter has drawn anything.
+
+      It mirrors ZopiqPalette.primaryDeep (#FF5200), which is what SplashPage
+      paints itself and what the launcher icon's own background is. Android
+      cannot read a Dart token, so this is the one place in the project that
+      value is written twice — change them together or the handover from the
+      system splash to the first Flutter frame becomes two oranges that nearly
+      match, which is more noticeable than two that do not.
+    -->
+    <color name="zopiq_splash_background">#FF5200</color>
+</resources>

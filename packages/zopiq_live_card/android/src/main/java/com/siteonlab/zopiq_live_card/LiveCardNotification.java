@@ -43,6 +43,14 @@ final class LiveCardNotification {
     private LiveCardNotification() {}
 
     static final String CHANNEL_ID = "order_live";
+    /**
+     * How close to its deadline a countdown gets before it is replaced by plain text.
+     *
+     * <p>See the use site: a {@code Chronometer} does not stop at zero, so the last second is
+     * given up rather than risk rendering a negative one.
+     */
+    private static final long COUNTDOWN_RETIRE_MS = 1_000L;
+
     private static final String CHANNEL_NAME = "Live order tracking";
     private static final String CHANNEL_DESCRIPTION = "The live card while an order is on its way.";
 
@@ -174,7 +182,11 @@ final class LiveCardNotification {
         views.setImageViewResource(R.id.zopiq_live_artwork, artworkResId);
 
         final long remaining = spec.remainingMs();
-        if (remaining > 0L) {
+        // Not `> 0`. The redraw is scheduled to land exactly on the deadline, but a Handler is
+        // allowed to be late, and a Chronometer whose base has already passed paints the overshoot
+        // as a negative time — "-00:02", counting downward, on somebody's lock screen. Retiring it
+        // a second early costs a second of an already-rounded countdown and makes that impossible.
+        if (remaining > COUNTDOWN_RETIRE_MS) {
             views.setViewVisibility(R.id.zopiq_live_countdown, View.VISIBLE);
             views.setViewVisibility(R.id.zopiq_live_countdown_done, View.GONE);
             // The Chronometer timebase is elapsedRealtime, not wall clock.

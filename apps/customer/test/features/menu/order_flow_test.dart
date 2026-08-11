@@ -13,6 +13,7 @@ import 'package:zopiqnow/features/menu/presentation/providers/menu_providers.dar
 import 'package:zopiqnow/features/menu/presentation/widgets/menu_item_tile.dart';
 
 import '../../support/fake_stores.dart';
+import '../../support/menu_navigation.dart';
 
 const Duration _latency = Duration(milliseconds: 10);
 
@@ -49,6 +50,39 @@ Future<void> _settle(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 50));
 }
 
+/// Opens a restaurant from the feed.
+///
+/// The feed is ordered by distance now and the list is lazy, so a named
+/// restaurant is built only once it is near the viewport — `Paradise Biryani`
+/// sits fourth at the fixtures' distances. The settle afterwards matters as
+/// much as the scroll: a tap delivered while the list is still moving is
+/// swallowed by the scrollable as a stop-the-fling gesture.
+Future<void> _openRestaurant(WidgetTester tester, String name) async {
+  if (find.text(name).evaluate().isEmpty) {
+    // Back to the top first. `scrollUntilVisible` only ever scrolls one way,
+    // and coming back from a menu leaves the feed wherever the last search left
+    // it — which for the second restaurant in a flow is usually *past* the one
+    // being looked for.
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 4000));
+    await tester.pumpAndSettle();
+
+    if (find.text(name).evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        find.text(name),
+        300,
+        scrollable: find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+    }
+  }
+  await tester.tap(find.text(name).first);
+}
+
 /// The ADD button inside a specific dish's tile.
 Finder _addButtonFor(String dishName) => find.descendant(
       of: find.ancestor(
@@ -64,7 +98,7 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pump(const Duration(milliseconds: 50));
 
-    await tester.tap(find.text('Paradise Biryani').first);
+    await _openRestaurant(tester, 'Paradise Biryani');
     await _settle(tester);
 
     expect(find.byType(MenuPage), findsOneWidget);
@@ -83,7 +117,7 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pump(const Duration(milliseconds: 50));
 
-    await tester.tap(find.text('Paradise Biryani').first);
+    await _openRestaurant(tester, 'Paradise Biryani');
     await _settle(tester);
 
     // No cart bar until something is in the cart.
@@ -114,15 +148,15 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     // Fill a cart at Paradise Biryani.
-    await tester.tap(find.text('Paradise Biryani').first);
+    await _openRestaurant(tester, 'Paradise Biryani');
     await _settle(tester);
     await tester.tap(_addButtonFor('Signature Chicken Biryani'));
     await tester.pumpAndSettle();
 
     // Go back and open a different restaurant.
-    await tester.pageBack();
+    await menuPageBack(tester);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Green Theory').first);
+    await _openRestaurant(tester, 'Green Theory');
     await _settle(tester);
 
     await tester.tap(_addButtonFor('Signature Chicken Biryani'));
@@ -142,13 +176,15 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pump(const Duration(milliseconds: 50));
 
-    await tester.tap(find.text('Paradise Biryani').first);
+    await _openRestaurant(tester, 'Paradise Biryani');
     await _settle(tester);
 
     expect(find.text('Signature Chicken Biryani'), findsOneWidget); // non-veg
     expect(find.text('Paneer Butter Masala'), findsOneWidget); // veg
 
-    await tester.tap(find.byType(Switch));
+    // A chip in the menu's filter bar now, not a `Switch` — same provider
+    // behind it (`vegOnlyProvider`), same effect on the list.
+    await tester.tap(find.text('Veg only'));
     await _settle(tester);
 
     expect(find.text('Signature Chicken Biryani'), findsNothing);

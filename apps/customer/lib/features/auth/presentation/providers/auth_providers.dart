@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:zopiqnow/app/supabase_bootstrap.dart';
 import 'package:zopiqnow/features/auth/data/datasources/auth_datasource.dart';
 import 'package:zopiqnow/features/auth/data/datasources/auth_supabase_datasource.dart';
 import 'package:zopiqnow/features/auth/data/repositories/auth_repository_impl.dart';
@@ -55,6 +56,13 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> _restore() async {
     try {
+      // The session is read from the Keystore by `Supabase.initialize`, which no
+      // longer finishes before `runApp` — it now runs behind the splash so the
+      // splash can exist at all. `restoreSession` only reads back what that call
+      // has already resolved, so asking before it lands would report a signed-in
+      // customer as signed out. This is the wait that used to be implicit.
+      await SupabaseBootstrap.ready;
+
       final AuthUser? user = await ref
           .read(authRepositoryProvider)
           .restoreSession();

@@ -15,6 +15,7 @@ import 'package:zopiqnow/features/menu/presentation/providers/menu_providers.dar
 import 'package:zopiqnow/features/menu/presentation/widgets/menu_item_tile.dart';
 
 import '../support/fake_stores.dart';
+import '../support/menu_navigation.dart';
 
 const Duration _latency = Duration(milliseconds: 10);
 
@@ -55,6 +56,27 @@ Finder _cartCount(String count) => find.descendant(
   matching: find.text(count),
 );
 
+/// The feed is ordered by distance now and the list is lazy, so a named
+/// restaurant is built only once it is near the viewport. `Paradise Biryani`
+/// sits fourth at the fixtures' distances, below the fold of even a tall test
+/// surface.
+Future<void> _scrollToRestaurant(WidgetTester tester, String name) async {
+  await tester.scrollUntilVisible(
+    find.text(name),
+    300,
+    scrollable: find
+        .descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  // Let the list come to rest. A tap delivered while it is still moving is
+  // swallowed by the scrollable as a stop-the-fling gesture and never reaches
+  // the card underneath it.
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('starts on the Delivery tab', (WidgetTester tester) async {
     _useTallSurface(tester);
@@ -92,12 +114,19 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('RECOMMENDED FOR YOU'), findsOneWidget);
+    // The landmark used to be the top-chains rail's "RECOMMENDED FOR YOU"
+    // heading. Home's revamp replaced that section with a dish rail that ranks
+    // against a Supabase read, so in a widget test it renders nothing at all.
+    // The count header is the equivalent: it scrolls with the content (the
+    // category rail and the chips above it are pinned and never leave), and it
+    // is present whenever the feed has data.
+    final Finder landmark = find.textContaining('RESTAURANTS DELIVERING');
+    expect(landmark, findsOneWidget);
 
     // Scroll that section off the top of the viewport.
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -1500));
     await tester.pumpAndSettle();
-    expect(find.text('RECOMMENDED FOR YOU'), findsNothing);
+    expect(landmark, findsNothing);
 
     await tester.tap(_tab('Cart'));
     await tester.pumpAndSettle();
@@ -106,7 +135,7 @@ void main() {
 
     // Still scrolled: an IndexedStack shell keeps the branch alive.
     expect(find.byType(HomePage), findsOneWidget);
-    expect(find.text('RECOMMENDED FOR YOU'), findsNothing);
+    expect(landmark, findsNothing);
   });
 
   testWidgets('the cart badge tracks the item count',
@@ -119,6 +148,7 @@ void main() {
     expect(_cartCount('0'), findsNothing);
     expect(_cartCount('1'), findsNothing);
 
+    await _scrollToRestaurant(tester, 'Paradise Biryani');
     await tester.tap(find.text('Paradise Biryani').first);
     await tester.pump(const Duration(milliseconds: 50));
     await tester.pump(const Duration(milliseconds: 400));
@@ -137,8 +167,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // The menu sits above the shell, so go back to see the tab bar again.
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    await menuPageBack(tester);
 
     expect(_cartCount('1'), findsOneWidget);
   });

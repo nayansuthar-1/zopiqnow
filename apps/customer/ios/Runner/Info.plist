@@ -6,11 +6,12 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
-	<!-- The name under the icon. "Zopiq", not "Zopiqnow", to match
+	<!-- The name under the icon. "ZopiQ", not "Zopiqnow", to match
 	     `android:label` in AndroidManifest.xml — the home screen is the one
-	     place the two platforms are read side by side. -->
+	     place the two platforms are read side by side. The capital Q is the
+	     brand's, and it is the same one the splash wordmark draws. -->
 	<key>CFBundleDisplayName</key>
-	<string>Zopiq</string>
+	<string>ZopiQ</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -85,7 +86,7 @@
 	     option in the dialog for a capability we do not have — the same reason
 	     ACCESS_BACKGROUND_LOCATION is absent on the Android side. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Zopiq uses your location to find your delivery address and show restaurants that deliver to you.</string>
+	<string>ZopiQ uses your location to find your delivery address and show restaurants that deliver to you.</string>
 
 	<!-- image_picker, the profile photo's two paths. Both strings are required
 	     even though the user only ever takes one of the routes: iOS resolves
@@ -94,9 +95,9 @@
 	     Note what is deliberately *not* here: NSPhotoLibraryAddUsageDescription.
 	     We read a photo, we never write one back to the library. -->
 	<key>NSCameraUsageDescription</key>
-	<string>Zopiq needs the camera so you can take a profile photo.</string>
+	<string>ZopiQ needs the camera so you can take a profile photo.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Zopiq needs your photo library so you can choose a profile photo.</string>
+	<string>ZopiQ needs your photo library so you can choose a profile photo.</string>
 
 	<!-- POST_NOTIFICATIONS has no plist counterpart — on iOS the prompt is a
 	     runtime call, which `PushService.start` already makes. What *is*

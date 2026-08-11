@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_map/src/map_markers.dart';
+import 'package:zopiq_map/src/map_style.dart';
 import 'package:zopiq_map/src/polyline_codec.dart';
 import 'package:zopiq_map/src/route_progress.dart';
 
@@ -57,19 +58,6 @@ class ZopiqMapPin {
   String get imageKey => '${kind.name}|$heading|$label';
 }
 
-/// What the map is showing underneath the route.
-enum ZopiqMapLayer {
-  map(MapType.normal, 'Map', Icons.map_outlined),
-  satellite(MapType.hybrid, 'Satellite', Icons.satellite_alt),
-  terrain(MapType.terrain, 'Terrain', Icons.terrain);
-
-  const ZopiqMapLayer(this.type, this.label, this.icon);
-
-  final MapType type;
-  final String label;
-  final IconData icon;
-}
-
 /// The map, once, for both apps.
 ///
 /// **Google draws the ground; Ola draws the road.** The basemap, its satellite
@@ -112,7 +100,6 @@ class ZopiqMapView extends StatefulWidget {
     this.encodedPolyline,
     this.liveEncodedPolyline,
     this.pins = const <ZopiqMapPin>[],
-    this.showLayerSwitcher = true,
     this.showMyLocation = false,
     this.interactive = true,
     this.onTap,
@@ -137,10 +124,6 @@ class ZopiqMapView extends StatefulWidget {
   final String? liveEncodedPolyline;
 
   final List<ZopiqMapPin> pins;
-
-  /// The Map / Satellite / Terrain control. Off for a small map that is a
-  /// glance rather than a screen.
-  final bool showLayerSwitcher;
 
   /// Google's own blue dot. The rider's map wants it; the customer's does not —
   /// the customer's own position is not what that screen is about, and asking
@@ -181,8 +164,6 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
     with SingleTickerProviderStateMixin {
   final Completer<GoogleMapController> _controller =
       Completer<GoogleMapController>();
-
-  ZopiqMapLayer _layer = ZopiqMapLayer.map;
 
   /// Marker images, keyed by [ZopiqMapPin.imageKey].
   final Map<String, _PinImage> _images = <String, _PinImage>{};
@@ -632,7 +613,14 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
                   : points.first,
               zoom: 13,
             ),
-            mapType: _layer.type,
+            // One basemap, always. Satellite and terrain were a layer switcher
+            // in the corner; neither helps anybody find a gate, and imagery
+            // fought the route for attention every time it was on.
+            mapType: MapType.normal,
+            // The quiet grey ground the route is drawn over — see map_style.dart.
+            // Passed to the native SDK on Android and iOS alike, so this is the
+            // one place the look of every map in every app is decided.
+            style: zopiqMapStyle,
             padding: widget.padding,
             myLocationEnabled: widget.showMyLocation,
             myLocationButtonEnabled:
@@ -659,17 +647,6 @@ class _ZopiqMapViewState extends State<ZopiqMapView>
             onCameraIdle: _openingFit,
           ),
         ),
-        if (widget.showLayerSwitcher)
-          Positioned(
-            top: widget.padding.top + ZopiqSpacing.sm,
-            right: widget.padding.right + ZopiqSpacing.sm,
-            child: _LayerSwitcher(
-              current: _layer,
-              zc: zc,
-              onChanged: (ZopiqMapLayer layer) =>
-                  setState(() => _layer = layer),
-            ),
-          ),
         Positioned(
           right: widget.padding.right + ZopiqSpacing.sm,
           bottom: widget.padding.bottom + ZopiqSpacing.sm,
@@ -800,56 +777,3 @@ class _RoutingCredit extends StatelessWidget {
   }
 }
 
-/// Map / Satellite / Terrain, as a menu behind one button.
-///
-/// A button rather than chips across the top: this sits over the map, and
-/// anything permanently over a map is map the person cannot see. It is the
-/// shape Google Maps itself uses, so nobody has to be taught it.
-class _LayerSwitcher extends StatelessWidget {
-  const _LayerSwitcher({
-    required this.current,
-    required this.zc,
-    required this.onChanged,
-  });
-
-  final ZopiqMapLayer current;
-  final ZopiqColors zc;
-  final ValueChanged<ZopiqMapLayer> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.surface,
-      elevation: 2,
-      borderRadius: ZopiqRadii.rMd,
-      clipBehavior: Clip.antiAlias,
-      child: PopupMenuButton<ZopiqMapLayer>(
-        tooltip: 'Map layers',
-        initialValue: current,
-        onSelected: onChanged,
-        itemBuilder: (BuildContext context) => ZopiqMapLayer.values
-            .map(
-              (ZopiqMapLayer layer) => PopupMenuItem<ZopiqMapLayer>(
-                value: layer,
-                child: Row(
-                  children: <Widget>[
-                    Icon(
-                      layer.icon,
-                      size: 18,
-                      color: layer == current ? zc.primary : zc.textMuted,
-                    ),
-                    const SizedBox(width: ZopiqSpacing.sm),
-                    Text(layer.label),
-                  ],
-                ),
-              ),
-            )
-            .toList(),
-        child: Padding(
-          padding: const EdgeInsets.all(ZopiqSpacing.sm),
-          child: Icon(current.icon, size: 20, color: zc.primary),
-        ),
-      ),
-    );
-  }
-}

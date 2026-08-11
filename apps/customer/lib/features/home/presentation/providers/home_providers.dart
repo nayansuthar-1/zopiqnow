@@ -8,6 +8,9 @@ import 'package:zopiqnow/features/home/data/datasources/restaurant_datasource.da
 import 'package:zopiqnow/features/home/data/datasources/restaurant_supabase_datasource.dart';
 import 'package:zopiqnow/features/home/data/repositories/restaurant_repository_impl.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
+import 'package:zopiqnow/features/home/domain/geo_distance.dart';
+import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 import 'package:zopiqnow/features/home/domain/entities/hero_slide.dart';
 import 'package:zopiqnow/features/home/domain/entities/offer.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
@@ -30,19 +33,70 @@ final Provider<RestaurantRepository> restaurantRepositoryProvider =
 
 /// The Home feed as an [AsyncValue]: loading → data | error, giving the UI its
 /// shimmer/success/error states for free. Retry = `ref.invalidate(...)`.
+///
+/// Distances are measured here rather than read from the database — see
+/// [measureFrom] — and the feed is ordered by the result, which is what the
+/// `order by distance_km` in the data source used to be doing with a column
+/// that was 0 for every real restaurant.
+///
+/// Watching the address means changing it refetches. That is the right cost:
+/// the delivery radius (0098) is a function of where you are, so a new address
+/// deserves a fresh feed rather than the old one re-sorted.
 final FutureProvider<List<Restaurant>> nearbyRestaurantsProvider =
-    FutureProvider<List<Restaurant>>(
-      (Ref ref) =>
-          ref.watch(restaurantRepositoryProvider).getNearbyRestaurants(),
-    );
+    FutureProvider<List<Restaurant>>((Ref ref) async {
+      final Address? from = ref.watch(selectedAddressProvider);
+      final List<Restaurant> all = await ref
+          .watch(restaurantRepositoryProvider)
+          .getNearbyRestaurants();
+
+      final List<Restaurant> measured = measureFrom(all, from);
+      // Nearest first, with the unmeasurable ones last rather than first — a
+      // restaurant we cannot place is not a restaurant next door.
+      measured.sort((Restaurant a, Restaurant b) {
+        final double x = a.distanceKm ?? double.infinity;
+        final double y = b.distanceKm ?? double.infinity;
+        return x.compareTo(y);
+      });
+      return measured;
+    });
 
 /// A single restaurant, for the menu screen. A family so a cold deep link to
-/// `/restaurant/:id` resolves without the Home feed ever having loaded.
+/// `/restaurant/:id` resolves without the Home feed ever having loaded — which
+/// is why it measures its own distance instead of borrowing the feed's.
 final AutoDisposeFutureProviderFamily<Restaurant, String>
-restaurantByIdProvider = FutureProvider.autoDispose.family<Restaurant, String>(
-  (Ref ref, String id) =>
-      ref.watch(restaurantRepositoryProvider).getRestaurantById(id),
-);
+restaurantByIdProvider = FutureProvider.autoDispose.family<Restaurant, String>((
+  Ref ref,
+  String id,
+) async {
+  final Address? from = ref.watch(selectedAddressProvider);
+  final Restaurant restaurant = await ref
+      .watch(restaurantRepositoryProvider)
+      .getRestaurantById(id);
+  return restaurant.withDistance(_kmFrom(from, restaurant));
+});
+
+/// Fills in [Restaurant.distanceKm] for a whole feed, from [from].
+///
+/// Null address, or a restaurant nobody has placed on the map, leaves the
+/// distance null and the UI says nothing — the one thing it must not do is
+/// print 0.0 km, which is what reading `restaurants.distance_km` did.
+List<Restaurant> measureFrom(List<Restaurant> all, Address? from) => all
+    .map((Restaurant r) => r.withDistance(_kmFrom(from, r)))
+    .toList(growable: true);
+
+/// Measured if we can, otherwise whatever the data source already knew.
+///
+/// The fallback is not the Postgres column — that is no longer read. It is for
+/// sources that carry a distance of their own, which today means
+/// `RestaurantMockDataSource` and its fixtures.
+double? _kmFrom(Address? from, Restaurant r) =>
+    distanceKmBetween(
+      fromLat: from?.latitude,
+      fromLng: from?.longitude,
+      toLat: r.latitude,
+      toLng: r.longitude,
+    ) ??
+    r.distanceKm;
 
 /// The Home hero's campaign slides (migration 0053).
 ///
@@ -146,77 +200,14 @@ final Provider<ScrollController> homeScrollControllerProvider =
       return controller;
     });
 
-/// Restaurants serving one category, keyed by its label ("Pizza", "Biryani").
-///
-/// Filtered out of [nearbyRestaurantsProvider] rather than through
-/// `searchRestaurants`, and the difference matters. The server search is an
-/// `ilike` over `search_text`, which is name + cuisines — the same two fields
-/// matched here — but it searches *every* restaurant on the platform, including
-/// ones that do not deliver to this address. The nearby feed has already applied
-/// the delivery radius, so filtering it keeps the promise the section header
-/// makes: these are restaurants delivering to you.
-///
-/// It also costs no round trip, so switching categories is instant.
-final ProviderFamily<AsyncValue<List<Restaurant>>, String>
-categoryRestaurantsProvider =
-    Provider.family<AsyncValue<List<Restaurant>>, String>((
-      Ref ref,
-      String label,
-    ) {
-      final HomeFilters filters = ref.watch(homeFiltersProvider);
-      final HomeFilters effective = ref.watch(vegModeProvider)
-          ? filters.copyWith(pureVeg: true)
-          : filters;
-
-      return ref
-          .watch(nearbyRestaurantsProvider)
-          .whenData(
-            (List<Restaurant> all) => effective.apply(_inCategory(all, label)),
-          );
-    });
-
-/// The "Recommended for you" rail on a category page. Highest-rated in that
-/// category, and — like [topRatedRestaurantsProvider], which it mirrors — it
-/// ignores the chip row, so the rail does not empty out as filters are tried.
-final ProviderFamily<AsyncValue<List<Restaurant>>, String>
-categoryTopRatedProvider =
-    Provider.family<AsyncValue<List<Restaurant>>, String>((
-      Ref ref,
-      String label,
-    ) {
-      return ref.watch(nearbyRestaurantsProvider).whenData((
-        List<Restaurant> all,
-      ) {
-        final List<Restaurant> sorted = _inCategory(all, label)
-          ..sort((Restaurant a, Restaurant b) => b.rating.compareTo(a.rating));
-        return sorted.take(_topChainCount).toList(growable: false);
-      });
-    });
-
 /// Name or cuisine tag contains the label. Deliberately the same two fields the
 /// server's `search_text` column is generated from, so a category page and a
 /// typed search for the same word agree with each other.
-List<Restaurant> _inCategory(List<Restaurant> all, String label) {
+///
+/// Only half the test a category page applies — see `categoryRestaurantsProvider`
+/// in `dish_providers.dart`, which also asks what each kitchen actually cooks.
+bool restaurantTagged(Restaurant r, String label) {
   final String needle = label.toLowerCase();
-  return all
-      .where(
-        (Restaurant r) =>
-            r.name.toLowerCase().contains(needle) ||
-            r.cuisines.any((String c) => c.toLowerCase().contains(needle)),
-      )
-      .toList();
+  return r.name.toLowerCase().contains(needle) ||
+      r.cuisines.any((String c) => c.toLowerCase().contains(needle));
 }
-
-/// "Top restaurant chains" rail — highest-rated first, ignores the chip row.
-final Provider<AsyncValue<List<Restaurant>>> topRatedRestaurantsProvider =
-    Provider<AsyncValue<List<Restaurant>>>((Ref ref) {
-      return ref.watch(nearbyRestaurantsProvider).whenData((
-        List<Restaurant> all,
-      ) {
-        final List<Restaurant> sorted = List<Restaurant>.of(all)
-          ..sort((Restaurant a, Restaurant b) => b.rating.compareTo(a.rating));
-        return sorted.take(_topChainCount).toList();
-      });
-    });
-
-const int _topChainCount = 6;

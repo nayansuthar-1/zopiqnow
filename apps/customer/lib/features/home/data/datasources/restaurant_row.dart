@@ -6,9 +6,17 @@ import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 /// Shared because favourites reads restaurants too — through a join, but the
 /// same columns into the same entity. Two copies of this mapping would be two
 /// places to forget `promo_text` the day someone adds a column.
+/// `latitude`/`longitude` and **not** `distance_km`.
+///
+/// The column is still there and still says 0 for every restaurant onboarded
+/// through the admin console — 0001 carried it as "a plain column rather than
+/// pretending to be computed", and 0027 called it "a typed-in number pretending
+/// to be computed". Reading it is what put "0.0 km" on the card of a kitchen in
+/// the next town. The coordinates are the real fact; the distance is derived
+/// from them and the delivery address, in `home_providers.dart`.
 const String restaurantColumns =
     'id, name, cuisines, rating, rating_count, eta_minutes, price_for_two, '
-    'distance_km, is_veg, image_url, promo_text, accepting_orders, '
+    'latitude, longitude, is_veg, image_url, promo_text, accepting_orders, '
     'pause_reason';
 
 /// Postgres row → domain entity. Numeric columns arrive as `num` (int or double
@@ -21,7 +29,10 @@ Restaurant restaurantFromRow(Map<String, dynamic> row) => Restaurant(
   ratingCount: (row['rating_count'] as num).toInt(),
   etaMinutes: (row['eta_minutes'] as num).toInt(),
   priceForTwo: (row['price_for_two'] as num).toInt(),
-  distanceKm: (row['distance_km'] as num).toDouble(),
+  // Left null here on purpose: nothing in the data layer knows where the
+  // customer is. The feed fills it in once it does.
+  latitude: (row['latitude'] as num?)?.toDouble(),
+  longitude: (row['longitude'] as num?)?.toDouble(),
   isVeg: row['is_veg'] as bool,
   imageUrl: row['image_url'] as String,
   promoText: row['promo_text'] as String?,

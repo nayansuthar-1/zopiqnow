@@ -77,7 +77,6 @@ class LiveDeliveryMap extends ConsumerWidget {
               // still be scrolled, and no layer switcher because a control that
               // small over a map this small is mostly map you cannot see.
               interactive: false,
-              showLayerSwitcher: false,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (BuildContext context) =>

@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/features/home/domain/entities/dish_suggestion.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/domain/entities/hero_slide.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/domain/repositories/restaurant_repository.dart';
+import 'package:zopiqnow/features/home/presentation/providers/dish_providers.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
+import 'package:zopiqnow/features/home/presentation/widgets/dish_rail.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/food_category_rail.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_app_bar.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_filter_chips.dart';
@@ -16,7 +19,6 @@ import 'package:zopiqnow/features/home/presentation/widgets/more_categories_shee
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_list_skeleton.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/section_header.dart';
-import 'package:zopiqnow/features/home/presentation/widgets/top_chains_rail.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 import 'package:zopiqnow/features/location/presentation/widgets/address_picker_sheet.dart';
@@ -34,8 +36,8 @@ void _openMenu(BuildContext context, Restaurant restaurant) {
 
 /// Customer Home — restaurant discovery. The top is Zomato's home (a
 /// full-bleed brand hero carrying the location/search header and a campaign
-/// banner); everything below is Swiggy's layout: the dish-category rail, a
-/// top-chains rail, then the filterable restaurant list.
+/// banner); everything below is Swiggy's layout: the dish-category rail, a rail
+/// of recommended dishes, then the filterable restaurant list.
 ///
 /// Every section is its own sliver so the scroll view only builds and paints
 /// what is on screen — the rails do not cost anything once scrolled past.
@@ -76,14 +78,16 @@ class _HomePageState extends ConsumerState<HomePage>
 
   void _onScroll() {
     if (!_scroll.hasClients) return;
-    // Change threshold from 10 to 400 to hide when Top Chains is in the middle
+    // Change threshold from 10 to 400 to hide when the recommended rail is in
+    // the middle
     final bool atTop = _scroll.offset <= 400;
     final bool isVisible = ref.read(bottomNavVisibilityProvider);
     if (atTop != isVisible) {
       ref.read(bottomNavVisibilityProvider.notifier).state = atTop;
     }
 
-    final bool shouldHideFilters = _scroll.offset > 400; // Half of Top Chains
+    final bool shouldHideFilters =
+        _scroll.offset > 400; // Half of the recommended rail
     if (_filterAnimCtrl != null) {
       if (shouldHideFilters &&
           _filterAnimCtrl!.status != AnimationStatus.dismissed &&
@@ -206,7 +210,11 @@ class _HomePageState extends ConsumerState<HomePage>
               // a lie about where we deliver — ask instead.
               address: address?.shortDisplay ?? 'Set delivery location',
               heroSlides: heroSlides,
-              onTapLocation: () => showAddressPicker(context),
+              // Wrapped, because this is the one address picker opened from a
+              // screen the pills are actually on — the checkout ones sit on
+              // pushed routes that already cover the shell.
+              onTapLocation: () =>
+                  withBottomNavHidden(ref, () => showAddressPicker(context)),
               // Pushed, not `go` — the same rule `_openCategory` follows and for
               // the same reason. Search sits outside the shell, so a `go`
               // replaces the stack and leaves it with neither a bottom bar nor a
@@ -234,7 +242,7 @@ class _HomePageState extends ConsumerState<HomePage>
                 );
               },
             ),
-            const _TopChainsSection(),
+            const _RecommendedDishesSection(),
             const SliverToBoxAdapter(child: SizedBox(height: ZopiqSpacing.lg)),
             const _RestaurantCountHeader(),
             const _RestaurantListSection(),
@@ -245,18 +253,27 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 }
 
-/// The top-chains rail. Silent while the feed loads or fails — the restaurant
-/// list below already owns the shimmer and the retry, and duplicating either
-/// here would put two spinners (or two errors) on one screen.
-class _TopChainsSection extends ConsumerWidget {
-  const _TopChainsSection();
+/// "Recommended for you" — dishes, not restaurants.
+///
+/// Ranked against this phone's recent searches (see [recommendedDishesProvider]),
+/// so the section answers "what should I eat?" rather than "whose menu should I
+/// go read?". Tapping a card opens the dish's menu; the card's own ADD button
+/// means the customer need not go there at all.
+///
+/// Silent while the feed loads or fails — the restaurant list below already owns
+/// the shimmer and the retry, and duplicating either here would put two spinners
+/// (or two errors) on one screen.
+class _RecommendedDishesSection extends ConsumerWidget {
+  const _RecommendedDishesSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final List<Restaurant> top =
-        ref.watch(topRatedRestaurantsProvider).valueOrNull ??
-        const <Restaurant>[];
-    if (top.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+    final List<DishSuggestion> dishes =
+        ref.watch(recommendedDishesProvider).valueOrNull ??
+        const <DishSuggestion>[];
+    if (dishes.isEmpty) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
 
     return SliverMainAxisGroup(
       slivers: <Widget>[
@@ -264,9 +281,9 @@ class _TopChainsSection extends ConsumerWidget {
           child: SectionHeader(title: 'Recommended for you'),
         ),
         SliverToBoxAdapter(
-          child: TopChainsRail(
-            restaurants: top,
-            onTapRestaurant: (Restaurant r) => _openMenu(context, r),
+          child: DishRail(
+            dishes: dishes,
+            onOpenDish: (DishSuggestion d) => _openMenu(context, d.restaurant),
           ),
         ),
       ],

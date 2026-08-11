@@ -5,7 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:zopiqnow/core/storage/key_value_store.dart';
 import 'package:zopiqnow/core/storage/storage_providers.dart';
+import 'package:zopiqnow/features/account/presentation/providers/veg_mode_provider.dart';
+import 'package:zopiqnow/features/home/data/datasources/dish_discovery_datasource.dart';
+import 'package:zopiqnow/features/home/domain/dish_ranking.dart';
+import 'package:zopiqnow/features/home/domain/entities/dish_suggestion.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
+import 'package:zopiqnow/features/home/presentation/providers/dish_providers.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 
 /// What the user has typed, updated on every keystroke. Debouncing happens
@@ -44,6 +49,47 @@ final AutoDisposeFutureProvider<List<Restaurant>> searchResultsProvider =
   if (cancelled) return const <Restaurant>[];
 
   return ref.watch(restaurantRepositoryProvider).searchRestaurants(query);
+});
+
+/// Dishes matching the query, ranked — the other half of a search.
+///
+/// Searching only restaurants asked the customer to know which kitchen makes the
+/// thing they want. Typing "paneer" now finds the paneer, and the row it lands
+/// on can be added to the cart without opening a menu at all.
+///
+/// Debounced exactly like [searchResultsProvider], and for the same reason. The
+/// two run side by side rather than as one call: they hit different tables, and
+/// a slow dish query has no business holding up the restaurant list.
+///
+/// Ranked by [rankDishes] with the live query as the only interest, and with no
+/// rotation — a rail may reshuffle daily, but a result order that moves for
+/// reasons the customer cannot see is a bug on a search screen.
+final AutoDisposeFutureProvider<List<DishSuggestion>> dishSearchResultsProvider =
+    FutureProvider.autoDispose<List<DishSuggestion>>((Ref ref) async {
+  final String query = ref.watch(searchQueryProvider).trim();
+  if (query.isEmpty) return const <DishSuggestion>[];
+
+  final bool vegOnly = ref.watch(vegModeProvider);
+
+  bool cancelled = false;
+  ref.onDispose(() => cancelled = true);
+
+  await Future<void>.delayed(searchDebounce);
+  if (cancelled) return const <DishSuggestion>[];
+
+  final List<Restaurant> restaurants =
+      await ref.watch(nearbyRestaurantsProvider.future);
+  final List<DishRow> rows =
+      await ref.watch(dishDiscoveryDataSourceProvider).search(query);
+
+  // A closed kitchen's dish stays in the results with its ADD greyed out — a
+  // deliberate query deserves its answer. Only veg mode removes anything, and
+  // it is a standing preference rather than a filter on this screen.
+  final List<DishSuggestion> hits = joinDishes(rows, restaurants).where(
+    (DishSuggestion d) => !vegOnly || d.item.isVeg,
+  ).toList(growable: false);
+
+  return rankDishes(pool: hits, interests: <String>[query]);
 });
 
 /// Queries the user has *deliberately* run, most recent first.

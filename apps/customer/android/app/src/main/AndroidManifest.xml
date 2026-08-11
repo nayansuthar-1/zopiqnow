@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Required to load restaurant and dish imagery, and to reach the API.
          Flutter declares this for debug builds only; without it here, release
          builds fail every network image silently. -->
@@ -35,7 +36,7 @@
          Nothing overrides back in any of the three — no PopScope, no
          WillPopScope — so there is nothing for it to break. -->
     <application
-        android:label="Zopiq"
+        android:label="ZopiQ"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
@@ -77,6 +78,32 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="order_updates" />
+
+        <!-- The `location` package ships a service typed
+             `foregroundServiceType="location"` — the one that keeps reading
+             position while the app is backgrounded. We never start it in the
+             foreground: that package is here for a single call,
+             `requestService()`, which puts the Play Services "turn on GPS?"
+             dialog on screen and returns.
+
+             **The service itself must stay declared.** `LocationPlugin`
+             `bindService()`s it from `onAttachedToActivity` and only installs
+             its method-call handler in `onServiceConnected` — so removing the
+             component (`tools:node="remove"`) makes the bind fail silently and
+             every call into the plugin becomes a no-op. That is not theoretical:
+             it shipped, and "Enable" did nothing on a real device until the
+             owner turned location on by hand.
+
+             So only the attribute goes. A manifest is a claim, and this app
+             tells Play it has no background location and tells the customer the
+             same thing in as many words ("Only while the app is open — never in
+             the background", see location_disclosure.dart). Dropping the type
+             keeps the shipped manifest agreeing with both, and costs nothing we
+             use: promoting this service to the foreground is exactly the thing
+             we never do. -->
+        <service
+            android:name="com.lyokone.location.FlutterLocationService"
+            tools:remove="android:foregroundServiceType" />
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

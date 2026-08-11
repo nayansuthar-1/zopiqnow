@@ -10,7 +10,6 @@ import 'package:zopiqnow/features/home/presentation/widgets/home_filter_chips.da
 import 'package:zopiqnow/features/home/presentation/widgets/home_status_views.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_list_skeleton.dart';
-import 'package:zopiqnow/features/home/presentation/widgets/top_chains_rail.dart';
 
 import '../../support/fake_stores.dart';
 
@@ -33,12 +32,35 @@ void _useTallSurface(WidgetTester tester) {
   addTearDown(tester.view.reset);
 }
 
-/// A card-scoped finder: `Paradise Biryani` also appears in the top-chains rail,
-/// so bare `find.text` cannot tell the list apart from the rail.
+/// A card-scoped finder. It stays card-scoped even though the top-chains rail
+/// that used to duplicate these names is gone from Home: the finder is about
+/// asserting on the *list*, and a dish rail could put a restaurant's name back
+/// on the screen tomorrow.
 Finder _cardNamed(String name) => find.descendant(
       of: find.byType(RestaurantCard),
       matching: find.text(name),
     );
+
+/// The feed is ordered by distance from the selected address now, and the list
+/// is lazy — so a named restaurant is built only once it is near the viewport.
+/// At the fixtures' distances `Paradise Biryani` sits fourth, off the bottom of
+/// even a tall test surface, and a bare `find.text` for it finds nothing.
+///
+/// Scrolling to it rather than growing the surface again: a viewport tall
+/// enough to build every card is also one nothing can be scrolled *off*, which
+/// is the assertion the shell's scroll-position test depends on.
+Future<void> _scrollToCard(WidgetTester tester, String name) async {
+  await tester.scrollUntilVisible(
+    _cardNamed(name),
+    300,
+    scrollable: find
+        .descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+}
 
 Finder _chipNamed(String label) => find.descendant(
       of: find.byType(HomeFilterChips),
@@ -62,10 +84,11 @@ void main() {
 
     expect(find.byType(RestaurantListSkeleton), findsNothing);
     expect(find.byType(RestaurantCard), findsWidgets);
+    await _scrollToCard(tester, 'Paradise Biryani');
     expect(_cardNamed('Paradise Biryani'), findsOneWidget);
   });
 
-  testWidgets('renders merchandising rails independently of the feed',
+  testWidgets('renders merchandising above the feed while it is still loading',
       (WidgetTester tester) async {
     _useTallSurface(tester);
     await tester.pumpWidget(
@@ -80,13 +103,19 @@ void main() {
     expect(find.byType(HomeFilterChips), findsOneWidget);
     expect(find.text('Pizza'), findsOneWidget);
 
-    // The top-chains rail derives from the feed, so it only appears after load.
-    expect(find.byType(TopChainsRail), findsNothing);
+    // The feed-derived half of this case used to be the top-chains rail. Home
+    // no longer builds one — `_RecommendedDishesSection` took its place, and it
+    // ranks *dishes* off a Supabase read that a widget test has no seam for, so
+    // it renders nothing here and asserting on it would be asserting on the
+    // absence of a network. What survives is the claim that actually failed
+    // when it was broken: the count header appears with the feed and not
+    // before, so merchandising does not wait on the list.
+    expect(find.textContaining('RESTAURANTS DELIVERING'), findsNothing);
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byType(TopChainsRail), findsOneWidget);
+    expect(find.textContaining('RESTAURANTS DELIVERING'), findsOneWidget);
   });
 
-  testWidgets('the Pure Veg chip filters the list but not the top-chains rail',
+  testWidgets('the Pure Veg chip filters the list',
       (WidgetTester tester) async {
     _useTallSurface(tester);
     await tester.pumpWidget(
@@ -94,23 +123,22 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 50));
 
+    await _scrollToCard(tester, 'Paradise Biryani');
     expect(_cardNamed('Paradise Biryani'), findsOneWidget); // non-veg
-    expect(_cardNamed('Green Theory'), findsOneWidget); // veg
 
+    // The chips sit in a pinned header, so they are still on screen after the
+    // scroll above — which is the whole point of pinning them.
     await tester.tap(_chipNamed('Pure Veg'));
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(_cardNamed('Paradise Biryani'), findsNothing);
-    expect(_cardNamed('Green Theory'), findsOneWidget);
 
-    // The rail is deliberately unfiltered, so the non-veg chain is still there.
-    expect(
-      find.descendant(
-        of: find.byType(TopChainsRail),
-        matching: find.text('Paradise Biryani'),
-      ),
-      findsOneWidget,
-    );
+    // Back to the top to see what survived. Filtering does not rewind the list
+    // for us — the offset we scrolled to in order to reach the non-veg card is
+    // still past the three veg ones that remain.
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 3000));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(_cardNamed('Green Theory'), findsOneWidget); // veg
   });
 
   testWidgets('shows a retryable error state when the feed fails',

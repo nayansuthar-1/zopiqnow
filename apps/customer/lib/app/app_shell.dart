@@ -10,6 +10,9 @@ import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dar
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
+import 'package:zopiqnow/features/location/presentation/pages/location_gate_page.dart';
+import 'package:zopiqnow/features/location/presentation/widgets/location_off_sheet.dart';
+import 'package:zopiqnow/features/location/presentation/widgets/location_prompt.dart';
 
 /// The persistent bottom-navigation shell.
 ///
@@ -20,7 +23,7 @@ import 'package:zopiqnow/features/checkout/presentation/providers/orders_provide
 /// Only the tabs that exist are here. Account arrives with the feature behind it
 /// (DEVELOPMENT_PLAN step 5) as one more [StatefulShellBranch]. A tab that
 /// navigates to nothing reads as broken.
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({required this.navigationShell, super.key});
 
   final StatefulNavigationShell navigationShell;
@@ -29,6 +32,41 @@ class AppShell extends ConsumerWidget {
   /// (Delivery, Dining, Grocery, Gifts), and is reached from the separate Cart
   /// pill rather than the pill row.
   static const int cartBranchIndex = 4;
+
+  @override
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  StatefulNavigationShell get navigationShell => widget.navigationShell;
+
+  @override
+  void initState() {
+    super.initState();
+    // After the first frame: this runs while the shell is being built, and a
+    // modal route pushed from inside a build is a crash.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _offerLocation());
+  }
+
+  /// The location sheet, once per launch, when there is no location to be had.
+  ///
+  /// Skipped when the startup gate already ran this session
+  /// ([locationGateProvider]). The gate only appears when no address is
+  /// selected, and it asks the same question with the same buttons — following
+  /// it with this sheet would be the app asking twice in a row and accepting
+  /// "no" neither time. What is left is exactly the case in the design: somebody
+  /// with a saved address who never granted the permission.
+  Future<void> _offerLocation() async {
+    if (!mounted) return;
+    if (ref.read(locationSheetShownProvider)) return;
+    if (ref.read(locationGateProvider)) return;
+
+    if (!await isLocationOff(ref)) return;
+    if (!mounted) return;
+
+    ref.read(locationSheetShownProvider.notifier).state = true;
+    await showLocationOffSheet(context, ref);
+  }
 
   /// System Back, on the tab that is showing.
   ///
@@ -46,7 +84,7 @@ class AppShell extends ConsumerWidget {
   /// declared interest, a shell route with nothing above it to pop lets Android
   /// finish the activity — which is the app closing from the one screen that
   /// should be hardest to leave by accident.
-  void _onBack(WidgetRef ref) {
+  void _onBack() {
     if (navigationShell.currentIndex != 0) {
       navigationShell.goBranch(0);
       return;
@@ -66,14 +104,15 @@ class AppShell extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     // The cart carries its own bottom bar — the total and "Proceed to
     // checkout" — so the pills are not drawn over it, and (because
     // `extendBody` hands their height to the body as padding) do not reserve
     // space under it either. That reserved band was the ~115pt of empty screen
     // below the checkout button whenever the pills happened to be in their
     // hidden state, which is how they arrive here from a scrolled Home.
-    final bool onCart = navigationShell.currentIndex == cartBranchIndex;
+    final bool onCart =
+        navigationShell.currentIndex == AppShell.cartBranchIndex;
 
     return PopScope(
       // Never pops on its own — there is nothing under the shell to pop *to*,
@@ -82,7 +121,7 @@ class AppShell extends ConsumerWidget {
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
         if (didPop) return;
-        _onBack(ref);
+        _onBack();
       },
       child: Scaffold(
         extendBody: true,

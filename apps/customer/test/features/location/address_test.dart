@@ -58,11 +58,44 @@ class FakeDeviceLocationService implements DeviceLocationService {
     return point!;
   }
 
+  /// The same [point] the form's geocode uses, named after whatever was typed so
+  /// a result row has something to render. No [point] means a geocoder that
+  /// finds nothing, which is an empty list rather than a throw.
+  @override
+  Future<List<Address>> searchPlaces(String query, {int limit = 5}) async =>
+      point == null
+      ? const <Address>[]
+      : <Address>[
+          Address(
+            id: 'manual',
+            line1: query,
+            city: '',
+            latitude: point!.latitude,
+            longitude: point!.longitude,
+          ),
+        ];
+
   /// Permission is already granted, so no prominent disclosure stands between a
   /// tap and the GPS. That keeps these tests about detection rather than about
   /// the Play disclosure, which has its own manual check.
   @override
   Future<bool> needsPermissionPrompt() async => false;
+
+  /// Ready, for the same reason [needsPermissionPrompt] answers false: these
+  /// tests are about what happens once location is available. [failure] is how
+  /// they exercise the paths where it is not.
+  @override
+  Future<LocationReadiness> readiness() async => LocationReadiness.ready;
+
+  @override
+  Future<ServiceRequestOutcome> requestService() async =>
+      ServiceRequestOutcome.enabled;
+
+  @override
+  Future<void> openLocationSettings() async {}
+
+  @override
+  Future<void> openAppSettings() async {}
 }
 
 Widget _app(ProviderContainer container) =>

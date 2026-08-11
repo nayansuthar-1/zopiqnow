@@ -198,9 +198,14 @@ class MenuVitals extends StatelessWidget {
             icon: Icons.location_on_outlined,
             // Cuisines where a delivery app usually puts a locality: we do not
             // hold an area name, and "Indian, Chinese" is at least true.
-            text:
-                '${restaurant.distanceKm.toStringAsFixed(1)} km'
-                '${restaurant.cuisines.isEmpty ? '' : ' • ${restaurant.cuisines.join(', ')}'}',
+            //
+            // The distance drops out of the line when it is unknown, leaving
+            // just the cuisines, rather than heading the row with "0.0 km".
+            text: <String>[
+              if (restaurant.distanceKm != null)
+                '${restaurant.distanceKm!.toStringAsFixed(1)} km',
+              if (restaurant.cuisines.isNotEmpty) restaurant.cuisines.join(', '),
+            ].join(' • '),
           ),
           const SizedBox(height: ZopiqSpacing.xs),
           _VitalRow(

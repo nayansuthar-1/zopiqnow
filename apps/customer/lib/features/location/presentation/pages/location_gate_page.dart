@@ -6,7 +6,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/location/domain/services/device_location_service.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
-import 'package:zopiqnow/features/location/presentation/widgets/location_disclosure.dart';
+import 'package:zopiqnow/features/location/presentation/widgets/location_prompt.dart';
 
 /// Asked once at startup: where are we delivering?
 ///
@@ -38,21 +38,15 @@ class _LocationGatePageState extends ConsumerState<LocationGatePage> {
   String? _error;
 
   Future<void> _useCurrentLocation() async {
-    final DeviceLocationService service = ref.read(
-      deviceLocationServiceProvider,
-    );
-
-    // Play's User Data policy: the in-app disclosure comes before the system
-    // dialog, and only when the system dialog would actually appear. Showing it
-    // to somebody who has already decided is a second sheet in front of an
-    // answer they have given.
-    if (await service.needsPermissionPrompt()) {
-      if (!mounted) return;
-      final bool accepted = await showLocationDisclosure(context);
-      // Declining is an answer, not a failure. Say nothing and stop — an error
-      // message here would be arguing with it.
-      if (!accepted) return;
-    }
+    // Everything that can stand in the way, asked for in the order the OS
+    // enforces it: services switched on in place, then Play's prominent
+    // disclosure, then app settings if location was blocked outright. This
+    // screen's button says "Enable Device Location", and until now the one thing
+    // it could not do was enable the device's location.
+    //
+    // Declining is an answer, not a failure. Say nothing and stop — an error
+    // message here would be arguing with it.
+    if (!await ensureLocationReady(context, ref)) return;
 
     if (!mounted) return;
     setState(() {

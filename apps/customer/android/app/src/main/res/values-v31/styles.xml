@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ owns the launch screen.
+
+  From API 31 the system draws the splash itself: it takes a background colour
+  and an icon and composites them, and `windowBackground` no longer decides what
+  is on screen. That is where the logo everybody was seeing came from — not from
+  launch_background.xml, and not from anything in the Flutter layer, which is why
+  changing those alone did nothing.
+
+  Both attributes are set here. The background matches SplashPage; the icon is a
+  transparent drawable, because the platform has no "no icon" and an unset one
+  falls back to the launcher icon.
+-->
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@color/zopiq_splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+
+    <!--
+      Restated because a values-v31 file shadows values/ entirely on API 31+ —
+      leaving it out would drop NormalTheme on exactly the devices this exists
+      for, and the manifest names it.
+    -->
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>

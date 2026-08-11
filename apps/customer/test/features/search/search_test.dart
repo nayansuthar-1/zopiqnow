@@ -13,6 +13,7 @@ import 'package:zopiqnow/features/menu/presentation/providers/menu_providers.dar
 import 'package:zopiqnow/features/search/presentation/providers/search_providers.dart';
 
 import '../../support/fake_stores.dart';
+import '../../support/menu_navigation.dart';
 
 const Duration _latency = Duration(milliseconds: 10);
 
@@ -224,7 +225,7 @@ void main() {
     expect(find.byType(MenuPage), findsOneWidget);
 
     // Back on Search, the query is remembered.
-    await tester.pageBack();
+    await menuPageBack(tester);
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '');
     await tester.pump(const Duration(milliseconds: 50));

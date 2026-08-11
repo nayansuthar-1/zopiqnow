@@ -288,13 +288,15 @@ class _ShopDescription extends StatelessWidget {
   }
 }
 
-class _ShopItems extends StatelessWidget {
+/// A [ConsumerWidget] only so that opening an item can slide the shell's pills
+/// out of the way — the sheet itself takes the ref, so this must have one.
+class _ShopItems extends ConsumerWidget {
   const _ShopItems({required this.items});
 
   final List<GiftItem> items;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (items.isEmpty) {
       return const SliverFillRemaining(
         hasScrollBody: false,
@@ -338,7 +340,7 @@ class _ShopItems extends StatelessWidget {
                       return RepaintBoundary(
                         child: GiftItemCard(
                           item: item,
-                          onTap: () => showGiftItemSheet(context, item),
+                          onTap: () => showGiftItemSheet(context, ref, item),
                         ),
                       );
                     },

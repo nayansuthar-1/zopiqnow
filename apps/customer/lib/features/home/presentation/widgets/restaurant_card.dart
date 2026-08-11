@@ -119,11 +119,15 @@ class RestaurantCard extends StatelessWidget {
                           '${restaurant.etaMinutes} min',
                           style: t.bodyMedium?.copyWith(color: zc.textMuted),
                         ),
-                        _Separator(color: zc.textMuted),
-                        Text(
-                          '${restaurant.distanceKm.toStringAsFixed(1)} km',
-                          style: t.bodyMedium?.copyWith(color: zc.textMuted),
-                        ),
+                        // Omitted entirely when we cannot measure it, rather
+                        // than shown as 0.0 km — see Restaurant.distanceKm.
+                        if (restaurant.distanceKm != null) ...<Widget>[
+                          _Separator(color: zc.textMuted),
+                          Text(
+                            '${restaurant.distanceKm!.toStringAsFixed(1)} km',
+                            style: t.bodyMedium?.copyWith(color: zc.textMuted),
+                          ),
+                        ],
                       ],
                     ),
 
