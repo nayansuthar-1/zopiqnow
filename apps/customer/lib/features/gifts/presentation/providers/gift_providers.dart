@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
-import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/gifts/data/datasources/gift_datasource.dart';
 import 'package:zopiqnow/features/gifts/data/datasources/gift_supabase_datasource.dart';
 import 'package:zopiqnow/features/gifts/data/repositories/gift_repository_impl.dart';
@@ -124,20 +123,6 @@ giftOrderIssuesProvider =
       String orderId,
     ) {
       return ref.watch(giftOrderDataSourceProvider).fetchIssues(orderId);
-    });
-
-/// Money owed back on one gift order (0115), oldest first.
-///
-/// The food side's `orderRefundsProvider` with a different function behind it.
-/// Empty on almost every order, and the section renders nothing at all when it
-/// is — including while the read is in flight, so a receipt does not jump.
-final AutoDisposeFutureProviderFamily<List<OrderRefund>, String>
-giftOrderRefundsProvider =
-    FutureProvider.autoDispose.family<List<OrderRefund>, String>((
-      Ref ref,
-      String orderId,
-    ) {
-      return ref.watch(giftOrderDataSourceProvider).fetchRefunds(orderId);
     });
 
 /// The receipt the acknowledgement screen shows.

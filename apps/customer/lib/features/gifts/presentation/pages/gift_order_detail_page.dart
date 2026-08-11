@@ -3,9 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
-import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_issue_section.dart';
-import 'package:zopiqnow/features/checkout/presentation/widgets/order_refund_section.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/report_issue_sheet.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_order.dart';
 import 'package:zopiqnow/features/gifts/presentation/pages/gift_orders_page.dart'
@@ -28,51 +26,6 @@ class GiftOrderDetailPage extends ConsumerWidget {
 
   final String orderId;
   final VoidCallback onBack;
-
-  Future<void> _cancel(BuildContext context, WidgetRef ref) async {
-    // Captured before the dialog, not after: this is a ConsumerWidget with no
-    // `mounted` of its own, so reaching for the context once the await has
-    // returned is the one thing that cannot be checked.
-    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-
-    final bool? sure = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext c) => AlertDialog(
-        title: const Text('Cancel this gift order?'),
-        content: const Text(
-          'We\'ll stop preparing it and refund what you paid. This cannot be '
-          'undone.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('Keep it'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(c, true),
-            child: const Text('Cancel order'),
-          ),
-        ],
-      ),
-    );
-    if (!(sure ?? false)) return;
-
-    try {
-      await ref
-          .read(giftOrderDataSourceProvider)
-          .cancelOrder(orderId: orderId);
-      ref.invalidate(giftOrdersProvider);
-      // The cancel raises the refund in the same statement (0115), so the
-      // section below has something to draw the moment this returns — and the
-      // dialog above has just promised it.
-      ref.invalidate(giftOrderRefundsProvider(orderId));
-    } on GiftOrderFailure catch (failure) {
-      // The service's own sentence — "This one is already with the courier."
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(failure.message)));
-    }
-  }
 
   /// Files a complaint against this gift order (0114).
   ///
@@ -225,22 +178,7 @@ class GiftOrderDetailPage extends ConsumerWidget {
           const SizedBox(height: ZopiqSpacing.xs),
           _Money(label: 'Paid', amount: order.total, strong: true),
 
-          // What happened to the money (0115). Directly under the total it is
-          // reversing, because on a cancelled gift this is the whole reason the
-          // screen was opened — and until 0115 the Cancel dialog above promised
-          // "we'll refund what you paid" with nothing behind it and nowhere for
-          // the customer to see it happen. The same widget the food receipt
-          // draws, handed the gift's own rows.
-          if (ref
-              .watch(giftOrderRefundsProvider(order.id))
-              .valueOrNull
-              case final List<OrderRefund> refunds
-              when refunds.isNotEmpty) ...<Widget>[
-            const SizedBox(height: ZopiqSpacing.xl),
-            OrderRefundSection(refunds: refunds),
-          ],
-
-          // What they have already told us, if anything. Above the buttons for
+          // What they have already told us, if anything. Above the button for
           // the same reason the food receipt puts it above them: somebody who
           // has complained is looking for their complaint, not for the button
           // that raises another one.
@@ -253,23 +191,12 @@ class GiftOrderDetailPage extends ConsumerWidget {
             OrderIssueSection(issues: issues),
           ],
 
-          if (order.status.canCancel) ...<Widget>[
-            const SizedBox(height: ZopiqSpacing.xxl),
-            ZopiqButton(
-              label: 'Cancel this order',
-              variant: ZopiqButtonVariant.outline,
-              onPressed: () => _cancel(context, ref),
-            ),
-          ],
-
-          // **The one door that is always open.** Cancelling is refused once a
-          // parcel is with the courier (0096), which is exactly when things go
-          // wrong — so before 0114 an undelivered gift had no route back into
-          // this system at all, only the support address on the Account screen.
-          // Offered on every gift order, including a cancelled one: "you
-          // cancelled it and the money never came back" is a complaint, and the
-          // screen that refuses to hear it is the screen somebody phones about.
-          const SizedBox(height: ZopiqSpacing.md),
+          // **The only door, and it is always open.** A gift order is final once
+          // it is placed (0116) — there is no cancel and no refund — so this is
+          // the whole of a customer's recourse and it is offered on every gift
+          // order, in every state, including a cancelled one. A screen that
+          // refuses to hear "it never came" is the screen somebody phones about.
+          const SizedBox(height: ZopiqSpacing.xxl),
           ZopiqButton(
             label: 'Report a problem',
             variant: ZopiqButtonVariant.outline,

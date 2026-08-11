@@ -1,7 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
-import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/gifts/data/datasources/gift_datasource.dart';
 import 'package:zopiqnow/features/gifts/data/datasources/gift_row.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_item.dart';
@@ -171,19 +170,6 @@ class GiftOrderSupabaseDataSource implements GiftOrderDataSource {
   }
 
   @override
-  Future<void> cancelOrder({required String orderId, String? reason}) async {
-    try {
-      await _db.rpc<String>(
-        'cancel_my_gift_order',
-        params: <String, dynamic>{'p_order_id': orderId, 'p_reason': reason},
-      );
-    } on PostgrestException catch (e) {
-      if (e.code == _businessRuleErrorCode) throw GiftOrderFailure(e.message);
-      throw const GiftOrderFailure();
-    }
-  }
-
-  @override
   Future<List<OrderIssue>> fetchIssues(String orderId) async {
     final List<dynamic> rows = await _db.rpc<List<dynamic>>(
       'my_gift_order_issues',
@@ -192,18 +178,6 @@ class GiftOrderSupabaseDataSource implements GiftOrderDataSource {
     return rows
         .cast<Map<String, dynamic>>()
         .map(OrderIssue.fromJson)
-        .toList(growable: false);
-  }
-
-  @override
-  Future<List<OrderRefund>> fetchRefunds(String orderId) async {
-    final List<dynamic> rows = await _db.rpc<List<dynamic>>(
-      'my_gift_order_refund',
-      params: <String, dynamic>{'p_gift_order_id': orderId},
-    );
-    return rows
-        .cast<Map<String, dynamic>>()
-        .map(OrderRefund.fromJson)
         .toList(growable: false);
   }
 

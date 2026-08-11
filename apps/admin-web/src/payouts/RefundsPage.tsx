@@ -77,11 +77,6 @@ export function RefundsPage() {
   const [declineReason, setDeclineReason] = useState('')
 
   const [issuing, setIssuing] = useState(false)
-  // Which ledger the id belongs to, asked rather than sniffed off the `ZPG-`
-  // prefix: the two go to different RPCs, and a typo in a prefix should read as
-  // "no such order" rather than as a refund quietly raised against the wrong
-  // kind of thing.
-  const [issueKind, setIssueKind] = useState<RefundRow['kind']>('food')
   const [orderId, setOrderId] = useState('')
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
@@ -204,11 +199,7 @@ export function RefundsPage() {
                     <td className="px-5 py-3">
                       <p className="font-medium text-ink">{r.order_id}</p>
                       <p className="truncate text-ink-muted">
-                        {/* Named, not inferred from the id prefix: a queue that
-                            asks somebody to decode `ZPG-` is a queue that gets
-                            a gift charged to a restaurant one tired evening. */}
-                        {r.kind === 'gift' && 'Gift · '}
-                        {r.seller_name} · {r.user_phone}
+                        {r.restaurant_name} · {r.user_phone}
                       </p>
                     </td>
                     <td className="max-w-[260px] px-5 py-3 text-ink-muted">
@@ -339,18 +330,12 @@ export function RefundsPage() {
                 onClick={() =>
                   void run(
                     () =>
-                      issueKind === 'gift'
-                        ? api.issueGiftRefund(
-                            orderId.trim(),
-                            Number(amount),
-                            reason.trim(),
-                          )
-                        : api.issueRefund(
-                            orderId.trim(),
-                            Number(amount),
-                            reason.trim(),
-                            issueFunder,
-                          ),
+                      api.issueRefund(
+                        orderId.trim(),
+                        Number(amount),
+                        reason.trim(),
+                        issueFunder,
+                      ),
                     () => setIssuing(false),
                   )
                 }
@@ -365,21 +350,10 @@ export function RefundsPage() {
             would take this order past what the customer paid, counting
             everything already refunded on it.
           </p>
-          <div className="mt-5">
-            <SegmentedControl
-              label="Kind"
-              value={issueKind}
-              onChange={setIssueKind}
-              options={[
-                { value: 'food', label: 'Food' },
-                { value: 'gift', label: 'Gift' },
-              ]}
-            />
-          </div>
           <Field
-            className="mt-4"
+            className="mt-5"
             label="Order"
-            placeholder={issueKind === 'gift' ? 'ZPG-1007' : 'ZPQ-1042'}
+            placeholder="ZPQ-1042"
             value={orderId}
             onChange={(e) => setOrderId(e.target.value)}
           />
@@ -399,29 +373,21 @@ export function RefundsPage() {
             value={reason}
             onChange={(e) => setReason(e.target.value)}
           />
-          {issueKind === 'food' ? (
-            <div className="mt-4">
-              <SegmentedControl
-                label="Funded by"
-                value={issueFunder}
-                onChange={setIssueFunder}
-                options={[
-                  { value: 'platform', label: 'Platform' },
-                  { value: 'restaurant', label: 'Restaurant' },
-                ]}
-              />
-              <p className="mt-1.5 text-sm text-ink-muted">
-                A restaurant-funded refund comes off that restaurant&rsquo;s next
-                settlement.
-              </p>
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-ink-muted">
-              Zopiqnow funds gift refunds. A gift shop is a catalogue, not a
-              counterparty with a weekly statement, so there is nothing to charge
-              this to.
+          <div className="mt-4">
+            <SegmentedControl
+              label="Funded by"
+              value={issueFunder}
+              onChange={setIssueFunder}
+              options={[
+                { value: 'platform', label: 'Platform' },
+                { value: 'restaurant', label: 'Restaurant' },
+              ]}
+            />
+            <p className="mt-1.5 text-sm text-ink-muted">
+              A restaurant-funded refund comes off that restaurant&rsquo;s next
+              settlement.
             </p>
-          )}
+          </div>
         </Modal>
       )}
 
@@ -454,27 +420,21 @@ export function RefundsPage() {
           }
         >
           <p className="text-sm text-ink-muted">
-            {approving.kind === 'gift'
-              ? 'Clears it to be sent. Zopiqnow fulfils gift orders itself, so there is no vendor to charge this to.'
-              : 'Clears it to be sent. This is also the last chance to change who pays for it — once a settlement has absorbed the row, the figure has already been shown to the restaurant and the database refuses.'}
+            Clears it to be sent. This is also the last chance to change who pays
+            for it — once a settlement has absorbed the row, the figure has
+            already been shown to the restaurant and the database refuses.
           </p>
-          {/* Absent, not disabled, on a gift — the same rule the Decline button
-              follows above. There is no restaurant behind a gift order, the
-              database refuses the change, and a control whose only other option
-              always errors is a control that teaches people to ignore errors. */}
-          {approving.kind === 'food' && (
-            <div className="mt-5">
-              <SegmentedControl
-                label="Funded by"
-                value={funder}
-                onChange={setFunder}
-                options={[
-                  { value: 'platform', label: 'Platform' },
-                  { value: 'restaurant', label: 'Restaurant' },
-                ]}
-              />
-            </div>
-          )}
+          <div className="mt-5">
+            <SegmentedControl
+              label="Funded by"
+              value={funder}
+              onChange={setFunder}
+              options={[
+                { value: 'platform', label: 'Platform' },
+                { value: 'restaurant', label: 'Restaurant' },
+              ]}
+            />
+          </div>
         </Modal>
       )}
 

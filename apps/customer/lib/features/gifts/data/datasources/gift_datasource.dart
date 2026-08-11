@@ -1,8 +1,7 @@
-// A complaint is a complaint and a refund is a refund whichever kind of order it
-// is about, so gifts reuse the checkout feature's entities rather than declaring
-// parallel ones that would have to be kept identical by hand.
+// A complaint is a complaint whichever kind of order it is about, so gifts
+// reuse the checkout feature's entity rather than declaring a parallel one that
+// would have to be kept identical by hand.
 import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
-import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_item.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_order.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_shop.dart';
@@ -60,18 +59,16 @@ abstract interface class GiftOrderDataSource {
   /// The lines on one of their own orders.
   Future<List<GiftOrderLine>> fetchOrderLines(String orderId);
 
-  /// Calls one off, while it is still callable off. Throws [GiftOrderFailure]
-  /// with the service's own sentence when it is not.
-  Future<void> cancelOrder({required String orderId, String? reason});
+  // No `cancelOrder`. A gift order is final once it is placed (0116) — the
+  // database refuses it with a sentence for builds that still have the button,
+  // and this app no longer has one to press.
 
   /// Complaints this customer has already raised about one of their own gift
   /// orders (0114). Empty for almost every order.
+  ///
+  /// The only route a customer has back into this system on a gift, now that
+  /// there is no cancel and no refund.
   Future<List<OrderIssue>> fetchIssues(String orderId);
-
-  /// Money owed back on one of their own gift orders (0115). Empty for almost
-  /// every order — a cancellation raises one automatically, and support raises
-  /// the rest by hand.
-  Future<List<OrderRefund>> fetchRefunds(String orderId);
 
   /// Reports a problem with a gift order. Throws [OrderIssueFailure] carrying
   /// the service's own sentence — "You have already reported this order." — so

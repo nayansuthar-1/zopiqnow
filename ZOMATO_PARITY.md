@@ -176,105 +176,75 @@ has ever moved. Building it against a real gateway once beats building it twice.
       drift the first time one is reworded.
 
       **What this deliberately did not do: refund a gift.** A ticket is a
-      statement, not a transaction (0095's rule). `refunds.order_id` was also a
-      not-null FK to `orders`, so a gift was refunded in Razorpay's dashboard and
-      was not written down in the ledger. That is the same schema question 0113
-      answered for `payment_intents`, and doing it in the same breath would have
-      meant two ledgers changing shape in one migration. ~~Owed, and written here
-      so it is found rather than discovered.~~ ✅ **Closed by 0115, below.**
-- [x] **…and a gift is refunded too** — migration **0115**, 2026-08-11. The
-      fourth and last of the gaps gifts inherited by being built beside the food
-      path rather than through it, and the only one about money leaving the
-      platform with no record of it: no amount, no reason, no promised date, no
-      notification, and nothing in `admin_actions` saying who sent it.
+      statement, not a transaction (0095's rule). `refunds.order_id` was a
+      not-null FK to `orders`, so a gift could not be refunded through the
+      ledger at all. That was written here as owed — and the answer, when it was
+      finally asked out loud, turned out to be that it is not owed. See 0116.
+- [x] **A gift is final — no cancel, no refund** — migration **0116**,
+      2026-08-11. **A product decision, and it reverses 0115 in full.**
 
-      Two places already promised the money back and could not keep it. The gift
-      Cancel dialog says *"We'll stop preparing it and refund what you paid"* —
-      and nothing behind that button wrote anything down. 0114's own header named
-      the gap and deferred it. Now `order_id` is nullable, `gift_order_id` joins
-      it, and `num_nonnulls(...) = 1` says exactly one: the third migration in a
-      row to take that shape, and for the same reason each time. **One ledger,
-      not two** — the over-refund check, the requested→approved→paid machine and
-      the console's work queue are one implementation each, and the copy that
-      drifts is the one that pays twice.
+      0115 built the gift refund ledger this file had been asking for since
+      0114: nullable `order_id`, `gift_order_id` beside it, an automatic refund
+      on cancellation, `admin_issue_gift_refund`, and the console queue widened
+      to show both kinds. It was applied, verified over 32 edge cases, and then
+      **the rule it was built to serve turned out not to be the rule.** Gifts are
+      not cancellable and are not refundable. Once one is bought, it is bought.
 
-      **A gift refund is never restaurant-funded and never on a settlement**, as
-      a check constraint. `run_settlement_batch` was already safe twice over (it
-      inner joins `orders` *and* filters `funded_by = 'restaurant'`), but "the
-      batch happens not to reach it" is a fact about one function and this is a
-      property of the row — 0077's own argument for
-      `refund_on_a_statement_is_the_vendors`, one step further out.
+      So 0116 takes all of it back out, down to the column — `gift_order_id` had
+      never held a row, so there was nothing to preserve and no reason to leave a
+      dead nullable column for a future reader to puzzle over. `refunds.order_id`
+      is `not null` again, which is the honest statement once more: every row in
+      that ledger is against a food order. A separate migration rather than an
+      edit to 0115, because 0115 was applied to the live database and a migration
+      that rewrites an applied one is a file that no longer describes what
+      happened.
 
-      **The automatic path covers the easy case; the manual one covers the case
-      that actually happens.** A cancelled prepaid gift raises its own approved
-      refund, exactly as a cancelled dinner does. But a gift order cannot be
-      cancelled once it is dispatched (0096) — which is precisely when a parcel
-      goes missing — so `admin_issue_gift_refund` is not a nicety, it is the
-      path. No `p_funded_by` on it: there is nobody else to charge, and an
-      argument whose only legal value is the default is one somebody eventually
-      passes the other value to.
+      **What stays, and why it is not a contradiction:**
 
-      **Three things that would each have been a bug.** `refund_within_the_order`
-      read the total out of `orders` and raised *"We couldn't find that order."*
-      — left alone it would have refused every gift refund this migration
-      creates, from inside a trigger, including the automatic one. Its sibling
-      count had to become `is not distinct from` rather than `=`, because
-      `r.order_id = null` is null rather than true and every gift refund would
-      have counted zero siblings — the over-refund check silently a no-op on half
-      the ledger. And `admin_list_refunds` **inner joined `orders`**, so every
-      gift refund would have sat in the ledger invisible to the people whose job
-      is to send the money, after the customer had been told it was on its way:
-      the same blindness 0114 found in `admin_support_tickets`, one table over.
-      It is left joins, a `kind` column and `seller_name` now.
+      * **The admin's cancel stays.** `admin_set_gift_order_status` can still
+        move a `placed` or `accepted` gift order to `cancelled`. The rule is
+        about a customer changing their mind, not about Zopiqnow being unable to
+        fulfil — an order for a thing that turns out not to exist has to be able
+        to end, or it sits open for ever. Where money has to go back in that
+        case it goes back in Razorpay's dashboard, by hand, which is now the
+        whole of the arrangement rather than half of it.
+      * **`support_tickets` stays** (0114), and matters more than it did
+        yesterday: raising an issue is now the *only* route a customer has back
+        into this system on a gift. That is exactly the door 0114 built, and
+        0095's rule — a ticket is a statement, not a transaction — is what makes
+        it survive this decision unchanged.
 
-      **A fourth, found by reading rather than by it happening.**
-      `admin_mark_refund_paid` looked the customer up in `orders`.
-      `notifications.user_id` is *nullable*, so on a gift refund nothing would
-      have raised, the `exception when others` would have had nothing to swallow,
-      and the row would have been written addressed to **nobody** — a refund sent
-      and the customer never told, with no error anywhere to say so, on the one
-      message in the flow they are actually waiting for.
+      **`cancel_my_gift_order` is kept and made to refuse, not dropped.**
+      Dropping it would refuse too, but as a missing-function error, which the
+      gift datasource maps to its generic apology. An installed build still has
+      the Cancel button and will still press it, and what that customer should
+      read is a sentence explaining the rule — *"Gift orders can't be cancelled
+      once they're placed. If something is wrong with it, report a problem and
+      we'll sort it out."* — not "Something went wrong." A stranger still gets
+      *"We couldn't find that order on your account."* instead, because
+      answering the rule would confirm the id is real (0095).
 
-      **The notification carries no `order_id`, on purpose.** That column routes
-      a tap to `/orders/:id` in both the inbox and the push handler, so a `ZPG-…`
-      there sends somebody who tapped "Refund initiated" to a screen saying the
-      order they are asking about does not exist. Standing rule 2, one column
-      over: filling it in — so the alert opens `/gift-orders/:id` — waits for a
-      customer build that reads the prefix. The sentence carries the id, the
-      amount and the date, which is the whole reason the row exists.
+      **The rule is said before the money moves.** Gift checkout now prints
+      *"Gift orders can't be cancelled once placed."* under the total. A rule a
+      customer only meets when they try to undo something is the rule that
+      generates the complaint rather than preventing it.
 
-      Customer side, both platforms: `OrderRefundSection` now takes its rows
-      rather than an order id, like `OrderIssueSection` since 0114, and the gift
-      receipt draws the same widget under the total it reverses. Console side:
-      the queue names the kind instead of asking anybody to decode a prefix, the
-      "Funded by" control is *absent* on a gift rather than disabled, and the
-      issue form asks which ledger the id belongs to rather than sniffing it.
+      Nothing was done to existing `gift_orders`: there is one row in the table
+      and it is `delivered`, and no gift order has ever been cancelled. A
+      migration that rewrote order history to match a rule made today would be
+      rewriting what happened, which is 0063's argument about receipts.
 
-      **32 edge cases against the live database in a rolled-back transaction.**
-      Both-set and neither-set refused; a gift funded by a restaurant refused by
-      the constraint; a cancelled paid gift raising one approved platform refund
-      at the full total with the customer's own reason on it; an *unpaid* gift
-      raising none; a second automatic one refused by the unique index (run
-      against an order with nothing else on it — on a spent one the over-refund
-      trigger answers first and proves the wrong rule); siblings counted per
-      order, so ZPG-E1 being spent leaves ZPG-E3 whole; the food path still
-      writing and still refusing a rupee too many; approving a gift onto a
-      restaurant refused with a sentence; the "sent" notification reaching the
-      right customer with a null `order_id`; a stranger reading none of it;
-      the queue returning both kinds with the right seller and total; `anon`
-      reaching none of the six functions and `authenticated` not the trigger
-      body; no overload (0051); every definer's `search_path` pinned (0093);
-      nothing gift-shaped visible to the settlement batch; and deleting a gift
-      order taking its refunds with it.
-
-      16 edge cases against the live database in a rolled-back transaction:
-      both-set and neither-set refused by the constraint; the food path
-      unchanged; another customer's gift order refused with the *same words* as
-      "no such order"; `rider` refused; three per order then refused; a
-      non-owner reads nothing; the queue returning both kinds with the right
-      seller, status and total; closing one naming the gift order; closing it
-      twice refused; a signed-in non-admin refused from both admin functions;
-      and deleting a gift order taking its tickets with it.
+      **21 edge cases against the live database in a rolled-back transaction.**
+      The owner refused from `placed` and from `accepted` with the rule, and a
+      stranger refused with "no such order"; neither order's status actually
+      moved; the admin's cancel still succeeding and raising *no* refund row and
+      *no* notification; all three 0115 functions gone, the trigger gone,
+      `gift_order_id` gone, `order_id` back to `not null`, both 0115 constraints
+      gone; the food path issuing, approving and paying end to end with its
+      notification intact and its over-refund check still refusing; the queue
+      still reading; a gift complaint still landing; no overload (0051); every
+      definer's `search_path` pinned (0093); and `anon` reaching none of the
+      five touched functions.
 - [x] Admin: refund management console — `apps/admin-web/src/payouts/RefundsPage.tsx`
 
 **A hole found and closed on the way:** 0050 did not do what it says. 0015 had widened

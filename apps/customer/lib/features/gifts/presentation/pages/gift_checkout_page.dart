@@ -265,6 +265,15 @@ class _GiftCheckoutPageState extends ConsumerState<GiftCheckoutPage> {
             'Delivery by the Zopiqnow team is free.',
             style: t.bodySmall?.copyWith(color: zc.textMuted),
           ),
+          const SizedBox(height: ZopiqSpacing.xs),
+          // Said before the money moves, not discovered afterwards on the order
+          // screen. A gift order is final once it is placed (0116), and a rule
+          // the customer only meets when they try to undo something is the rule
+          // that generates the complaint rather than preventing it.
+          Text(
+            'Gift orders can\'t be cancelled once placed.',
+            style: t.bodySmall?.copyWith(color: zc.textMuted),
+          ),
 
           if (_failure case final String failure) ...<Widget>[
             const SizedBox(height: ZopiqSpacing.lg),

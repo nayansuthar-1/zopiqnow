@@ -36,9 +36,9 @@ enum GiftOrderStatus {
   bool get isOpen =>
       this == placed || this == accepted || this == dispatched;
 
-  /// The customer may still call it off. Once it is with a courier there is a
-  /// parcel in a van, and a button that pretended to recall it would be a lie.
-  bool get canCancel => this == placed || this == accepted;
+  // No `canCancel`. A gift order is final once it is placed (0116). `cancelled`
+  // remains a status because Zopiqnow itself may still have to end an order it
+  // cannot fulfil — that is an admin's act, not a button on this screen.
 
   /// How far along the four-step tracker, or null for a cancelled order which
   /// is not on the tracker at all.
