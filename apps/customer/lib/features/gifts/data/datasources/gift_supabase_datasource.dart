@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/gifts/data/datasources/gift_datasource.dart';
 import 'package:zopiqnow/features/gifts/data/datasources/gift_row.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_item.dart';
@@ -191,6 +192,18 @@ class GiftOrderSupabaseDataSource implements GiftOrderDataSource {
     return rows
         .cast<Map<String, dynamic>>()
         .map(OrderIssue.fromJson)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<OrderRefund>> fetchRefunds(String orderId) async {
+    final List<dynamic> rows = await _db.rpc<List<dynamic>>(
+      'my_gift_order_refund',
+      params: <String, dynamic>{'p_gift_order_id': orderId},
+    );
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map(OrderRefund.fromJson)
         .toList(growable: false);
   }
 

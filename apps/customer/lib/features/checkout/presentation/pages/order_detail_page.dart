@@ -9,6 +9,7 @@ import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/payment_method.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
@@ -253,7 +254,11 @@ class _OrderBodyState extends ConsumerState<_OrderBody> {
           // out where their ₹565 went, and burying the answer under the itemised
           // list is how that becomes a phone call. Renders nothing on the
           // overwhelming majority of orders, which have no refund.
-          OrderRefundSection(orderId: order.id),
+          OrderRefundSection(
+            refunds:
+                ref.watch(orderRefundsProvider(order.id)).valueOrNull ??
+                const <OrderRefund>[],
+          ),
           OrderIssueSection(
             issues:
                 ref.watch(orderIssuesProvider(order.id)).valueOrNull ??

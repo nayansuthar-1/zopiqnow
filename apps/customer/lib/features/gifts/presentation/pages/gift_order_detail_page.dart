@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/checkout/domain/entities/order_issue.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_issue_section.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/order_refund_section.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/report_issue_sheet.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_order.dart';
 import 'package:zopiqnow/features/gifts/presentation/pages/gift_orders_page.dart'
@@ -60,6 +62,10 @@ class GiftOrderDetailPage extends ConsumerWidget {
           .read(giftOrderDataSourceProvider)
           .cancelOrder(orderId: orderId);
       ref.invalidate(giftOrdersProvider);
+      // The cancel raises the refund in the same statement (0115), so the
+      // section below has something to draw the moment this returns — and the
+      // dialog above has just promised it.
+      ref.invalidate(giftOrderRefundsProvider(orderId));
     } on GiftOrderFailure catch (failure) {
       // The service's own sentence — "This one is already with the courier."
       messenger
@@ -218,6 +224,21 @@ class GiftOrderDetailPage extends ConsumerWidget {
           _Money(label: 'GST', amount: order.taxes),
           const SizedBox(height: ZopiqSpacing.xs),
           _Money(label: 'Paid', amount: order.total, strong: true),
+
+          // What happened to the money (0115). Directly under the total it is
+          // reversing, because on a cancelled gift this is the whole reason the
+          // screen was opened — and until 0115 the Cancel dialog above promised
+          // "we'll refund what you paid" with nothing behind it and nowhere for
+          // the customer to see it happen. The same widget the food receipt
+          // draws, handed the gift's own rows.
+          if (ref
+              .watch(giftOrderRefundsProvider(order.id))
+              .valueOrNull
+              case final List<OrderRefund> refunds
+              when refunds.isNotEmpty) ...<Widget>[
+            const SizedBox(height: ZopiqSpacing.xl),
+            OrderRefundSection(refunds: refunds),
+          ],
 
           // What they have already told us, if anything. Above the buttons for
           // the same reason the food receipt puts it above them: somebody who

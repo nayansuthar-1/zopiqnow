@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:zopiqnow/features/checkout/domain/entities/order_refund.dart';
-import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
 
-/// What happened to the money on an order that ended badly (migration 0077).
+/// What happened to the money on an order that ended badly (migrations 0077 and,
+/// for a gift, 0115).
 ///
 /// The audit's own claim about this section is that the sentence "Refund
 /// initiated, in your account by 3 Aug" prevents more support contacts than any
@@ -12,19 +11,21 @@ import 'package:zopiqnow/features/checkout/presentation/providers/orders_provide
 /// amount, and a date. Not a progress bar, not a status the customer has to
 /// interpret.
 ///
+/// Takes the rows rather than an order id, like [OrderIssueSection]: a food
+/// order and a gift order read theirs through different functions, and a second
+/// copy of this widget is two screens that word the same promise differently the
+/// first time one is edited.
+///
 /// Renders nothing at all when there is no refund, which is almost every order —
 /// including while the read is in flight, so a receipt does not jump. And there
 /// is nothing to tap: a refund is not an action the customer takes.
-class OrderRefundSection extends ConsumerWidget {
-  const OrderRefundSection({required this.orderId, super.key});
+class OrderRefundSection extends StatelessWidget {
+  const OrderRefundSection({required this.refunds, super.key});
 
-  final String orderId;
+  final List<OrderRefund> refunds;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final List<OrderRefund> refunds =
-        ref.watch(orderRefundsProvider(orderId)).valueOrNull ??
-        const <OrderRefund>[];
+  Widget build(BuildContext context) {
     if (refunds.isEmpty) return const SizedBox.shrink();
 
     final TextTheme t = Theme.of(context).textTheme;

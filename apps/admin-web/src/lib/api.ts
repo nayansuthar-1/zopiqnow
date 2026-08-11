@@ -388,6 +388,21 @@ export const api = {
       p_funded_by: fundedBy,
     }),
 
+  /// The same, for a gift order (0115). A separate call rather than a widening,
+  /// for the database's own reason: the two look their order up in different
+  /// tables, and one function taking "an id of one of two kinds" has to guess
+  /// which. There is no `fundedBy` — Zopiqnow fulfils gifts itself, so there is
+  /// nobody else to charge, and the check constraint on the row says so too.
+  ///
+  /// This is the one that matters in practice: a gift that was dispatched and
+  /// never arrived cannot be cancelled, so it never reaches the automatic path.
+  issueGiftRefund: (giftOrderId: string, amount: number, reason: string) =>
+    rpc<number>('admin_issue_gift_refund', {
+      p_gift_order_id: giftOrderId,
+      p_amount: amount,
+      p_reason: reason,
+    }),
+
   /// Clears it to be sent, and is the one chance to move who pays for it — the
   /// database refuses the change once a settlement has absorbed the row.
   approveRefund: (id: number, fundedBy?: RefundRow['funded_by']) =>
@@ -941,9 +956,16 @@ export type TopRestaurant = {
 /// admin's email, and that one waits for approval.
 export type RefundRow = {
   id: number
+  /// Which kind of order the money is owed on (0115). A gift has no restaurant
+  /// to charge and no settlement to charge it to, so the console does not offer
+  /// to move one onto a vendor — the database refuses it either way.
+  kind: 'food' | 'gift'
+  /// Whichever id this refund is against — `ZPQ-…` for food, `ZPG-…` for a gift.
   order_id: string
-  restaurant_id: string
-  restaurant_name: string
+  /// The restaurant, or the gift shop. Named for what it holds rather than for
+  /// one of the two things it can be.
+  seller_id: string
+  seller_name: string
   user_phone: string
   order_total: number
   payment_method: 'cod' | 'upi'
