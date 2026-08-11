@@ -10,6 +10,8 @@ import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/cart/presentation/widgets/add_to_cart_control.dart';
 import 'package:zopiqnow/features/cart/presentation/widgets/bill_summary.dart';
+import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
+import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_image.dart'
     show GradientImagePlaceholder;
 
@@ -157,6 +159,47 @@ class _CartBody extends StatelessWidget {
   }
 }
 
+/// The kitchen's own photo at the top of the cart.
+///
+/// The cart stores a restaurant's id and its name and nothing else, so this
+/// header had no picture to draw and always fell back to the branded gradient
+/// tile with a generic storefront glyph — while Home, the top-chains rail and
+/// the menu header all showed the real thing. The same order looked like a
+/// different restaurant depending on which screen you were on.
+///
+/// Resolved by id rather than carried in the cart: `restaurantByIdProvider`
+/// already exists for the menu screen's cold deep link, it is `autoDispose` and
+/// cached, and threading an image URL through the four add-to-cart paths would
+/// have been churn in the order flow for one picture. A cart whose restaurant
+/// cannot be fetched keeps exactly the placeholder it has today.
+class _RestaurantAvatar extends ConsumerWidget {
+  const _RestaurantAvatar({required this.restaurantId});
+
+  final String? restaurantId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final Widget placeholder = GradientImagePlaceholder(
+      seed: restaurantId ?? '',
+      icon: Icons.storefront_rounded,
+      iconSize: 22,
+    );
+
+    final String? id = restaurantId;
+    if (id == null) return placeholder;
+
+    // Placeholder while it loads and if it fails, so the tile never flashes
+    // empty and a dead network is not a broken-looking cart.
+    return ref
+        .watch(restaurantByIdProvider(id))
+        .maybeWhen(
+          data: (Restaurant r) =>
+              ZopiqNetworkImage(url: r.imageUrl, fallback: placeholder),
+          orElse: () => placeholder,
+        );
+  }
+}
+
 /// Restaurant Store Card Header
 class _RestaurantHeader extends StatelessWidget {
   const _RestaurantHeader({required this.cart});
@@ -205,11 +248,7 @@ class _RestaurantHeader extends StatelessWidget {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: GradientImagePlaceholder(
-                seed: cart.restaurantId ?? '',
-                icon: Icons.storefront_rounded,
-                iconSize: 22,
-              ),
+              child: _RestaurantAvatar(restaurantId: cart.restaurantId),
             ),
           ),
           const SizedBox(width: 12),

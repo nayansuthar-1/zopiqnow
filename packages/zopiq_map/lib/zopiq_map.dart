@@ -7,3 +7,5 @@ library;
 export 'src/map_markers.dart' show ZopiqPinKind;
 export 'src/polyline_codec.dart' show decodePolyline;
 export 'src/zopiq_map_view.dart' show ZopiqMapPin, ZopiqMapView;
+export 'src/zopiq_point_picker.dart'
+    show ZopiqPointPicker, ZopiqPointPickerState;

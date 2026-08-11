@@ -6,6 +6,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/domain/services/device_location_service.dart';
+import 'package:zopiqnow/features/location/presentation/pages/address_map_page.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 import 'package:zopiqnow/features/location/presentation/widgets/location_prompt.dart';
 
@@ -71,6 +72,30 @@ class _AddressPickerSheetState extends ConsumerState<AddressPickerSheet> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  /// Choose the delivery point on a map.
+  ///
+  /// The third way in, beside GPS and the saved list, and the one this sheet was
+  /// missing: a customer who is not at the address and has not saved it yet had
+  /// nowhere to go but "add a new address" and a form of empty text fields.
+  ///
+  /// The sheet closes *before* the map opens — a full-screen route pushed
+  /// underneath a modal leaves the modal on top of it. It reopens nothing on the
+  /// way back: the address is chosen, which is what the sheet was for.
+  Future<void> _pickOnMap() async {
+    final Address? current = ref.read(selectedAddressProvider);
+    final NavigatorState navigator = Navigator.of(context);
+    final Address? picked = await showAddressMapPicker(
+      context,
+      initial: current == null
+          ? null
+          : GeoPoint(current.latitude, current.longitude),
+    );
+    if (picked == null) return;
+
+    await ref.read(selectedAddressProvider.notifier).select(picked);
+    if (navigator.mounted) navigator.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
@@ -103,6 +128,17 @@ class _AddressPickerSheetState extends ConsumerState<AddressPickerSheet> {
               const SizedBox(height: ZopiqSpacing.sm),
               Text(_error!, style: t.bodySmall?.copyWith(color: zc.nonVeg)),
             ],
+            const SizedBox(height: ZopiqSpacing.sm),
+            // Beside GPS rather than below the saved list: the two are the same
+            // kind of answer — "work it out for me" and "I'll show you" — and a
+            // customer with no saved addresses should see both at once.
+            ZopiqButton(
+              label: 'Set location on map',
+              icon: Icons.map_outlined,
+              variant: ZopiqButtonVariant.outline,
+              expand: true,
+              onPressed: _pickOnMap,
+            ),
             const SizedBox(height: ZopiqSpacing.lg),
             Text(
               'SAVED ADDRESSES',

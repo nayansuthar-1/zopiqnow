@@ -64,17 +64,29 @@ class _Headline extends ConsumerWidget {
   final OrderStatus status;
   final CustomerOrder order;
 
-  static String _sentence(OrderStatus status) => switch (status) {
-    OrderStatus.placed => 'Waiting for the restaurant to accept',
-    OrderStatus.accepted => 'Your order is confirmed',
-    OrderStatus.preparing => 'Your food is being prepared',
-    OrderStatus.readyForPickup => 'Packed and ready for pickup',
-    OrderStatus.outForDelivery => 'On its way to you',
-    OrderStatus.delivered => 'Delivered. Enjoy!',
-    // Rendered by _Ended, which this never sees.
-    OrderStatus.rejected => 'This order wasn\'t accepted',
-    OrderStatus.cancelled => 'This order was cancelled',
-  };
+  /// The headline sentence.
+  ///
+  /// [riderName] is the one thing on this screen that turns a status into a
+  /// person: once the food has left the kitchen, "Rahul is on the way to
+  /// deliver" says who has it, and a customer watching a bike cross a map wants
+  /// the name of whoever is riding it. It is null until a rider is assigned and
+  /// their name has been read, and the impersonal line stands in until then —
+  /// an order a restaurant delivers with its own staff never gets one, and
+  /// waiting on a name that is not coming would leave the headline blank.
+  static String _sentence(OrderStatus status, String? riderName) =>
+      switch (status) {
+        OrderStatus.placed => 'Waiting for the restaurant to accept',
+        OrderStatus.accepted => 'Your order is confirmed',
+        OrderStatus.preparing => 'Your food is being prepared',
+        OrderStatus.readyForPickup => 'Packed and ready for pickup',
+        OrderStatus.outForDelivery => riderName == null
+            ? 'On its way to you'
+            : '$riderName is on the way to deliver',
+        OrderStatus.delivered => 'Delivered. Enjoy!',
+        // Rendered by _Ended, which this never sees.
+        OrderStatus.rejected => 'This order wasn\'t accepted',
+        OrderStatus.cancelled => 'This order was cancelled',
+      };
 
   static IconData _icon(OrderStatus status) => switch (status) {
     OrderStatus.placed => Icons.receipt_long_rounded,
@@ -113,6 +125,15 @@ class _Headline extends ConsumerWidget {
         route?.etaAt ?? order.placedAt.add(Duration(minutes: order.etaMinutes));
     final String? slippedBecause = route?.etaReason;
 
+    // Only worth asking once the food has actually left the kitchen — which is
+    // the same window `_Rider` below asks in, so the two share one fetch rather
+    // than making two. `valueOrNull` throughout: a name that has not arrived is
+    // the impersonal sentence, never a blank headline.
+    final String? riderName = status == OrderStatus.outForDelivery
+        ? ref.watch(orderRiderProvider(order.id)).valueOrNull?.name
+        : null;
+    final String sentence = _sentence(status, riderName);
+
     return Row(
       children: <Widget>[
         // Fixed-size, so a status change repaints a circle and lays out nothing.
@@ -137,8 +158,12 @@ class _Headline extends ConsumerWidget {
                 duration: ZopiqDurations.base,
                 switchInCurve: ZopiqCurves.enter,
                 child: Text(
-                  _sentence(status),
-                  key: ValueKey<OrderStatus>(status),
+                  sentence,
+                  // Keyed on the sentence, not the status: the rider's name
+                  // arrives a moment after `outForDelivery` does, and a key that
+                  // only tracked the status would swap the text underneath
+                  // without the fade that every other change on this card gets.
+                  key: ValueKey<String>(sentence),
                   style: t.titleSmall,
                 ),
               ),

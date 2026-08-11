@@ -22,6 +22,18 @@ abstract interface class DeviceLocationService {
   /// Play services) or the text matches nothing.
   Future<GeoPoint> coordinatesOf(String query);
 
+  /// A point → the named place standing at it.
+  ///
+  /// The map picker's question, and the one direction this interface could not
+  /// answer. [currentAddress] reverse-geocodes too, but only ever the GPS fix —
+  /// "where am I", when the customer has just dragged a map to somewhere they
+  /// are not. Naming the point back to them is what makes the pin a choice
+  /// rather than a pair of numbers.
+  ///
+  /// Throws [AddressNotFound] when the geocoder is missing or the point is
+  /// somewhere with no address, exactly as the other two do.
+  Future<Address> addressAt(GeoPoint point);
+
   /// Typed text → a short list of named, selectable places.
   ///
   /// [coordinatesOf] answers "where is that text" with a bare point, which is

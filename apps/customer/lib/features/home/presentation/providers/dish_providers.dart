@@ -37,6 +37,27 @@ final FutureProvider<List<DishSuggestion>> dishPoolProvider =
       return joinDishes(rows, restaurants);
     });
 
+/// Whether the customer has asked for vegetarian food, by *either* of the two
+/// ways this app offers to ask.
+///
+/// There are two, and the rails only knew about one. Account's "100% Veg Mode"
+/// is a standing preference and was honoured; the **VEG MODE** switch in the
+/// home app bar and the "Pure Veg" chip beside it both write
+/// [HomeFilters.pureVeg], and that never reached the dish rails at all — so
+/// turning on the most prominent veg control in the app filtered the restaurant
+/// list underneath while "Recommended for you" carried on suggesting chicken.
+///
+/// The chip row is otherwise deliberately ignored here, so the rail does not
+/// empty out while filters are being tried. Veg is not one of those: "fast
+/// delivery" is a preference about browsing and this is a line somebody does not
+/// cross. Watched through `select` so the rail still rebuilds only when the veg
+/// answer changes, not on every unrelated chip.
+final Provider<bool> _vegOnlyProvider = Provider<bool>(
+  (Ref ref) =>
+      ref.watch(vegModeProvider) ||
+      ref.watch(homeFiltersProvider.select((HomeFilters f) => f.pureVeg)),
+);
+
 /// "Recommended for you" — dishes, ranked against what this phone has been
 /// searching for.
 ///
@@ -47,7 +68,7 @@ final FutureProvider<List<DishSuggestion>> dishPoolProvider =
 final Provider<AsyncValue<List<DishSuggestion>>> recommendedDishesProvider =
     Provider<AsyncValue<List<DishSuggestion>>>((Ref ref) {
       final List<String> interests = ref.watch(recentSearchesProvider);
-      final bool vegOnly = ref.watch(vegModeProvider);
+      final bool vegOnly = ref.watch(_vegOnlyProvider);
 
       return ref.watch(dishPoolProvider).whenData((List<DishSuggestion> pool) {
         return diversify(
@@ -72,7 +93,7 @@ categoryDishesProvider =
       String label,
     ) {
       final List<String> interests = ref.watch(recentSearchesProvider);
-      final bool vegOnly = ref.watch(vegModeProvider);
+      final bool vegOnly = ref.watch(_vegOnlyProvider);
 
       return ref.watch(dishPoolProvider).whenData((List<DishSuggestion> pool) {
         final List<DishSuggestion> inCategory =

@@ -58,6 +58,20 @@ class FakeDeviceLocationService implements DeviceLocationService {
     return point!;
   }
 
+  /// The map picker's reverse geocode. Named for the point it was asked about,
+  /// so a test can tell the pin's answer apart from the GPS one.
+  @override
+  Future<Address> addressAt(GeoPoint at) async {
+    if (failure != null) throw failure!;
+    return Address(
+      id: 'manual:${at.latitude},${at.longitude}',
+      line1: 'Pinned place',
+      city: 'Hyderabad',
+      latitude: at.latitude,
+      longitude: at.longitude,
+    );
+  }
+
   /// The same [point] the form's geocode uses, named after whatever was typed so
   /// a result row has something to render. No [point] means a geocoder that
   /// finds nothing, which is an empty list rather than a throw.

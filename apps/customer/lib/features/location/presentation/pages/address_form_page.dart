@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:zopiq_map/zopiq_map.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/location/presentation/pages/address_map_page.dart';
 import 'package:zopiqnow/features/location/domain/repositories/address_repository.dart';
 import 'package:zopiqnow/features/location/domain/services/device_location_service.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
@@ -108,6 +112,36 @@ class _AddressFormPageState extends ConsumerState<AddressFormPage> {
     }
   }
 
+  /// Source 1b — the map.
+  ///
+  /// Between "here" and "these words" there was a gap: a customer who is not
+  /// standing at the address, whose lane the geocoder has never heard of, and
+  /// who can see their own roof on a map. The pin closes it, and it is the
+  /// strongest of the three sources — the customer looked at the ground and
+  /// pointed at it.
+  ///
+  /// The text fields are filled from the pin only where the pin has something
+  /// to say and the field is empty or came from an earlier pin. Typed words are
+  /// never overwritten: somebody who wrote "Flat 402, blue gate" and then
+  /// adjusted the pin means both, and replacing their flat number with a street
+  /// name would throw away the half only they know.
+  Future<void> _pickOnMap() async {
+    final Address? picked = await showAddressMapPicker(context, initial: _point);
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _error = null;
+      if (picked.line1.isNotEmpty && _line1.text.trim().isEmpty) {
+        _line1.text = picked.line1;
+      }
+      if (picked.city.isNotEmpty) _city.text = picked.city;
+      _point = GeoPoint(picked.latitude, picked.longitude);
+      // The pin is now the authority for these words, whatever they say — so
+      // `_resolvePoint` keeps it instead of re-geocoding the text over the top.
+      _pointText = _query(_line1.text.trim(), _city.text.trim());
+    });
+  }
+
   /// Source 1, then source 2, then give up (source 3).
   Future<GeoPoint?> _resolvePoint(String line1, String city) async {
     final String text = _query(line1, city);
@@ -194,6 +228,10 @@ class _AddressFormPageState extends ConsumerState<AddressFormPage> {
       body: ListView(
         padding: const EdgeInsets.all(ZopiqSpacing.pageGutter),
         children: <Widget>[
+          // The point, before the words. It is the part of this form the
+          // customer cannot type and the part the rider actually needs.
+          _MapCard(point: _point, onTap: _pickOnMap),
+          const SizedBox(height: ZopiqSpacing.md),
           ZopiqButton(
             label: 'Use my current location',
             icon: Icons.my_location_rounded,
@@ -247,6 +285,94 @@ class _AddressFormPageState extends ConsumerState<AddressFormPage> {
             onPressed: _save,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The pin, shown as a small still map, or an invitation to place one.
+///
+/// Not interactive: a map that claimed drags inside this `ListView` would eat
+/// the scroll, which is the same reason [ZopiqMapView] has an `interactive`
+/// flag at all. It is a picture and a button — the real map is the full screen
+/// this opens.
+class _MapCard extends StatelessWidget {
+  const _MapCard({required this.point, required this.onTap});
+
+  final GeoPoint? point;
+  final Future<void> Function() onTap;
+
+  static const double _height = 140;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+    final GeoPoint? p = point;
+
+    return SizedBox(
+      height: _height,
+      child: Material(
+        color: zc.primary.withValues(alpha: 0.06),
+        borderRadius: ZopiqRadii.rLg,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => unawaited(onTap()),
+          child: p == null
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Icon(Icons.map_outlined, color: zc.primary),
+                    const SizedBox(width: ZopiqSpacing.sm),
+                    Text(
+                      'Set location on map',
+                      style: t.titleSmall?.copyWith(color: zc.primary),
+                    ),
+                  ],
+                )
+              : Stack(
+                  children: <Widget>[
+                    Positioned.fill(
+                      child: ZopiqMapView(
+                        interactive: false,
+                        pins: <ZopiqMapPin>[
+                          ZopiqMapPin(
+                            id: 'address',
+                            lat: p.latitude,
+                            lng: p.longitude,
+                            kind: ZopiqPinKind.customer,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // The whole card is the button, so the map must not take
+                    // the tap that opens the real one.
+                    Positioned.fill(
+                      child: InkWell(onTap: () => unawaited(onTap())),
+                    ),
+                    Positioned(
+                      right: ZopiqSpacing.sm,
+                      top: ZopiqSpacing.sm,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: ZopiqRadii.rPill,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: ZopiqSpacing.sm,
+                            vertical: 4,
+                          ),
+                          child: Text(
+                            'Change',
+                            style: t.labelMedium?.copyWith(color: zc.primary),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }

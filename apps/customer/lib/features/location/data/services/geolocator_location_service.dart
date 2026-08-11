@@ -156,6 +156,29 @@ class GeolocatorLocationService implements DeviceLocationService {
   }
 
   @override
+  Future<Address> addressAt(GeoPoint point) async {
+    // The same capability check the other two make: no Play services means no
+    // Geocoder, and calling it there throws rather than returning empty.
+    if (!await _geocoding.isPresent()) throw const AddressNotFound();
+
+    final List<Placemark> places = await _geocoding.placemarkFromCoordinates(
+      point.latitude,
+      point.longitude,
+    );
+    if (places.isEmpty) throw const AddressNotFound();
+
+    return _toAddress(
+      places.first,
+      // 'manual:' — the same id the search path mints, and for the same reason:
+      // it marks a place the customer chose rather than one they saved, and the
+      // coordinates keep two different choices from colliding.
+      id: 'manual:${point.latitude},${point.longitude}',
+      latitude: point.latitude,
+      longitude: point.longitude,
+    );
+  }
+
+  @override
   Future<List<Address>> searchPlaces(String query, {int limit = 5}) async {
     final String text = query.trim();
     if (text.isEmpty) return const <Address>[];
