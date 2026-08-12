@@ -145,13 +145,16 @@ class CheckoutController extends Notifier<CheckoutState> {
   /// so there is nothing to say. Throws [PaymentFailure] on a decline and
   /// [OrderPlacementFailure] on a transport error; the caller surfaces both.
   ///
-  /// Pay-then-order is still the shape here. Verifying the payment with Razorpay
-  /// server-side inverts it (create payment order → settle → verify signature),
-  /// but that reshuffle lives behind this method.
+  /// Pay-then-order is still the shape here, with two guards bolted to it since
+  /// it cost real money: a preflight before the gateway (0120), and [_paidId]
+  /// after it so a retry cannot charge twice. Inverting the shape properly —
+  /// writing the order first as `pending_payment` — is the real answer and is
+  /// deliberately not this.
   ///
-  /// The bill computed here is what the *gateway* is asked to charge. It is not
-  /// what the order costs: `place_order` reprices the cart in Postgres, and the
-  /// receipt it returns is the number that counts.
+  /// The amount charged is the *server's* total, from `checkout_preflight`, not
+  /// the cart's. `place_order` reprices once more and its receipt is still the
+  /// number that counts, but the two now start from the same arithmetic — a
+  /// disagreement between them is a charge the payment gate then refuses.
   /// [userPhone] is E.164 and non-null: an account can exist without a number
   /// (sign-in is by email), but an order cannot. Checkout collects it before it
   /// gets here — see `showDeliveryPhoneSheet`. Who is buying is not passed at
@@ -180,6 +183,45 @@ class CheckoutController extends Notifier<CheckoutState> {
         .join();
   }
 
+  /// The gateway reference for a payment **already taken** for this attempt.
+  ///
+  /// [_attemptKey] made the retry safe at the wrong end. It is `place_order`
+  /// that it makes idempotent — and `place_order` is not where the money is
+  /// taken. So a placement that failed *after* the charge went through sent the
+  /// customer back to a button that opened the gateway again: two captures, and
+  /// at most one order to show for them.
+  ///
+  /// Held for exactly the same lifetime as [_attemptKey] and cleared in the same
+  /// breath, because they are two halves of one attempt: the key names the order
+  /// that may already exist, this names the payment that certainly does. While
+  /// it is set, the retry skips the gateway entirely and goes straight back to
+  /// `place_order` with the payment it already holds.
+  ///
+  /// **In memory only, and that is a known limit rather than an oversight.** The
+  /// notifier is rebuilt when the cart's subtotal changes, and the process can be
+  /// killed outright — either way this is lost and the payment behind it is
+  /// orphaned. Nothing in the schema can currently record that: `refunds.order_id`
+  /// is `not null` with a foreign key to `orders`, so a payment that never became
+  /// an order has nowhere to be written down. That is P3 in `BUGFIX_QUEUE.md`.
+  /// What this field fixes is the case the customer can actually cause by
+  /// tapping the button again, which is every ordinary occurrence of it.
+  ///
+  /// **One narrow case it makes slightly worse, stated rather than hidden.** The
+  /// notifier resets on the cart's *subtotal*, so a retry after an edit that
+  /// changed the cart while leaving the subtotal identical would reuse a payment
+  /// made for the old basket. Two baskets worth the same can still cost
+  /// different totals, because the tax follows each dish's GST rate. Before this
+  /// field the retry simply re-charged, so the amount always matched.
+  ///
+  /// It is not worth machinery: every menu item on the platform is at one GST
+  /// rate today, so the two totals are arithmetically identical, and when that
+  /// stops being true the payment gate refuses an intent worth less than the
+  /// order — which leaves the money orphaned, which is P3, which is where a
+  /// payment with no order belongs anyway. Widening [build]'s watch to the whole
+  /// cart would fix it and would also throw away an applied coupon every time
+  /// somebody reordered their basket, which is a worse trade.
+  String? _paidId;
+
   Future<PlacedOrder?> placeOrder({
     required Address deliveryAddress,
     required String userPhone,
@@ -191,49 +233,62 @@ class CheckoutController extends Notifier<CheckoutState> {
 
     state = CheckoutState(coupon: state.coupon, isPlacingOrder: true);
     try {
-      // Everything `place_order` could refuse on, asked before a rupee moves
-      // (migration 0120). Until this existed the gateway ran first and nine
-      // separate rules could refuse afterwards — a kitchen that shut, a dish
-      // that sold out, a coupon that expired — leaving the customer charged for
-      // an order that does not exist and no refund row to hang the money on,
-      // because `orders_refund_on_termination` fires on an order and there is
-      // none. It throws [OrderPlacementFailure] with the service's own
-      // sentence, which is the same sentence the customer would have seen a
-      // moment later and several hundred rupees worse off.
-      //
-      // Not a guarantee: the cart can still go stale in the seconds the payment
-      // sheet is open, and `place_order` re-checks everything. It removes the
-      // ordinary occurrences, not the race.
-      final int chargeable = await ref
-          .read(orderRepositoryProvider)
-          .preflight(
-            cart: cart,
-            deliveryAddress: deliveryAddress,
-            couponCode: state.coupon?.code,
-          );
+      // A payment already taken for this attempt. Both steps below are skipped
+      // when there is one — the gateway because charging twice for one dinner is
+      // the bug this guards, and the preflight with it, because its whole job is
+      // to keep money from being taken for a doomed order and the money is
+      // already gone. What remains is `place_order`, carrying the same
+      // idempotency key and the same payment id as the attempt that failed.
+      String? paymentId = _paidId;
 
-      final String paymentId;
-      final PaymentOutcome outcome = await ref
-          .read(paymentGatewayProvider)
-          .pay(
-            // The server's total. The screen's own `CartBill` used to decide
-            // this, and the two should agree — the point is what happens when
-            // they do not: the payment gate refuses an intent worth less than
-            // the order it is spent on, so charging the phone's figure and
-            // letting Postgres price the order is itself a charge followed by a
-            // refusal. `checkoutBillProvider` still draws the bill the customer
-            // reads; it no longer decides what they are charged.
-            amount: chargeable,
-            description: cart.restaurantName ?? 'Zopiq order',
-          );
-      switch (outcome) {
-        case PaymentSucceeded(paymentId: final String id):
-          paymentId = id;
-        case PaymentFailed(message: final String message):
-          throw PaymentFailure(message);
-        case PaymentCancelled():
-          state = CheckoutState(coupon: state.coupon);
-          return null;
+      if (paymentId == null) {
+        // Everything `place_order` could refuse on, asked before a rupee moves
+        // (migration 0120). Until this existed the gateway ran first and nine
+        // separate rules could refuse afterwards — a kitchen that shut, a dish
+        // that sold out, a coupon that expired — leaving the customer charged
+        // for an order that does not exist and no refund row to hang the money
+        // on, because `orders_refund_on_termination` fires on an order and
+        // there is none. It throws [OrderPlacementFailure] with the service's
+        // own sentence, which is the same sentence the customer would have seen
+        // a moment later and several hundred rupees worse off.
+        //
+        // Not a guarantee: the cart can still go stale in the seconds the
+        // payment sheet is open, and `place_order` re-checks everything. It
+        // removes the ordinary occurrences, not the race.
+        final int chargeable = await ref
+            .read(orderRepositoryProvider)
+            .preflight(
+              cart: cart,
+              deliveryAddress: deliveryAddress,
+              couponCode: state.coupon?.code,
+            );
+
+        final PaymentOutcome outcome = await ref
+            .read(paymentGatewayProvider)
+            .pay(
+              // The server's total. The screen's own `CartBill` used to decide
+              // this, and the two should agree — the point is what happens when
+              // they do not: the payment gate refuses an intent worth less than
+              // the order it is spent on, so charging the phone's figure and
+              // letting Postgres price the order is itself a charge followed by
+              // a refusal. `checkoutBillProvider` still draws the bill the
+              // customer reads; it no longer decides what they are charged.
+              amount: chargeable,
+              description: cart.restaurantName ?? 'Zopiq order',
+            );
+        switch (outcome) {
+          case PaymentSucceeded(paymentId: final String id):
+            paymentId = id;
+            // Written down *before* the order is attempted, which is the whole
+            // point: everything that can go wrong from here on is a retry, and
+            // a retry must find this rather than the gateway.
+            _paidId = id;
+          case PaymentFailed(message: final String message):
+            throw PaymentFailure(message);
+          case PaymentCancelled():
+            state = CheckoutState(coupon: state.coupon);
+            return null;
+        }
       }
 
       final PlacedOrder order = await ref
@@ -252,11 +307,15 @@ class CheckoutController extends Notifier<CheckoutState> {
             deliveryNotes: ref.read(deliveryNotesProvider),
             idempotencyKey: _attemptKey,
           );
-      // Spent. A later order from this same notifier — the cart is cleared
-      // below, so there will not be one, but it costs a line to be sure — must
-      // never reuse a key that already names an order, or it would be answered
-      // with that order instead of being placed.
+      // Both spent, and cleared together because they are two halves of one
+      // attempt. A later order from this same notifier — the cart is cleared
+      // below, so there will not be one, but it costs two lines to be sure —
+      // must never reuse a key that already names an order, or it would be
+      // answered with that order instead of being placed; and must never reuse
+      // a payment that has already bought a dinner, or the gate would refuse it
+      // as consumed.
       _attemptKey = null;
+      _paidId = null;
       ref.read(lastPlacedOrderProvider.notifier).record(order);
       // Clearing the cart also resets this notifier (build watches subtotal).
       ref.read(cartProvider.notifier).clear();

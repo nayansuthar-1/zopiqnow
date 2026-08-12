@@ -56,18 +56,6 @@ function, and the rule is one at a time.
 
 ---
 
-### P2 — The retry after a failed placement charges a second time
-
-`_attemptKey` is deliberately preserved across a failure so the retry carries the
-same idempotency key — and that makes **`place_order`** idempotent, which is not
-where the money is taken. The retry re-enters `pay()` first. Two captures, at most
-one order.
-
-P1's preflight makes the *first* charge much less likely to be wasted, but does
-nothing about the retry path once one has happened.
-
----
-
 ### P3 — Refunds are promised with a date and nothing pays them
 
 `orders_refund_on_termination` inserts the refund already `approved` and pushes the
@@ -190,6 +178,45 @@ those are split, or a run errors between the two.
 ---
 
 ## Closed
+
+### ~~P2 — The retry after a failed placement charges a second time~~ · 2026-08-12
+
+**Was:** `_attemptKey` is deliberately preserved across a failure so the retry
+carries the same idempotency key — and that makes **`place_order`** idempotent,
+which is not where the money is taken. The retry re-entered `pay()` first, so a
+placement that failed *after* a successful capture sent the customer back to a
+button that charged them again. Two captures, at most one order.
+
+**Fix:** `_paidId` on `CheckoutController`, held for exactly the lifetime of
+`_attemptKey` and cleared in the same breath — the key names the order that may
+already exist, `_paidId` names the payment that certainly does. While it is set
+the retry skips the gateway *and* the preflight (whose only job is to stop money
+being taken for a doomed order, and the money is already gone) and goes straight
+back to `place_order` with the payment it holds.
+
+**Verified:** the mechanism the retry now depends on was confirmed live rather
+than assumed — `orders_idempotency_key_unique` is `(user_id, idempotency_key)
+where idempotency_key is not null`, and `order_receipt_by_key` returns the
+existing receipt for every stored key it was asked about. So a retry is answered
+with the order already placed, and now without a second charge behind it.
+
+**Known narrow case, documented on the field rather than hidden:** the notifier
+resets on the cart's *subtotal*, so an edit that changes the basket while leaving
+the subtotal identical would reuse a payment made for the old one — and two
+baskets worth the same can cost different totals, because tax follows each dish's
+GST rate. Arithmetically impossible today (every menu item on the platform is at
+one GST rate), and when it stops being so the payment gate refuses the underpaid
+direction, which lands it in P3 where a payment with no order belongs. Widening
+the watch to the whole cart would fix it and would also discard an applied coupon
+every time somebody reordered their basket.
+
+**Still not fixed by this:** a payment captured and then lost to a process kill,
+or to a cart edit. That needs somewhere to write down a payment that never became
+an order — **P3**.
+
+Touched: `checkout_providers.dart` only.
+
+---
 
 ### ~~P1 — Pay-then-order has no compensation~~ · migration 0120, 2026-08-12
 
