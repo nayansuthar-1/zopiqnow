@@ -185,23 +185,45 @@ class CheckoutController extends Notifier<CheckoutState> {
     required String userPhone,
   }) async {
     final Cart cart = ref.read(cartProvider);
-    // Not read from checkoutBillProvider: that provider watches this
-    // controller, and reading it back from here is a dependency cycle.
-    final CartBill bill = CartBill.of(
-      cart,
-      discount: state.coupon?.discount ?? 0,
-    );
     // Minted on the first attempt and reused by every retry of it. See the
     // field: surviving a failure is the entire behaviour.
     _attemptKey ??= _newAttemptKey();
 
     state = CheckoutState(coupon: state.coupon, isPlacingOrder: true);
     try {
+      // Everything `place_order` could refuse on, asked before a rupee moves
+      // (migration 0120). Until this existed the gateway ran first and nine
+      // separate rules could refuse afterwards — a kitchen that shut, a dish
+      // that sold out, a coupon that expired — leaving the customer charged for
+      // an order that does not exist and no refund row to hang the money on,
+      // because `orders_refund_on_termination` fires on an order and there is
+      // none. It throws [OrderPlacementFailure] with the service's own
+      // sentence, which is the same sentence the customer would have seen a
+      // moment later and several hundred rupees worse off.
+      //
+      // Not a guarantee: the cart can still go stale in the seconds the payment
+      // sheet is open, and `place_order` re-checks everything. It removes the
+      // ordinary occurrences, not the race.
+      final int chargeable = await ref
+          .read(orderRepositoryProvider)
+          .preflight(
+            cart: cart,
+            deliveryAddress: deliveryAddress,
+            couponCode: state.coupon?.code,
+          );
+
       final String paymentId;
       final PaymentOutcome outcome = await ref
           .read(paymentGatewayProvider)
           .pay(
-            amount: bill.total,
+            // The server's total. The screen's own `CartBill` used to decide
+            // this, and the two should agree — the point is what happens when
+            // they do not: the payment gate refuses an intent worth less than
+            // the order it is spent on, so charging the phone's figure and
+            // letting Postgres price the order is itself a charge followed by a
+            // refusal. `checkoutBillProvider` still draws the bill the customer
+            // reads; it no longer decides what they are charged.
+            amount: chargeable,
             description: cart.restaurantName ?? 'Zopiq order',
           );
       switch (outcome) {

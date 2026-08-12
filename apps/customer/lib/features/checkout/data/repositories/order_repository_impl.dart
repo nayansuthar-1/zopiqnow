@@ -37,6 +37,30 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
+  Future<int> preflight({
+    required Cart cart,
+    required Address deliveryAddress,
+    String? couponCode,
+  }) async {
+    try {
+      return await _dataSource.preflight(
+        cart: cart,
+        deliveryAddress: deliveryAddress,
+        couponCode: couponCode,
+      );
+    } on OrderPlacementFailure {
+      rethrow;
+    } on CouponFailure catch (failure) {
+      // Same translation `placeOrder` makes below, and for the same reason: by
+      // this point the screen has no coupon field to attach an error to, but
+      // "Add items worth ₹99 more" is still the sentence worth showing.
+      throw OrderPlacementFailure(failure.message);
+    } on Object catch (_) {
+      throw const OrderPlacementFailure();
+    }
+  }
+
+  @override
   Future<PlacedOrder> placeOrder({
     required Cart cart,
     required Address deliveryAddress,

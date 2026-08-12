@@ -28,6 +28,23 @@ abstract interface class OrderRepository {
     required String restaurantId,
   });
 
+  /// Everything [placeOrder] could refuse on, asked before any money moves, and
+  /// the total the gateway should be asked for (migration 0120).
+  ///
+  /// Exists because the order of operations is charge-then-place: without this,
+  /// a kitchen that closed while the cart sat open costs the customer a payment
+  /// and buys them nothing, and there is no order for the refund machinery to
+  /// attach itself to.
+  ///
+  /// Throws [OrderPlacementFailure] with the service's own sentence. Callers
+  /// should let it propagate exactly as they would from [placeOrder] — it is the
+  /// same refusal, arriving early enough to be free.
+  Future<int> preflight({
+    required Cart cart,
+    required Address deliveryAddress,
+    String? couponCode,
+  });
+
   /// Places the order and returns the receipt.
   ///
   /// Takes no bill. The order service prices the cart from its own menu and its

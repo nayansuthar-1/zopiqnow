@@ -65,6 +65,59 @@ class OrderSupabaseDataSource implements OrderDataSource {
     }
   }
 
+  /// Ids, quantities and the chosen option ids only. No prices leave this
+  /// device — both `checkout_preflight` and `place_order` re-price every line
+  /// and its options from the menu.
+  ///
+  /// Shared by the two so that the cart the preflight approves is byte-for-byte
+  /// the cart that is placed. Two builders would be two chances for the
+  /// approved order and the placed one to differ.
+  static List<Map<String, dynamic>> _itemsJson(Cart cart) => cart.lines
+      .map(
+        (CartLine l) => <String, dynamic>{
+          'menu_item_id': l.item.id,
+          'quantity': l.quantity,
+          'option_ids': l.options.map((MenuOption o) => o.id).toList(),
+        },
+      )
+      .toList();
+
+  @override
+  Future<int> preflight({
+    required Cart cart,
+    required Address deliveryAddress,
+    String? couponCode,
+  }) async {
+    try {
+      final Map<String, dynamic> bill = await _db
+          .rpc<Map<String, dynamic>>(
+            'checkout_preflight',
+            params: <String, dynamic>{
+              'p_restaurant_id': cart.restaurantId,
+              'p_items': _itemsJson(cart),
+              'p_delivery_lat': deliveryAddress.latitude,
+              'p_delivery_lng': deliveryAddress.longitude,
+              'p_coupon_code': couponCode,
+            },
+          );
+      return (bill['total'] as num).toInt();
+    } on PostgrestException catch (e, stack) {
+      if (e.code == _businessRuleErrorCode) {
+        throw OrderPlacementFailure(e.message);
+      }
+      // Same rule as `placeOrder` below: when the app replaces the truth with a
+      // friendlier sentence, the truth goes to Crashlytics first. A preflight
+      // that fails for a reason nobody wrote down would send every customer to
+      // the gateway on a cart nobody checked.
+      CrashReporter.recordHandled(
+        e,
+        stack,
+        reason: 'checkout_preflight failed (${e.code}): ${e.message}',
+      );
+      rethrow;
+    }
+  }
+
   @override
   Future<PlacedOrder> placeOrder({
     required Cart cart,
@@ -86,19 +139,7 @@ class OrderSupabaseDataSource implements OrderDataSource {
             params: <String, dynamic>{
               'p_user_phone': userPhone,
               'p_restaurant_id': cart.restaurantId,
-              // Ids, quantities and the chosen option ids only. No prices leave
-              // this device — place_order re-prices every line and its options.
-              'p_items': cart.lines
-                  .map(
-                    (CartLine l) => <String, dynamic>{
-                      'menu_item_id': l.item.id,
-                      'quantity': l.quantity,
-                      'option_ids': l.options
-                          .map((MenuOption o) => o.id)
-                          .toList(),
-                    },
-                  )
-                  .toList(),
+              'p_items': _itemsJson(cart),
               'p_delivery_to': deliveryAddress.shortDisplay,
               'p_delivery_lat': deliveryAddress.latitude,
               'p_delivery_lng': deliveryAddress.longitude,

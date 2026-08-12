@@ -33,6 +33,33 @@ abstract interface class OrderDataSource {
     required String restaurantId,
   });
 
+  /// Asks every question [placeOrder] would refuse on, *before* the gateway is
+  /// opened, and returns the total to charge (migration 0120).
+  ///
+  /// The gateway runs first and `place_order` runs second, so any rule that
+  /// fires at insert — a kitchen that shut, a dish that sold out, a coupon that
+  /// expired, an account over its hourly limit — refuses an order the customer
+  /// has already paid for, and no refund is recorded because there is no order
+  /// to hang one on. This asks all of it up front instead.
+  ///
+  /// The returned number is the *server's* total, not the cart's. They should
+  /// agree, and the point is what happens when they do not: the payment gate
+  /// refuses an intent worth less than the order, so charging the phone's figure
+  /// and letting Postgres price the order is itself a charge-then-refuse. Charge
+  /// this.
+  ///
+  /// Advisory by construction. It takes no locks and writes nothing, so a cart
+  /// can still go stale in the seconds the payment sheet is open; `place_order`
+  /// re-checks and re-prices everything and remains the only authority.
+  ///
+  /// Throws [OrderPlacementFailure] carrying the service's own sentence — the
+  /// same sentence [placeOrder] would have thrown after taking the money.
+  Future<int> preflight({
+    required Cart cart,
+    required Address deliveryAddress,
+    String? couponCode,
+  });
+
   /// No user id: `place_order` reads it from the caller's JWT (`auth.uid()`).
   /// A client that could name the buyer could buy in someone else's name.
   /// [userPhone] is a delivery contact, not an identity.

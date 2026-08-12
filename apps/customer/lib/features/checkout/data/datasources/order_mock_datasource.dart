@@ -348,6 +348,30 @@ class OrderMockDataSource implements OrderDataSource {
     return AppliedCoupon(code: rule.code, discount: rule.discountOn(subtotal));
   }
 
+  /// The same answer `checkout_preflight` gives: the coupon re-validated against
+  /// this cart, and the total this mock would charge for it.
+  ///
+  /// Prices it the same way [placeOrder] does rather than guessing, for the
+  /// reason [placeOrder] re-validates the coupon: a mock that approved a cart it
+  /// would then refuse would hide the exact bug the preflight exists to prevent.
+  @override
+  Future<int> preflight({
+    required Cart cart,
+    required Address deliveryAddress,
+    String? couponCode,
+  }) async {
+    await Future<void>.delayed(latency);
+
+    final int discount = couponCode == null || couponCode.trim().isEmpty
+        ? 0
+        : (await applyCoupon(
+            code: couponCode,
+            subtotal: cart.subtotal,
+            restaurantId: cart.restaurantId ?? '',
+          )).discount;
+    return CartBill.of(cart, discount: discount).total;
+  }
+
   @override
   Future<PlacedOrder> placeOrder({
     required Cart cart,
