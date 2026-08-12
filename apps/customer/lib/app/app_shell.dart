@@ -28,10 +28,15 @@ class AppShell extends ConsumerStatefulWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  /// The Cart branch's index. It sits after the four left-pill tabs
-  /// (Delivery, Dining, Grocery, Gifts), and is reached from the separate Cart
-  /// pill rather than the pill row.
-  static const int cartBranchIndex = 4;
+  /// The Cart branch's index. It sits after the left-pill tabs (Delivery,
+  /// Gifts), and is reached from the separate Cart pill rather than the pill
+  /// row.
+  ///
+  /// Was 4 while Dining and Grocery held branches 1 and 2. Both were
+  /// `ComingSoonPage` and both are gone — see the note in `router.dart`. This
+  /// constant, [_ShellNavBar._tabCount] and the branch list are the three places
+  /// that have to agree; adding a tab back means editing all three.
+  static const int cartBranchIndex = 2;
 
   @override
   ConsumerState<AppShell> createState() => _AppShellState();
@@ -144,6 +149,13 @@ class _ShellNavBar extends ConsumerWidget {
   /// not a distance in pixels.
   static const double _pillHeight = 57.0;
 
+  /// How many tabs share the left pill. Drives both the tab width and the
+  /// sliding indicator's travel, so it is a constant rather than a `4` written
+  /// twice — which is what it was, and which is why removing two tabs would
+  /// otherwise have left the indicator sliding to a quarter-width stop under a
+  /// half-width tab.
+  static const int _tabCount = 2;
+
   /// The gap under the pills when the bar is showing.
   ///
   /// Android draws its system bar outside the Flutter view, so `padding.bottom`
@@ -182,8 +194,8 @@ class _ShellNavBar extends ConsumerWidget {
         : null;
 
     final int currentIndex = navigationShell.currentIndex;
-    // The four pill tabs are indices 0–3; Cart is the one after them. When Cart
-    // is the selected branch, the sliding indicator has no pill to sit under, so
+    // The pill tabs are indices 0–1; Cart is the one after them. When Cart is
+    // the selected branch, the sliding indicator has no pill to sit under, so
     // it falls back to the first tab rather than sliding off the row.
     final int leftIndex =
         currentIndex < AppShell.cartBranchIndex ? currentIndex : 0;
@@ -264,7 +276,8 @@ class _ShellNavBar extends ConsumerWidget {
                       ),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          final double tabWidth = constraints.maxWidth / 4;
+                          final double tabWidth =
+                              constraints.maxWidth / _tabCount;
                           return Stack(
                             children: [
                               // Sliding indicator
@@ -299,33 +312,11 @@ class _ShellNavBar extends ConsumerWidget {
                                     context: context,
                                     ref: ref,
                                     index: 1,
-                                    title: 'Dining',
-                                    icon: Icons.restaurant_outlined,
-                                    activeIcon: Icons.restaurant,
-                                    width: tabWidth,
-                                    isSelected: currentIndex == 1,
-                                    zc: zc,
-                                  ),
-                                  _buildNavItem(
-                                    context: context,
-                                    ref: ref,
-                                    index: 2,
-                                    title: 'Grocery',
-                                    icon: Icons.local_grocery_store_outlined,
-                                    activeIcon: Icons.local_grocery_store,
-                                    width: tabWidth,
-                                    isSelected: currentIndex == 2,
-                                    zc: zc,
-                                  ),
-                                  _buildNavItem(
-                                    context: context,
-                                    ref: ref,
-                                    index: 3,
                                     title: 'Gifts',
                                     icon: Icons.card_giftcard_outlined,
                                     activeIcon: Icons.card_giftcard,
                                     width: tabWidth,
-                                    isSelected: currentIndex == 3,
+                                    isSelected: currentIndex == 1,
                                     zc: zc,
                                   ),
                                 ],

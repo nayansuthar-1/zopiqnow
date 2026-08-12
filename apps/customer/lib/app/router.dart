@@ -40,7 +40,6 @@ import 'package:zopiqnow/features/location/presentation/providers/location_provi
 import 'package:zopiqnow/features/menu/presentation/pages/menu_page.dart';
 import 'package:zopiqnow/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:zopiqnow/features/search/presentation/pages/search_page.dart';
-import 'package:zopiqnow/app/coming_soon_page.dart';
 
 /// Route name constants — referenced instead of raw path strings.
 abstract final class Routes {
@@ -296,25 +295,18 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
               ),
             ],
           ),
-          // Branch 1: Dining
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
-                path: '/dining',
-                builder: (_, _) => const ComingSoonPage(title: 'Dining'),
-              ),
-            ],
-          ),
-          // Branch 2: Grocery
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
-                path: '/grocery',
-                builder: (_, _) => const ComingSoonPage(title: 'Grocery'),
-              ),
-            ],
-          ),
-          // Branch 3: Gifts — a second storefront beside food. Its own branch so
+          // Dining and Grocery used to be branches 1 and 2 here, and both were
+          // `ComingSoonPage`. Two of five primary tabs went nowhere, which is
+          // the same thing the five dots on the restaurant card were before
+          // 0119 and the favourite heart before that: a control that looks live
+          // and is not. At three live restaurants there is no supply behind a
+          // table booking and Grocery is a second logistics business, so the
+          // honest version of the app is the one that does not advertise them.
+          //
+          // Coming back is one commit — a branch, a nav item, and the tab
+          // arithmetic below — on the day there is something behind them.
+          //
+          // Branch 1: Gifts — a second storefront beside food. Its own branch so
           // it keeps its stack and scroll position, and so a shop opened inside
           // it (the nested route below) stays under the Gifts tab.
           StatefulShellBranch(
@@ -341,7 +333,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
               ),
             ],
           ),
-          // Branch 4: Cart
+          // Branch 2: Cart
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(

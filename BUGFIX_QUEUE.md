@@ -174,10 +174,48 @@ those are split, or a run errors between the two.
 - **The open board leaks addresses.** `available_deliveries` returns `delivery_to`
   and `total` for every dispatchable order to every verified rider, not only the
   ones offered to them.
+- **The customer router has no `errorBuilder`.** Any unmatched path renders
+  GoRouter's raw developer error page. Not reachable today — `initialLocation` is
+  `/` and no route is persisted across launches — but one typo in a push payload
+  or a future deep link puts a stack trace in front of a customer.
+- **Three hero slides name coupon codes that do not exist.** `TRYNEW`,
+  `ZOPIQ150` and `SAVE30` are string constants in `home_hero_carousel.dart`, not
+  rows in `coupons`, so a customer who reads one and types it at checkout is told
+  the code isn't valid. The file's own header has said so for a while. Either
+  issue the codes or rewrite the copy.
 
 ---
 
 ## Closed
+
+### ~~Dining and Grocery were dead tabs~~ · 2026-08-12
+
+Not from the sweep — found while answering "what's next" — but the same class of
+bug the sweep is full of, and the same one 0119 fixed on the restaurant card: a
+control that looks live and is not.
+
+**Was:** branches 1 and 2 of the bottom-nav shell were both `ComingSoonPage`. Two
+of five primary tabs went nowhere, and a `BOOK A TABLE` hero slide advertised the
+Dining one. Every new customer tapped them once and learned the app was
+unfinished.
+
+**Fix:** both branches removed, the pill row rebalanced to Delivery / Gifts, the
+Cart branch index moved 4 → 2, the tab-width divisor made a named `_tabCount`
+rather than a `4` written twice, the `BOOK A TABLE` slide deleted, and
+`coming_soon_page.dart` deleted with its last caller.
+
+**Why cut rather than build:** 3 live restaurants, 179 dishes, 5 riders, 3 towns.
+Zomato has Dining because it runs metros with thousands of venues; a table booking
+across three restaurants has no supply side, and Grocery is a second logistics
+business. Coming back is one commit — a branch, a nav item, and the three places
+the tab arithmetic lives, which are now named in each other's comments.
+
+**Verified:** branches read `0 /` → `1 /gifts` → `2 /cart`; `cartBranchIndex`,
+`_tabCount` and the nav items agree; nothing persists a branch index, and
+`initialLocation: '/'` means no launch can land on a removed route. Analyzer
+unchanged at 16 pre-existing issues, none in the touched files.
+
+---
 
 ### ~~P2 — The retry after a failed placement charges a second time~~ · 2026-08-12
 

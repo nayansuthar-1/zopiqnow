@@ -28,11 +28,15 @@ import 'package:zopiqnow/features/home/domain/entities/hero_slide.dart';
 /// **The in-app slides name coupon codes.** `TRYNEW`, `ZOPIQ150` and `SAVE30`
 /// are strings in the const list at the bottom of this file, not rows in
 /// `coupons`, so a customer who reads one and types it at checkout is told the
-/// code isn't valid; `BOOK A TABLE` points at a Dining feature that does not
-/// exist. That was survivable while these were a placeholder nobody saw next to
-/// a real campaign. Now that they always show, the copy in `_slides` is the
-/// thing to fix — either by issuing those codes for real or by rewriting the
-/// slides to promise nothing a customer can be refused.
+/// code isn't valid. That was survivable while these were a placeholder nobody
+/// saw next to a real campaign. Now that they always show, the copy in `_slides`
+/// is the thing to fix — either by issuing those codes for real or by rewriting
+/// the slides to promise nothing a customer can be refused.
+///
+/// The `BOOK A TABLE` slide that used to sit beside them is gone with the Dining
+/// tab it pointed at. **The three coupon codes are the same bug and are still
+/// here** — they are copy, not navigation, so they are P10's business rather
+/// than this change's.
 ///
 /// Motion budget (DEVELOPMENT_PLAN — Motion & performance standard): every loop
 /// is a transform or a one-shot opacity behind a [RepaintBoundary]; nothing
@@ -1736,8 +1740,7 @@ enum _DealArt { priceDrop, dealFeast, topBrands, freeDelivery }
 
 /// The empty state — what the hero shows when no campaign is published, and not
 /// a placeholder waiting to be deleted. The first slide stays on the brand
-/// orange; the rest carry the offers that used to live in the removed cards,
-/// plus a teaser for the upcoming Dining feature.
+/// orange and the rest carry the offers that used to live in the removed cards.
 ///
 /// Real artwork arrives as rows now (migration 0053), which is why this list is
 /// no longer the thing to edit when copy changes.
@@ -1790,13 +1793,9 @@ const List<_HeroSlide> _slides = <_HeroSlide>[
     subline: 'On orders above ₹399',
     gradient: <Color>[Color(0xFF7C4DFF), Color(0xFF5B2A9D)],
   ),
-  _HeroSlide(
-    eyebrow: 'NEW · DINING',
-    eyebrowIcon: Icons.restaurant_rounded,
-    headline: 'BOOK A TABLE',
-    subline: 'Reserve at top spots near you',
-    gradient: <Color>[Color(0xFF00B894), Color(0xFF007E63)],
-  ),
+  // `BOOK A TABLE` stood here and pointed at a Dining tab that was a
+  // `ComingSoonPage`. The tab is gone; a slide advertising a table booking with
+  // nowhere to book it would have outlived it.
   _HeroSlide(
     eyebrow: 'USE SAVE30',
     eyebrowIcon: Icons.local_offer_rounded,
