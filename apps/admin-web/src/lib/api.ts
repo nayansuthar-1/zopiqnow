@@ -536,6 +536,75 @@ export const api = {
       p_reason: opts?.reason ?? null,
     }),
 
+  // --- The gift catalogue (0118) --------------------------------------------
+  // Read-only since 0022 until this. Every price, name and photo in the Gifts
+  // tab used to be reachable only from a psql prompt.
+
+  /// Every shop, delisted ones included — the world-readable policy is
+  /// `is_active` and the switched-off shop is the one an editor came for.
+  giftShops: () => rpc<GiftShopRow[]>('admin_gift_shops'),
+
+  /// Every product in one shop, sold-out ones included, in shelf order.
+  giftItems: (shopId: string) =>
+    rpc<GiftItemRow[]>('admin_gift_items', { p_shop_id: shopId }),
+
+  /// Create or update, keyed on whether an `id` rides along. Returns the id,
+  /// which for a new shop is a slug the database worked out from the name.
+  upsertGiftShop: (shop: Record<string, unknown>) =>
+    rpc<string>('admin_upsert_gift_shop', { p_shop: shop }),
+
+  /// Refused for a shop with orders against it — `gift_orders.shop_id` is a
+  /// plain reference and the receipts read the shop's name. The RPC says so in
+  /// a sentence; switching it off is what that admin actually wants.
+  deleteGiftShop: (id: string) =>
+    rpc<void>('admin_delete_gift_shop', { p_id: id }),
+
+  /// The gallery is the input and `image_url` is derived from its first entry
+  /// (0023's convention, enforced in 0118). Do not send `image_url`.
+  upsertGiftItem: (shopId: string, item: Record<string, unknown>) =>
+    rpc<string>('admin_upsert_gift_item', { p_shop_id: shopId, p_item: item }),
+
+  /// A real delete, unlike a dish. `gift_order_items` holds no reference back
+  /// and copied every field its line needs, so no receipt is harmed.
+  deleteGiftItem: (id: string) =>
+    rpc<void>('admin_delete_gift_item', { p_id: id }),
+
+  setGiftItemAvailable: (id: string, available: boolean) =>
+    rpc<void>('admin_set_gift_item_available', {
+      p_id: id,
+      p_available: available,
+    }),
+
+  /// The whole running order, not the rows that moved — sending only the movers
+  /// is what lets two items claim one rank.
+  reorderGiftItems: (
+    shopId: string,
+    order: { id: string; category: string; category_rank: number; item_rank: number }[],
+  ) => rpc<void>('admin_reorder_gift_items', { p_shop_id: shopId, p_order: order }),
+
+  /// Renaming onto an existing shelf merges into it, taking that shelf's rank.
+  renameGiftCategory: (shopId: string, from: string, to: string) =>
+    rpc<void>('admin_rename_gift_category', {
+      p_shop_id: shopId,
+      p_from: from,
+      p_to: to,
+    }),
+
+  /// Returns how many products went with it.
+  deleteGiftCategory: (shopId: string, category: string) =>
+    rpc<number>('admin_delete_gift_category', {
+      p_shop_id: shopId,
+      p_category: category,
+    }),
+
+  /// `gift_settings.delivery_fee` — one row, one integer, charged on every gift
+  /// order. 0096 built the knob and left nothing attached to it.
+  giftSettings: () =>
+    rpc<GiftSettingsRow[]>('admin_gift_settings').then((rows) => rows[0]),
+
+  setGiftDeliveryFee: (fee: number) =>
+    rpc<number>('admin_set_gift_delivery_fee', { p_fee: fee }),
+
   orderPhotos: (orderId: string) =>
     rpc<OrderPhotoRow[]>('admin_order_photos', { p_order_id: orderId }),
 
@@ -1309,3 +1378,60 @@ export type GiftOrderLineRow = {
   line_total: number
   tax_amount: number
 }
+
+/// One gift shop, as `admin_gift_shops` returns it (0118) — including the
+/// delisted ones the world-readable policy hides.
+export type GiftShopRow = {
+  id: string
+  name: string
+  tagline: string
+  description: string
+  image_url: string
+  /// Null means unrated, which is not the same as rated zero. Neither this nor
+  /// `rating_count` is writable from the console: nothing computes a gift
+  /// shop's rating yet, and a number an admin types into one is not a rating.
+  rating: number | null
+  rating_count: number
+  is_active: boolean
+  created_at: string
+  item_count: number
+  /// What decides whether a delete will be refused. Shown beside the button so
+  /// nobody has to find out by pressing it.
+  order_count: number
+}
+
+/// One giftable product. `image_url` is present because the table has it, and
+/// is **derived** — it is `image_urls[0]`, written by the RPC. Editing sends the
+/// gallery; sending a thumbnail of its own would let the card show a photo that
+/// appears nowhere in the gallery it opens into.
+export type GiftItemRow = {
+  id: string
+  shop_id: string
+  name: string
+  description: string
+  price: number
+  image_url: string
+  image_urls: string[]
+  category: string
+  category_rank: number
+  item_rank: number
+  is_available: boolean
+  gst_rate_bps: number
+  created_at: string
+}
+
+export type GiftSettingsRow = {
+  delivery_fee: number
+  updated_at: string
+}
+
+/// The five slabs `admin_upsert_gift_item` accepts. The column's own check is
+/// the whole 0–10000 range; this is narrower because those are the rates that
+/// exist, and 15% would pass the constraint and produce an indefensible invoice.
+export const GIFT_GST_SLABS: { value: number; label: string }[] = [
+  { value: 1800, label: '18% — most gifts' },
+  { value: 0, label: '0% — exempt' },
+  { value: 500, label: '5%' },
+  { value: 1200, label: '12% — many handicrafts' },
+  { value: 2800, label: '28% — luxury' },
+]

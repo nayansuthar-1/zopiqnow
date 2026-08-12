@@ -35,6 +35,10 @@ const groups: {
       { to: '/restaurants/new', label: 'Add restaurant', end: false },
       { to: '/riders', label: 'Riders', end: false },
       { to: '/users', label: 'People', end: false },
+      // Under Catalogue and not beside Gift orders, because that is what it is:
+      // the second marketplace's products, edited the way restaurants are.
+      // Read-only from 0022 until 0118.
+      { to: '/gifts', label: 'Gift catalogue', end: false },
     ],
   },
   {

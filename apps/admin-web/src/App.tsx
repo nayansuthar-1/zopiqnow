@@ -11,6 +11,7 @@ import { PayoutsPage } from './payouts/PayoutsPage'
 import { CashPage } from './payouts/CashPage'
 import { RefundsPage } from './payouts/RefundsPage'
 import { GiftOrdersPage } from './gifts/GiftOrdersPage'
+import { GiftCataloguePage } from './gifts/GiftCataloguePage'
 import { SupportPage } from './support/SupportPage'
 import { SettingsPage } from './settings/SettingsPage'
 import { AllOrdersPage } from './orders/AllOrdersPage'
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/refunds" element={<RefundsPage />} />
           <Route path="/support" element={<SupportPage />} />
           <Route path="/gift-orders" element={<GiftOrdersPage />} />
+          <Route path="/gifts" element={<GiftCataloguePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

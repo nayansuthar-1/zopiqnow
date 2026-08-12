@@ -97,6 +97,30 @@ export function croppedUrl(asset: CloudinaryAsset, box: CropBox): string {
   return `${asset.prefix}${transform}/${asset.path}`
 }
 
+/// The two widths a gift photo is delivered at.
+///
+/// A gift is the one catalogue where this is not optional. The seller's
+/// originals are around 8 MB at 5712×4284, the Gifts grid draws fifteen of them
+/// at once, and the floor is an Android 10 phone on mobile data — a raw
+/// `secure_url` there is the difference between a grid and a stall. The seeded
+/// rows already store exactly these two, and `admin_upsert_gift_item` (0118)
+/// checks that the card and the gallery's first entry are renditions of one
+/// asset rather than two different pictures.
+export const GIFT_GALLERY_WIDTH = 1200
+export const GIFT_THUMB_WIDTH = 600
+
+/// A delivery URL for [asset] capped at [width].
+///
+/// `f_auto` here and **not** in [croppedUrl], matching what the gift seed
+/// stored. The difference is the client: these URLs are also rendered by this
+/// console in a browser, which negotiates format properly, and the customer
+/// app's gift screens fetch them through `Image.network` on URLs Cloudinary has
+/// already resolved. `c_limit` only ever shrinks, so a small original is
+/// delivered untouched rather than upscaled.
+export function deliveryUrl(asset: CloudinaryAsset, width: number): string {
+  return `${asset.prefix}f_auto,q_auto,w_${width},c_limit/${asset.path}`
+}
+
 /// The untouched original, for the adjuster to measure and drag against.
 ///
 /// It must be the *original*: opening the adjuster on an already-cropped URL and
