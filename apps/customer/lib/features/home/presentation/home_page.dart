@@ -299,6 +299,9 @@ class _RestaurantListSection extends ConsumerWidget {
     final AsyncValue<List<Restaurant>> feed = ref.watch(
       filteredRestaurantsProvider,
     );
+    // Empty until the photo request lands, which costs one rebuild and never a
+    // loading state — a card without its strip is a finished card.
+    final Map<String, List<String>> photos = ref.watch(cardPhotosProvider);
 
     return feed.when(
       loading: () => const SliverPadding(
@@ -335,6 +338,7 @@ class _RestaurantListSection extends ConsumerWidget {
             itemBuilder: (BuildContext context, int i) => RepaintBoundary(
               child: RestaurantCard(
                 restaurant: restaurants[i],
+                photos: photos[restaurants[i].id] ?? const <String>[],
                 onTap: () => _openMenu(context, restaurants[i]),
               ),
             ),

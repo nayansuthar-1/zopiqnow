@@ -225,6 +225,7 @@ class _CategoryListSection extends ConsumerWidget {
     final AsyncValue<List<Restaurant>> feed = ref.watch(
       categoryRestaurantsProvider(label),
     );
+    final Map<String, List<String>> photos = ref.watch(cardPhotosProvider);
 
     return feed.when(
       loading: () => const SliverPadding(
@@ -285,6 +286,7 @@ class _CategoryListSection extends ConsumerWidget {
                 itemBuilder: (BuildContext context, int i) => RepaintBoundary(
                   child: RestaurantCard(
                     restaurant: restaurants[i],
+                    photos: photos[restaurants[i].id] ?? const <String>[],
                     onTap: () => _openMenu(context, restaurants[i]),
                   ),
                 ),

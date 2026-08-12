@@ -37,11 +37,21 @@ class RestaurantCard extends StatelessWidget {
     required this.restaurant,
     this.onTap,
     this.heroic = true,
+    this.photos = const <String>[],
     super.key,
   });
 
   final Restaurant restaurant;
   final VoidCallback? onTap;
+
+  /// Dish photographs from this restaurant's menu (0119), shown after its cover
+  /// in the card's photo strip.
+  ///
+  /// Optional, and every call site that cannot cheaply supply them leaves it
+  /// empty rather than fetching: with none the card draws exactly what it drew
+  /// before — one photo and no dots. The strip is an enrichment of the card, not
+  /// a part of it that can be missing.
+  final List<String> photos;
 
   /// Whether this card's image is the Hero source for the menu header.
   ///
@@ -75,7 +85,11 @@ class RestaurantCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              _CardImage(restaurant: restaurant, heroic: heroic),
+              _CardImage(
+                restaurant: restaurant,
+                heroic: heroic,
+                photos: photos,
+              ),
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: ZopiqSpacing.lg,
@@ -219,17 +233,143 @@ class RestaurantCard extends StatelessWidget {
   }
 }
 
-class _CardImage extends StatelessWidget {
-  const _CardImage({required this.restaurant, required this.heroic});
+/// The most pages the strip will draw, and the most dots it will draw.
+///
+/// Six pages because that is the ceiling `restaurant_card_photos` clamps to
+/// (0119) plus nothing — the cover is one of the six, not a seventh.
+///
+/// Five dots because a row of dots stops being readable at a glance somewhere
+/// around six, and because the strip is a hint that there is more to see rather
+/// than a page counter. With six photos the dots window: the active one is kept
+/// inside the row and the row slides under it, the way a phone keyboard's page
+/// dots do.
+const int _maxPages = 6;
+const int _maxDots = 5;
+
+/// Where an infinite [PageView] starts.
+///
+/// A looping strip is a `PageView` with no `itemCount` and the real page read
+/// out with `%`. It has to start a long way from zero so that the *first* swipe
+/// can go backwards as well as forwards; starting at 0 gives a strip that loops
+/// one way and hits a wall the other, which is worse than not looping at all.
+///
+/// **The photo index is measured from here, not from zero** — `index % length`
+/// would open the card on whichever photo the origin happened to land on, and
+/// the page count is not known when the controller is built. 100000 % 6 is 4, so
+/// every restaurant with a full strip would have opened on its fifth photograph
+/// and flown the wrong Hero. Subtracting first makes the origin arbitrary again,
+/// which is what it was meant to be; Dart's `%` returns a non-negative result
+/// for a positive divisor, so swiping back past the origin still lands on a real
+/// photo rather than a negative index.
+const int _loopOrigin = 100000;
+
+class _CardImage extends StatefulWidget {
+  const _CardImage({
+    required this.restaurant,
+    required this.heroic,
+    required this.photos,
+  });
 
   final Restaurant restaurant;
   final bool heroic;
+  final List<String> photos;
+
+  @override
+  State<_CardImage> createState() => _CardImageState();
+}
+
+class _CardImageState extends State<_CardImage> {
+  late final PageController _controller = PageController(
+    initialPage: _loopOrigin,
+  );
+
+  /// Which photo is showing, already reduced modulo the page count.
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// The cover first, then the dishes.
+  ///
+  /// The cover leads because it is the one photograph the restaurant chose, and
+  /// because it is the Hero source for the menu screen — a strip that opened on
+  /// a dish would fly the wrong picture. Duplicates are dropped: a vendor whose
+  /// cover *is* one of their dish photos would otherwise get the same image
+  /// twice with a dot for each.
+  List<String> get _pages {
+    final List<String> urls = <String>[];
+    if (widget.restaurant.imageUrl.isNotEmpty) {
+      urls.add(widget.restaurant.imageUrl);
+    }
+    for (final String url in widget.photos) {
+      if (url.isNotEmpty && !urls.contains(url)) urls.add(url);
+      if (urls.length == _maxPages) break;
+    }
+    return urls;
+  }
+
+  /// The first page: the restaurant's own cover, and the Hero source.
+  ///
+  /// **Only page zero is ever wrapped in a [Hero].** A tag may be claimed by one
+  /// mounted widget at a time, and a `PageView` keeps its neighbours alive — so
+  /// tagging every page would register three Heroes under one tag and crash the
+  /// next route transition, which is the same trap the [RestaurantCard.heroic]
+  /// flag exists for between Home and Search.
+  ///
+  /// A consequence worth naming: swipe to a dish and tap, and page zero may no
+  /// longer be mounted, so there is no Hero to fly and the menu opens with an
+  /// ordinary push. That is the right way for this to degrade — the alternative
+  /// is a cover photo flying out of a card that is showing a biryani.
+  Widget _page0(BuildContext context, String url) {
+    final Widget image = url.isEmpty || url == widget.restaurant.imageUrl
+        ? RestaurantImage(restaurant: widget.restaurant)
+        : _photo(url, widget.restaurant.id);
+    return widget.heroic
+        ? Hero(tag: restaurantImageHeroTag(widget.restaurant.id), child: image)
+        : image;
+  }
+
+  /// A dish photograph. The gradient behind it is seeded with the restaurant's
+  /// id rather than the dish's, so a strip that fails to load reads as one
+  /// coherent card instead of five different colours.
+  Widget _photo(String url, String seed) => ZopiqNetworkImage(
+    url: url,
+    fallback: GradientImagePlaceholder(
+      seed: seed,
+      icon: Icons.restaurant_rounded,
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
-    final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
-    final Widget image = RestaurantImage(restaurant: restaurant);
+    final List<String> pages = _pages;
+
+    // Nothing to swipe through: one photo, or none at all. Drawn as a plain
+    // image with no controller attached and — the point of the exercise — no
+    // dots. Five dots under a single photograph is what this card did before
+    // and it was never true.
+    final Widget strip = pages.length < 2
+        ? _page0(context, pages.isEmpty ? '' : pages.first)
+        : PageView.builder(
+            controller: _controller,
+            // No `itemCount`, which is what makes it endless in both
+            // directions. The page index is unbounded; `%` turns it back into a
+            // photograph.
+            itemBuilder: (BuildContext context, int index) {
+              final int at = (index - _loopOrigin) % pages.length;
+              return at == 0
+                  ? _page0(context, pages[0])
+                  : _photo(pages[at], widget.restaurant.id);
+            },
+            onPageChanged: (int index) {
+              final int at = (index - _loopOrigin) % pages.length;
+              if (at != _page) setState(() => _page = at);
+            },
+          );
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(
@@ -240,11 +380,7 @@ class _CardImage extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
-            // Image (with optional Hero animation)
-            if (heroic)
-              Hero(tag: restaurantImageHeroTag(restaurant.id), child: image)
-            else
-              image,
+            strip,
 
             // ─── Favourite heart (top-right) ───
             // Outside the card's InkWell hit area in intent, though not in the
@@ -253,7 +389,7 @@ class _CardImage extends StatelessWidget {
             Positioned(
               right: ZopiqSpacing.md,
               top: ZopiqSpacing.md,
-              child: FavouriteButton(restaurant: restaurant),
+              child: FavouriteButton(restaurant: widget.restaurant),
             ),
 
             // ─── Cuisine · Price overlay (top-left) ───
@@ -273,7 +409,7 @@ class _CardImage extends StatelessWidget {
                   // Cuisine alone since 0101. "₹400 for one" was a number an
                   // admin invented once during onboarding, and it is no longer
                   // asked for — printing it would be printing a zero.
-                  restaurant.cuisines.take(1).join(),
+                  widget.restaurant.cuisines.take(1).join(),
                   style: t.labelSmall?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -310,35 +446,22 @@ class _CardImage extends StatelessWidget {
             ),
 
             // ─── Dot indicator strip (bottom-right) ───
-            Positioned(
-              right: ZopiqSpacing.md,
-              bottom: ZopiqSpacing.md,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: List<Widget>.generate(5, (int i) {
-                  return Container(
-                    width: 6,
-                    height: 6,
-                    margin: EdgeInsets.only(
-                      left: i == 0 ? 0 : ZopiqSpacing.xs,
-                    ),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: i == 0
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.45),
-                    ),
-                  );
-                }),
+            // Only when there is more than one photograph. A single dot says
+            // nothing, and five dots over one photo is what this card used to
+            // claim before there was a strip behind them.
+            if (pages.length > 1)
+              Positioned(
+                right: ZopiqSpacing.md,
+                bottom: ZopiqSpacing.md,
+                child: _Dots(count: pages.length, active: _page),
               ),
-            ),
 
             // ─── "Closed for now" scrim ───
             // Over everything, because "closed" is the first thing to read about
             // this restaurant. The card stays tappable — a closed kitchen's menu
             // is still worth browsing — and the scrim only paints; it absorbs no
             // taps, so the heart beneath it still hearts.
-            if (!restaurant.acceptingOrders)
+            if (!widget.restaurant.acceptingOrders)
               Positioned.fill(
                 child: ColoredBox(
                   color: Colors.black.withValues(alpha: 0.55),
@@ -366,7 +489,7 @@ class _CardImage extends StatelessWidget {
                         // The kitchen's own reason, under the pill rather than
                         // inside it: the pill is the fact and has to stay one
                         // glance wide, the reason is the detail and may not fit.
-                        if (restaurant.pauseReason.isNotEmpty)
+                        if (widget.restaurant.pauseReason.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(
                               ZopiqSpacing.lg,
@@ -375,7 +498,7 @@ class _CardImage extends StatelessWidget {
                               0,
                             ),
                             child: Text(
-                              restaurant.pauseReason,
+                              widget.restaurant.pauseReason,
                               textAlign: TextAlign.center,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -392,6 +515,64 @@ class _CardImage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The photo strip's position indicator: at most [_maxDots] dots, whatever the
+/// page count.
+///
+/// With five photos or fewer this is one dot per photo and nothing clever
+/// happens. With six — the ceiling — the row becomes a window onto the dots: the
+/// active one is kept away from the ends where possible and the row slides under
+/// it, so the strip stays five dots wide and still says where you are. The dots
+/// entering and leaving the window are drawn smaller, which is what stops the
+/// slide reading as the dots changing meaning.
+class _Dots extends StatelessWidget {
+  const _Dots({required this.count, required this.active});
+
+  final int count;
+  final int active;
+
+  @override
+  Widget build(BuildContext context) {
+    final int shown = count < _maxDots ? count : _maxDots;
+
+    // Where the window starts. Clamped so it never runs off either end — with
+    // `count <= _maxDots` this is always 0 and every dot is its own photo.
+    final int start = count <= _maxDots
+        ? 0
+        : (active - _maxDots ~/ 2).clamp(0, count - _maxDots);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List<Widget>.generate(shown, (int i) {
+        final int at = start + i;
+        final bool isActive = at == active;
+        // An edge dot only shrinks when there is actually something past it.
+        final bool isEdge =
+            (i == 0 && start > 0) ||
+            (i == shown - 1 && start + shown < count);
+        final double size = isActive
+            ? 6
+            : isEdge
+            ? 4
+            : 5;
+
+        return AnimatedContainer(
+          duration: ZopiqDurations.fast,
+          curve: ZopiqCurves.emphasized,
+          width: size,
+          height: size,
+          margin: EdgeInsets.only(left: i == 0 ? 0 : ZopiqSpacing.xs),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isActive
+                ? Colors.white
+                : Colors.white.withValues(alpha: 0.45),
+          ),
+        );
+      }),
     );
   }
 }

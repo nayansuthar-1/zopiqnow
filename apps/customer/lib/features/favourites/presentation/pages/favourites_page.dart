@@ -7,6 +7,7 @@ import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/favourites/domain/repositories/favourites_repository.dart';
 import 'package:zopiqnow/features/favourites/presentation/providers/favourites_providers.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
+import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart';
 
 /// The restaurants the customer saved.
@@ -20,6 +21,7 @@ class FavouritesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<Restaurant>> favourites = ref.watch(favouritesProvider);
+    final Map<String, List<String>> photos = ref.watch(cardPhotosProvider);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -62,6 +64,7 @@ class FavouritesPage extends ConsumerWidget {
                 // ends up meaning two different things on two screens.
                 child: RestaurantCard(
                   restaurant: saved[i],
+                  photos: photos[saved[i].id] ?? const <String>[],
                   // Home is still mounted underneath (the shell's IndexedStack
                   // keeps it alive), so a restaurant showing in both would
                   // register two Heroes under one tag and crash the next route

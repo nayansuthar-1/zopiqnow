@@ -5,6 +5,7 @@ import 'package:zopiqnow/features/account/presentation/providers/veg_mode_provid
 import 'package:zopiqnow/features/home/data/datasources/hero_slide_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/home_catalog_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_datasource.dart';
+import 'package:zopiqnow/features/home/data/datasources/restaurant_photos_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_supabase_datasource.dart';
 import 'package:zopiqnow/features/home/data/repositories/restaurant_repository_impl.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
@@ -59,6 +60,42 @@ final FutureProvider<List<Restaurant>> nearbyRestaurantsProvider =
       });
       return measured;
     });
+
+final Provider<RestaurantPhotosDataSource> restaurantPhotosDataSourceProvider =
+    Provider<RestaurantPhotosDataSource>(
+      (Ref ref) => const RestaurantPhotosDataSource(),
+    );
+
+/// Dish photographs for the card strip, keyed by restaurant id (0119).
+///
+/// **A plain [Provider] over a map, not an [AsyncValue].** The card is complete
+/// without these — it has the restaurant's own cover and a branded gradient
+/// behind that — so there is no loading state worth showing and, more
+/// importantly, no error state worth showing. A failed photo request must not be
+/// able to put an error screen in front of a feed that loaded perfectly well, so
+/// the async value is flattened here and anything that is not data reads as "no
+/// extra photos yet".
+///
+/// Deliberately **not** keyed to the feed. Watching [nearbyRestaurantsProvider]
+/// would make a card's photos wait on a distance sort they have nothing to do
+/// with, and the request is bounded by the platform rather than by what is on
+/// screen — so it runs on its own and the cards pick up their strips whenever it
+/// lands, one rebuild later.
+final FutureProvider<Map<String, List<String>>> restaurantCardPhotosProvider =
+    FutureProvider<Map<String, List<String>>>(
+      (Ref ref) => ref.watch(restaurantPhotosDataSourceProvider).fetch(),
+    );
+
+/// The map above, flattened. This is what widgets watch.
+final Provider<Map<String, List<String>>> cardPhotosProvider =
+    Provider<Map<String, List<String>>>(
+      (Ref ref) => ref
+          .watch(restaurantCardPhotosProvider)
+          .maybeWhen(
+            data: (Map<String, List<String>> photos) => photos,
+            orElse: () => const <String, List<String>>{},
+          ),
+    );
 
 /// A single restaurant, for the menu screen. A family so a cold deep link to
 /// `/restaurant/:id` resolves without the Home feed ever having loaded — which

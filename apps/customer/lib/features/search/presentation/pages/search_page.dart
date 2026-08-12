@@ -5,6 +5,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 import 'package:zopiqnow/features/home/domain/entities/dish_suggestion.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/domain/repositories/restaurant_repository.dart';
+import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/section_header.dart';
 import 'package:zopiqnow/features/search/presentation/providers/search_providers.dart';
@@ -167,7 +168,9 @@ class _SearchField extends StatelessWidget {
 /// "paneer tikka" wants the dish, and the kitchens that happen to have the word
 /// in their name are the wider guess. Either section is dropped entirely when it
 /// has nothing — an empty heading is a promise the screen did not keep.
-class _Results extends StatelessWidget {
+/// A [ConsumerWidget] only so the restaurant cards can reach the photo strips
+/// (0119). Everything it needs to *find* is still passed in.
+class _Results extends ConsumerWidget {
   const _Results({
     required this.restaurants,
     required this.dishes,
@@ -181,7 +184,8 @@ class _Results extends StatelessWidget {
   final ValueChanged<DishSuggestion> onTapDish;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final Map<String, List<String>> photos = ref.watch(cardPhotosProvider);
     return CustomScrollView(
       slivers: <Widget>[
         if (dishes.isNotEmpty) ...<Widget>[
@@ -217,6 +221,7 @@ class _Results extends StatelessWidget {
               itemBuilder: (BuildContext context, int i) => RepaintBoundary(
                 child: RestaurantCard(
                   restaurant: restaurants[i],
+                  photos: photos[restaurants[i].id] ?? const <String>[],
                   onTap: () => onTapRestaurant(restaurants[i]),
                   // Home's card owns the Hero tag for this restaurant; both
                   // screens are mounted at once inside the shell. See
