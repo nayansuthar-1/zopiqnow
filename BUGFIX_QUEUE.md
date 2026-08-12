@@ -35,6 +35,49 @@ on the day Razorpay goes live, which is exactly why they sit above the rest.
 
 ## Open
 
+### P11 — Rider pay has no ceiling, and the live payout queue already shows it
+
+**Found 2026-08-12 while verifying 0121. This is the most exposed thing on the
+list.**
+
+`rider_pay_quote` is `base_fee + round(km × per_km_fee)` — ₹25 plus ₹5/km, with
+**no upper bound and no sanity check on `km`**. `claim_delivery` then freezes that
+number onto the delivery, and the weekly payout batch pays what is frozen. So a
+single bad coordinate is an unbounded payout, and nothing between the map and the
+bank account disagrees with it.
+
+It is not hypothetical. Across the 55 orders on the platform:
+
+| | |
+|---|---|
+| Worst quoted ride | **4,387.5 km → ₹21,962** |
+| Average ride | **509.6 km** (in a three-town operation) |
+| Orders over 50 km | 14 |
+| `deliveries` rows with that pay already frozen | yes — worst is ₹21,962 |
+| `rider_payouts` | **5 pending, ₹23,599 total** |
+
+The cause is coordinates, not arithmetic. Three orders carry a delivery point of
+`41.033841, 28.9816861` — that is **Istanbul**, against a kitchen at
+`24.6061, 72.3283` in Rajasthan. Emulator-default location, saved as a real
+address, priced as a real ride.
+
+Two halves, and only one is already closed:
+
+- **New orders can no longer do this.** `orders_within_service_area` (0098, 0117)
+  refuses a delivery point outside Falna, Ranakpur and Sadri. These orders
+  pre-date it.
+- **Nothing bounds the pay itself, and the queue is still holding the money.**
+  The ₹23,599 is test data and no real rider is owed it, but it is `pending` in a
+  live table that a Monday batch drains. Both need dealing with: a ceiling on the
+  quote (or a refusal above a plausible ride), and the existing queue cleared.
+
+Related: [0097](supabase/migrations/0097_one_number_for_one_job.sql) already
+noted `route_km` 174.39 vs `distance_km` 129.40 on ZPQ-1140 and made the *offer*
+binding, which fixed the disagreement between two distances without ever asking
+whether either was plausible.
+
+---
+
 ### P1a — `place_order` cannot be called twice in one transaction
 
 Found while building P1's verification. `place_order` opens with
@@ -97,37 +140,6 @@ receives `configured` from the server; the copy should read it.
 
 ---
 
-### P6 — Latent deadlock between overlapping dispatcher runs
-
-`dispatch_deliveries` runs every 20 seconds with no advisory lock, loops over up to
-50 orders, and `offer_delivery` takes a row lock on each of them
-(`update orders set dispatch_started_at = coalesce(...)`) that is held until the
-transaction commits.
-
-The loop order is `(status = 'ready_for_pickup') desc, created_at` — and **that
-order changes between ticks**, because an order moving `preparing → ready_for_pickup`
-jumps to the front. Run 1 locks A then wants B; run 2, seeing B promoted, locks B
-then wants A. A cycle, and Postgres will break it by killing one of them.
-
-Not firing today: `deadlocks = 0`, and a run averages 0.01 s against 55 lifetime
-orders. It is a load-triggered bomb, not an incident.
-
-One `pg_try_advisory_lock` at the top of the sweeper fixes this *and* the
-unrelated pile-up when a run ever exceeds its 20-second period.
-
----
-
-### P7 — Vendor taps stall behind the dispatcher
-
-Same root cause as P6, milder and more visible: the sweeper holds row locks on up
-to 50 orders for its whole transaction, and `set_order_status` opens with
-`select … for update` on one order. A cook tapping **Ready** blocks until the sweep
-commits. Invisible at 55 orders; a complaint at 5,000.
-
-Closed by P6's advisory lock plus keeping the sweeper's transaction short.
-
----
-
 ### P8 — `claim_delivery` ignores the exclusive offer
 
 `available_deliveries` correctly hides an order that has a live offer to somebody
@@ -187,6 +199,53 @@ those are split, or a run errors between the two.
 ---
 
 ## Closed
+
+### ~~P6 + P7 — Dispatcher deadlock, and vendor taps stalling behind it~~ · migration 0121, 2026-08-12
+
+**Was (P6):** `dispatch_deliveries` ran every 20 s with no mutual exclusion,
+looped up to 50 orders, and `offer_delivery` took a row lock on each
+(`update orders set dispatch_started_at = coalesce(…)`) held to commit. The loop
+order — `(status = 'ready_for_pickup') desc, created_at` — **changes between
+ticks**, because an order moving `preparing → ready_for_pickup` jumps to the
+front. Two overlapping runs could lock A→B and B→A.
+
+**Was (P7):** the same row locks meant a cook tapping **Ready** (which opens
+`select … for update`) queued behind the sweeper.
+
+**Fix:** two changes, and the second is the one that does most of the work.
+
+1. `pg_try_advisory_xact_lock(4242, 1)` at the top of the sweeper. `try` so a
+   tick that finds the board busy leaves rather than joining a queue that grows
+   faster than it drains; `xact` so a run that *raises* cannot strand the lock
+   and wedge dispatch. The migration also opens an advisory-key registry, since
+   there was no convention and a bare one-arg key shares a space with every
+   extension on the box.
+2. `offer_delivery` reads `dispatch_started_at` before writing it. It was
+   rewriting the column to its own value on every tick for ever; now only the
+   first pass over an order writes, so an order is locked by dispatch **once in
+   its life** rather than every 20 seconds. `coalesce` stays inside the `update`
+   — `decline_offer` re-offers inline without the sweeper's lock, so two callers
+   can still both read null, and the one that arrives second re-evaluates under
+   the row lock it waited for.
+
+**Verified, all three against the live database:**
+- *The lock excludes.* Session A took it (`t`), session B was refused (`f`) while
+  A held it, and C took it after A **rolled back** — the rollback half is what
+  proves a raising run cannot strand it.
+- *The sweeper does not block.* `dispatch_deliveries()` returned in 2.5 s while
+  the lock was held versus 1.75 s free, both dominated by pooler round-trip —
+  against ~8 s if it had waited.
+- *The second pass writes nothing.* In a rolled-back transaction, the order row's
+  `ctid` moved on the first `offer_delivery` and was **identical** after the
+  second. `pg_locks` is the wrong instrument here — row locks live in the tuple,
+  not the lock table — so `ctid` is the honest measurement.
+- *The function is still intact.* The rewrite touched one block of a 300-line
+  function, so it was re-run end to end: it picked a rider, wrote the offer, and
+  froze the quote onto it.
+
+**That last check is what turned up [P11](#p11--rider-pay-has-no-ceiling-and-the-live-payout-queue-already-shows-it)** — the offer it produced was ₹21,962.
+
+---
 
 ### ~~Dining and Grocery were dead tabs~~ · 2026-08-12
 
