@@ -264,6 +264,24 @@ export const api = {
   setRiderActive: (email: string, active: boolean) =>
     rpc<void>('admin_set_rider_active', { p_email: email, p_active: active }),
 
+  /// Decides whether this rider is ever paid by Zopiq (migration 0122). Only a
+  /// `freelance` rider produces a weekly payout row; the other two accrue
+  /// `rider_pay` on the delivery for costing and are never transferred to.
+  ///
+  /// `restaurant` is required for `restaurant_owned` and must be null for the
+  /// other two — the database says so in a check constraint and this call raises
+  /// the sentence rather than the constraint name.
+  setRiderEngagement: (
+    email: string,
+    engagement: RiderEngagement,
+    restaurant: string | null,
+  ) =>
+    rpc<void>('admin_set_rider_engagement', {
+      p_email: email,
+      p_engagement: engagement,
+      p_employer: restaurant,
+    }),
+
   listAdmins: () => rpc<AdminRow[]>('admin_list_admins'),
 
   addAdmin: (email: string, name: string) =>
@@ -1290,7 +1308,25 @@ export type RiderRow = {
   /// rider is working because an admin vouched for them, not because anybody
   /// read their documents (0083). Never render it as "verified".
   kyc_overridden: boolean
+  /// On what terms the rider is engaged, and therefore whether Zopiq owes them
+  /// money at all (migration 0122).
+  engagement: RiderEngagement
+  /// The kitchen that employs a `restaurant_owned` rider. Null for the other
+  /// two engagements — the database constrains the pair together.
+  employer_restaurant_id: string | null
+  employer_name: string | null
 }
+
+/// How a rider is engaged, which is the only thing deciding whether the weekly
+/// batch ever creates a payout for them (migration 0122).
+///
+/// - `freelance` — works like a Zomato/Swiggy partner, paid per delivery by
+///   Zopiq. The only one that produces a `rider_payouts` row.
+/// - `salaried` — paid a wage off-platform. The delivery still records
+///   `rider_pay` so the route's cost stays visible, but nothing is transferred.
+/// - `restaurant_owned` — the kitchen's own rider, employed and paid by the
+///   kitchen. Zopiq owes them nothing and the delivery fee stays with Zopiq.
+export type RiderEngagement = 'freelance' | 'salaried' | 'restaurant_owned'
 
 export type KycStatus = 'pending' | 'verified' | 'rejected'
 

@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
-import type { RiderKyc, RiderRow, Vehicle } from '../lib/api'
+import type {
+  RestaurantRow,
+  RiderEngagement,
+  RiderKyc,
+  RiderRow,
+  Vehicle,
+} from '../lib/api'
 import {
   signedRiderDocumentUrl,
   uploadRiderDocument,
@@ -20,15 +26,48 @@ import {
 
 /// The delivery fleet.
 ///
-/// Riders belong to Zopiqnow, not to a restaurant — there is no restaurant
-/// picker on this screen and there is not meant to be. A rider carries orders
-/// from any kitchen, which is why this page sits beside Restaurants rather than
-/// inside one.
+/// A rider carries orders from any kitchen, which is why this page sits beside
+/// Restaurants rather than inside one.
+///
+/// That used to be the whole truth, and migration 0122 made it three-quarters
+/// of it: a `restaurant_owned` rider *is* employed by one kitchen, and the
+/// engagement dialog names it. The picker is deliberately confined to that
+/// dialog — naming an employer says who pays the rider's wages, not which
+/// kitchen may dispatch them, and dispatch is still fleet-wide for everyone.
 ///
 /// Until now the only way onto the fleet was a seed file. That was honest for the
 /// first rider and untenable by the tenth.
 
 const vehicles: Vehicle[] = ['bike', 'scooter', 'bicycle']
+
+/// The three engagements, with the sentence each one means for money. Kept
+/// beside the list rather than inside the dialog because the row renders the
+/// label too, and two spellings of "restaurant's own" would be one edit apart
+/// from disagreeing.
+const engagements: {
+  value: RiderEngagement
+  label: string
+  blurb: string
+}[] = [
+  {
+    value: 'freelance',
+    label: 'Freelance',
+    blurb:
+      'Works like a Zomato or Swiggy partner. Zopiq pays them per delivery, and they are the only kind that appears in the weekly payout queue.',
+  },
+  {
+    value: 'salaried',
+    label: 'Salaried',
+    blurb:
+      'Paid a wage off the platform. Deliveries still record what the route was worth, so you can see what it cost, but Zopiq never transfers them anything.',
+  },
+  {
+    value: 'restaurant_owned',
+    label: "Restaurant's own",
+    blurb:
+      'The kitchen employs and pays them. Zopiq owes them nothing, and the delivery fee the customer paid stays with Zopiq.',
+  },
+]
 
 /// Adding and editing are the same four fields, so they are the same form. The
 /// only difference is that an existing rider's email is fixed: it is the primary
@@ -134,6 +173,7 @@ export function RidersPage() {
   const [deactivating, setDeactivating] = useState<RiderRow | null>(null)
   const [banking, setBanking] = useState<RiderRow | null>(null)
   const [verifying, setVerifying] = useState<RiderRow | null>(null)
+  const [engaging, setEngaging] = useState<RiderRow | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -283,6 +323,22 @@ export function RidersPage() {
                           <Pill tone="warn">documents pending</Pill>
                         )}
                       </span>
+                      {/* Only the exceptions get a pill. Freelance is the
+                          default and the overwhelming majority, so badging it
+                          would put a label on every row and draw the eye away
+                          from the two that actually change what is owed. The
+                          engagement is spelled out in the line below either
+                          way, so nothing is hidden — this only decides what is
+                          worth interrupting for. */}
+                      {r.engagement !== 'freelance' && (
+                        <span className="ml-2 inline-block align-middle">
+                          <Pill tone="neutral">
+                            {r.engagement === 'salaried'
+                              ? 'salaried · not paid by us'
+                              : `${r.employer_name ?? 'restaurant'}'s own · not paid by us`}
+                          </Pill>
+                        </span>
+                      )}
                     </p>
                     <p className="truncate text-sm text-ink-muted">
                       {r.email} · {r.phone} · {r.vehicle} · {r.delivered_count}{' '}
@@ -324,6 +380,15 @@ export function RidersPage() {
                     Bank
                   </button>
 
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setEngaging(r)}
+                    className="text-sm font-medium text-ink-muted hover:text-ink disabled:opacity-40"
+                  >
+                    Engagement
+                  </button>
+
                   {r.is_active ? (
                     <button
                       type="button"
@@ -363,6 +428,16 @@ export function RidersPage() {
 
       {banking && (
         <BankDialog rider={banking} onClose={() => setBanking(null)} />
+      )}
+
+      {engaging && (
+        <EngagementDialog
+          rider={engaging}
+          onClose={(changed) => {
+            setEngaging(null)
+            if (changed) void load()
+          }}
+        />
       )}
 
       {verifying && (
@@ -1066,6 +1141,162 @@ function BankDialog({ rider, onClose }: { rider: RiderRow; onClose: () => void }
           </div>
         </form>
       )}
+    </Modal>
+  )
+}
+
+/// On what terms a rider is engaged — which is the only thing deciding whether
+/// the weekly batch ever creates a payout for them (migration 0122).
+///
+/// The consequence is spelled out under every option rather than in a help link,
+/// because this is the one screen on the fleet page that decides whether somebody
+/// gets paid, and "salaried" does not tell you on its own that Zopiq will now
+/// transfer them nothing.
+///
+/// The restaurant list is fetched only when it is needed — a picker that is
+/// hidden for two of the three options should not cost a round trip for them.
+function EngagementDialog({
+  rider,
+  onClose,
+}: {
+  rider: RiderRow
+  onClose: (changed: boolean) => void
+}) {
+  const [engagement, setEngagement] = useState<RiderEngagement>(rider.engagement)
+  const [employer, setEmployer] = useState<string>(
+    rider.employer_restaurant_id ?? '',
+  )
+  const [restaurants, setRestaurants] = useState<RestaurantRow[] | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const needsEmployer = engagement === 'restaurant_owned'
+
+  useEffect(() => {
+    if (!needsEmployer || restaurants !== null) return
+    let alive = true
+    void api
+      .listRestaurants()
+      .then((rows) => {
+        if (alive) setRestaurants(rows)
+      })
+      .catch((e: unknown) => {
+        if (alive) setError(e instanceof Error ? e.message : String(e))
+      })
+    return () => {
+      alive = false
+    }
+  }, [needsEmployer, restaurants])
+
+  return (
+    <Modal
+      busy={busy}
+      onClose={() => onClose(false)}
+      title={`Engagement · ${rider.name}`}
+    >
+      <p className="text-sm text-ink-muted">
+        How this rider is engaged, and therefore whether Zopiq owes them money at
+        all. Deliveries always record what the route was worth — this decides
+        whether that amount is ever transferred.
+      </p>
+
+      {error && (
+        <Banner tone="error" className="mt-4" onDismiss={() => setError(null)}>
+          {error}
+        </Banner>
+      )}
+
+      <form
+        className="mt-5 grid gap-4"
+        onSubmit={(e) => {
+          e.preventDefault()
+          setBusy(true)
+          setError(null)
+          void api
+            .setRiderEngagement(
+              rider.email,
+              engagement,
+              // The database constrains the pair together, so an employer left
+              // over from a previous choice must not be sent with an engagement
+              // that forbids one.
+              needsEmployer ? employer : null,
+            )
+            .then(() => onClose(true))
+            .catch((err: unknown) =>
+              setError(err instanceof Error ? err.message : String(err)),
+            )
+            .finally(() => setBusy(false))
+        }}
+      >
+        <fieldset className="grid gap-2">
+          <legend className="sr-only">Engagement</legend>
+          {engagements.map((o) => (
+            <label
+              key={o.value}
+              className={`flex cursor-pointer gap-3 rounded-xl border p-3 ${
+                engagement === o.value
+                  ? 'border-brand bg-brand-soft/40'
+                  : 'border-hairline hover:bg-canvas'
+              }`}
+            >
+              <input
+                type="radio"
+                name="engagement"
+                className="mt-1"
+                value={o.value}
+                checked={engagement === o.value}
+                onChange={() => setEngagement(o.value)}
+              />
+              <span>
+                <span className="block text-sm font-semibold text-ink">
+                  {o.label}
+                </span>
+                <span className="mt-0.5 block text-sm text-ink-muted">
+                  {o.blurb}
+                </span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+
+        {needsEmployer &&
+          (restaurants === null ? (
+            <Skeleton className="h-11 w-full" />
+          ) : (
+            <label className="grid gap-1.5">
+              <span className="text-sm font-medium text-ink">
+                Which restaurant employs them?
+              </span>
+              <select
+                value={employer}
+                onChange={(e) => setEmployer(e.target.value)}
+                required
+                className="h-11 rounded-xl border border-hairline bg-surface px-3 text-sm text-ink"
+              >
+                <option value="">Choose a restaurant…</option>
+                {restaurants.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => onClose(false)}
+            disabled={busy}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" loading={busy} disabled={needsEmployer && !employer}>
+            Save
+          </Button>
+        </div>
+      </form>
     </Modal>
   )
 }
