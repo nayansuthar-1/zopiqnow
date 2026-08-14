@@ -3,16 +3,20 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 
-/// The itemised bill summary widget shared by the cart and checkout screens:
-/// Presents item total, delivery fee savings, taxes, coupons, free delivery progress,
-/// total to pay, and savings highlight strip.
+/// The itemised bill summary shared by the cart and checkout screens: item
+/// total, delivery fee, taxes, coupon, total to pay, and the savings strip.
+///
+/// The free-delivery progress bar that used to live here is gone with migration
+/// 0123 — there is no threshold to make progress towards.
 class BillSummary extends StatelessWidget {
   const BillSummary({required this.bill, super.key});
 
   final CartBill bill;
 
-  int get _saved =>
-      bill.discount + (bill.hasFreeDelivery ? CartBill.flatDeliveryFee : 0);
+  /// Coupon only. A waived delivery fee used to count towards this and no
+  /// longer can — migration 0123 withdrew the threshold, so there is no waived
+  /// fee to add and "you saved ₹40" would be a claim about nothing.
+  int get _saved => bill.discount;
 
   @override
   Widget build(BuildContext context) {
@@ -69,14 +73,10 @@ class BillSummary extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _BillRow(label: 'Item total', value: '₹${bill.subtotal}'),
-          _BillRow(
-            label: 'Delivery fee',
-            value: bill.hasFreeDelivery ? 'FREE' : '₹${bill.deliveryFee}',
-            valueColor: bill.hasFreeDelivery ? zc.veg : null,
-            strikethrough: bill.hasFreeDelivery
-                ? '₹${CartBill.flatDeliveryFee}'
-                : null,
-          ),
+          // No FREE branch and no strikethrough. The fee is charged on every
+          // order now, so a struck-through ₹40 beside the word FREE would be
+          // advertising a discount that does not exist.
+          _BillRow(label: 'Delivery fee', value: '₹${bill.deliveryFee}'),
           _BillRow(label: 'Taxes', value: '₹${bill.taxes}'),
           if (bill.discount > 0)
             _BillRow(
@@ -84,10 +84,6 @@ class BillSummary extends StatelessWidget {
               value: '-₹${bill.discount}',
               valueColor: zc.veg,
             ),
-          if (!bill.hasFreeDelivery) ...<Widget>[
-            const SizedBox(height: 10),
-            _FreeDeliveryProgress(bill: bill),
-          ],
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 14),
             child: Divider(
@@ -147,70 +143,6 @@ class BillSummary extends StatelessWidget {
   }
 }
 
-/// "Add ₹124 more for free delivery", with an animated progress bar.
-class _FreeDeliveryProgress extends StatelessWidget {
-  const _FreeDeliveryProgress({required this.bill});
-
-  final CartBill bill;
-
-  @override
-  Widget build(BuildContext context) {
-    final ZopiqColors zc = context.zc;
-    final TextTheme t = Theme.of(context).textTheme;
-
-    final double progress = (bill.subtotal / CartBill.freeDeliveryThreshold)
-        .clamp(0.0, 1.0);
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: zc.primary.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: zc.primary.withValues(alpha: 0.15),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Icon(Icons.delivery_dining_rounded, size: 20, color: zc.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Add ₹${bill.amountToFreeDelivery} more for free delivery',
-                  style: t.bodySmall?.copyWith(
-                    color: zc.primary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: progress, end: progress),
-              duration: ZopiqDurations.slow,
-              curve: ZopiqCurves.emphasized,
-              builder: (BuildContext context, double value, _) =>
-                  LinearProgressIndicator(
-                    value: value,
-                    minHeight: 6,
-                    backgroundColor: zc.primary.withValues(alpha: 0.12),
-                    valueColor: AlwaysStoppedAnimation<Color>(zc.primary),
-                  ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Green savings highlight strip at the base of the bill.
 class _SavingsStrip extends StatelessWidget {
   const _SavingsStrip({required this.saved});
@@ -259,17 +191,14 @@ class _BillRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.valueColor,
-    this.strikethrough,
   });
 
   final String label;
   final String value;
   final Color? valueColor;
-  final String? strikethrough;
 
   @override
   Widget build(BuildContext context) {
-    final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -287,17 +216,6 @@ class _BillRow extends StatelessWidget {
           ),
           Row(
             children: <Widget>[
-              if (strikethrough != null) ...<Widget>[
-                Text(
-                  strikethrough!,
-                  style: t.bodySmall?.copyWith(
-                    color: zc.textMuted,
-                    decoration: TextDecoration.lineThrough,
-                    fontSize: 11.5,
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
               Text(
                 value,
                 style: t.bodyMedium?.copyWith(

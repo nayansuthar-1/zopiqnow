@@ -15,6 +15,13 @@ abstract interface class CustomerNotificationsDataSource {
 
   /// Mark the whole unread pile seen at once.
   Future<void> markAllRead();
+
+  /// Removes the caller's own notifications, returning how many went.
+  ///
+  /// Ids belonging to anybody else are skipped rather than raising (migration
+  /// 0124), so a selection holding a row that has already gone still succeeds
+  /// for the rest of it.
+  Future<int> deleteMany(List<int> ids);
 }
 
 class CustomerNotificationsSupabaseDataSource
@@ -58,5 +65,17 @@ class CustomerNotificationsSupabaseDataSource
   @override
   Future<void> markAllRead() async {
     await _db.rpc<void>('mark_all_notifications_read');
+  }
+
+  @override
+  Future<int> deleteMany(List<int> ids) async {
+    if (ids.isEmpty) return 0;
+    // One call for the whole selection, so it cannot half-delete: the RPC does
+    // it in a single statement inside one transaction.
+    final Object? deleted = await _db.rpc<Object?>(
+      'delete_my_notifications',
+      params: <String, dynamic>{'p_ids': ids},
+    );
+    return deleted is int ? deleted : 0;
   }
 }

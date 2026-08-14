@@ -145,6 +145,43 @@ class _SortChip extends StatelessWidget {
   }
 }
 
+/// What each sort order *means*, and the glyph that stands for it.
+///
+/// The labels alone were doing all the work — five lines of near-identical text
+/// beside five identical radio buttons, where the only way to tell "Delivery
+/// time" from "Rating: high to low" was to read both carefully. An icon and a
+/// line of plain English make the row scannable, and they cost nothing at the
+/// call site because they hang off the enum rather than off the sheet.
+({IconData icon, String blurb}) _sortMeta(HomeSort sort) {
+  switch (sort) {
+    case HomeSort.relevance:
+      return (
+        icon: Icons.auto_awesome_rounded,
+        blurb: 'What we think you will like',
+      );
+    case HomeSort.rating:
+      return (
+        icon: Icons.star_rounded,
+        blurb: 'Best rated kitchens first',
+      );
+    case HomeSort.deliveryTime:
+      return (
+        icon: Icons.timer_outlined,
+        blurb: 'Quickest to reach you',
+      );
+    case HomeSort.costLowToHigh:
+      return (
+        icon: Icons.trending_down_rounded,
+        blurb: 'Cheapest first',
+      );
+    case HomeSort.costHighToLow:
+      return (
+        icon: Icons.trending_up_rounded,
+        blurb: 'Most expensive first',
+      );
+  }
+}
+
 class _SortSheet extends StatelessWidget {
   const _SortSheet({required this.current});
 
@@ -153,8 +190,10 @@ class _SortSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
 
     return SafeArea(
+      top: false,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,39 +201,143 @@ class _SortSheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(
               ZopiqSpacing.lg,
-              ZopiqSpacing.lg,
-              ZopiqSpacing.lg,
               ZopiqSpacing.sm,
+              ZopiqSpacing.lg,
+              ZopiqSpacing.md,
             ),
-            child: Text(
-              'Sort by',
-              style: Theme.of(context).textTheme.titleLarge,
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  Icons.tune_rounded,
+                  size: 20,
+                  color: zc.textStrong,
+                ),
+                const SizedBox(width: ZopiqSpacing.sm),
+                Text(
+                  'Sort by',
+                  style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const Spacer(),
+                // Only offered once it does something. "Reset" beside an
+                // untouched list is a control that cannot be used.
+                if (current != HomeSort.relevance)
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.pop(context, HomeSort.relevance),
+                    child: const Text('Reset'),
+                  ),
+              ],
             ),
           ),
           Flexible(
             child: SingleChildScrollView(
-              child: RadioGroup<HomeSort>(
-                groupValue: current,
-                onChanged: (HomeSort? value) => Navigator.pop(context, value),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    for (final HomeSort option in HomeSort.values)
-                      RadioListTile<HomeSort>(
-                        value: option,
-                        activeColor: zc.primary,
-                        title: Text(
-                          option.label,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                      ),
-                  ],
-                ),
+              padding: const EdgeInsets.fromLTRB(
+                ZopiqSpacing.md,
+                0,
+                ZopiqSpacing.md,
+                ZopiqSpacing.md,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  for (final HomeSort option in HomeSort.values)
+                    _SortOptionTile(
+                      option: option,
+                      selected: option == current,
+                      onTap: () => Navigator.pop(context, option),
+                    ),
+                ],
               ),
             ),
           ),
-          const SizedBox(height: ZopiqSpacing.sm),
         ],
+      ),
+    );
+  }
+}
+
+/// One sort order as a card: glyph, label, what it does, and a tick.
+class _SortOptionTile extends StatelessWidget {
+  const _SortOptionTile({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final HomeSort option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+    final ({IconData icon, String blurb}) meta = _sortMeta(option);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: ZopiqSpacing.sm),
+      child: Material(
+        color: selected
+            ? zc.primary.withValues(alpha: 0.07)
+            : Colors.transparent,
+        borderRadius: ZopiqRadii.rMd,
+        child: InkWell(
+          borderRadius: ZopiqRadii.rMd,
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: ZopiqSpacing.md,
+              vertical: ZopiqSpacing.md,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: ZopiqRadii.rMd,
+              border: Border.all(
+                color: selected ? zc.primary : zc.divider,
+                width: selected ? 1.4 : 1,
+              ),
+            ),
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  meta.icon,
+                  size: 20,
+                  color: selected ? zc.primary : zc.textMuted,
+                ),
+                const SizedBox(width: ZopiqSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        option.label,
+                        style: t.bodyLarge?.copyWith(
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: selected ? zc.primary : zc.textStrong,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        meta.blurb,
+                        style: t.bodySmall?.copyWith(color: zc.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                // The tick occupies its slot either way, so the rows do not
+                // shift sideways as the selection moves down the list.
+                Icon(
+                  selected
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  size: 20,
+                  color: selected ? zc.primary : zc.divider,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

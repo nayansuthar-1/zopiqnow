@@ -418,32 +418,14 @@ class _CardImageState extends State<_CardImage> {
               ),
             ),
 
-            // ─── "FREE delivery" badge (bottom-left) ───
-            Positioned(
-              left: 0,
-              bottom: ZopiqSpacing.sm,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: ZopiqSpacing.md,
-                  vertical: ZopiqSpacing.xs,
-                ),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF2E7D32),
-                  borderRadius: BorderRadius.only(
-                    topRight: Radius.circular(ZopiqRadii.xs),
-                    bottomRight: Radius.circular(ZopiqRadii.xs),
-                  ),
-                ),
-                child: Text(
-                  'FREE delivery',
-                  style: t.labelSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
-            ),
+            // The "FREE delivery" badge that used to sit here is gone with
+            // migration 0123, which withdrew the ₹500 threshold — but it was
+            // never conditional on anything in the first place. It was a
+            // hardcoded green flag on *every* card in the feed, so it promised
+            // free delivery on restaurants that charged for it and on baskets
+            // nowhere near the threshold. The same class of thing as the five
+            // dots before 0119 and the two dead nav tabs: a control that looks
+            // like information and is a constant.
 
             // ─── Dot indicator strip (bottom-right) ───
             // Only when there is more than one photograph. A single dot says

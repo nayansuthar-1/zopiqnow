@@ -7,110 +7,292 @@ import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/notifications/domain/entities/customer_notification.dart';
 import 'package:zopiqnow/features/notifications/presentation/providers/notifications_providers.dart';
 
-/// The customer's inbox: exact Zomato-grade flat notification feed layout.
-class NotificationsPage extends ConsumerWidget {
+/// The customer's inbox.
+///
+/// **Selection is a mode, not a control on every row.** A checkbox beside a
+/// hundred notifications is a hundred controls nobody wants on the day they are
+/// just reading one; tapping Select turns them on, and Cancel turns them off.
+/// That is the shape Gmail and every photo gallery use, and it keeps the
+/// ordinary path — open the inbox, tap the order — a single tap.
+///
+/// Deleting is deliberately **not** swipe-to-dismiss. A swipe deletes one row on
+/// contact, and the thing being deleted here is the only record a customer has
+/// that they were told something. Selecting, seeing a count, and confirming is
+/// three deliberate acts to lose correspondence.
+class NotificationsPage extends ConsumerStatefulWidget {
   const NotificationsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationsPage> createState() => _NotificationsPageState();
+}
+
+class _NotificationsPageState extends ConsumerState<NotificationsPage> {
+  bool _selecting = false;
+
+  /// Ids, not indices: the list is a live stream, so a row can arrive or leave
+  /// while a selection is open and an index would silently come to mean a
+  /// different notification.
+  final Set<int> _selected = <int>{};
+
+  bool _busy = false;
+
+  void _exitSelection() {
+    setState(() {
+      _selecting = false;
+      _selected.clear();
+    });
+  }
+
+  Future<void> _deleteSelected() async {
+    if (_selected.isEmpty || _busy) return;
+    final int count = _selected.length;
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(count == 1 ? 'Delete this one?' : 'Delete $count?'),
+        content: const Text('They will not come back.'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE53935),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (!(confirmed ?? false) || !mounted) return;
+
+    setState(() => _busy = true);
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    try {
+      final int deleted = await ref
+          .read(notificationsDataSourceProvider)
+          .deleteMany(_selected.toList(growable: false));
+      if (!mounted) return;
+      _exitSelection();
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            content: Text(
+              deleted == 1 ? 'Notification deleted' : '$deleted deleted',
+            ),
+          ),
+        );
+    } catch (e) {
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            content: const Text("We couldn't delete those. Try again."),
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final AsyncValue<List<CustomerNotification>> async = ref.watch(
       notificationsProvider,
     );
     final int unread = ref.watch(unreadCountProvider);
     final TextTheme t = Theme.of(context).textTheme;
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final ZopiqColors zc = context.zc;
+    final Color ink = isDark ? Colors.white : const Color(0xFF1E1E1E);
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            // Top Navigation & Action Row (Zomato style)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: <Widget>[
-                  IconButton(
-                    icon: Icon(
-                      Icons.arrow_back_rounded,
-                      color: isDark ? Colors.white : const Color(0xFF1E1E1E),
-                      size: 24,
+    final List<CustomerNotification> items =
+        async.valueOrNull ?? const <CustomerNotification>[];
+    final bool allSelected =
+        items.isNotEmpty && _selected.length == items.length;
+
+    return PopScope(
+      // Back leaves the selection before it leaves the screen — the same rule
+      // the shell applies to tabs, and the reason is the same: Back should undo
+      // the last thing the customer did, not the whole visit.
+      canPop: !_selecting,
+      onPopInvokedWithResult: (bool didPop, Object? _) {
+        if (!didPop && _selecting) _exitSelection();
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                child: Row(
+                  children: <Widget>[
+                    IconButton(
+                      icon: Icon(
+                        _selecting
+                            ? Icons.close_rounded
+                            : Icons.arrow_back_rounded,
+                        color: ink,
+                        size: 22,
+                      ),
+                      onPressed: _selecting ? _exitSelection : context.pop,
                     ),
-                    onPressed: () => context.pop(),
-                  ),
-                  GestureDetector(
-                    onTap: unread > 0
-                        ? () => ref
-                            .read(notificationsDataSourceProvider)
-                            .markAllRead()
-                        : null,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                      child: Text(
-                        'Mark all as read',
-                        style: t.labelLarge?.copyWith(
-                          color: unread > 0
-                              ? (isDark ? Colors.white70 : const Color(0xFF666666))
-                              : (isDark ? Colors.white24 : const Color(0xFFCCCCCC)),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                    const Spacer(),
+                    if (_selecting) ...<Widget>[
+                      TextButton(
+                        onPressed: items.isEmpty
+                            ? null
+                            : () => setState(() {
+                                if (allSelected) {
+                                  _selected.clear();
+                                } else {
+                                  _selected
+                                    ..clear()
+                                    ..addAll(
+                                      items.map(
+                                        (CustomerNotification n) => n.id,
+                                      ),
+                                    );
+                                }
+                              }),
+                        child: Text(allSelected ? 'Clear all' : 'Select all'),
+                      ),
+                      IconButton(
+                        tooltip: 'Delete selected',
+                        icon: Icon(
+                          Icons.delete_outline_rounded,
+                          size: 22,
+                          color: _selected.isEmpty ? zc.textMuted : zc.nonVeg,
                         ),
+                        onPressed: _selected.isEmpty || _busy
+                            ? null
+                            : _deleteSelected,
                       ),
-                    ),
+                    ] else ...<Widget>[
+                      if (unread > 0)
+                        TextButton(
+                          onPressed: () => ref
+                              .read(notificationsDataSourceProvider)
+                              .markAllRead(),
+                          child: const Text('Mark all as read'),
+                        ),
+                      IconButton(
+                        tooltip: 'Select',
+                        icon: Icon(
+                          Icons.checklist_rounded,
+                          size: 22,
+                          color: items.isEmpty ? zc.textMuted : ink,
+                        ),
+                        onPressed: items.isEmpty
+                            ? null
+                            : () => setState(() => _selecting = true),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                child: Text(
+                  _selecting
+                      ? (_selected.isEmpty
+                            ? 'Select notifications'
+                            : '${_selected.length} selected')
+                      : 'Notifications',
+                  style: t.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 28,
+                    letterSpacing: -0.5,
+                    color: isDark ? Colors.white : const Color(0xFF111111),
                   ),
-                ],
-              ),
-            ),
-
-            // Large Section Title (Zomato Header)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-              child: Text(
-                'Notifications',
-                style: t.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 28,
-                  letterSpacing: -0.5,
-                  color: isDark ? Colors.white : const Color(0xFF111111),
                 ),
               ),
-            ),
 
-            // Content List / Empty / Error
-            Expanded(
-              child: async.when(
-                loading: () => const Center(child: ZopiqLoader()),
-                error: (Object _, StackTrace _) => _Empty(
-                  icon: Icons.cloud_off_rounded,
-                  title: 'Notifications are out of reach',
-                  body: 'We couldn\'t load your inbox just now.',
-                  onRetry: () => ref.invalidate(notificationsProvider),
-                ),
-                data: (List<CustomerNotification> items) {
-                  if (items.isEmpty) {
-                    return const _Empty(
-                      icon: Icons.notifications_off_outlined,
-                      title: 'Nothing yet',
-                      body: 'Updates about your orders will show up here.',
+              Expanded(
+                child: async.when(
+                  loading: () => const Center(child: ZopiqLoader()),
+                  error: (Object _, StackTrace _) => _Empty(
+                    icon: Icons.cloud_off_rounded,
+                    title: 'Notifications are out of reach',
+                    body: 'We couldn\'t load your inbox just now.',
+                    onRetry: () => ref.invalidate(notificationsProvider),
+                  ),
+                  data: (List<CustomerNotification> list) {
+                    if (list.isEmpty) {
+                      return const _Empty(
+                        icon: Icons.notifications_off_rounded,
+                        title: 'Nothing yet',
+                        body: 'Updates about your orders will show up here.',
+                      );
+                    }
+                    return ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      itemCount: list.length,
+                      itemBuilder: (BuildContext context, int i) {
+                        final CustomerNotification n = list[i];
+                        final bool picked = _selected.contains(n.id);
+
+                        final Widget tile = _NotificationTile(
+                          item: n,
+                          isLast: i == list.length - 1,
+                          // Suppressed while selecting: a tap has to mean
+                          // "pick this", not "open the order and lose the
+                          // selection behind a route change".
+                          tapsEnabled: !_selecting,
+                        );
+
+                        if (!_selecting) {
+                          return ZopiqReveal(index: i, child: tile);
+                        }
+
+                        return InkWell(
+                          onTap: () => setState(() {
+                            if (!_selected.add(n.id)) _selected.remove(n.id);
+                          }),
+                          child: Row(
+                            children: <Widget>[
+                              Padding(
+                                padding: const EdgeInsets.only(left: 12),
+                                child: Icon(
+                                  picked
+                                      ? Icons.check_circle_rounded
+                                      : Icons.radio_button_unchecked_rounded,
+                                  size: 22,
+                                  color: picked ? zc.primary : zc.textMuted,
+                                ),
+                              ),
+                              Expanded(child: IgnorePointer(child: tile)),
+                            ],
+                          ),
+                        );
+                      },
                     );
-                  }
-                  return ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    itemCount: items.length,
-                    itemBuilder: (BuildContext context, int i) => ZopiqReveal(
-                      index: i,
-                      child: _NotificationTile(
-                        item: items[i],
-                        isLast: i == items.length - 1,
-                      ),
-                    ),
-                  );
-                },
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -125,10 +307,19 @@ class _NotificationIconInfo {
 
 /// Zomato-grade flat notification list item (No cards, flat divider)
 class _NotificationTile extends ConsumerWidget {
-  const _NotificationTile({required this.item, required this.isLast});
+  const _NotificationTile({
+    required this.item,
+    required this.isLast,
+    this.tapsEnabled = true,
+  });
 
   final CustomerNotification item;
   final bool isLast;
+
+  /// False while the page is in selection mode, where a tap has to mean "pick
+  /// this row" rather than "open the order and lose the selection behind a
+  /// route change".
+  final bool tapsEnabled;
 
   static _NotificationIconInfo _getIconInfo(
     CustomerNotification item,
@@ -229,17 +420,21 @@ class _NotificationTile extends ConsumerWidget {
     final _NotificationIconInfo info = _getIconInfo(item, zc, isDark);
 
     return InkWell(
-      onTap: () {
-        if (unread) {
-          ref.read(notificationsDataSourceProvider).markRead(item.id);
-        }
-        if (item.orderId != null) {
-          context.pushNamed(
-            Routes.orderDetail,
-            pathParameters: <String, String>{'id': item.orderId!},
-          );
-        }
-      },
+      // Null while selecting, so the row does not also mark itself read and
+      // navigate away underneath the checkbox the customer just tapped.
+      onTap: !tapsEnabled
+          ? null
+          : () {
+              if (unread) {
+                ref.read(notificationsDataSourceProvider).markRead(item.id);
+              }
+              if (item.orderId != null) {
+                context.pushNamed(
+                  Routes.orderDetail,
+                  pathParameters: <String, String>{'id': item.orderId!},
+                );
+              }
+            },
       child: Container(
         color: unread
             ? zc.primary.withValues(alpha: isDark ? 0.08 : 0.03)

@@ -37,27 +37,27 @@ void main() {
     expect(bill.subtotal, 350); // 200 + 150
   });
 
-  test('charges the flat delivery fee below the free-delivery threshold', () {
+  test('charges the flat delivery fee on a small basket', () {
     final CartBill bill = CartBill.of(_cartOf(<CartLine>[
       CartLine(item: _item('a', 200), quantity: 1),
     ]));
 
     expect(bill.deliveryFee, 40);
-    expect(bill.hasFreeDelivery, isFalse);
-    expect(bill.amountToFreeDelivery, 300);
     expect(bill.taxes, 10); // 5% of 200
     expect(bill.total, 250); // 200 + 40 + 10
   });
 
-  test('waives delivery exactly at the threshold', () {
+  // Was 'waives delivery exactly at the threshold', asserting a ₹0 fee at ₹500.
+  // Migration 0123 withdrew the threshold from `place_order` and
+  // `checkout_preflight`, and `CartBill` mirrors them — so the same basket that
+  // used to prove the waiver now proves there is no waiver left to apply.
+  test('charges the flat delivery fee on a large basket too', () {
     final CartBill bill = CartBill.of(_cartOf(<CartLine>[
       CartLine(item: _item('a', 500), quantity: 1),
     ]));
 
-    expect(bill.hasFreeDelivery, isTrue);
-    expect(bill.deliveryFee, 0);
-    expect(bill.amountToFreeDelivery, 0);
-    expect(bill.total, 525); // 500 + 0 + 25
+    expect(bill.deliveryFee, 40);
+    expect(bill.total, 565); // 500 + 40 + 25
   });
 
   test('subtracts a coupon discount from the total, not the subtotal', () {

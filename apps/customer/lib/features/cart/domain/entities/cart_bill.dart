@@ -65,7 +65,14 @@ class CartBill {
 
     return CartBill(
       subtotal: subtotal,
-      deliveryFee: subtotal >= freeDeliveryThreshold ? 0 : flatDeliveryFee,
+      // Flat, always. Migration 0123 withdrew the ₹500 free-delivery threshold
+      // from `place_order` and `checkout_preflight` in the same statement, and
+      // this line is the third copy of that rule — the cart quotes what the
+      // server charges, and a disagreement here is not a cosmetic one: the
+      // payment gate refuses an intent worth less than the order, so a cart that
+      // still believed in free delivery would take ₹40 too little and have the
+      // order refused after the money was captured.
+      deliveryFee: flatDeliveryFee,
       taxes: taxes,
       discount: discount,
     );
@@ -103,12 +110,15 @@ class CartBill {
     return alloc;
   }
 
-  /// Public because the bill *card* needs them: it strikes through the fee the
-  /// customer is not paying, and draws how far they are from not paying it. The
-  /// alternative is the UI restating 40 and 500 as its own magic numbers, and
-  /// then quietly disagreeing with the bill the day the rule changes.
+  /// Public because the bill card renders it: the alternative is the UI
+  /// restating 40 as its own magic number and then quietly disagreeing with the
+  /// bill the day the rule changes.
+  ///
+  /// `freeDeliveryThreshold` used to sit beside this and is gone with migration
+  /// 0123 — there is no basket size that earns free delivery any more, so there
+  /// is no number to compare against and nothing for the bill card to draw a
+  /// progress bar towards.
   static const int flatDeliveryFee = 40;
-  static const int freeDeliveryThreshold = 500;
 
   /// Sum of the line totals, in whole rupees.
   final int subtotal;
@@ -126,10 +136,4 @@ class CartBill {
   final int discount;
 
   int get total => subtotal + deliveryFee + taxes - discount;
-
-  bool get hasFreeDelivery => subtotal >= freeDeliveryThreshold;
-
-  /// Rupees still needed to unlock free delivery; 0 once unlocked.
-  int get amountToFreeDelivery =>
-      hasFreeDelivery ? 0 : freeDeliveryThreshold - subtotal;
 }

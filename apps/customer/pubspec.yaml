@@ -200,6 +200,35 @@ dependencies:
   # than a preference.
   video_player: 2.13.0
 
+  # --- NO third-party icon package, and not for want of trying ----------------
+  # (2026-08-14.) `phosphor_flutter` and `lucide_icons` were both approved and
+  # both **fail to compile against this Flutter SDK**, identically:
+  #
+  #   Error: The class 'IconData' can't be extended outside of its library
+  #          because it's a final class.
+  #
+  # Flutter has sealed `IconData`, and every icon-font package of this shape
+  # subclasses it to carry its own font family. Phosphor has no release that
+  # avoids it (there is no 3.x); Lucide 0.257.0 is the same. The only fix is
+  # moving the Flutter pin, which is precisely what Rule 3 forbids.
+  #
+  # ⚠️ **`flutter analyze` does not catch this.** It does not analyse the pub
+  # cache, so both packages analysed clean and then died at kernel compile. An
+  # icon package has to be proven with a real build before it is believed.
+  #
+  # So the icons stay Material's, curated: rounded variants used consistently
+  # and chosen for meaning rather than for whatever was nearest. A genuinely
+  # bespoke set is still reachable without a package — `flutter_svg` is already
+  # a dependency and would take real SVG assets — but that is asset work rather
+  # than a one-line dependency, and it is not this change.
+
+  # NOTE: `share_plus` was approved the same day and could **not** be added
+  # either. Two independent conflicts, neither ours to fix: `melos 6.3.3` in the
+  # workspace requires `file ^7.0.0` while every share_plus version's chain
+  # requires `file ^6.0.0`, and `share_plus >=13` requires `mime ^2.0.0` against
+  # the `mime ^1.0.2` supabase's storage_client pins. No version resolves without
+  # moving a pin the freeze protects.
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

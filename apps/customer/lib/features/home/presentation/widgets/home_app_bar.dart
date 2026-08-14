@@ -3,13 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
-import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
+import 'package:zopiqnow/features/account/presentation/widgets/header_actions.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/domain/entities/hero_slide.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_filters.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/home_hero_carousel.dart';
-import 'package:zopiqnow/features/notifications/presentation/widgets/notification_bell.dart';
 
 /// Home header as a Zomato-style collapsing sliver, built *around* the hero
 /// carousel.
@@ -171,9 +170,11 @@ class HomeSliverAppBar extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: ZopiqSpacing.sm),
-                            const NotificationBell(),
-                            const SizedBox(width: ZopiqSpacing.sm),
-                            _ProfileButton(onTap: onTapProfile),
+                            // Shared with Gifts and Collection, so the same
+                            // customer cannot end up with a different picture on
+                            // three tabs. `onColour` because this row floats
+                            // over the hero carousel and the orange strip.
+                            const HeaderActions(),
                           ],
                         ),
                       ),
@@ -266,59 +267,6 @@ class _LocationTitle extends StatelessWidget {
   }
 }
 
-/// The customer's own face, when there is one.
-///
-/// Deliberately *not* [ProfileAvatar], which is the right widget on the account
-/// screen and the wrong one here: its no-photo fallback is a brand-tinted
-/// initial, and this button sits on the hero's coloured header where a pale
-/// orange disc on orange would vanish. So the photo is shared and the fallback
-/// is not — the translucent-white person glyph stays exactly as it was, which is
-/// what a signed-out customer and a customer who never set a picture both see.
-class _ProfileButton extends ConsumerWidget {
-  const _ProfileButton({required this.onTap});
-
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final AuthState auth = ref.watch(authControllerProvider);
-    final String? avatarUrl = auth is AuthSignedIn ? auth.user.avatarUrl : null;
-
-    const Widget fallback = ColoredBox(
-      color: Color(0x38FFFFFF),
-      child: Icon(Icons.person_rounded, color: ZopiqPalette.white, size: 20),
-    );
-
-    return InkResponse(
-      onTap: onTap,
-      radius: 24,
-      child: SizedBox(
-        width: 36,
-        height: 36,
-        child: ClipOval(
-          // A white hairline so a photo of any brightness still reads as a
-          // distinct control against the header behind it, rather than as a
-          // rectangle of somebody's face bleeding into the orange.
-          child: DecoratedBox(
-            position: DecorationPosition.foreground,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: ZopiqPalette.white.withValues(alpha: 0.6),
-                width: 1.5,
-              ),
-            ),
-            // `ZopiqNetworkImage` already owns empty, loading and failed, so a
-            // Cloudinary URL that 404s lands on the same glyph as no photo at
-            // all rather than on a broken-image icon.
-            child: ZopiqNetworkImage(url: avatarUrl ?? '', fallback: fallback),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _SearchField extends StatelessWidget {
   const _SearchField({required this.onTap});
 
@@ -377,8 +325,14 @@ class _VegToggle extends ConsumerWidget {
     final bool on = ref.watch(
       homeFiltersProvider.select((HomeFilters f) => f.pureVeg),
     );
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color textColor = isDark ? Colors.white : Colors.black87;
+    // **White, always — the theme is the wrong question here.** This label does
+    // not sit on the page's surface. At the top of Home it floats over the hero
+    // carousel (photographs and video), and on scroll it rises into the solid
+    // `primary` strip that pins under the status bar. Both are dark or
+    // saturated, in *either* theme, so the old `isDark ? white : black87` put
+    // black lettering on a photograph and then on orange every time the phone
+    // was in light mode.
+    const Color textColor = ZopiqPalette.white;
 
     return Semantics(
       button: true,
@@ -395,15 +349,27 @@ class _VegToggle extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Text(
+              const Text(
                 'VEG\nMODE',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w900,
                   height: 1.1,
-                  letterSpacing: 0.5,
+                  letterSpacing: 0.6,
                   color: textColor,
+                  // A photograph can be any brightness, including white plates
+                  // under bright light — which is exactly what a food carousel
+                  // is full of. The shadow is what keeps white lettering legible
+                  // on the one slide that happens to be pale, and it costs
+                  // nothing on the dark ones.
+                  shadows: <Shadow>[
+                    Shadow(
+                      color: Color(0x8A000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 2),
@@ -433,8 +399,15 @@ class _MiniToggle extends StatelessWidget {
       width: 32,
       height: 18,
       decoration: BoxDecoration(
-        color: on ? zc.veg : ZopiqPalette.textMuted.withValues(alpha: 0.5),
+        // The off track is a translucent *white*, not a muted grey, for the same
+        // reason the label above is white: this control sits on photographs and
+        // on the orange strip, never on the page's surface, and grey-on-either
+        // is the state that disappears.
+        color: on ? zc.veg : ZopiqPalette.white.withValues(alpha: 0.38),
         borderRadius: ZopiqRadii.rPill,
+        border: Border.all(
+          color: ZopiqPalette.white.withValues(alpha: on ? 0.0 : 0.7),
+        ),
       ),
       child: AnimatedAlign(
         duration: ZopiqDurations.fast,

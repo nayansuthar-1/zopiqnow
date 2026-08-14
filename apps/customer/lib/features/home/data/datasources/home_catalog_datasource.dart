@@ -87,12 +87,12 @@ class HomeCatalogDataSource {
       detail: 'ABOVE ₹399',
       code: 'ZOPIQ150',
     ),
-    Offer(
-      id: 'o3',
-      headline: 'FREE DELIVERY',
-      detail: 'ON FIRST ORDER',
-      code: 'WELCOME',
-    ),
+    // 'FREE DELIVERY / ON FIRST ORDER / WELCOME' was here and is gone with
+    // migration 0123: there is no basket and no first order that earns free
+    // delivery any more, so the offer could not be honoured by any coupon.
+    // (`WELCOME` was not a row in `coupons` either — the same defect
+    // BUGFIX_QUEUE P10 records for TRYNEW, ZOPIQ150 and SAVE30, which are still
+    // here and still name codes that do not exist.)
     Offer(id: 'o4', headline: '30% OFF', detail: 'UPTO ₹75', code: 'SAVE30'),
   ];
 }

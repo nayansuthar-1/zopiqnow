@@ -5,6 +5,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/providers/bottom_nav_provider.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_bag_bar.dart';
+import 'package:zopiqnow/features/account/presentation/widgets/header_actions.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_item.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_shop.dart';
 import 'package:zopiqnow/features/gifts/domain/repositories/gift_repository.dart';
@@ -166,6 +167,13 @@ class _GiftsAppBar extends StatelessWidget {
       elevation: 0,
       titleSpacing: ZopiqSpacing.pageGutter,
       toolbarHeight: 72,
+      // The same bell and face Home carries, in the on-surface livery — this
+      // header is the page's own background rather than a photograph, so the
+      // white-on-translucent-white pair Home uses would be invisible here.
+      actions: const <Widget>[
+        HeaderActions(onColour: false),
+        SizedBox(width: ZopiqSpacing.pageGutter),
+      ],
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,

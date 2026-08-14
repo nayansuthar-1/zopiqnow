@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/router.dart';
+import 'package:zopiqnow/features/account/presentation/widgets/header_actions.dart';
 import 'package:zopiqnow/features/favourites/domain/repositories/favourites_repository.dart';
 import 'package:zopiqnow/features/favourites/presentation/providers/favourites_providers.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
@@ -26,9 +27,16 @@ class FavouritesPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Favourites'),
+        title: const Text('Collection'),
         elevation: 0,
         backgroundColor: Colors.transparent,
+        // A branch root, so there is nothing to pop and no leading arrow — which
+        // left the whole top-right of a primary tab empty. The same bell and
+        // face the other two tabs carry, in the on-surface livery.
+        actions: const <Widget>[
+          HeaderActions(onColour: false),
+          SizedBox(width: ZopiqSpacing.pageGutter),
+        ],
       ),
       body: favourites.when(
         loading: () => const Center(child: ZopiqLoader()),
