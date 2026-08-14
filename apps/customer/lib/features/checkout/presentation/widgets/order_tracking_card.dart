@@ -384,7 +384,7 @@ class _Map extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.only(top: ZopiqSpacing.lg),
-      child: LiveDeliveryMap(route: route, rider: rider),
+      child: LiveDeliveryMap(route: route, rider: rider, orderId: orderId),
     );
   }
 }

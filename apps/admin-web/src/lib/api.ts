@@ -486,6 +486,24 @@ export const api = {
   deleteHeroSlide: (id: string) =>
     rpc<void>('admin_delete_hero_slide', { p_id: id }),
 
+  /// Every ad beside the tracking map, live or not, with its view and click
+  /// totals (migration 0125).
+  listOrderAds: () => rpc<OrderAdRow[]>('admin_list_order_ads'),
+
+  /// Create (no `id`) or edit (with one). Every field every time — a partial
+  /// save is how a campaign keeps last month's end date.
+  upsertOrderAd: (ad: Record<string, unknown>) =>
+    rpc<string>('admin_upsert_order_ad', { p_ad: ad }),
+
+  /// Taking an ad down, which is the common act and should not need the editor.
+  setOrderAdActive: (id: string, active: boolean) =>
+    rpc<void>('admin_set_order_ad_active', { p_id: id, p_active: active }),
+
+  /// Takes the ad's recorded views and clicks with it. Deactivating is the
+  /// reversible act; this one is not.
+  deleteOrderAd: (id: string) =>
+    rpc<void>('admin_delete_order_ad', { p_id: id }),
+
   /// No argument is the live board — every order that has not ended. An argument
   /// is a lookup by order id or phone across every status, because the order
   /// support gets called about is usually one that already ended badly.
@@ -1174,7 +1192,39 @@ export type HeroSlideRow = {
 /// policy uses, so the pill and the customer's phone can never disagree.
 export type SlideState = 'live' | 'off' | 'scheduled' | 'expired'
 
-export function slideStateOf(s: HeroSlideRow, now = Date.now()): SlideState {
+/// One admin-authored ad beside the order tracking map (migration 0125).
+///
+/// `views` and `clicks` are totals over `ad_events`, computed by the RPC. A view
+/// is counted once per order, a click every time — so clicks above views is not
+/// a bug, it is one customer tapping twice.
+export type OrderAdRow = {
+  id: string
+  name: string
+  /// The round puck over the map's corner. Square.
+  logo_url: string
+  /// The full-bleed artwork the puck opens. Tall.
+  image_url: string
+  headline: string
+  cta_label: string
+  /// `http…` leaves for the browser, `/…` is a route inside the app, empty is no
+  /// button at all. The string is the type — 0125 refuses anything else.
+  cta_target: string
+  sort_order: number
+  is_active: boolean
+  starts_at: string
+  ends_at: string | null
+  created_at: string
+  views: number
+  clicks: number
+}
+
+/// Scheduling reads the same on anything with a window, so this takes the three
+/// fields rather than a hero slide — a hero slide and an order ad answer "is it
+/// live right now?" identically and should not answer it in two functions.
+export function slideStateOf(
+  s: { is_active: boolean; starts_at: string; ends_at: string | null },
+  now = Date.now(),
+): SlideState {
   if (s.ends_at && Date.parse(s.ends_at) <= now) return 'expired'
   if (!s.is_active) return 'off'
   if (Date.parse(s.starts_at) > now) return 'scheduled'

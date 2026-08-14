@@ -4,9 +4,13 @@ import 'package:zopiq_map/zopiq_map.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_ad.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
+import 'package:zopiqnow/features/checkout/presentation/pages/order_ad_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/pages/order_map_page.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/corner_puck.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/explore_puck.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_map_pins.dart';
 
 /// The rider, on the road, moving — on a real map.
@@ -30,10 +34,17 @@ import 'package:zopiqnow/features/checkout/presentation/widgets/order_map_pins.d
 /// does not keep drawing one whose position has gone stale (see
 /// [RiderPosition.isStale]). A dot that keeps gliding after the rider's phone
 /// died is the single most convincing lie a tracking screen can tell.
-class LiveDeliveryMap extends ConsumerWidget {
+///
+/// **It has a second face** (0125). While a campaign is live, the corner carries
+/// an Explore puck, and tapping it turns this slot over to the ad with a Map
+/// puck to turn it back. The swap happens in place rather than pushing a screen,
+/// because at this size the ad is the same glance the map was — a full screen of
+/// somebody else's artwork is what tapping the *ad* is for.
+class LiveDeliveryMap extends ConsumerStatefulWidget {
   const LiveDeliveryMap({
     required this.route,
     required this.rider,
+    required this.orderId,
     super.key,
   });
 
@@ -44,10 +55,25 @@ class LiveDeliveryMap extends ConsumerWidget {
   /// the ride ahead rather than of a ride in progress.
   final OrderRider? rider;
 
+  final String orderId;
+
+  @override
+  ConsumerState<LiveDeliveryMap> createState() => _LiveDeliveryMapState();
+}
+
+class _LiveDeliveryMapState extends ConsumerState<LiveDeliveryMap> {
+  /// The ad currently filling the slot, or null while the map does.
+  ///
+  /// Held as the ad rather than a bool so the face cannot outlive the campaign
+  /// that put it there.
+  OrderAd? _showing;
+
   static const double _height = 220;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final DeliveryRoute route = widget.route;
+    final OrderRider? rider = widget.rider;
     if (!route.isMappable) return const SizedBox.shrink();
 
     final ZopiqColors zc = context.zc;
@@ -61,6 +87,8 @@ class LiveDeliveryMap extends ConsumerWidget {
     final RiderPosition? live =
         position != null && !position.isStale(DateTime.now()) ? position : null;
 
+    final OrderAd? ad = _showing;
+
     return ClipRRect(
       borderRadius: ZopiqRadii.rMd,
       child: SizedBox(
@@ -69,22 +97,43 @@ class LiveDeliveryMap extends ConsumerWidget {
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
-            ZopiqMapView(
-              encodedPolyline: route.encodedPath,
-              liveEncodedPolyline: route.livePath,
-              pins: orderMapPins(route: route, live: live),
-              // A glance, not a map you drive: gestures off so the page can
-              // still be scrolled, and no layer switcher because a control that
-              // small over a map this small is mostly map you cannot see.
-              interactive: false,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (BuildContext context) =>
-                      OrderMapPage(route: route, rider: rider),
+            if (ad != null)
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) =>
+                        OrderAdPage(ad: ad, orderId: widget.orderId),
+                  ),
+                ),
+                child: ZopiqNetworkImage(
+                  url: ad.imageUrl,
+                  // Cover here and contain full screen, on purpose: this is a
+                  // 220-high band cut out of a tall banner, and letterboxing it
+                  // would show more grey than artwork.
+                  fallback: ColoredBox(color: zc.divider),
+                ),
+              )
+            else
+              ZopiqMapView(
+                encodedPolyline: route.encodedPath,
+                liveEncodedPolyline: route.livePath,
+                pins: orderMapPins(route: route, live: live),
+                // A glance, not a map you drive: gestures off so the page can
+                // still be scrolled, and no layer switcher because a control
+                // that small over a map this small is mostly map you cannot see.
+                interactive: false,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) => OrderMapPage(
+                      route: route,
+                      rider: rider,
+                      orderId: widget.orderId,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            if (live == null)
+
+            if (ad == null && live == null)
               Positioned(
                 left: 0,
                 right: 0,
@@ -96,10 +145,26 @@ class LiveDeliveryMap extends ConsumerWidget {
                       ? 'Live location paused — reconnecting'
                       : rider == null
                       ? 'The route your order will take'
-                      : 'Waiting for ${rider!.name}\'s location',
+                      : 'Waiting for ${rider.name}\'s location',
                   color: zc.textMuted,
                 ),
               ),
+
+            Positioned(
+              right: ZopiqSpacing.sm,
+              bottom: ZopiqSpacing.sm,
+              child: ad == null
+                  ? ExplorePuck(
+                      orderId: widget.orderId,
+                      onOpen: (OrderAd opened) =>
+                          setState(() => _showing = opened),
+                    )
+                  : CornerPuck(
+                      label: 'MAP',
+                      icon: Icons.map_rounded,
+                      onTap: () => setState(() => _showing = null),
+                    ),
+            ),
           ],
         ),
       ),

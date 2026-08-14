@@ -45,6 +45,7 @@ const groups: {
     heading: 'Reach',
     links: [
       { to: '/hero', label: 'Home hero', end: false },
+      { to: '/map-ads', label: 'Map ads', end: false },
       { to: '/coupons', label: 'Coupons', end: false },
       { to: '/broadcast', label: 'Send a notification', end: false },
     ],

@@ -7,6 +7,7 @@ import { WizardPage } from './restaurants/WizardPage'
 import { RidersPage } from './riders/RidersPage'
 import { UsersPage } from './users/UsersPage'
 import { HeroSlidesPage } from './content/HeroSlidesPage'
+import { OrderAdsPage } from './content/OrderAdsPage'
 import { PayoutsPage } from './payouts/PayoutsPage'
 import { CashPage } from './payouts/CashPage'
 import { RefundsPage } from './payouts/RefundsPage'
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/riders" element={<RidersPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/hero" element={<HeroSlidesPage />} />
+          <Route path="/map-ads" element={<OrderAdsPage />} />
           <Route path="/coupons" element={<CouponsPage />} />
           <Route path="/broadcast" element={<BroadcastPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />

@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_map/zopiq_map.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
+import 'package:zopiqnow/features/checkout/domain/entities/order_ad.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/order_rider.dart';
+import 'package:zopiqnow/features/checkout/presentation/pages/order_ad_page.dart';
+import 'package:zopiqnow/features/checkout/presentation/widgets/explore_puck.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/orders_providers.dart';
 import 'package:zopiqnow/features/checkout/presentation/widgets/order_card.dart'
     show formatClockTime;
@@ -21,10 +24,19 @@ import 'package:zopiqnow/features/checkout/presentation/widgets/order_map_pins.d
 /// door. Below the map it costs a strip of height once instead of hiding the
 /// destination for the whole ride.
 class OrderMapPage extends ConsumerWidget {
-  const OrderMapPage({required this.route, required this.rider, super.key});
+  const OrderMapPage({
+    required this.route,
+    required this.rider,
+    required this.orderId,
+    super.key,
+  });
 
   final DeliveryRoute route;
   final OrderRider? rider;
+
+  /// Carried for the ad puck alone — it is what keeps one order's view from
+  /// being counted twice (0125).
+  final String orderId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -41,17 +53,38 @@ class OrderMapPage extends ConsumerWidget {
       body: Column(
         children: <Widget>[
           Expanded(
-            child: ZopiqMapView(
-              encodedPolyline: route.encodedPath,
-              liveEncodedPolyline: route.livePath,
-              pins: orderMapPins(route: route, live: live),
-              // The customer's own position is not what this screen is about,
-              // and asking for it would raise a location prompt with nothing
-              // behind it.
-              showMyLocation: false,
-              // Offered only while there is something to follow. The button
-              // starts on and the first drag turns it off — see ZopiqMapView.
-              followPinId: live == null ? null : 'rider',
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                ZopiqMapView(
+                  encodedPolyline: route.encodedPath,
+                  liveEncodedPolyline: route.livePath,
+                  pins: orderMapPins(route: route, live: live),
+                  // The customer's own position is not what this screen is
+                  // about, and asking for it would raise a location prompt with
+                  // nothing behind it.
+                  showMyLocation: false,
+                  // Offered only while there is something to follow. The button
+                  // starts on and the first drag turns it off — see ZopiqMapView.
+                  followPinId: live == null ? null : 'rider',
+                ),
+                // Bottom-right, above the arrival bar. The left half of a map is
+                // where the route usually runs and the top-right is where
+                // ZopiqMapView puts its own controls.
+                Positioned(
+                  right: ZopiqSpacing.md,
+                  bottom: ZopiqSpacing.md,
+                  child: ExplorePuck(
+                    orderId: orderId,
+                    onOpen: (OrderAd ad) => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (BuildContext context) =>
+                            OrderAdPage(ad: ad, orderId: orderId),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           _ArrivalBar(route: route, live: live),
