@@ -4,6 +4,7 @@ import type { MenuItemRow } from '../lib/api'
 import { Banner, Button, ConfirmDialog } from '../ui/primitives'
 import { ItemDialog } from './ItemDialog'
 import { ImportDialog } from './ImportDialog'
+import { OptionsDialog } from './OptionsDialog'
 
 /// The menu builder.
 ///
@@ -65,6 +66,7 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
   const [adding, setAdding] = useState(false)
   const [importing, setImporting] = useState(false)
   const [deleting, setDeleting] = useState<MenuItemRow | null>(null)
+  const [optioning, setOptioning] = useState<MenuItemRow | null>(null)
   const [deletingSection, setDeletingSection] = useState<Section | null>(null)
   const [clearing, setClearing] = useState(false)
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null)
@@ -334,6 +336,13 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
                   </button>
                   <button
                     type="button"
+                    onClick={() => setOptioning(item)}
+                    className="shrink-0 text-sm font-medium text-ink-muted hover:text-ink"
+                  >
+                    Options
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setDeleting(item)}
                     className="shrink-0 text-sm font-medium text-ink-muted hover:text-non-veg"
                   >
@@ -368,6 +377,20 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
               }
             })
           }
+        />
+      )}
+
+      {optioning && (
+        // Options are read and written by this dialog alone, and it reloads the
+        // menu on the way out only because a dish's cheapest configuration is its
+        // own price — which this never changes. The refresh is for the day it does.
+        <OptionsDialog
+          item={optioning}
+          onClose={() => setOptioning(null)}
+          onSaved={() => {
+            setOptioning(null)
+            void load()
+          }}
         />
       )}
 
