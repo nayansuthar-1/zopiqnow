@@ -165,6 +165,48 @@ abstract final class ZopiqTheme {
           ),
         ),
       ),
+      // An *off* switch has to still read as a switch.
+      //
+      // Material 3's defaults draw the off thumb in `colorScheme.outline` on a
+      // `surfaceContainerHighest` track. Against this palette those two land
+      // close enough together that the thumb disappears and the control reads as
+      // a plain grey pill — which is what "100% Veg Mode" looked like whenever it
+      // was turned off, in both light and dark.
+      //
+      // So the off state is stated rather than inherited: a white thumb (a light
+      // grey one in dark mode, where white would glare) on a muted track, with a
+      // border to hold the shape against the card behind it. The on state keeps
+      // the green it already had, and is set here rather than per call site so
+      // the next switch anybody adds is right without their having to know this.
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith<Color>((
+          Set<WidgetState> states,
+        ) {
+          if (states.contains(WidgetState.disabled)) {
+            return zc.textMuted.withValues(alpha: 0.5);
+          }
+          if (states.contains(WidgetState.selected)) return Colors.white;
+          return isDark ? const Color(0xFFBFC4CC) : Colors.white;
+        }),
+        trackColor: WidgetStateProperty.resolveWith<Color>((
+          Set<WidgetState> states,
+        ) {
+          if (states.contains(WidgetState.disabled)) {
+            return zc.divider.withValues(alpha: 0.5);
+          }
+          if (states.contains(WidgetState.selected)) return zc.veg;
+          return isDark
+              ? const Color(0xFF3A3F47)
+              : const Color(0xFFD5D9E0);
+        }),
+        trackOutlineColor: WidgetStateProperty.resolveWith<Color>((
+          Set<WidgetState> states,
+        ) {
+          if (states.contains(WidgetState.selected)) return zc.veg;
+          return isDark ? const Color(0xFF4A5058) : const Color(0xFFC2C8D0);
+        }),
+        trackOutlineWidth: const WidgetStatePropertyAll<double>(1),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: isDark

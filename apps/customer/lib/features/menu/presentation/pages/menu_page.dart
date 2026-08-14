@@ -151,11 +151,29 @@ class _MenuJumpButton extends ConsumerWidget {
     if (categories.length < 2) return const SizedBox.shrink();
 
     final TextTheme t = Theme.of(context).textTheme;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // The button inverts against the page rather than being painted a fixed
+    // colour. It used to be `zc.textStrong` with hardcoded white text — which is
+    // a near-black chip in light mode and a near-*white* one in dark, where the
+    // white label sat on top of it and the button read as a blank rounded
+    // rectangle. Both halves have to flip together, so they are derived from one
+    // brightness check rather than set independently.
+    final Color background = isDark
+        ? const Color(0xFFF2F3F5)
+        : const Color(0xFF1C1D1F);
+    final Color foreground = isDark
+        ? const Color(0xFF1C1D1F)
+        : ZopiqPalette.white;
 
     return Material(
-      color: context.zc.textStrong,
+      color: background,
       borderRadius: ZopiqRadii.rMd,
       elevation: 6,
+      // A dark chip on a dark page needs its own edge to sit on; without it the
+      // elevation shadow is the only thing separating the two and it disappears
+      // against anything but white.
+      shadowColor: Colors.black.withValues(alpha: isDark ? 0.6 : 0.3),
       child: InkWell(
         borderRadius: ZopiqRadii.rMd,
         onTap: () async {
@@ -175,16 +193,16 @@ class _MenuJumpButton extends ConsumerWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              const Icon(
+              Icon(
                 Icons.restaurant_menu_rounded,
                 size: 20,
-                color: ZopiqPalette.white,
+                color: foreground,
               ),
               const SizedBox(width: ZopiqSpacing.sm),
               Text(
                 'Menu',
                 style: t.titleSmall?.copyWith(
-                  color: ZopiqPalette.white,
+                  color: foreground,
                   fontWeight: FontWeight.w700,
                 ),
               ),

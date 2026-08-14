@@ -29,14 +29,15 @@ class AppShell extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
 
   /// The Cart branch's index. It sits after the left-pill tabs (Delivery,
-  /// Gifts), and is reached from the separate Cart pill rather than the pill
-  /// row.
+  /// Gifts, Collection), and is reached from the separate Cart pill rather than
+  /// the pill row.
   ///
-  /// Was 4 while Dining and Grocery held branches 1 and 2. Both were
-  /// `ComingSoonPage` and both are gone — see the note in `router.dart`. This
-  /// constant, [_ShellNavBar._tabCount] and the branch list are the three places
-  /// that have to agree; adding a tab back means editing all three.
-  static const int cartBranchIndex = 2;
+  /// Was 4 while Dining and Grocery held branches 1 and 2 — both were
+  /// `ComingSoonPage` and both are gone. Then 2, until Collection took that
+  /// index. This constant, [_ShellNavBar._tabs] and the branch list in
+  /// `router.dart` are the three places that have to agree; adding or removing a
+  /// tab means editing all three.
+  static const int cartBranchIndex = 3;
 
   @override
   ConsumerState<AppShell> createState() => _AppShellState();
@@ -139,6 +140,28 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 }
 
+/// One tab of the left pill: what it is called, how it is drawn, and the colour
+/// it takes when it is the one showing.
+class _NavTab {
+  const _NavTab({
+    required this.title,
+    required this.icon,
+    required this.activeIcon,
+    required this.colour,
+  });
+
+  final String title;
+  final IconData icon;
+
+  /// The filled twin of [icon]. The swap is most of what says "selected" now
+  /// that nothing is painted behind it.
+  final IconData activeIcon;
+
+  /// Selected colour. Unselected is always the muted text colour, so an
+  /// unselected row reads as one row rather than as three competing ones.
+  final Color colour;
+}
+
 class _ShellNavBar extends ConsumerWidget {
   const _ShellNavBar({required this.navigationShell});
 
@@ -149,12 +172,40 @@ class _ShellNavBar extends ConsumerWidget {
   /// not a distance in pixels.
   static const double _pillHeight = 57.0;
 
-  /// How many tabs share the left pill. Drives both the tab width and the
-  /// sliding indicator's travel, so it is a constant rather than a `4` written
-  /// twice — which is what it was, and which is why removing two tabs would
-  /// otherwise have left the indicator sliding to a quarter-width stop under a
-  /// half-width tab.
-  static const int _tabCount = 2;
+  /// The tabs sharing the left pill, in branch order.
+  ///
+  /// **Each carries its own selected colour**, which is the point: a storefront
+  /// tab, a gift shop and a saved list are three different errands, and the app
+  /// says so with colour rather than by moving one orange block around. The old
+  /// bar painted a brand-tinted rounded rectangle behind whichever tab was
+  /// selected — a filled slab under a 57pt pill, which crowded the icon it was
+  /// meant to be highlighting and made every tab look like Delivery. Now nothing
+  /// is filled: the icon and its label take the colour and the background stays
+  /// the pill's own.
+  ///
+  /// The list is the single source of the tab count, so adding a tab here and a
+  /// branch in `router.dart` is the whole change — there is no separate `4`
+  /// waiting to disagree with it.
+  static const List<_NavTab> _tabs = <_NavTab>[
+    _NavTab(
+      title: 'Delivery',
+      icon: Icons.delivery_dining_outlined,
+      activeIcon: Icons.delivery_dining,
+      colour: Color(0xFFFC8019),
+    ),
+    _NavTab(
+      title: 'Gifts',
+      icon: Icons.card_giftcard_outlined,
+      activeIcon: Icons.card_giftcard,
+      colour: Color(0xFF0C831F),
+    ),
+    _NavTab(
+      title: 'Collection',
+      icon: Icons.favorite_border_rounded,
+      activeIcon: Icons.favorite_rounded,
+      colour: Color(0xFFE8467C),
+    ),
+  ];
 
   /// The gap under the pills when the bar is showing.
   ///
@@ -193,12 +244,12 @@ class _ShellNavBar extends ConsumerWidget {
         ? ref.watch(liveOrderProvider)
         : null;
 
+    // The pill tabs are indices 0–2; Cart is the one after them, and while it is
+    // the live branch no tab reads as selected — which is correct, because the
+    // Cart pill beside them is the thing that is showing. The old fallback index
+    // existed only to park the sliding indicator somewhere, and the indicator is
+    // gone.
     final int currentIndex = navigationShell.currentIndex;
-    // The pill tabs are indices 0–1; Cart is the one after them. When Cart is
-    // the selected branch, the sliding indicator has no pill to sit under, so
-    // it falls back to the first tab rather than sliding off the row.
-    final int leftIndex =
-        currentIndex < AppShell.cartBranchIndex ? currentIndex : 0;
 
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final Color glowColor = isDark ? Colors.black : Colors.white;
@@ -277,50 +328,22 @@ class _ShellNavBar extends ConsumerWidget {
                       child: LayoutBuilder(
                         builder: (context, constraints) {
                           final double tabWidth =
-                              constraints.maxWidth / _tabCount;
-                          return Stack(
-                            children: [
-                              // Sliding indicator
-                              AnimatedPositioned(
-                                duration: const Duration(milliseconds: 250),
-                                curve: Curves.easeInOutCubic,
-                                left: leftIndex * tabWidth,
-                                top: 4,
-                                bottom: 4,
-                                width: tabWidth,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: zc.primaryDeep.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(28),
-                                  ),
+                              constraints.maxWidth / _tabs.length;
+                          // No Stack and no indicator any more — the row is the
+                          // whole bar. `leftIndex` still decides which tab reads
+                          // as selected while Cart is the live branch.
+                          return Row(
+                            children: <Widget>[
+                              for (int i = 0; i < _tabs.length; i++)
+                                _buildNavItem(
+                                  context: context,
+                                  ref: ref,
+                                  index: i,
+                                  tab: _tabs[i],
+                                  width: tabWidth,
+                                  isSelected: currentIndex == i,
+                                  zc: zc,
                                 ),
-                              ),
-                              Row(
-                                children: [
-                                  _buildNavItem(
-                                    context: context,
-                                    ref: ref,
-                                    index: 0,
-                                    title: 'Delivery',
-                                    icon: Icons.delivery_dining_outlined,
-                                    activeIcon: Icons.delivery_dining,
-                                    width: tabWidth,
-                                    isSelected: currentIndex == 0,
-                                    zc: zc,
-                                  ),
-                                  _buildNavItem(
-                                    context: context,
-                                    ref: ref,
-                                    index: 1,
-                                    title: 'Gifts',
-                                    icon: Icons.card_giftcard_outlined,
-                                    activeIcon: Icons.card_giftcard,
-                                    width: tabWidth,
-                                    isSelected: currentIndex == 1,
-                                    zc: zc,
-                                  ),
-                                ],
-                              ),
                             ],
                           );
                         },
@@ -416,13 +439,15 @@ class _ShellNavBar extends ConsumerWidget {
     required BuildContext context,
     required WidgetRef ref,
     required int index,
-    required String title,
-    required IconData icon,
-    required IconData activeIcon,
+    required _NavTab tab,
     required double width,
     required bool isSelected,
     required ZopiqColors zc,
   }) {
+    // The tab's own colour when selected, the shared muted one when not. Nothing
+    // is drawn behind either state.
+    final Color colour = isSelected ? tab.colour : zc.textMuted;
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _onTap(ref, index),
@@ -430,18 +455,30 @@ class _ShellNavBar extends ConsumerWidget {
         width: width,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isSelected ? activeIcon : icon,
-              color: isSelected ? zc.primaryDeep : zc.textMuted,
-              size: 24,
+          children: <Widget>[
+            // The colour crossfades rather than snapping, which is the only
+            // animation left in the row now that the sliding block is gone. 180ms
+            // is short enough to feel like a tap response instead of a transition.
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: Icon(
+                isSelected ? tab.activeIcon : tab.icon,
+                // Keyed so the switcher sees the filled and outlined icons as
+                // different children; without it the swap is silent and the
+                // crossfade never runs.
+                key: ValueKey<bool>(isSelected),
+                color: colour,
+                size: 24,
+              ),
             ),
             const SizedBox(height: 2),
             Text(
-              title,
+              tab.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: isSelected ? zc.primaryDeep : zc.textMuted,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: colour,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
           ],

@@ -101,7 +101,10 @@ class AccountPage extends ConsumerWidget {
                 iconColor: context.zc.nonVeg,
                 title: 'Your collection',
                 subtitle: 'Restaurants you saved',
-                onTap: () => context.pushNamed(Routes.favourites),
+                // `go`, not `push`: Favourites is the Collection tab now, so
+                // this switches to it rather than stacking a second copy on top
+                // of Account and leaving a back arrow over a primary tab.
+                onTap: () => context.goNamed(Routes.favourites),
               ),
             ],
           ),
@@ -328,11 +331,10 @@ class _VegModeTile extends ConsumerWidget {
         'Show only vegetarian restaurants',
         style: t.bodySmall?.copyWith(color: zc.textMuted),
       ),
-      trailing: Switch(
-        value: isVeg,
-        onChanged: set,
-        activeThumbColor: zc.veg,
-      ),
+      // Colours come from `switchTheme` rather than from here. This used to pass
+      // `activeThumbColor: zc.veg`, which put a green thumb on a green track and
+      // made the *on* state as shapeless as the off one was.
+      trailing: Switch(value: isVeg, onChanged: set),
     );
   }
 }

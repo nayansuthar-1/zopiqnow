@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/domain/entities/hero_slide.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_filters.dart';
@@ -265,23 +266,53 @@ class _LocationTitle extends StatelessWidget {
   }
 }
 
-class _ProfileButton extends StatelessWidget {
+/// The customer's own face, when there is one.
+///
+/// Deliberately *not* [ProfileAvatar], which is the right widget on the account
+/// screen and the wrong one here: its no-photo fallback is a brand-tinted
+/// initial, and this button sits on the hero's coloured header where a pale
+/// orange disc on orange would vanish. So the photo is shared and the fallback
+/// is not — the translucent-white person glyph stays exactly as it was, which is
+/// what a signed-out customer and a customer who never set a picture both see.
+class _ProfileButton extends ConsumerWidget {
   const _ProfileButton({required this.onTap});
 
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AuthState auth = ref.watch(authControllerProvider);
+    final String? avatarUrl = auth is AuthSignedIn ? auth.user.avatarUrl : null;
+
+    const Widget fallback = ColoredBox(
+      color: Color(0x38FFFFFF),
+      child: Icon(Icons.person_rounded, color: ZopiqPalette.white, size: 20),
+    );
+
     return InkResponse(
       onTap: onTap,
       radius: 24,
-      child: CircleAvatar(
-        radius: 18,
-        backgroundColor: ZopiqPalette.white.withValues(alpha: 0.22),
-        child: const Icon(
-          Icons.person_rounded,
-          color: ZopiqPalette.white,
-          size: 20,
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: ClipOval(
+          // A white hairline so a photo of any brightness still reads as a
+          // distinct control against the header behind it, rather than as a
+          // rectangle of somebody's face bleeding into the orange.
+          child: DecoratedBox(
+            position: DecorationPosition.foreground,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: ZopiqPalette.white.withValues(alpha: 0.6),
+                width: 1.5,
+              ),
+            ),
+            // `ZopiqNetworkImage` already owns empty, loading and failed, so a
+            // Cloudinary URL that 404s lands on the same glyph as no photo at
+            // all rather than on a broken-image icon.
+            child: ZopiqNetworkImage(url: avatarUrl ?? '', fallback: fallback),
+          ),
         ),
       ),
     );

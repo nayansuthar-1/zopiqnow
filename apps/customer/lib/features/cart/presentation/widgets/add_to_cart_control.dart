@@ -5,16 +5,30 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 /// The iconic "ADD" control that expands into a −/quantity/+ stepper once the
 /// item is in the cart. Presentation-only: quantity and callbacks are supplied
 /// by the caller, so it works identically on the menu and in the cart.
+///
+/// **The shape is a rounded rectangle, not a pill, and the fill is the card's
+/// own surface rather than orange.** It used to be a 20pt pill with a tinted
+/// orange fill, an orange border and an orange glow — three statements of the
+/// same colour stacked on one 36pt control, repeated down a hundred-dish menu
+/// until the brand colour stopped meaning anything. Now the border and the word
+/// carry it and the button sits *on* the card instead of glowing off it, which
+/// is the shape Zomato and Swiggy both settled on for the same reason.
 class AddToCartControl extends StatelessWidget {
   const AddToCartControl({
     required this.quantity,
     required this.onAdd,
     required this.onIncrement,
     required this.onDecrement,
-    this.width = 104,
+    this.width = 88,
     this.enabled = true,
     super.key,
   });
+
+  /// The corner radius both states share. Small enough to read as a rectangle,
+  /// large enough not to look like an unstyled box — and named because the
+  /// button, the stepper and both of their ink splashes have to agree, which is
+  /// four places one number used to be written into.
+  static const double radius = 9;
 
   final int quantity;
   final VoidCallback onAdd;
@@ -65,46 +79,51 @@ class _AddButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    const BorderRadius shape = BorderRadius.all(
+      Radius.circular(AddToCartControl.radius),
+    );
 
     return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(20),
+      // The card's own surface, not a tint of the brand. On a white card this is
+      // white; in dark mode it is the elevated surface — either way the button
+      // reads as a raised control rather than as a coloured patch.
+      color: surface,
+      borderRadius: shape,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: shape,
         onTap: () {
           HapticFeedback.selectionClick();
           onAdd();
         },
-        child: Container(
+        child: DecoratedBox(
           decoration: BoxDecoration(
-            color: isDark ? zc.primary.withValues(alpha: 0.15) : zc.primary.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: zc.primary,
-              width: 1.2,
-            ),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: zc.primary.withValues(alpha: 0.15),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: shape,
+            border: Border.all(color: zc.primary.withValues(alpha: 0.55)),
           ),
           child: Center(
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Icon(Icons.add_rounded, size: 14, color: zc.primary),
-                const SizedBox(width: 2),
                 Text(
                   'ADD',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: zc.primary,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 12,
-                    letterSpacing: 0.5,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                const SizedBox(width: 1),
+                // Superscript, not a leading icon at label size. It says the
+                // button adds *another* one without competing with the word for
+                // the eye, which is the detail that makes the Zomato control
+                // read as small rather than as cramped.
+                Transform.translate(
+                  offset: const Offset(0, -4),
+                  child: Icon(
+                    Icons.add_rounded,
+                    size: 10,
+                    color: zc.primary,
                   ),
                 ),
               ],
@@ -131,17 +150,16 @@ class _Stepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return DecoratedBox(
+      // Solid brand here and only here. Once a dish is in the cart the control
+      // *is* the state, so it earns the fill the ADD button no longer takes —
+      // and one filled control per row still reads as an accent, where two did
+      // not. Same radius as ADD, so the swap between them does not change shape.
       decoration: BoxDecoration(
         color: zc.primary,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: zc.primary.withValues(alpha: 0.3),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: const BorderRadius.all(
+          Radius.circular(AddToCartControl.radius),
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -23,6 +23,10 @@ Future<void> showGiftItemSheet(
     () => showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      // Takes the status bar and the gesture inset off the sheet's constraints,
+      // so the 92% below is 92% of the space that actually exists rather than of
+      // the raw screen. Without it a tall gift overflowed by exactly the notch.
+      useSafeArea: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -96,37 +100,33 @@ class _GiftItemSheet extends ConsumerWidget {
 
     final int originalMrp = (item.price * 1.25).round();
 
-    return SafeArea(
-      top: false,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.88,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            // Grab handle
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(
-                  top: 12,
-                  bottom: 8,
-                ),
-                width: 44,
-                height: 4.5,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
+    // **No grab handle here.** There used to be one, and the theme
+    // (`bottomSheetTheme.showDragHandle: true`) draws one for every sheet in the
+    // app — so this sheet rendered *two*, the framework's 32×4 and a hand-rolled
+    // 44×4.5 stacked underneath it. That is the pair of small bars at the top.
+    // Flutter also reserves `kMinInteractiveDimension` (48pt) above the builder's
+    // child to hold its handle, which the old custom handle's 24pt of margin sat
+    // on top of, wasting most of the sheet's first 72 points on nothing.
+    //
+    // **And the column min-sizes.** The action bar is a sibling of the scroll
+    // view rather than the last widget inside it, so the sheet is exactly as
+    // tall as its content up to the cap — it can no longer reserve height it
+    // does not fill, which is the shape a trailing gap comes from. The cap is a
+    // *max*, never a floor: a short gift makes a short sheet.
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
                     // Gallery
                     ClipRRect(
                       borderRadius: BorderRadius.circular(18),
@@ -364,30 +364,90 @@ class _GiftItemSheet extends ConsumerWidget {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
 
-                    // The button that used to say "Close" and close. A
-                    // catalogue with no way to buy anything was the whole of
-                    // the Gifts tab until 0096.
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _blinkitGreen,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+          // The action bar, pinned.
+          //
+          // Outside the scroll view on purpose. It used to be the last widget
+          // *inside* it, so on any gift with a real description the only way to
+          // reach "Add to bag" was to scroll to the very bottom — the button
+          // that is the entire point of the sheet was the one thing you could
+          // not see when it opened. Now it is always on screen and the content
+          // scrolls behind it.
+          //
+          // `SafeArea` here and nowhere else in the sheet: this is the only part
+          // that touches the bottom edge, so it is the only part that has to
+          // clear the home indicator.
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border(
+                top: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : const Color(0xFFE2E8F0),
+                ),
+              ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                child: Row(
+                  children: <Widget>[
+                    // The price again, and deliberately: at the moment of
+                    // committing, the number being committed to should be beside
+                    // the button rather than scrolled off the top of the sheet.
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          '₹${item.price}',
+                          style: t.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 20,
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF1E1E1E),
                           ),
                         ),
-                        onPressed: () => _addToBag(context, ref),
-                        child: Text(
-                          'Add to bag · ₹${item.price}',
-                          style: t.titleMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
+                        Text(
+                          'incl. gift packaging',
+                          style: t.labelSmall?.copyWith(
+                            color: zc.textMuted,
+                            fontSize: 10.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: SizedBox(
+                        height: 50,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _blinkitGreen,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          // The button that used to say "Close" and close. A
+                          // catalogue with no way to buy anything was the whole
+                          // of the Gifts tab until 0096.
+                          onPressed: () => _addToBag(context, ref),
+                          child: Text(
+                            'Add to bag',
+                            style: t.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
                           ),
                         ),
                       ),
@@ -396,8 +456,8 @@ class _GiftItemSheet extends ConsumerWidget {
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

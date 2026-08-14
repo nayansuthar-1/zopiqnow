@@ -15,7 +15,7 @@ library;
 /// Where a customer writes to about any of this. One constant because it
 /// appears in both documents, in the Play listing, and in the grievance section
 /// the DPDP Act requires — four places that must not drift apart.
-const String supportEmail = 'support@zopiqnow.com';
+const String supportEmail = 'zopiqnow@gmail.com';
 
 /// The legal entity behind the app, as it should appear on a legal document.
 const String legalEntity = 'Zopiqnow';

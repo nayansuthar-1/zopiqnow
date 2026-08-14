@@ -333,7 +333,28 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
               ),
             ],
           ),
-          // Branch 2: Cart
+          // Branch 2: Collection — the restaurants they saved.
+          //
+          // Promoted out of the account screen and into a tab of its own. It was
+          // already a whole feature (repository, providers, the heart on every
+          // card) reachable only by opening Account and finding one row; a saved
+          // restaurant is something you come back to, and a tab is what "come
+          // back to" looks like.
+          //
+          // Still auth-guarded by `_protectedPrefixes` — a favourite belongs to
+          // an account, and there is no such thing as a signed-out customer's
+          // saved restaurants. Tapping the tab signed out lands on login, which
+          // is the same answer /orders and /addresses already give.
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/favourites',
+                name: Routes.favourites,
+                builder: (_, _) => const FavouritesPage(),
+              ),
+            ],
+          ),
+          // Branch 3: Cart
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
@@ -362,12 +383,6 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             builder: (_, _) => const OrderSuccessPage(),
           ),
         ],
-      ),
-
-      GoRoute(
-        path: '/favourites',
-        name: Routes.favourites,
-        builder: (_, _) => const FavouritesPage(),
       ),
 
       // The address book. Guarded by prefix; the form nests under it so one
