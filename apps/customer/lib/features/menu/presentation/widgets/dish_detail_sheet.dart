@@ -136,7 +136,7 @@ class _DishDetailSheet extends ConsumerWidget {
                         Radius.circular(AddToCartControl.radius),
                       ),
                       child: AddToCartControl(
-                        width: 104,
+                        width: 76,
                         // A customisable dish always shows ADD: every tap can
                         // build a different configuration, so there is no single
                         // line for a stepper to count. Same rule as the menu row.
@@ -275,13 +275,17 @@ class _DishDetailSheet extends ConsumerWidget {
           ),
         ),
 
-        // **No bottom bar.** It held the price and the Add control, and both
-        // moved: the control onto the photo, and the price is three lines under
-        // the dish name where it was already being shown. A bar repeating a
-        // number the customer can see, under a button that is now somewhere
-        // else, is a bar with nothing left to say — and it was costing ~70pt of
-        // a sheet that has better uses for them.
-        const SafeArea(top: false, child: SizedBox.shrink()),
+        // **No bottom bar, and no trailing `SafeArea` either.** The bar held the
+        // price and the Add control, and both moved: the control onto the photo,
+        // and the price is three lines under the dish name where it was already
+        // being shown. A bar repeating a number the customer can see, under a
+        // button that is now somewhere else, is a bar with nothing left to say.
+        //
+        // The `SafeArea` that briefly replaced it was worse than useless: the
+        // route is opened `useSafeArea: true`, so the gesture inset is already
+        // off the sheet's constraints, and adding a second copy here left a band
+        // of empty surface along the bottom. The rail's own list padding is what
+        // keeps it off the edge.
       ],
     );
   }
@@ -451,7 +455,7 @@ class _AddOnCard extends ConsumerWidget {
                     Radius.circular(AddToCartControl.radius),
                   ),
                   child: AddToCartControl(
-                    width: 82,
+                    width: 68,
                     quantity: item.isCustomizable ? 0 : quantity,
                     enabled: enabled,
                     onAdd: () => addDishToCart(

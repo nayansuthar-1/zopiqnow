@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/providers/bottom_nav_provider.dart';
+import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
@@ -28,8 +30,16 @@ class CartPage extends ConsumerWidget {
     final TextTheme t = Theme.of(context).textTheme;
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // **A canvas, not a surface.** The page and every card on it were both
+    // `colorScheme.surface` — white sections on a white page — so the borders
+    // and shadows were the only thing separating them and the screen read as
+    // one undivided sheet of white with lines drawn on it. On the grey
+    // container the sections separate themselves, which is what lets the
+    // shadows come down and the whole thing stop looking like a form.
+    final Color canvas = Theme.of(context).colorScheme.surfaceContainer;
+
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: canvas,
       appBar: AppBar(
         // The cart is a shell *branch root*, so its own Navigator has nothing
         // to pop and `AppBar` draws no leading at all. That was survivable
@@ -46,7 +56,7 @@ class CartPage extends ConsumerWidget {
           ),
         ),
         centerTitle: false,
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        backgroundColor: canvas,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         actions: <Widget>[
@@ -152,8 +162,10 @@ class _CartBody extends StatelessWidget {
           index: 1,
           child: _ItemsCard(cart: cart),
         ),
+        const SizedBox(height: 10),
+        ZopiqReveal(index: 2, child: _AddMoreItems(cart: cart)),
         const SizedBox(height: 14),
-        ZopiqReveal(index: 2, child: BillSummary(bill: CartBill.of(cart))),
+        ZopiqReveal(index: 3, child: BillSummary(bill: CartBill.of(cart))),
       ],
     );
   }
@@ -308,6 +320,81 @@ class _RestaurantHeader extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// "Add more items" — back to the kitchen the cart belongs to.
+///
+/// The gap this fills was a real dead end: the only route off a non-empty cart
+/// was the app-bar back arrow, which goes to Home rather than to the restaurant
+/// being ordered from. So a customer who forgot a drink had to find that kitchen
+/// again from the feed, and the one obvious-looking control on the screen was
+/// "Clear". Every cart in this category has this row for that reason.
+///
+/// Pushed, so the menu arrives *over* the cart and system Back returns to it
+/// with the order intact — going by branch would have swapped tabs and left the
+/// cart behind a tab switch.
+///
+/// Silent when the cart somehow has no restaurant id. That should not happen —
+/// a line cannot be added without one — but a row that navigates nowhere is the
+/// thing this whole screen is trying to stop being.
+class _AddMoreItems extends StatelessWidget {
+  const _AddMoreItems({required this.cart});
+
+  final Cart cart;
+
+  @override
+  Widget build(BuildContext context) {
+    final String? id = cart.restaurantId;
+    if (id == null) return const SizedBox.shrink();
+
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Material(
+      color: isDark ? const Color(0xFF1E1E24) : Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => context.pushNamed(
+          Routes.menu,
+          pathParameters: <String, String>{'id': id},
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : const Color(0xFFE8ECEF),
+            ),
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(Icons.add_rounded, size: 18, color: zc.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Add more items',
+                  style: t.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: isDark ? Colors.white : const Color(0xFF1E1E1E),
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: zc.textMuted,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -500,7 +587,11 @@ class _CartLineTile extends ConsumerWidget {
                 onAdd: () => cart.increment(line.lineId),
                 onIncrement: () => cart.increment(line.lineId),
                 onDecrement: () => cart.decrement(line.lineId),
-                width: 96,
+                // A shade wider than the 72 the menu rows use: this control is
+                // always a stepper here (a cart line exists because quantity is
+                // at least one), and three elements want a little more room than
+                // the word ADD does.
+                width: 84,
               ),
               const SizedBox(height: 6),
               ZopiqAnimatedAmount(

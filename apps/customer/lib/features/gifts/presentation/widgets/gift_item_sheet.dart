@@ -23,10 +23,11 @@ Future<void> showGiftItemSheet(
     () => showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      // Takes the status bar and the gesture inset off the sheet's constraints,
-      // so the 92% below is 92% of the space that actually exists rather than of
-      // the raw screen. Without it a tall gift overflowed by exactly the notch.
-      useSafeArea: true,
+      // **Deliberately not `useSafeArea`.** That insets the whole *route* above
+      // the gesture bar, and the action bar below already wraps itself in a
+      // `SafeArea` — so the inset was counted twice and the sheet floated a
+      // finger's width off the bottom of the screen with nothing in the gap.
+      // One inset, spent in the one place that touches the bottom edge.
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -115,7 +116,10 @@ class _GiftItemSheet extends ConsumerWidget {
     // *max*, never a floor: a short gift makes a short sheet.
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        // Of the *whole* screen, which is right now that the route is not
+        // insetting: the sheet is free to run to the bottom edge and the action
+        // bar's own SafeArea is what keeps the button off the gesture bar.
+        maxHeight: MediaQuery.sizeOf(context).height * 0.94,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -394,8 +398,11 @@ class _GiftItemSheet extends ConsumerWidget {
             ),
             child: SafeArea(
               top: false,
+              // 6 under the row rather than 12: the SafeArea beneath it already
+              // contributes the gesture inset, so a symmetric pad here reads as
+              // double the gap it looks like in the code.
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
                 child: Row(
                   children: <Widget>[
                     // The price again, and deliberately: at the moment of

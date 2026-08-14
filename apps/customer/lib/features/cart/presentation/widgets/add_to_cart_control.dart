@@ -6,20 +6,26 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 /// item is in the cart. Presentation-only: quantity and callbacks are supplied
 /// by the caller, so it works identically on the menu and in the cart.
 ///
-/// **The shape is a rounded rectangle, not a pill, and the fill is the card's
-/// own surface rather than orange.** It used to be a 20pt pill with a tinted
-/// orange fill, an orange border and an orange glow — three statements of the
-/// same colour stacked on one 36pt control, repeated down a hundred-dish menu
-/// until the brand colour stopped meaning anything. Now the border and the word
-/// carry it and the button sits *on* the card instead of glowing off it, which
-/// is the shape Zomato and Swiggy both settled on for the same reason.
+/// **The ADD half carries no brand colour at all.** It was a pill with a tinted
+/// orange fill, an orange border, orange text and an orange glow — four
+/// statements of one colour on a 36pt control, repeated down a hundred-dish
+/// menu until the brand colour stopped meaning anything. It is now the card's
+/// own surface, a hairline in the divider colour, and the word in the page's
+/// text colour: white-on-grey in light mode, and the dark surface with a light
+/// word in dark. Orange survives in exactly one place — the stepper, below,
+/// which is the state worth colouring.
+///
+/// **And there is no `+`.** A superscript plus beside the word put a glyph on a
+/// different baseline from the letters next to it, which is the kind of detail
+/// that reads as a rendering fault rather than as typography. "ADD" already says
+/// what the button does.
 class AddToCartControl extends StatelessWidget {
   const AddToCartControl({
     required this.quantity,
     required this.onAdd,
     required this.onIncrement,
     required this.onDecrement,
-    this.width = 88,
+    this.width = 72,
     this.enabled = true,
     super.key,
   });
@@ -28,7 +34,7 @@ class AddToCartControl extends StatelessWidget {
   /// large enough not to look like an unstyled box — and named because the
   /// button, the stepper and both of their ink splashes have to agree, which is
   /// four places one number used to be written into.
-  static const double radius = 9;
+  static const double radius = 8;
 
   final int quantity;
   final VoidCallback onAdd;
@@ -98,35 +104,20 @@ class _AddButton extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: shape,
-            border: Border.all(color: zc.primary.withValues(alpha: 0.55)),
+            border: Border.all(color: zc.divider),
           ),
+          // The word alone, centred, with nothing beside it to push it off
+          // centre. No Row and no icon — a single centred Text is why the button
+          // can now be 72pt instead of 104 without looking cramped.
           child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(
-                  'ADD',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: zc.primary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-                const SizedBox(width: 1),
-                // Superscript, not a leading icon at label size. It says the
-                // button adds *another* one without competing with the word for
-                // the eye, which is the detail that makes the Zomato control
-                // read as small rather than as cramped.
-                Transform.translate(
-                  offset: const Offset(0, -4),
-                  child: Icon(
-                    Icons.add_rounded,
-                    size: 10,
-                    color: zc.primary,
-                  ),
-                ),
-              ],
+            child: Text(
+              'ADD',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: zc.textStrong,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: 0.3,
+              ),
             ),
           ),
         ),
@@ -202,10 +193,13 @@ class _StepButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkResponse(
       onTap: onTap,
-      radius: 20,
+      radius: 18,
+      // 6, not 8. The control narrowed to 72 with ADD, and both states share one
+      // width — at the old padding the two 16pt icons and the count needed 76
+      // and overflowed by four points the moment a dish went into the cart.
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Icon(icon, color: Colors.white, size: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Icon(icon, color: Colors.white, size: 15),
       ),
     );
   }
