@@ -2,7 +2,7 @@ name: zopiq_rider
 description: "Zopiqnow for delivery partners — the bike's side of an order."
 publish_to: 'none'
 
-version: 1.0.0+4
+version: 1.0.0+5
 # Part of the zopiqnow pub workspace: shares the single root lockfile (Rule 3).
 resolution: workspace
 
