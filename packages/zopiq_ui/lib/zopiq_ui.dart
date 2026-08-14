@@ -6,6 +6,7 @@
 library;
 
 // Tokens
+export 'src/tokens/zopiq_icons.dart';
 export 'src/tokens/zopiq_palette.dart';
 export 'src/tokens/zopiq_spacing.dart';
 export 'src/tokens/zopiq_radii.dart';

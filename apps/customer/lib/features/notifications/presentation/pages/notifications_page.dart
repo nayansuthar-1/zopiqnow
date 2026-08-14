@@ -150,8 +150,8 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                     IconButton(
                       icon: Icon(
                         _selecting
-                            ? Icons.close_rounded
-                            : Icons.arrow_back_rounded,
+                            ? ZopiqIcons.close
+                            : ZopiqIcons.arrowLeft,
                         color: ink,
                         size: 22,
                       ),
@@ -180,7 +180,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                       IconButton(
                         tooltip: 'Delete selected',
                         icon: Icon(
-                          Icons.delete_outline_rounded,
+                          ZopiqIcons.trash,
                           size: 22,
                           color: _selected.isEmpty ? zc.textMuted : zc.nonVeg,
                         ),
@@ -199,7 +199,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                       IconButton(
                         tooltip: 'Select',
                         icon: Icon(
-                          Icons.checklist_rounded,
+                          ZopiqIcons.checkSquare,
                           size: 22,
                           color: items.isEmpty ? zc.textMuted : ink,
                         ),
@@ -233,7 +233,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                 child: async.when(
                   loading: () => const Center(child: ZopiqLoader()),
                   error: (Object _, StackTrace _) => _Empty(
-                    icon: Icons.cloud_off_rounded,
+                    icon: ZopiqIcons.cloudSlash,
                     title: 'Notifications are out of reach',
                     body: 'We couldn\'t load your inbox just now.',
                     onRetry: () => ref.invalidate(notificationsProvider),
@@ -241,7 +241,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                   data: (List<CustomerNotification> list) {
                     if (list.isEmpty) {
                       return const _Empty(
-                        icon: Icons.notifications_off_rounded,
+                        icon: ZopiqIcons.bellSlash,
                         title: 'Nothing yet',
                         body: 'Updates about your orders will show up here.',
                       );
@@ -276,8 +276,8 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                                 padding: const EdgeInsets.only(left: 12),
                                 child: Icon(
                                   picked
-                                      ? Icons.check_circle_rounded
-                                      : Icons.radio_button_unchecked_rounded,
+                                      ? ZopiqIconsFill.checkCircle
+                                      : ZopiqIcons.circle,
                                   size: 22,
                                   color: picked ? zc.primary : zc.textMuted,
                                 ),
@@ -340,7 +340,7 @@ class _NotificationTile extends ConsumerWidget {
         text.contains('speed') ||
         text.contains('minute')) {
       return const _NotificationIconInfo(
-        Icons.sports_motorsports_rounded,
+        ZopiqIconsFill.moped,
         Color(0xFF0C831F), // Emerald Delivery Green
       );
     }
@@ -355,7 +355,7 @@ class _NotificationTile extends ConsumerWidget {
         text.contains('confirm') ||
         text.contains('place')) {
       return _NotificationIconInfo(
-        Icons.restaurant_rounded,
+        ZopiqIconsFill.cookingPot,
         zc.primary, // Zopiq Primary Brand
       );
     }
@@ -371,7 +371,7 @@ class _NotificationTile extends ConsumerWidget {
         text.contains('gift') ||
         text.contains('flat')) {
       return const _NotificationIconInfo(
-        Icons.local_offer_rounded,
+        ZopiqIconsFill.tag,
         Color(0xFF8B5CF6), // Purple
       );
     }
@@ -384,7 +384,7 @@ class _NotificationTile extends ConsumerWidget {
         text.contains('bill') ||
         text.contains('upi')) {
       return const _NotificationIconInfo(
-        Icons.account_balance_wallet_rounded,
+        ZopiqIconsFill.wallet,
         Color(0xFF0284C7), // Blue
       );
     }
@@ -392,20 +392,20 @@ class _NotificationTile extends ConsumerWidget {
     // 5. Fallback based on Kind
     if (item.kind == CustomerNotificationKind.message) {
       return _NotificationIconInfo(
-        Icons.chat_bubble_rounded,
+        ZopiqIconsFill.chat,
         zc.primary,
       );
     }
 
     if (item.kind == CustomerNotificationKind.orderUpdate) {
       return _NotificationIconInfo(
-        Icons.receipt_long_rounded,
+        ZopiqIconsFill.receipt,
         zc.primary,
       );
     }
 
     return _NotificationIconInfo(
-      Icons.notifications_active_rounded,
+      ZopiqIconsFill.bellRinging,
       isDark ? const Color(0xFF33333E) : const Color(0xFF2E2E38),
     );
   }
@@ -661,7 +661,7 @@ class _Empty extends StatelessWidget {
                           ),
                         ),
                         onPressed: onRetry,
-                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        icon: const Icon(ZopiqIcons.refresh, size: 18),
                         label: const Text(
                           'Retry',
                           style: TextStyle(fontWeight: FontWeight.w800),

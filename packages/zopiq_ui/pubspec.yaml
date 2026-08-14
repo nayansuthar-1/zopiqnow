@@ -43,3 +43,18 @@ flutter:
     - family: Figtree
       fonts:
         - asset: assets/fonts/Figtree-Variable.ttf
+
+    # The icon set, as a font rather than as a package — see `ZopiqIcons` for
+    # why the package could not be used. Phosphor Icons, MIT, redistributed with
+    # its licence at lib/fonts/PHOSPHOR-LICENSE.txt.
+    #
+    # Two weights only, of the six Phosphor ships: Regular is the working glyph
+    # and Fill is what "selected" looks like. Bold, Light, Thin and Duotone are
+    # deliberately not bundled — each is another ~450 KB of asset for a
+    # distinction nothing in the product makes.
+    - family: PhosphorRegular
+      fonts:
+        - asset: lib/fonts/Phosphor-Regular.ttf
+    - family: PhosphorFill
+      fonts:
+        - asset: lib/fonts/Phosphor-Fill.ttf

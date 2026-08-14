@@ -86,7 +86,7 @@ class HeaderBell extends ConsumerWidget {
               // Filled while something is unread, outlined when nothing is —
               // the weight itself carries the state, so the badge is a count
               // rather than the only signal that there is anything to read.
-              unread > 0 ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
+              unread > 0 ? ZopiqIconsFill.bellRinging : ZopiqIcons.bell,
               color: skin.foreground,
               size: 20,
             ),
@@ -144,7 +144,7 @@ class HeaderProfileButton extends ConsumerWidget {
     final Widget fallback = ColoredBox(
       color: skin.background,
       child: Icon(
-        Icons.person_rounded,
+        ZopiqIcons.user,
         color: skin.foreground,
         size: 20,
       ),

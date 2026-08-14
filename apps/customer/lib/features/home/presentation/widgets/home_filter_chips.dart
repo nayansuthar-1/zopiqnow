@@ -105,7 +105,7 @@ class _FilterChip extends StatelessWidget {
               ),
               if (selected) ...<Widget>[
                 const SizedBox(width: ZopiqSpacing.xs),
-                Icon(Icons.close_rounded, size: 14, color: zc.primary),
+                Icon(ZopiqIcons.close, size: 14, color: zc.primary),
               ],
             ],
           ),
@@ -156,27 +156,27 @@ class _SortChip extends StatelessWidget {
   switch (sort) {
     case HomeSort.relevance:
       return (
-        icon: Icons.auto_awesome_rounded,
+        icon: ZopiqIcons.sparkle,
         blurb: 'What we think you will like',
       );
     case HomeSort.rating:
       return (
-        icon: Icons.star_rounded,
+        icon: ZopiqIcons.star,
         blurb: 'Best rated kitchens first',
       );
     case HomeSort.deliveryTime:
       return (
-        icon: Icons.timer_outlined,
+        icon: ZopiqIcons.timer,
         blurb: 'Quickest to reach you',
       );
     case HomeSort.costLowToHigh:
       return (
-        icon: Icons.trending_down_rounded,
+        icon: ZopiqIcons.trendDown,
         blurb: 'Cheapest first',
       );
     case HomeSort.costHighToLow:
       return (
-        icon: Icons.trending_up_rounded,
+        icon: ZopiqIcons.trendUp,
         blurb: 'Most expensive first',
       );
   }
@@ -208,7 +208,7 @@ class _SortSheet extends StatelessWidget {
             child: Row(
               children: <Widget>[
                 Icon(
-                  Icons.tune_rounded,
+                  ZopiqIcons.sliders,
                   size: 20,
                   color: zc.textStrong,
                 ),
@@ -329,8 +329,8 @@ class _SortOptionTile extends StatelessWidget {
                 // shift sideways as the selection moves down the list.
                 Icon(
                   selected
-                      ? Icons.check_circle_rounded
-                      : Icons.radio_button_unchecked_rounded,
+                      ? ZopiqIconsFill.checkCircle
+                      : ZopiqIcons.circle,
                   size: 20,
                   color: selected ? zc.primary : zc.divider,
                 ),
