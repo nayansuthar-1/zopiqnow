@@ -103,7 +103,15 @@ class AddressMockDataSource implements AddressDataSource {
     required double latitude,
     required double longitude,
   }) async {
-    await Future<void>.delayed(latency);
+    // Guarded, unlike its siblings above, and it has to be. `selectAddress`
+    // awaits this to stamp the town onto the selection (0126), and tests call
+    // `selectAddress` *before* `pumpWidget` to seed a persisted address. A
+    // `Future.delayed(Duration.zero)` still arms a Timer, and a Timer inside a
+    // widget test only fires when the tester pumps — so an unguarded zero-length
+    // delay awaited before the first pump waits forever. A latency of nothing
+    // therefore schedules nothing, which is what a caller asking for no latency
+    // meant. `RestaurantMockDataSource._wait` guards for the same reason.
+    if (latency > Duration.zero) await Future<void>.delayed(latency);
     return refuseDeliveryArea
         ? const DeliveryAreaVerdict(
             serviceable: false,
@@ -112,10 +120,16 @@ class AddressMockDataSource implements AddressDataSource {
                 "We're not delivering to this address yet — we're still only "
                 'in Falna, Ranakpur and Sadri.',
           )
+        // A town on the yes branch and none on the no branch, because that is
+        // the only pairing the server can produce: `serviceable` is *defined*
+        // as "this point resolved to a town" since 0126, so a serviceable
+        // verdict with no `areaId` is a state a fake should not be able to
+        // invent.
         : const DeliveryAreaVerdict(
             serviceable: true,
             headline: 'We deliver here',
             detail: "You're inside our delivery area.",
+            areaId: 'sadri',
           );
   }
 }

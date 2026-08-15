@@ -4,11 +4,16 @@ import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 /// depends only on this abstraction; the concrete implementation (mock today,
 /// HTTP tomorrow) is bound via Riverpod (SAD 7.3 / 7.4).
 abstract interface class RestaurantRepository {
-  /// Restaurants serviceable near the user, ranked for discovery.
+  /// The kitchens of one town, ranked for discovery.
+  ///
+  /// [areaId] is the town the delivery address orders from (migration 0126).
+  /// There is no "all towns" call and deliberately so: we deliver within a town
+  /// and not between them, so a feed that spanned two of them would be a list of
+  /// things the customer cannot buy.
   ///
   /// Throws [RestaurantLoadFailure] on any transport/parse error so the
   /// presentation layer can surface a retryable error state.
-  Future<List<Restaurant>> getNearbyRestaurants();
+  Future<List<Restaurant>> getNearbyRestaurants({required String areaId});
 
   /// A single restaurant by id, for the menu screen.
   ///
@@ -25,7 +30,10 @@ abstract interface class RestaurantRepository {
   /// query" and "no results" are different screens, and the caller decides.
   ///
   /// Throws [RestaurantLoadFailure] on any transport/parse error.
-  Future<List<Restaurant>> searchRestaurants(String query);
+  Future<List<Restaurant>> searchRestaurants(
+    String query, {
+    required String areaId,
+  });
 }
 
 /// The requested restaurant does not exist — a stale link, or a vendor that has

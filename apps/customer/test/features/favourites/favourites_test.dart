@@ -189,7 +189,7 @@ void main() {
       await container.read(favouritesProvider.future);
       final List<Restaurant> feed = await container
           .read(restaurantRepositoryProvider)
-          .getNearbyRestaurants();
+          .getNearbyRestaurants(areaId: 'sadri');
       final Restaurant first = feed.first;
 
       final FavouritesController controller = container.read(
@@ -219,7 +219,7 @@ void main() {
       await container.read(favouritesProvider.future);
       final Restaurant first = (await container
               .read(restaurantRepositoryProvider)
-              .getNearbyRestaurants())
+              .getNearbyRestaurants(areaId: 'sadri'))
           .first;
 
       await expectLater(

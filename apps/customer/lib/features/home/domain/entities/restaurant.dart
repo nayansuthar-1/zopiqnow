@@ -19,6 +19,7 @@ class Restaurant {
     this.distanceKm,
     this.latitude,
     this.longitude,
+    this.serviceAreaId,
     this.promoText,
     this.acceptingOrders = true,
     this.pauseReason = '',
@@ -53,6 +54,15 @@ class Restaurant {
   /// has not been placed on the map yet.
   final double? latitude;
   final double? longitude;
+
+  /// Which town's catalogue this kitchen belongs to (migration 0126) — `sadri`,
+  /// `falna`. Derived in Postgres from [latitude]/[longitude], never typed in.
+  ///
+  /// A kitchen is only ever offered to a customer whose delivery address is in
+  /// the same town, and `orders_within_service_area` refuses the order outright
+  /// if one gets through anyway. Null on a restaurant outside every service
+  /// area, which RLS already hides from the catalogue.
+  final String? serviceAreaId;
 
   final bool isVeg;
 
@@ -96,6 +106,7 @@ class Restaurant {
     distanceKm: km,
     latitude: latitude,
     longitude: longitude,
+    serviceAreaId: serviceAreaId,
     promoText: promoText,
     acceptingOrders: acceptingOrders,
     pauseReason: pauseReason,

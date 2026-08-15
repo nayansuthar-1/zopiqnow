@@ -88,6 +88,14 @@ class ResolvedAuthController extends AuthController {
 /// per-run by design, so "already answered" is a state the real app reaches a
 /// second after launch. Tests that *are* about the gate pass `false` and drive
 /// it themselves.
+///
+/// [deliveringIn] is the sibling of [locationGateAnswered], needed for the same
+/// shape of reason. The catalogue is filtered to the customer's town since
+/// migration 0126, so a test that selects no address gets an empty feed and
+/// every assertion about a restaurant card lands on a screen politely asking it
+/// to set a location. Supplied directly rather than by seeding a selection,
+/// because a seeded address also rewrites the Home header that other tests
+/// assert on. Pass null to test the no-location feed itself.
 List<Override> storageOverrides({
   KeyValueStore? keyValueStore,
   SecureStore? secureStore,
@@ -96,6 +104,7 @@ List<Override> storageOverrides({
   FavouritesDataSource? favouritesDataSource,
   AuthState? authState = const AuthSignedOut(),
   bool locationGateAnswered = true,
+  String? deliveringIn = 'sadri',
 }) => <Override>[
   keyValueStoreProvider.overrideWithValue(keyValueStore ?? FakeKeyValueStore()),
   secureStoreProvider.overrideWithValue(secureStore ?? FakeSecureStore()),
@@ -106,6 +115,7 @@ List<Override> storageOverrides({
   // which is the thing these tests are actually about.
   splashHoldProvider.overrideWithValue(Duration.zero),
   locationGateProvider.overrideWith((Ref _) => locationGateAnswered),
+  currentAreaIdProvider.overrideWithValue(deliveringIn),
   authDataSourceProvider.overrideWithValue(
     authDataSource ?? FakeAuthDataSource(),
   ),

@@ -33,8 +33,13 @@ class RestaurantMockDataSource implements RestaurantDataSource {
     if (latency > Duration.zero) await Future<void>.delayed(latency);
   }
 
+  /// [areaId] is accepted, defaulted and ignored. The fixtures carry no town, so
+  /// a mock that filtered on one would return nothing to every caller; and
+  /// relaxing the interface's `required` to a default — which an override may do
+  /// — keeps the callers that have no town to give, the favourites mock and the
+  /// widget tests, saying what they mean instead of passing a fake one.
   @override
-  Future<List<Restaurant>> fetchNearby() async {
+  Future<List<Restaurant>> fetchNearby({String areaId = ''}) async {
     await _wait();
     if (shouldFail) {
       throw const _MockNetworkException();
@@ -58,7 +63,7 @@ class RestaurantMockDataSource implements RestaurantDataSource {
   /// tokenising, typo tolerance and ranking server-side; this only has to be
   /// good enough to build the screen against.
   @override
-  Future<List<Restaurant>> search(String query) async {
+  Future<List<Restaurant>> search(String query, {String areaId = ''}) async {
     await _wait();
     if (shouldFail) {
       throw const _MockNetworkException();

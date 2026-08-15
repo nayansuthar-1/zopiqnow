@@ -16,6 +16,10 @@ import 'package:zopiqnow/features/checkout/domain/entities/placed_order.dart';
 import 'package:zopiqnow/features/checkout/domain/gateways/payment_gateway.dart';
 import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.dart';
 import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
+// `show`, because both this and `checkout_providers.dart` export an
+// `offersProvider` and they are different things.
+import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart'
+    show restaurantByIdProvider;
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/domain/entities/delivery_area.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
@@ -113,6 +117,28 @@ class CheckoutPage extends ConsumerWidget {
         ? area
         : null;
 
+    // Is the kitchen in the same town as the address? (Migration 0126.) Asked
+    // here for the same reason the question above is: the gateway runs before
+    // `place_order`, so the trigger's refusal arrives after the money.
+    //
+    // Not reachable from the feed, which only ever offers kitchens in the
+    // customer's own town. Reachable two ways that matter — a deep link straight
+    // into a menu, and changing the delivery address with a full cart, which is
+    // a customer who did nothing wrong and needs telling before they pay.
+    final String? myArea = ref.watch(currentAreaIdProvider);
+    final String? kitchenArea = cart.restaurantId == null
+        ? null
+        : ref
+              .watch(restaurantByIdProvider(cart.restaurantId!))
+              .valueOrNull
+              ?.serviceAreaId;
+    // Both sides have to be *known* before this refuses anything. An unresolved
+    // town is "not yet", not "somewhere else", and treating the two the same
+    // would block checkout on a slow request — which is the failure the area
+    // check above is careful not to have.
+    final bool wrongTown =
+        myArea != null && kitchenArea != null && myArea != kitchenArea;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
       body: SafeArea(
@@ -124,7 +150,29 @@ class CheckoutPage extends ConsumerWidget {
             // has just been told we do not reach them will want to read the
             // sentence twice, and a snackbar is gone in four seconds.
             if (refusal != null) ...<Widget>[
-              ZopiqReveal(child: _OutOfAreaCard(verdict: refusal)),
+              ZopiqReveal(
+                child: _OutOfAreaCard(
+                  headline: refusal.headline,
+                  detail: refusal.detail,
+                ),
+              ),
+              const SizedBox(height: ZopiqSpacing.md),
+            ]
+            // Only when the address itself is fine — "we don't reach your
+            // street" and "that kitchen is in the next town" are different
+            // problems with different fixes, and showing both would ask the
+            // customer to solve one they do not have.
+            else if (wrongTown) ...<Widget>[
+              ZopiqReveal(
+                child: _OutOfAreaCard(
+                  headline: 'That kitchen is in another town',
+                  detail:
+                      '${cart.restaurantName ?? 'This restaurant'} doesn\'t '
+                      'deliver to ${address?.shortDisplay ?? 'this address'}. '
+                      'We deliver within a town, not between them — pick an '
+                      'address nearer this kitchen, or order from one in yours.',
+                ),
+              ),
               const SizedBox(height: ZopiqSpacing.md),
             ],
             ZopiqReveal(
@@ -194,11 +242,15 @@ class CheckoutPage extends ConsumerWidget {
             ? 'Select delivery address'
             : refusal != null
             ? 'Choose an address we deliver to'
+            : wrongTown
+            ? 'Choose an address in this town'
             : needsPhone
             ? 'Add a delivery number'
             : 'Pay ₹${bill.total}',
         caption: refusal != null
             ? refusal.headline
+            : wrongTown
+            ? 'We deliver within a town, not between them'
             : 'Test gateway — no money moves until the Razorpay keys are live.',
         isLoading: checkout.isPlacingOrder,
         // The route is auth-guarded, so `auth` is AuthSignedIn here. The pattern
@@ -207,7 +259,8 @@ class CheckoutPage extends ConsumerWidget {
         // Out of area sends them back to the picker rather than going dead —
         // the same rule the rest of this bar follows: a tap with something
         // missing opens the thing that fills it in.
-        onPressed: needsAddress || refusal != null || auth is! AuthSignedIn
+        onPressed:
+            needsAddress || refusal != null || wrongTown || auth is! AuthSignedIn
             ? () => showAddressPicker(context)
             : needsPhone
             ? () => showDeliveryPhoneSheet(context)
@@ -606,9 +659,10 @@ class _PaymentMethods extends StatelessWidget {
 /// treatment is deliberate — a red banner for "we don't reach your street yet"
 /// reads as a fault, and the honest tone is closer to an apology than a warning.
 class _OutOfAreaCard extends StatelessWidget {
-  const _OutOfAreaCard({required this.verdict});
+  const _OutOfAreaCard({required this.headline, required this.detail});
 
-  final DeliveryAreaVerdict verdict;
+  final String headline;
+  final String detail;
 
   @override
   Widget build(BuildContext context) {
@@ -637,12 +691,12 @@ class _OutOfAreaCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  verdict.headline,
+                  headline,
                   style: t.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  verdict.detail,
+                  detail,
                   style: t.bodySmall?.copyWith(color: zc.textMuted),
                 ),
               ],

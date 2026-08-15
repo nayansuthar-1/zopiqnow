@@ -42,13 +42,25 @@ final Provider<RestaurantRepository> restaurantRepositoryProvider =
 ///
 /// Watching the address means changing it refetches. That is the right cost:
 /// the delivery radius (0098) is a function of where you are, so a new address
-/// deserves a fresh feed rather than the old one re-sorted.
+/// deserves a fresh feed rather than the old one re-sorted — and since 0126 the
+/// *town* is too, so switching from a Falna address to a Sadri one exchanges the
+/// whole catalogue rather than re-sorting it.
+///
+/// **No town, no feed.** An unknown town yields an empty list rather than every
+/// kitchen on the platform: showing a Sadri customer a Falna restaurant they
+/// cannot order from is the failure this exists to prevent, and it must not be
+/// what happens by default. Home tells them to set a location — see
+/// [HomeNoLocationView] — which is a screen they can act on, unlike a list of
+/// food from the wrong town.
 final FutureProvider<List<Restaurant>> nearbyRestaurantsProvider =
     FutureProvider<List<Restaurant>>((Ref ref) async {
       final Address? from = ref.watch(selectedAddressProvider);
+      final String? areaId = ref.watch(currentAreaIdProvider);
+      if (areaId == null) return const <Restaurant>[];
+
       final List<Restaurant> all = await ref
           .watch(restaurantRepositoryProvider)
-          .getNearbyRestaurants();
+          .getNearbyRestaurants(areaId: areaId);
 
       final List<Restaurant> measured = measureFrom(all, from);
       // Nearest first, with the unmeasurable ones last rather than first — a

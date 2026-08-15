@@ -12,6 +12,7 @@ import 'package:zopiqnow/features/home/domain/entities/dish_suggestion.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/presentation/providers/dish_providers.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
+import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 
 /// What the user has typed, updated on every keystroke. Debouncing happens
 /// downstream in [searchResultsProvider], not here — the field must stay
@@ -42,13 +43,21 @@ final AutoDisposeFutureProvider<List<Restaurant>> searchResultsProvider =
   final String query = ref.watch(searchQueryProvider).trim();
   if (query.isEmpty) return const <Restaurant>[];
 
+  // Same rule as the feed (0126): search is search *within a town*, and with no
+  // town to search there is nothing honest to return. Reads as "no results",
+  // which is the truth — there is nothing here the customer could order.
+  final String? areaId = ref.watch(currentAreaIdProvider);
+  if (areaId == null) return const <Restaurant>[];
+
   bool cancelled = false;
   ref.onDispose(() => cancelled = true);
 
   await Future<void>.delayed(searchDebounce);
   if (cancelled) return const <Restaurant>[];
 
-  return ref.watch(restaurantRepositoryProvider).searchRestaurants(query);
+  return ref
+      .watch(restaurantRepositoryProvider)
+      .searchRestaurants(query, areaId: areaId);
 });
 
 /// Dishes matching the query, ranked — the other half of a search.

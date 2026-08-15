@@ -16,8 +16,8 @@ import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 /// from them and the delivery address, in `home_providers.dart`.
 const String restaurantColumns =
     'id, name, cuisines, rating, rating_count, eta_minutes, price_for_two, '
-    'latitude, longitude, is_veg, image_url, promo_text, accepting_orders, '
-    'pause_reason';
+    'latitude, longitude, service_area_id, is_veg, image_url, promo_text, '
+    'accepting_orders, pause_reason';
 
 /// Postgres row → domain entity. Numeric columns arrive as `num` (int or double
 /// depending on the value), so every one is coerced explicitly.
@@ -33,6 +33,10 @@ Restaurant restaurantFromRow(Map<String, dynamic> row) => Restaurant(
   // customer is. The feed fills it in once it does.
   latitude: (row['latitude'] as num?)?.toDouble(),
   longitude: (row['longitude'] as num?)?.toDouble(),
+  // The town, computed from those coordinates by Postgres (0126). Read rather
+  // than derived here so the app and the trigger that refuses cross-town orders
+  // can never disagree about where a kitchen is.
+  serviceAreaId: row['service_area_id'] as String?,
   isVeg: row['is_veg'] as bool,
   imageUrl: row['image_url'] as String,
   promoText: row['promo_text'] as String?,

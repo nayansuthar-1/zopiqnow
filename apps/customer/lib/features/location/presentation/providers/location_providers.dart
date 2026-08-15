@@ -48,6 +48,33 @@ final AutoDisposeFutureProviderFamily<DeliveryAreaVerdict,
               .deliveryArea(latitude: point.lat, longitude: point.lng),
         );
 
+/// Which town the customer is ordering from — `sadri`, `falna` (0126).
+///
+/// Null means **we do not know yet**, and every reader has to treat it as such:
+/// no address chosen, an address outside every service area, or a resolve that
+/// has not landed. It is never a town in its own right, which is why the catalog
+/// providers refuse to fetch on null rather than fetching everything.
+///
+/// Two sources, in order. The selection carries its own town, written when the
+/// address was picked, so the usual case is synchronous and survives a dead
+/// connection — which matters, because the feed is served from disk in exactly
+/// that state and would otherwise be filtered by nothing. The live check is the
+/// fallback for a snapshot written by a build that predates the column.
+final Provider<String?> currentAreaIdProvider = Provider<String?>((Ref ref) {
+  final Address? address = ref.watch(selectedAddressProvider);
+  if (address == null) return null;
+
+  final String? stored = address.serviceAreaId;
+  if (stored != null) return stored;
+
+  return ref
+      .watch(
+        deliveryAreaProvider((lat: address.latitude, lng: address.longitude)),
+      )
+      .valueOrNull
+      ?.areaId;
+});
+
 /// The signed-in customer's saved addresses.
 ///
 /// Async now that the list is the account's rather than two constants everyone

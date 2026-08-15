@@ -17,9 +17,18 @@ class DeliveryAreaVerdict {
     required this.serviceable,
     required this.headline,
     required this.detail,
+    this.areaId,
   });
 
   final bool serviceable;
+
+  /// Which town this point orders from — `sadri`, `falna` (migration 0126).
+  /// Null when we do not deliver here, and null when the check failed open, so
+  /// a caller must treat "no town" as "not known" rather than as a town.
+  ///
+  /// Ranakpur answers `sadri`: it has no kitchens of its own and shares Sadri's
+  /// catalogue, which is a row in `service_areas` rather than a rule in here.
+  final String? areaId;
 
   /// Four words for a button or a banner title — "We'll be there soon".
   final String headline;

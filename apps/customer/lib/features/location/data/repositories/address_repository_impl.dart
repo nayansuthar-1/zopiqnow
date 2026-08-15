@@ -42,9 +42,34 @@ class AddressRepositoryImpl implements AddressRepository {
     }
   }
 
+  /// Picking an address also settles which town it orders from (0126).
+  ///
+  /// Resolved **here**, and not wherever the catalogue is read, for two reasons.
+  /// It is the one funnel every caller already goes through — the picker sheet,
+  /// the map, "use my current location", and the re-select that follows an edit —
+  /// so the town cannot be forgotten on one path. And it is written into the same
+  /// JSON blob as the address itself, in one atomic write, so the stored town can
+  /// never belong to a different door than the stored coordinates.
+  ///
+  /// A failed resolve stores the address with a null town rather than refusing
+  /// the selection: choosing where to deliver must work on a bad connection, and
+  /// null means "ask the server again", which is what the feed then does.
   @override
-  Future<void> selectAddress(Address address) =>
-      _store.setString(_selectedKey, jsonEncode(address.toJson()));
+  Future<void> selectAddress(Address address) async {
+    String? areaId;
+    try {
+      areaId = (await _dataSource.checkDeliveryArea(
+        latitude: address.latitude,
+        longitude: address.longitude,
+      )).areaId;
+    } on Object catch (_) {
+      areaId = null;
+    }
+    await _store.setString(
+      _selectedKey,
+      jsonEncode(address.withServiceArea(areaId).toJson()),
+    );
+  }
 
   @override
   Future<Address> addAddress({
@@ -118,6 +143,10 @@ class AddressRepositoryImpl implements AddressRepository {
         longitude: longitude,
       );
     } on Object catch (_) {
+      // `areaId` stays null, which is "not known" and not a town. Failing open
+      // on *whether* we deliver is a considered risk the trigger covers; failing
+      // open on *which town* would put another town's kitchens on the feed, and
+      // there is no honest guess to make.
       return const DeliveryAreaVerdict(
         serviceable: true,
         headline: 'We deliver here',

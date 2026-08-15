@@ -116,6 +116,7 @@ class AddressSupabaseDataSource implements AddressDataSource {
       serviceable: row['serviceable'] as bool,
       headline: row['headline'] as String,
       detail: row['detail'] as String,
+      areaId: row['area_id'] as String?,
     );
   }
 

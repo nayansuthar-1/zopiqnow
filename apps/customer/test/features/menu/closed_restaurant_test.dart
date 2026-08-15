@@ -36,13 +36,14 @@ class _ClosedRestaurantDataSource implements RestaurantDataSource {
   );
 
   @override
-  Future<List<Restaurant>> fetchNearby() async => const <Restaurant>[_closed];
+  Future<List<Restaurant>> fetchNearby({String areaId = ''}) async =>
+      const <Restaurant>[_closed];
 
   @override
   Future<Restaurant?> fetchById(String id) async => _closed;
 
   @override
-  Future<List<Restaurant>> search(String query) async =>
+  Future<List<Restaurant>> search(String query, {String areaId = ''}) async =>
       const <Restaurant>[_closed];
 }
 

@@ -73,6 +73,53 @@ class HomeEmptyView extends StatelessWidget {
   }
 }
 
+/// No delivery address, so no town, so no catalogue (migration 0126).
+///
+/// Distinct from [HomeEmptyView], which says "there is nothing here" — a claim
+/// we are not entitled to make until we know where "here" is. The kitchens exist;
+/// we just cannot tell which of them are the customer's until they say. So this
+/// asks, and gives them the button rather than describing one.
+///
+/// Reachable in one way in practice: the location gate at startup is skippable,
+/// and this is what skipping it looks like on the feed.
+class HomeNoLocationView extends StatelessWidget {
+  const HomeNoLocationView({required this.onSetLocation, super.key});
+
+  final VoidCallback onSetLocation;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return _CenteredState(
+      children: <Widget>[
+        Icon(Icons.location_off_outlined, size: 56, color: zc.textMuted),
+        const SizedBox(height: ZopiqSpacing.lg),
+        Text(
+          'Where are we delivering?',
+          style: t.titleMedium,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: ZopiqSpacing.xs),
+        Text(
+          'We deliver within your town, so set your address and we\'ll show '
+          'you the kitchens that can reach you.',
+          style: t.bodyMedium?.copyWith(color: zc.textMuted),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: ZopiqSpacing.xl),
+        ZopiqButton(
+          label: 'Set delivery location',
+          icon: Icons.my_location_rounded,
+          expand: false,
+          onPressed: onSetLocation,
+        ),
+      ],
+    );
+  }
+}
+
 /// The feed had restaurants, but the active filter chips excluded all of them.
 /// Distinct from [HomeEmptyView]: the fix here is the user's, not ours.
 class HomeNoMatchesView extends StatelessWidget {

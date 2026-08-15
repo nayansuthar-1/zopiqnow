@@ -10,9 +10,11 @@ class RestaurantRepositoryImpl implements RestaurantRepository {
   final RestaurantDataSource _dataSource;
 
   @override
-  Future<List<Restaurant>> getNearbyRestaurants() async {
+  Future<List<Restaurant>> getNearbyRestaurants({
+    required String areaId,
+  }) async {
     try {
-      return await _dataSource.fetchNearby();
+      return await _dataSource.fetchNearby(areaId: areaId);
     } on Object catch (_) {
       // Translate any transport/parse error into a domain failure so the UI
       // never sees infrastructure exceptions (SAD 7.7).
@@ -35,9 +37,12 @@ class RestaurantRepositoryImpl implements RestaurantRepository {
   }
 
   @override
-  Future<List<Restaurant>> searchRestaurants(String query) async {
+  Future<List<Restaurant>> searchRestaurants(
+    String query, {
+    required String areaId,
+  }) async {
     try {
-      return await _dataSource.search(query);
+      return await _dataSource.search(query, areaId: areaId);
     } on Object catch (_) {
       throw const RestaurantLoadFailure('We couldn\'t run that search.');
     }

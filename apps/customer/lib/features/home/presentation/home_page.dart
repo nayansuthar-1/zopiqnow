@@ -319,6 +319,19 @@ class _RestaurantListSection extends ConsumerWidget {
       ),
       data: (List<Restaurant> restaurants) {
         if (restaurants.isEmpty) {
+          // Three different empty screens, because they have three different
+          // fixes. No town yet is asked first: until we know where the customer
+          // is we cannot claim there is nothing near them, and the other two
+          // sentences both make that claim.
+          if (ref.watch(currentAreaIdProvider) == null) {
+            return SliverFillRemaining(
+              hasScrollBody: false,
+              child: HomeNoLocationView(
+                onSetLocation: () =>
+                    withBottomNavHidden(ref, () => showAddressPicker(context)),
+              ),
+            );
+          }
           // An empty *filtered* feed is a different problem from an empty area.
           final bool filtersActive = ref
               .read(homeFiltersProvider)
