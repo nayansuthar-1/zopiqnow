@@ -1,0 +1,71 @@
+-- ---------------------------------------------------------------------------
+-- 0127 — the circle reaches the edge of the town.
+-- ---------------------------------------------------------------------------
+-- 0098 seeded every radius at 5 km and said, twice and in capitals, that the
+-- number was approximate and wanted confirming. This is the confirmation, and
+-- one of the three was wrong.
+--
+-- **Measured, not guessed.** OpenStreetMap has no boundary polygon for any of
+-- these towns — Sadri and Falna are single *nodes*, and the smallest real
+-- administrative border containing Sadri is Desuri Tehsil at roughly 47 x 40 km,
+-- which reaches 36 km north of the town and would re-create the 174 km ride
+-- 0098 exists to refuse. What OSM does carry is `landuse=residential` polygons,
+-- and those are a usable proxy for where a town physically is. Checking all 807
+-- boundary points of the 23 residential areas around Sadri against the live
+-- circles:
+--
+--     outside both the Sadri and Ranakpur 5 km circles : 57 points (7.1%)
+--     farthest built-up point                          : 5.81 km, to the
+--                                                        north-east, near
+--                                                        25.21678, 73.48491
+--
+-- So the 5 km circle was clipping the north-eastern edge of the built-up area:
+-- real streets, inside the town, that could not order. 6 km covers all 807 with
+-- ~200 m to spare, and over-covers into fields, which have no customers to
+-- mis-serve. That asymmetry is the whole argument for rounding a radius *up*:
+-- too large costs nothing, too small silently loses orders from people who live
+-- there.
+--
+-- **Falna and Ranakpur are deliberately left at 5 km**, and the reason is that
+-- the same measurement says nothing about them rather than that it clears them:
+--
+--   * Falna — no mapped residential land within 4.03 km of the centre at all,
+--     which for a town with a railway station and a hotel is a gap in OSM and
+--     not a fact about Falna. Everything the query returned is a neighbouring
+--     settlement, the nearest 4 km out and the largest 6.98 km out. Widening on
+--     that evidence would annex three villages. The centre itself is confirmed
+--     good from two directions: Falna railway station sits 0.33 km from it, and
+--     Hotel Wing Orbit 1.06 km.
+--   * Ranakpur — its own built-up area is three small polygons inside 2.30 km,
+--     so 5 km already clears it twice over. The rest of what the query caught
+--     starts at 4.77 km and is other villages.
+--
+-- **Nothing about the towns' relationships changes.** Sadri and Ranakpur still
+-- share one catalogue (0126's catchment, which the tehsils independently agree
+-- with — both are in Desuri, Falna is in Bali). Sadri and Falna centres are
+-- 21.32 km apart against 11 km of combined reach, so the two catalogues stay as
+-- separate as they were.
+--
+-- **Why a migration for a number 0098 promised needed no deploy.** Tuning a
+-- radius live is still one UPDATE and still needs no release — that promise
+-- holds and this file does not revoke it. But a database rebuilt from these
+-- migrations would come up at 5 km and start clipping Sadri again, silently, and
+-- this repo's ledger has already drifted from the live database four times. A
+-- considered value belongs in the history that reproduces it; an experiment does
+-- not.
+--
+-- Already applied to production on 2026-08-15. Written as an idempotent UPDATE
+-- so re-running is a no-op, and guarded so it does not touch a radius somebody
+-- has since tuned further.
+
+update public.service_areas
+   set radius_km = 6.00
+ where id = 'sadri'
+   and radius_km = 5.00;
+
+-- The kitchens re-sort themselves: 0126 put an `after ... on service_areas`
+-- trigger on exactly this, so `restaurants.service_area_id` is recomputed by the
+-- statement above rather than by anybody remembering to. Verified after the
+-- production run — all seven Sadri kitchens still read `sadri`, Hotel Wing Orbit
+-- still reads `falna`, and the previously-clipped point at 25.21678, 73.48491
+-- now resolves to `sadri`.
