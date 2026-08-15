@@ -145,49 +145,140 @@ function explain(message) {
   return message
 }
 
-/// Streams the .aab up.
+/// Opens a resumable upload session and returns the URI to send bytes to.
 ///
-/// **Not `fetch`, and that is the whole reason this function exists.** Node's
-/// fetch is undici, whose headers timeout starts when the request does — but
-/// Google sends no headers until the last byte of a 69 MB body has arrived, so
-/// on any ordinary upstream connection the timeout fires mid-upload and the
-/// whole thing fails with `UND_ERR_HEADERS_TIMEOUT`. `node:https` has no such
-/// clock, and streaming the file keeps 69 MB out of memory besides.
-function uploadBundle(editId) {
+/// **Resumable and not `uploadType=media`, because a 69 MB body does not
+/// reliably survive a domestic uplink.** `media` is one unbroken stream: a
+/// connection reset at 40% throws the 40% away and the next attempt starts at
+/// zero, which is how three consecutive attempts can fail without ever getting
+/// further. A resumable session lets the next attempt ask Google how much it
+/// already has and carry on from there, so progress accumulates across resets
+/// instead of being discarded.
+function startSession(editId) {
   return new Promise((resolve, reject) => {
     const request = https.request(
       {
         hostname: 'androidpublisher.googleapis.com',
         path:
           `/upload/androidpublisher/v3/applications/${packageName}` +
-          `/edits/${editId}/bundles?uploadType=media`,
+          `/edits/${editId}/bundles?uploadType=resumable`,
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/octet-stream',
-          'Content-Length': built.size,
+          'Content-Length': 0,
+          'X-Upload-Content-Type': 'application/octet-stream',
+          'X-Upload-Content-Length': built.size,
         },
       },
       (res) => {
         let text = ''
         res.on('data', (chunk) => (text += chunk))
         res.on('end', () => {
+          if (res.statusCode >= 300) {
+            const parsed = text ? JSON.parse(text) : {}
+            reject(new Error(explain(parsed.error?.message ?? `HTTP ${res.statusCode}`)))
+          } else if (!res.headers.location) {
+            reject(new Error('Play opened no resumable session (no Location header).'))
+          } else {
+            resolve(res.headers.location)
+          }
+        })
+      },
+    )
+    request.on('error', reject)
+    request.end()
+  })
+}
+
+/// Where the session actually got to.
+///
+/// Returns `{ done: true, bundle }` when Play already has every byte — a reset
+/// can kill the response *after* the last byte landed, so "finished" is a real
+/// answer to this question and the Bundle resource comes back with it rather
+/// than being thrown away and re-uploaded.
+///
+/// Otherwise `{ done: false, offset }`. The `Range` header reads `bytes=0-N` and
+/// is *inclusive*, so the next byte to send is N+1. A 308 carrying no `Range` at
+/// all means Play holds nothing yet, which is a legitimate answer and not an
+/// error.
+function sessionStatus(sessionUri) {
+  return new Promise((resolve, reject) => {
+    const request = https.request(
+      sessionUri,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Length': 0,
+          'Content-Range': `bytes */${built.size}`,
+        },
+      },
+      (res) => {
+        let text = ''
+        res.on('data', (chunk) => (text += chunk))
+        res.on('end', () => {
+          if (res.statusCode === 200 || res.statusCode === 201) {
+            return resolve({ done: true, bundle: text ? JSON.parse(text) : {} })
+          }
+          if (res.statusCode !== 308) {
+            return reject(new Error(`Upload session is gone (HTTP ${res.statusCode}).`))
+          }
+          const range = res.headers.range
+          resolve({ done: false, offset: range ? Number(range.split('-')[1]) + 1 : 0 })
+        })
+      },
+    )
+    request.on('error', reject)
+    request.end()
+  })
+}
+
+/// Sends the bytes from [offset] on.
+///
+/// Resolves the parsed Bundle resource when Play accepts the last byte, and
+/// `null` when the session is merely incomplete (308) — the caller loops.
+///
+/// **Not `fetch`, and that part is unchanged.** Node's fetch is undici, whose
+/// headers timeout starts when the request does — but Google sends no headers
+/// until the last byte has arrived, so on any ordinary upstream connection the
+/// timeout fires mid-upload and the whole thing dies with
+/// `UND_ERR_HEADERS_TIMEOUT`. `node:https` has no such clock, and streaming from
+/// disk keeps 69 MB out of memory besides.
+function sendFrom(sessionUri, offset) {
+  return new Promise((resolve, reject) => {
+    const remaining = built.size - offset
+    const request = https.request(
+      sessionUri,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Length': remaining,
+          'Content-Range': `bytes ${offset}-${built.size - 1}/${built.size}`,
+        },
+      },
+      (res) => {
+        let text = ''
+        res.on('data', (chunk) => (text += chunk))
+        res.on('end', () => {
+          if (res.statusCode === 308) return resolve(null)
           const parsed = text ? JSON.parse(text) : {}
           if (res.statusCode >= 300) {
-            reject(new Error(explain(parsed.error?.message ?? `HTTP ${res.statusCode}`)))
-          } else {
-            resolve(parsed)
+            return reject(new Error(explain(parsed.error?.message ?? `HTTP ${res.statusCode}`)))
           }
+          resolve(parsed)
         })
       },
     )
     request.on('error', reject)
 
     // Progress, because 69 MB on a domestic uplink is minutes of silence
-    // otherwise, and silence is indistinguishable from a hang.
-    let sent = 0
-    let lastShown = 0
-    const file = createReadStream(aab)
+    // otherwise, and silence is indistinguishable from a hang. Counted from
+    // [offset] so a resumed attempt picks up the percentage rather than
+    // restarting it.
+    let sent = offset
+    let lastShown = Math.floor((offset / built.size) * 100)
+    const file = createReadStream(aab, { start: offset })
     file.on('data', (chunk) => {
       sent += chunk.length
       const percent = Math.floor((sent / built.size) * 100)
@@ -199,6 +290,37 @@ function uploadBundle(editId) {
     file.on('error', reject)
     file.pipe(request)
   })
+}
+
+/// One session, retried until the bytes are all there.
+///
+/// The session URI outlives a reset, so each attempt resumes rather than
+/// restarts. Bounded, because a link that has dropped eight times is not going
+/// to be talked round by a ninth, and an unbounded loop on a broken uplink is a
+/// hang rather than an upload.
+async function uploadBundle(editId) {
+  const sessionUri = await startSession(editId)
+  let offset = 0
+
+  for (let attempt = 1; attempt <= 8; attempt++) {
+    try {
+      const bundle = await sendFrom(sessionUri, offset)
+      if (bundle) return bundle
+    } catch (error) {
+      if (attempt === 8) throw error
+      console.log(`  ${error.code ?? error.message} — resuming (attempt ${attempt + 1}/8)`)
+      await new Promise((r) => setTimeout(r, 2000 * attempt))
+    }
+
+    // Always ask where we got to rather than trusting the local count: a reset
+    // can drop bytes that were written to the socket but never committed, so
+    // ours is optimistic and Play's is the truth. This also catches the case
+    // where every byte landed and only the response was lost.
+    const status = await sessionStatus(sessionUri)
+    if (status.done) return status.bundle
+    offset = status.offset
+  }
+  throw new Error('Upload did not complete after 8 attempts.')
 }
 
 console.log(`${app} → ${track} (${packageName})`)
