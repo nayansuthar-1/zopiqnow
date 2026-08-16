@@ -3,8 +3,15 @@
 // Invoked by the database webhook on `orders` INSERT (see migration 0021). It
 // reads the FCM tokens registered for the order's restaurant (0020), mints a
 // short-lived Google access token from the service account, and posts a
-// notification to each device through the FCM HTTP v1 API. A token FCM reports
+// message to each device through the FCM HTTP v1 API. A token FCM reports
 // as dead is pruned on the spot, so the table doesn't rot.
+//
+// **Android messages carry no `notification` block on purpose.** The vendor app
+// draws the new-order notification itself so it can make it ring like a call —
+// looping until the order is accepted or rejected — and only the app can set
+// the flags that do that. See the comment at the send site before adding a
+// `notification` block back: doing so silently downgrades every kitchen to a
+// single ping, and nothing fails loudly when it happens.
 //
 // The one secret this needs is FCM_SERVICE_ACCOUNT — the Admin SDK service
 // account JSON, set as a function secret, never committed. SUPABASE_URL and
@@ -18,6 +25,10 @@ interface OrderRecord {
   restaurant_name: string | null;
   total: number | null;
   status: string;
+  // How long the kitchen has to answer (0051, five minutes from placement).
+  // Shipped to the device so a message delayed in a Doze queue rings for the
+  // time that is actually left rather than a fresh five minutes.
+  accept_deadline: string | null;
 }
 
 interface WebhookPayload {
@@ -129,7 +140,7 @@ Deno.serve(async (req) => {
 
   const { data: tokens, error } = await supabase
     .from("device_tokens")
-    .select("token")
+    .select("token, platform, rings_new_orders")
     .eq("restaurant_id", order.restaurant_id);
   if (error) {
     console.error("Token read failed:", error.message);
@@ -148,25 +159,69 @@ Deno.serve(async (req) => {
   const body = [order.restaurant_name, rupees].filter(Boolean).join(" · ") ||
     "You have a new order.";
 
+  // What every device is told about this order. Strings only — FCM `data` is a
+  // string map and a number here is a silent 400.
+  const payload: Record<string, string> = {
+    kind: "new_order",
+    order_id: order.id,
+    body,
+    accept_deadline: order.accept_deadline ?? "",
+  };
+
   let sent = 0;
-  for (const { token } of tokens) {
+  for (const { token, platform, rings_new_orders } of tokens) {
+    // ⚠️ A ringing Android install gets **data only, with no `notification`
+    // block**, and that is load-bearing rather than a style choice. A message
+    // carrying a `notification` block is drawn by Android itself while the app
+    // is backgrounded or killed, and Android will not attach `FLAG_INSISTENT` —
+    // so the kitchen would get one polite ping instead of a ring that keeps
+    // going. Data-only means Android draws nothing, the app's background
+    // isolate is woken, and `OrderRing` builds the notification with the flags,
+    // the alarm-stream ringtone and the Accept/Reject actions.
+    //
+    // The cost is that this depends on the Dart background isolate starting.
+    // `priority: high` is what wakes the device out of Doze to do it, and is
+    // not optional here.
+    //
+    // Everything else keeps the notification block. `rings_new_orders` (0128)
+    // is false for any install that predates the ring, and sending *those*
+    // devices data only would show them nothing at all while killed — a missed
+    // order rather than a quiet one. The flag flips itself when the device
+    // updates and re-registers its token, so this branch drains on its own.
+    //
+    // iOS cannot loop a notification sound without Apple's Critical Alerts
+    // entitlement, so there is nothing to be gained by withholding the alert
+    // there — it gets a high-priority notification marked Time Sensitive.
+    const canRing = platform !== "ios" && rings_new_orders === true;
+    const message = canRing
+      ? {
+        token,
+        android: { priority: "high" },
+        data: payload,
+      }
+      : {
+        token,
+        notification: { title, body },
+        data: payload,
+        android: {
+          priority: "high",
+          notification: { channel_id: "new_orders" },
+        },
+        apns: {
+          headers: { "apns-priority": "10" },
+          payload: {
+            aps: { sound: "default", "interruption-level": "time-sensitive" },
+          },
+        },
+      };
+
     const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        message: {
-          token,
-          notification: { title, body },
-          android: {
-            priority: "high",
-            notification: { channel_id: "new_orders" },
-          },
-          data: { order_id: order.id },
-        },
-      }),
+      body: JSON.stringify({ message }),
     });
 
     if (res.ok) {

@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:zopiq_vendor/features/notifications/push_service.dart';
+import 'package:zopiq_vendor/features/notifications/order_ring.dart';
 import 'package:zopiq_vendor/features/orders/domain/entities/vendor_order.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 
@@ -9,9 +9,16 @@ import 'package:zopiq_vendor/features/orders/presentation/providers/orders_provi
 ///
 /// The push notification (0020) wakes a *closed* app; this is its counterpart for
 /// an *open* one. The realtime order stream is already here, so a new ticket is a
-/// known event the instant it arrives — no server round trip — and the answer is
-/// a buzz and a chime, the two cues a busy kitchen notices without watching the
-/// screen.
+/// known event the instant it arrives — no server round trip.
+///
+/// What it rings is [OrderRing], the same ringtone a woken app plays, and it
+/// keeps ringing until the order is accepted or rejected — a single chime is
+/// what a kitchen mid-service does not hear, and unanswered orders were the
+/// result. This class owns the *stopping*: it holds the set of orders that
+/// arrived while it was awake and have not been answered, and the ring runs for
+/// exactly as long as that set is non-empty. Because the set is rebuilt from the
+/// stream on every tick, an order answered on another tablet stops this one's
+/// phone too, with no extra message.
 ///
 /// The one thing it must never do is ring for orders that were already on the
 /// queue when it woke up: a kitchen reopening the app to nine waiting tickets does
@@ -47,14 +54,30 @@ class NewOrderAlarm extends AutoDisposeNotifier<int> {
       _known = placed;
 
       if (known == null) return; // first sight — adopt, do not ring
-      if (placed.difference(known).isEmpty) return; // nothing new arrived
 
-      state++;
-      _ring();
+      // Orders that arrived on *this* tick, and everything still waiting for an
+      // answer. Intersecting with `placed` is what ends the ring: the moment an
+      // order is accepted or rejected it leaves `placed`, so it drops out of
+      // here, and when the last one drops out the phone goes quiet.
+      final Set<String> arrived = placed.difference(known);
+      _unanswered = <String>{..._unanswered, ...arrived}.intersection(placed);
+
+      if (arrived.isNotEmpty) {
+        state++;
+        _ring(orders);
+      } else if (_unanswered.isEmpty) {
+        OrderRing.stop();
+      }
     });
+
+    ref.onDispose(OrderRing.stop);
 
     return 0;
   }
+
+  /// New orders that have arrived since this alarm woke up and that nobody has
+  /// answered yet. The ring runs for exactly as long as this is non-empty.
+  Set<String> _unanswered = <String>{};
 
   static Set<String>? _placedIds(List<VendorOrder>? orders) {
     if (orders == null) return null;
@@ -64,12 +87,38 @@ class NewOrderAlarm extends AutoDisposeNotifier<int> {
         .toSet();
   }
 
-  void _ring() {
-    // Fire-and-forget: the alarm is a courtesy, not a step the queue waits on.
-    // The haptic fires even where notifications are denied; the chime carries the
-    // sound, off the same high-importance channel a pushed order rings.
+  /// Start the ring for the oldest unanswered order.
+  ///
+  /// Fire-and-forget: the alarm is a courtesy, not a step the queue waits on.
+  /// The haptic fires even where notifications are denied.
+  ///
+  /// The ring is bounded by the *earliest* deadline among the orders waiting,
+  /// not the newest one's. Those orders expire in the order they arrived, and
+  /// ringing past the point where the first one has already been auto-expired
+  /// is ringing about nothing.
+  void _ring(List<VendorOrder> orders) {
     HapticFeedback.heavyImpact();
-    PushService.chimeNewOrder();
+
+    final List<VendorOrder> waiting = orders
+        .where((VendorOrder o) => _unanswered.contains(o.id))
+        .toList(growable: false);
+    if (waiting.isEmpty) return;
+
+    DateTime? earliest;
+    for (final VendorOrder o in waiting) {
+      final DateTime? d = o.acceptDeadline;
+      if (d != null && (earliest == null || d.isBefore(earliest))) earliest = d;
+    }
+
+    OrderRing.ring(
+      orderId: waiting.first.id,
+      body: waiting.length == 1
+          ? 'A customer just placed an order.'
+          : '${waiting.length} orders are waiting to be accepted.',
+      ringFor: earliest == null
+          ? const Duration(minutes: 5)
+          : earliest.difference(DateTime.now()),
+    );
   }
 }
 

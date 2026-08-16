@@ -4,17 +4,54 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiq_vendor/core/widgets/vendor_svg_icons.dart';
+import 'package:zopiq_vendor/features/notifications/order_ring.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/new_order_alarm.dart';
 import 'package:zopiq_vendor/features/orders/presentation/providers/orders_providers.dart';
 
 /// The partner app's main rooms held in a modern vector navigation shell.
-class VendorShell extends ConsumerWidget {
+class VendorShell extends ConsumerStatefulWidget {
   const VendorShell({required this.navigationShell, super.key});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<VendorShell> createState() => _VendorShellState();
+}
+
+class _VendorShellState extends ConsumerState<VendorShell> {
+  /// The index of the Orders branch below. Named rather than inlined because
+  /// it is now referenced from two places and a silent drift between them
+  /// would send an answered ring to the wrong tab.
+  static const int _ordersBranch = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    OrderRing.answered.addListener(_openAnsweredOrder);
+    // A ring answered while the app was killed set this before the widget tree
+    // existed, so the listener alone would never fire for it.
+    _openAnsweredOrder();
+  }
+
+  @override
+  void dispose() {
+    OrderRing.answered.removeListener(_openAnsweredOrder);
+    super.dispose();
+  }
+
+  /// The vendor answered the ring from the notification tray. Put the queue in
+  /// front of them rather than wherever they last were — the whole point of the
+  /// ring is that the next thing they do is accept or reject.
+  void _openAnsweredOrder() {
+    if (OrderRing.answered.value == null) return;
+    OrderRing.answered.value = null;
+    if (!mounted) return;
+    widget.navigationShell.goBranch(_ordersBranch);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final StatefulNavigationShell navigationShell = widget.navigationShell;
     final ZopiqColors zc = context.zc;
     final Color surfaceColor = Theme.of(context).colorScheme.surface;
     final int newCount = ref.watch(newOrderCountProvider);

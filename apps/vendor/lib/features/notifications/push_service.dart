@@ -1,10 +1,13 @@
 import 'dart:io' show Platform;
+import 'dart:ui' show DartPluginRegistrant;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'package:zopiq_vendor/features/notifications/order_ring.dart';
 
 /// The wake: getting a new order to a kitchen that isn't looking at the app.
 ///
@@ -23,18 +26,8 @@ class PushService {
   static const String _channelId = 'new_orders';
   static const String _channelName = 'New orders';
 
-  /// A fixed id for the in-app chime, so a fresh order replaces the last chime in
-  /// the tray rather than stacking a new line every time — one ping, not a pile.
-  static const int _inAppChimeId = 424242;
-
   static final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
-
-  /// True once [start] has wired the channel. Guards [chimeNewOrder] so it is a
-  /// no-op until then — which is also what keeps the plugin off the test path:
-  /// tests never call [start], so they never reach a notification binding that
-  /// does not exist under `flutter test`.
-  static bool _started = false;
 
   /// Bring the whole thing up. Guarded end to end: a device with no Google
   /// Play services, a missing config, a denied permission — none of these is a
@@ -49,9 +42,16 @@ class PushService {
       return;
     }
 
+    // The channels exist after this, so the in-app alarm has somewhere to ring.
+    // `OrderRing` refuses to ring until it has been handed the plugin here,
+    // which is also what keeps notifications off the test path: tests never
+    // call `start()`, so they never reach a binding that `flutter test` lacks.
     await _initLocalNotifications();
-    // The channel exists now, so the in-app alarm has somewhere to ring.
-    _started = true;
+
+    // A ring left over from a previous run is a phone that starts ringing for
+    // an order somebody dealt with an hour ago. `ongoing` notifications survive
+    // the process that posted them, so clearing on start is not paranoia.
+    await OrderRing.stop();
 
     final FirebaseMessaging messaging = FirebaseMessaging.instance;
     // On Android 13+ this raises the POST_NOTIFICATIONS prompt; on older
@@ -98,6 +98,11 @@ class PushService {
     );
     await _local.initialize(
       const InitializationSettings(android: android, iOS: darwin),
+      onDidReceiveNotificationResponse: _onNotificationResponse,
+      // Answering the ring from a killed app runs here instead, in its own
+      // isolate. Without it, Accept and Reject on a ring the app did not draw
+      // itself would silence the phone and tell this app nothing.
+      onDidReceiveBackgroundNotificationResponse: onBackgroundNotificationTap,
     );
 
     // The channel a new-order notification lands on. Must match the id named in
@@ -112,6 +117,26 @@ class PushService {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
+
+    // The loud one, alongside it rather than instead of it. `new_orders` still
+    // carries everything `send-notification` sends; only a *new order* rings.
+    await OrderRing.install(_local);
+  }
+
+  /// The vendor answered the ring — from the tray, or by tapping the body.
+  ///
+  /// Both actions do the same two things: stop the noise, and remember which
+  /// order it was so the app can open on the queue rather than wherever the
+  /// vendor last happened to be. The accept and reject themselves stay in the
+  /// app, because each needs something the notification cannot ask for — a prep
+  /// time, or a reason — and a one-tap accept that invents a prep time is a
+  /// promise the kitchen never made.
+  static void _onNotificationResponse(NotificationResponse response) {
+    OrderRing.stop();
+    final String? orderId = response.payload;
+    if (orderId != null && orderId.isNotEmpty) {
+      OrderRing.answered.value = orderId;
+    }
   }
 
   /// Register only if there is a signed-in session; the RPC is scoped to staff,
@@ -156,6 +181,12 @@ class PushService {
           'p_platform': Platform.isIOS ? 'ios' : 'android',
           // Stated, not inferred — see 0060.
           'p_audience': 'restaurant',
+          // This build draws its own new-order notification, so it can be sent
+          // a data-only message and ring (0128). Builds that predate the ring
+          // do not send this at all and default to false, which is what keeps
+          // `send-order-push` including a notification block for them — a
+          // data-only message to an older install shows nothing while killed.
+          'p_rings_new_orders': true,
         },
       );
     } on Object catch (e) {
@@ -176,41 +207,60 @@ class PushService {
     }
   }
 
-  /// Ring an order that arrived while the app is open. The realtime stream, not
-  /// FCM, is what noticed it — but the *sound* comes off the same high-importance
-  /// channel a pushed order rings, so an open app and a woken one sound alike.
+  /// Bring the notification plugin up inside the FCM background isolate.
   ///
-  /// A no-op until [start] has wired the channel (see [_started]).
-  static Future<void> chimeNewOrder() async {
-    if (!_started) return;
-    try {
-      await _local.show(
-        _inAppChimeId,
-        'New order',
-        'A customer just placed an order.',
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-          // The chime is the whole point of this call, so `presentSound` is the
-          // load-bearing flag. On Android the sound comes off the channel; iOS
-          // has no channels and decides it here, per notification.
-          iOS: DarwinNotificationDetails(
-            presentAlert: true,
-            presentSound: true,
-            presentBanner: true,
-          ),
-        ),
-      );
-    } on Object catch (e) {
-      debugPrint('Could not chime new order: $e.');
-    }
+  /// A background isolate starts with nothing registered — [Firebase] handed it
+  /// a message and that is all. `DartPluginRegistrant.ensureInitialized()` is
+  /// what makes `flutter_local_notifications` reachable at all here, and it is
+  /// also the reason the ring lives in a **plugin package** rather than in this
+  /// app's own Kotlin: only plugins land in `GeneratedPluginRegistrant`, so
+  /// anything written in `android/app` simply does not exist on this path.
+  static Future<void> prepareBackgroundIsolate() async {
+    DartPluginRegistrant.ensureInitialized();
+    await _initLocalNotifications();
+  }
+
+  /// True when this message is the "a customer just ordered" wake, as opposed
+  /// to any of the ordinary notifications `send-notification` sends.
+  static bool _isNewOrder(RemoteMessage message) =>
+      message.data['kind'] == 'new_order';
+
+  /// Ring for a new-order message. Shared by the foreground listener and the
+  /// background isolate, because a woken kitchen and an open one should sound
+  /// identical — the vendor cannot tell which state the app was in, and should
+  /// not have to.
+  static Future<void> _ringForOrder(RemoteMessage message) async {
+    final String? orderId = message.data['order_id'] as String?;
+    if (orderId == null || orderId.isEmpty) return;
+    await OrderRing.ring(
+      orderId: orderId,
+      body: (message.data['body'] as String?) ??
+          'A customer just placed an order.',
+      ringFor: _windowLeft(message.data['accept_deadline'] as String?),
+    );
+  }
+
+  /// How long is left to answer. The server sends the order's `accept_deadline`
+  /// (0051); a message that sat in a Doze queue for four minutes should ring for
+  /// the one that remains, not for a fresh five.
+  static Duration _windowLeft(String? deadline) {
+    const Duration fallback = Duration(minutes: 5);
+    if (deadline == null) return fallback;
+    final DateTime? at = DateTime.tryParse(deadline);
+    if (at == null) return fallback;
+    final Duration left = at.difference(DateTime.now().toUtc());
+    // Clamped at both ends: never longer than the window the database allows,
+    // and never a negative duration, which would post and cancel in one frame.
+    return left <= Duration.zero
+        ? Duration.zero
+        : (left > fallback ? fallback : left);
   }
 
   static Future<void> _showForeground(RemoteMessage message) async {
+    if (_isNewOrder(message)) {
+      await _ringForOrder(message);
+      return;
+    }
     final RemoteNotification? n = message.notification;
     if (n == null) return;
     await _local.show(
@@ -238,11 +288,33 @@ class PushService {
 }
 
 /// Runs in its own isolate when a message arrives with the app killed or
-/// backgrounded. Android posts a *notification* message to the tray on its own;
-/// this exists so a *data* message still has an entry point, and so the plugin
-/// stops warning that none is registered. Top-level and annotated, as
-/// firebase_messaging requires.
+/// backgrounded. Top-level and annotated, as firebase_messaging requires.
+///
+/// This is where the ring for a closed app is drawn, and it has to be drawn
+/// here: a message carrying an FCM `notification` block is posted by Android
+/// itself, and Android will not set `FLAG_INSISTENT` on our behalf. So
+/// `send-order-push` sends **data only**, Android posts nothing, and this
+/// handler owns the whole notification — which is the only way the ring can
+/// have the flags, the alarm-stream sound and the Accept/Reject actions.
+///
+/// ⚠️ Nothing `start()` did has happened in this isolate. It is a fresh Dart
+/// VM with no plugin registrations, no channel, no initialize. Hence the
+/// two lines of setup before anything is shown; skip them and `show` throws.
 @pragma('vm:entry-point')
 Future<void> _onBackgroundMessage(RemoteMessage message) async {
-  // Intentionally minimal: the tray notification is Android's to draw here.
+  if (message.data['kind'] != 'new_order') return;
+  await PushService.prepareBackgroundIsolate();
+  await PushService._ringForOrder(message);
+}
+
+/// Answering the ring while the app is killed lands here — a separate isolate
+/// again, and a separate entry point from [_onBackgroundMessage].
+///
+/// All it can usefully do is stop the noise. Tapping an action with
+/// `showsUserInterface: true` also launches the app, and the launched app's own
+/// `start()` clears any leftover ring and picks the order up off the realtime
+/// stream, so the accept or reject happens there with the full ticket in view.
+@pragma('vm:entry-point')
+void onBackgroundNotificationTap(NotificationResponse response) {
+  OrderRing.stop();
 }
