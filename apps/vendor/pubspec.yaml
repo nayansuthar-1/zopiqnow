@@ -2,7 +2,7 @@ name: zopiq_vendor
 description: "Zopiqnow for restaurants — the kitchen's side of an order."
 publish_to: 'none'
 
-version: 1.0.0+6
+version: 1.0.0+7
 # Part of the zopiqnow pub workspace: shares the single root lockfile (Rule 3).
 resolution: workspace
 
