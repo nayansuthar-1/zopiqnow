@@ -304,6 +304,22 @@ export const api = {
   setRiderActive: (email: string, active: boolean) =>
     rpc<void>('admin_set_rider_active', { p_email: email, p_active: active }),
 
+  /// Things the platform noticed and wants a person to look at (migration
+  /// 0130). Open ones by default; `includeResolved` is the audit view.
+  alerts: (includeResolved = false) =>
+    rpc<AdminAlertRow[]>('admin_alerts_list', {
+      p_include_resolved: includeResolved,
+    }),
+
+  /// Dealt with. Not a delete — who dismissed an alert about a rider is in
+  /// `admin_actions` afterwards, which is what makes a later dispute answerable.
+  resolveAlert: (id: number) => rpc<void>('admin_resolve_alert', { p_alert_id: id }),
+
+  /// The individual incidents behind a no-show alert, for the admin who wants to
+  /// see them before taking somebody's income away.
+  riderNoShows: (email: string) =>
+    rpc<RiderNoShowRow[]>('admin_rider_no_shows', { p_email: email }),
+
   /// Decides whether this rider is ever paid by Zopiq (migration 0122). Only a
   /// `freelance` rider produces a weekly payout row; the other two accrue
   /// `rider_pay` on the delivery for costing and are never transferred to.
@@ -1380,6 +1396,45 @@ export type Vehicle = 'bike' | 'scooter' | 'bicycle'
 /// A delivery partner, as the roster shows them. `live_order_id` is the order
 /// they are carrying right now — the reason the console can grey out the switch
 /// *and* say why, rather than letting the database refuse after the click.
+/// Something the platform noticed on its own and wants a person to decide about
+/// (migration 0130).
+///
+/// One open alert per subject per kind: a rider who no-shows a fourth time
+/// updates the row already on this desk rather than adding to a pile, so this
+/// list is a queue of people to deal with and not a log of incidents. The log is
+/// [RiderNoShowRow], one level down.
+export type AdminAlertRow = {
+  id: number
+  kind: string
+  /// Who the alert is about. A rider's email, for `rider_no_shows`.
+  subject: string | null
+  title: string
+  body: string
+  order_id: string | null
+  created_at: string
+  resolved_at: string | null
+  resolved_by: string | null
+  /// The rider, joined in so the row can offer the suspend switch without a
+  /// second round trip — and so it can tell whether somebody already threw it.
+  rider_name: string | null
+  rider_phone: string | null
+  rider_active: boolean | null
+  no_show_count: number
+}
+
+/// One accepted-and-not-collected delivery.
+export type RiderNoShowRow = {
+  order_id: string
+  accepted_at: string
+  ready_at: string | null
+  /// They had tapped "I've arrived" and still did not collect. Not proof of
+  /// anything either way: it can mean a rider gaming the button, and it can mean
+  /// a kitchen that marked the bag ready before packing it. It is here so the
+  /// person deciding can see the difference exists.
+  had_arrived: boolean
+  released_at: string
+}
+
 export type RiderRow = {
   email: string
   name: string

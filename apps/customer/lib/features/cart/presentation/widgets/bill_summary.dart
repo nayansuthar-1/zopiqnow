@@ -77,6 +77,16 @@ class BillSummary extends StatelessWidget {
           // order now, so a struck-through ₹40 beside the word FREE would be
           // advertising a discount that does not exist.
           _BillRow(label: 'Delivery fee', value: '₹${bill.deliveryFee}'),
+          // Its own line rather than a bigger delivery fee, and captioned with
+          // the reason. A customer who opens the bill at 8pm and finds ₹60
+          // where ₹40 was an hour ago is owed the sentence, not left to work it
+          // out (migration 0129).
+          if (!bill.surcharge.isEmpty)
+            _BillRow(
+              label: bill.surcharge.label!,
+              caption: bill.surcharge.reason,
+              value: '₹${bill.surcharge.total}',
+            ),
           _BillRow(label: 'Taxes', value: '₹${bill.taxes}'),
           if (bill.discount > 0)
             _BillRow(
@@ -191,11 +201,16 @@ class _BillRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.valueColor,
+    this.caption,
   });
 
   final String label;
   final String value;
   final Color? valueColor;
+
+  /// A quieter second line under [label], for a charge that has to explain
+  /// itself. Null on every ordinary row.
+  final String? caption;
 
   @override
   Widget build(BuildContext context) {
@@ -206,14 +221,34 @@ class _BillRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            label,
-            style: t.bodyMedium?.copyWith(
-              color: isDark ? Colors.white70 : const Color(0xFF475569),
-              fontSize: 13.5,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  label,
+                  style: t.bodyMedium?.copyWith(
+                    color: isDark ? Colors.white70 : const Color(0xFF475569),
+                    fontSize: 13.5,
+                  ),
+                ),
+                if (caption != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      caption!,
+                      style: t.bodySmall?.copyWith(
+                        color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
+          const SizedBox(width: 12),
           Row(
             children: <Widget>[
               Text(

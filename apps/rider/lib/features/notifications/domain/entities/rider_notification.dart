@@ -20,6 +20,13 @@ enum RiderNotificationKind {
   message,
   payout,
   account,
+
+  /// The rider did something that will cost them if it continues — today, only
+  /// accepting a delivery and not collecting it (0130). Its own kind and not
+  /// [system] for the same reason [message] is: this is the one row in the
+  /// inbox the rider is expected to act on rather than note, and a warning that
+  /// looks like a notice is a warning nobody reads.
+  warning,
   system;
 
   static RiderNotificationKind fromWire(String wire) => switch (wire) {
@@ -29,6 +36,7 @@ enum RiderNotificationKind {
     'message' => message,
     'payout' => payout,
     'account' => account,
+    'warning' => warning,
     _ => system,
   };
 }

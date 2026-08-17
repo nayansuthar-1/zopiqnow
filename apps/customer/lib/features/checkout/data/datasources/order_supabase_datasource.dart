@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:zopiqnow/core/observability/crash_reporter.dart';
 import 'package:zopiqnow/core/storage/json_disk_cache.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
+import 'package:zopiqnow/features/cart/domain/entities/delivery_surcharge.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
@@ -532,6 +533,15 @@ class OrderSupabaseDataSource implements OrderDataSource {
         .cast<Map<String, dynamic>>()
         .map(RestaurantOffer.fromJson)
         .toList(growable: false);
+  }
+
+  @override
+  Future<DeliverySurcharge> fetchDeliverySurcharge(String restaurantId) async {
+    final Map<String, dynamic> row = await _db.rpc<Map<String, dynamic>>(
+      'delivery_surcharge_now',
+      params: <String, dynamic>{'p_restaurant_id': restaurantId},
+    );
+    return DeliverySurcharge.fromJson(row);
   }
 
   @override

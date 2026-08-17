@@ -5,6 +5,7 @@ import { AppShell } from './ui/AppShell'
 import { RestaurantsPage } from './restaurants/RestaurantsPage'
 import { WizardPage } from './restaurants/WizardPage'
 import { RidersPage } from './riders/RidersPage'
+import { AlertsPage } from './alerts/AlertsPage'
 import { UsersPage } from './users/UsersPage'
 import { HeroSlidesPage } from './content/HeroSlidesPage'
 import { OrderAdsPage } from './content/OrderAdsPage'
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="/cash" element={<CashPage />} />
           <Route path="/refunds" element={<RefundsPage />} />
           <Route path="/support" element={<SupportPage />} />
+          <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/gift-orders" element={<GiftOrdersPage />} />
           <Route path="/gifts" element={<GiftCataloguePage />} />
           <Route path="/settings" element={<SettingsPage />} />

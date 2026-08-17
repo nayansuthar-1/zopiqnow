@@ -81,6 +81,7 @@ class _NotificationCard extends ConsumerWidget {
       RiderNotificationKind.message => zc.primary,
       RiderNotificationKind.payout => zc.veg,
       RiderNotificationKind.account => zc.nonVeg,
+      RiderNotificationKind.warning => zc.nonVeg,
       RiderNotificationKind.system => zc.textMuted,
     };
 
@@ -157,6 +158,7 @@ class _NotificationCard extends ConsumerWidget {
     RiderNotificationKind.message => Icons.chat_bubble_rounded,
     RiderNotificationKind.payout => Icons.account_balance_wallet_rounded,
     RiderNotificationKind.account => Icons.manage_accounts_rounded,
+    RiderNotificationKind.warning => Icons.warning_amber_rounded,
     RiderNotificationKind.system => Icons.info_outline_rounded,
   };
 

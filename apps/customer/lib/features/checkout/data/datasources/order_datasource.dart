@@ -1,4 +1,5 @@
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
+import 'package:zopiqnow/features/cart/domain/entities/delivery_surcharge.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
@@ -88,6 +89,15 @@ abstract interface class OrderDataSource {
   /// plus that kitchen's (migration 0064). Advertising a coupon is not
   /// honouring one — that is `applyCoupon`'s job, and it re-checks the scope.
   Future<List<RestaurantOffer>> fetchOffers(String restaurantId);
+
+  /// What the hour and the weather are adding to delivery at [restaurantId]
+  /// right now (migration 0129).
+  ///
+  /// The one exception to the "no prices" rule above, and it survives the
+  /// reason for that rule: this is not the client quoting a fee, it is the
+  /// client *reading* the same server function `place_order` charges from. It
+  /// cannot get the number wrong, because it does not compute it.
+  Future<DeliverySurcharge> fetchDeliverySurcharge(String restaurantId);
 
   /// The signed-in customer's orders, newest first, one page at a time.
   ///

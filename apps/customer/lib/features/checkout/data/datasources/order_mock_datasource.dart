@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
+import 'package:zopiqnow/features/cart/domain/entities/delivery_surcharge.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
@@ -60,6 +61,13 @@ class OrderMockDataSource implements OrderDataSource {
             ),
           )
           .toList(growable: false);
+
+  /// Never surcharged. The mock has no clock worth respecting and no weather at
+  /// all, and a demo bill that changes at 8pm would be a mock lying about the
+  /// one thing this class exists to keep still.
+  @override
+  Future<DeliverySurcharge> fetchDeliverySurcharge(String restaurantId) async =>
+      DeliverySurcharge.none;
 
   /// Reviews the mock has taken, keyed by order. Enough to exercise the two
   /// states the screen actually has — "not rated" and "rated, still editable" —

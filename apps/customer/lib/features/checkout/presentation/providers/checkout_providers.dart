@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
+import 'package:zopiqnow/features/cart/domain/entities/delivery_surcharge.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_supabase_datasource.dart';
@@ -379,6 +380,25 @@ final AutoDisposeFutureProvider<List<RestaurantOffer>> offersProvider =
       return ref.watch(orderRepositoryProvider).getOffers(restaurantId);
     });
 
+/// What the hour and the weather are adding to delivery for this cart's kitchen
+/// (migration 0129).
+///
+/// Keyed off the cart's restaurant, like [offersProvider] beside it, because
+/// rain is a fact about a *town* and the kitchen is what places the order in
+/// one. Empty cart, failed read or no restaurant all collapse to
+/// [DeliverySurcharge.none] — the bill then quotes the plain fee, which is the
+/// safe direction to be wrong in: the charge comes from `checkout_preflight` at
+/// the moment of payment, so an under-quote costs a corrected total and never a
+/// charge the customer did not see coming.
+final AutoDisposeFutureProvider<DeliverySurcharge> deliverySurchargeProvider =
+    FutureProvider.autoDispose<DeliverySurcharge>((Ref ref) {
+      final String? restaurantId = ref.watch(
+        cartProvider.select((Cart c) => c.restaurantId),
+      );
+      if (restaurantId == null) return DeliverySurcharge.none;
+      return ref.watch(orderRepositoryProvider).getDeliverySurcharge(restaurantId);
+    });
+
 /// The bill the checkout screen shows: the cart's bill with the applied
 /// coupon's discount folded in.
 ///
@@ -389,7 +409,14 @@ final Provider<CartBill> checkoutBillProvider = Provider<CartBill>((Ref ref) {
   final AppliedCoupon? coupon = ref.watch(
     checkoutControllerProvider.select((CheckoutState s) => s.coupon),
   );
-  return CartBill.of(cart, discount: coupon?.discount ?? 0);
+  return CartBill.of(
+    cart,
+    discount: coupon?.discount ?? 0,
+    // `.value` and not `.requireValue`: while the read is in flight this is
+    // null and the bill shows the plain fee for a moment, rather than the
+    // screen showing a spinner over a total the customer was already reading.
+    surcharge: ref.watch(deliverySurchargeProvider).value ?? DeliverySurcharge.none,
+  );
 });
 
 /// The most recently placed order — what the confirmation screen renders.

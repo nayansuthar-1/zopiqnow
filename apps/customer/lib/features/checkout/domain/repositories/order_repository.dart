@@ -1,4 +1,5 @@
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
+import 'package:zopiqnow/features/cart/domain/entities/delivery_surcharge.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/delivery_route.dart';
@@ -79,6 +80,12 @@ abstract interface class OrderRepository {
   /// kitchen's. Never throws: checkout works without a hint, so a failed read
   /// is an empty list, not a broken screen.
   Future<List<RestaurantOffer>> getOffers(String restaurantId);
+
+  /// What the hour and the weather are adding to delivery at [restaurantId]
+  /// (migration 0129). Never throws: a bill that cannot read the surcharge
+  /// quotes the plain fee, and the amount actually charged comes from
+  /// `checkout_preflight` at the moment of payment either way.
+  Future<DeliverySurcharge> getDeliverySurcharge(String restaurantId);
 
   /// The signed-in customer's order history, newest first.
   ///

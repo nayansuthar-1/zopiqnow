@@ -9,7 +9,9 @@ import 'package:zopiqnow/app/providers/bottom_nav_provider.dart';
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
+import 'package:zopiqnow/features/cart/domain/entities/delivery_surcharge.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
+import 'package:zopiqnow/features/checkout/presentation/providers/checkout_providers.dart';
 import 'package:zopiqnow/features/cart/presentation/widgets/add_to_cart_control.dart';
 import 'package:zopiqnow/features/cart/presentation/widgets/bill_summary.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
@@ -27,6 +29,14 @@ class CartPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final Cart cart = ref.watch(cartProvider);
+    // Priced once here and handed down, rather than each half of the screen
+    // calling `CartBill.of` again: the surcharge arrives asynchronously, and two
+    // independent reads of it are two chances for the bill card and the pay bar
+    // to show different totals for a frame.
+    final CartBill bill = CartBill.of(
+      cart,
+      surcharge: ref.watch(deliverySurchargeProvider).value ?? DeliverySurcharge.none,
+    );
     final TextTheme t = Theme.of(context).textTheme;
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -99,12 +109,12 @@ class CartPage extends ConsumerWidget {
         },
         child: cart.isEmpty
             ? _EmptyCart(onBrowse: onBrowse)
-            : _CartBody(cart: cart),
+            : _CartBody(cart: cart, bill: bill),
       ),
       bottomNavigationBar: cart.isEmpty
           ? null
           : _CheckoutBar(
-              bill: CartBill.of(cart),
+              bill: bill,
               itemCount: cart.itemCount,
               onCheckout: onCheckout,
             ),
@@ -147,9 +157,10 @@ class CartPage extends ConsumerWidget {
 }
 
 class _CartBody extends StatelessWidget {
-  const _CartBody({required this.cart});
+  const _CartBody({required this.cart, required this.bill});
 
   final Cart cart;
+  final CartBill bill;
 
   @override
   Widget build(BuildContext context) {
@@ -165,7 +176,7 @@ class _CartBody extends StatelessWidget {
         const SizedBox(height: 10),
         ZopiqReveal(index: 2, child: _AddMoreItems(cart: cart)),
         const SizedBox(height: 14),
-        ZopiqReveal(index: 3, child: BillSummary(bill: CartBill.of(cart))),
+        ZopiqReveal(index: 3, child: BillSummary(bill: bill)),
       ],
     );
   }

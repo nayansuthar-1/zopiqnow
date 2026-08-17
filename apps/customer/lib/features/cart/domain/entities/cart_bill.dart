@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
+import 'package:zopiqnow/features/cart/domain/entities/delivery_surcharge.dart';
 
 /// The priced breakdown of a [Cart].
 ///
@@ -27,13 +28,22 @@ class CartBill {
     required this.deliveryFee,
     required this.taxes,
     this.discount = 0,
+    this.surcharge = DeliverySurcharge.none,
   });
 
   /// Prices a cart. An empty cart bills nothing — not even a delivery fee.
   ///
   /// [discount] comes from a coupon the order service has already validated
   /// (see `AppliedCoupon`) — this class subtracts it, it never computes it.
-  factory CartBill.of(Cart cart, {int discount = 0}) {
+  ///
+  /// [surcharge] likewise comes from the server (`delivery_surcharge_now`), and
+  /// defaults to none so that a caller which has not read it yet quotes the
+  /// plain fee rather than nothing at all.
+  factory CartBill.of(
+    Cart cart, {
+    int discount = 0,
+    DeliverySurcharge surcharge = DeliverySurcharge.none,
+  }) {
     if (cart.isEmpty) {
       return const CartBill(subtotal: 0, deliveryFee: 0, taxes: 0);
     }
@@ -65,6 +75,7 @@ class CartBill {
 
     return CartBill(
       subtotal: subtotal,
+      surcharge: surcharge,
       // Flat, always. Migration 0123 withdrew the ₹500 free-delivery threshold
       // from `place_order` and `checkout_preflight` in the same statement, and
       // this line is the third copy of that rule — the cart quotes what the
@@ -135,5 +146,14 @@ class CartBill {
   /// Coupon discount in whole rupees; 0 when no coupon is applied.
   final int discount;
 
-  int get total => subtotal + deliveryFee + taxes - discount;
+  /// What the hour and the weather are adding to delivery (migration 0129).
+  ///
+  /// Kept beside [deliveryFee] rather than folded into it: the server stores it
+  /// in its own column (`orders.surge_fee`), the bill draws it as its own line
+  /// so it can say why, and a customer who reads ₹40 + ₹20 can tell which part
+  /// is tonight and which part is always.
+  final DeliverySurcharge surcharge;
+
+  int get total =>
+      subtotal + deliveryFee + surcharge.total + taxes - discount;
 }

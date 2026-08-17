@@ -1,4 +1,5 @@
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
+import 'package:zopiqnow/features/cart/domain/entities/delivery_surcharge.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/customer_order.dart';
@@ -235,6 +236,17 @@ class OrderRepositoryImpl implements OrderRepository {
       // A missing hint is a missing hint. Checkout still works without it, so
       // this must never take the screen down.
       return const <RestaurantOffer>[];
+    }
+  }
+
+  @override
+  Future<DeliverySurcharge> getDeliverySurcharge(String restaurantId) async {
+    try {
+      return await _dataSource.fetchDeliverySurcharge(restaurantId);
+    } on Object catch (_) {
+      // Under-quote rather than over-quote, and never break the cart: the
+      // charge is `checkout_preflight`'s, not this reading's.
+      return DeliverySurcharge.none;
     }
   }
 
