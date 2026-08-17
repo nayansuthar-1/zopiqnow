@@ -47,6 +47,16 @@ had ever compiled it — exactly the class of error §7 predicted.
 
 ### Outstanding — blocked, with the reason
 
+> **Update 2026-08-17 — the Apple Developer Program account is active.** That
+> was the root blocker, and items 1, 2, 3 and 5 below are downstream of it and
+> now actionable in that order. Item 4 (`supabase login`) was never blocked on
+> Apple and still needs a human at an interactive prompt; do it early, because
+> push cannot arrive until it runs and it is the step most easily forgotten
+> once the app is on a device and visibly working.
+>
+> Read the items below as the queue, not as a list of excuses — the reasons are
+> kept because they say what "done" looks like.
+
 1. **Code signing.** There is no Apple Developer Program subscription yet and no
    signing certificate on this Mac. `flutter build ios --debug` fails with *"No
    valid code signing certificates were found."* No `DEVELOPMENT_TEAM` is set in

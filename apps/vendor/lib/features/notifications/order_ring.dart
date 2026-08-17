@@ -66,6 +66,15 @@ class OrderRing {
   /// Talks to [MainActivity] to pin the alarm volume while ringing. Absent in
   /// the FCM background isolate — there is no activity there — so every call
   /// through it is guarded and optional.
+  ///
+  /// **Android only, and argued for rather than defaulted to.** iOS has no
+  /// supported way to move the system volume: `AVAudioSession` has no setter
+  /// and `MPVolumeView`'s slider is the only route, which Apple rejects apps
+  /// for driving programmatically. Nothing registers this channel on iOS, so
+  /// [_setVolumeBoost] takes the same [MissingPluginException] path it takes in
+  /// the background isolate and the ring plays at whatever level the phone is
+  /// already set to. The ring itself is not Android-only — see the
+  /// `DarwinNotificationDetails` below.
   static const MethodChannel _volume = MethodChannel('zopiqnow/vendor_ring');
 
   static FlutterLocalNotificationsPlugin? _plugin;
