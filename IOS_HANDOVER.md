@@ -1,5 +1,11 @@
 # iOS handover — what was built on Windows, and what needs a Mac
 
+> **Start at `IOS_RELEASE_RUNBOOK.md` instead, if you are picking this up on the
+> Mac.** That file is the current queue as of 2026-08-17 — signing, APNs, the
+> Live Activity target, and publishing to the App Store, which this file never
+> covered. **This** file remains the archaeology: what was built, why, and which
+> decisions were deliberate. Both are needed; that one is the order of work.
+
 **Written 2026-08-01. Updated 2026-08-02 on the Mac** — see §0 for what is now
 actually verified. Read this whole file before touching Xcode.
 
