@@ -30,6 +30,12 @@ dependencies:
   zopiq_ui:
     path: ../../packages/zopiq_ui
 
+  # The legal corpus, shared with the other two apps. A rider sees the terms,
+  # the privacy policy, their handbook and the verification policy — the five
+  # documents that decide whether they can work and how they are paid.
+  zopiq_legal:
+    path: ../../packages/zopiq_legal
+
   # The delivery map, shared with the customer app (2026-07-28). Navigate opens
   # this rather than handing the rider to another app.
   zopiq_map:

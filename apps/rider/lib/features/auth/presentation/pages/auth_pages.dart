@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:zopiq_legal/zopiq_legal.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_rider/app/providers/consent_recorder.dart';
+import 'package:zopiq_rider/app/router.dart';
 import 'package:zopiq_rider/core/widgets/rider_animations.dart';
 import 'package:zopiq_rider/core/widgets/rider_svg_icons.dart';
 import 'package:zopiq_rider/features/auth/data/rider_auth_datasource.dart';
@@ -91,6 +95,11 @@ class SignInPage extends ConsumerStatefulWidget {
 class _SignInPageState extends ConsumerState<SignInPage> {
   final TextEditingController _email = TextEditingController();
   bool _sending = false;
+
+  /// The consent gate. Never pre-ticked — a box that arrives ticked is not
+  /// consent, it is a notice with a checkbox drawn on it.
+  bool _accepted = false;
+
   String? _error;
 
   @override
@@ -100,6 +109,8 @@ class _SignInPageState extends ConsumerState<SignInPage> {
   }
 
   Future<void> _send() async {
+    if (!_accepted) return;
+
     final String email = _email.text.trim();
     if (!email.contains('@')) {
       setState(() => _error = 'Enter the email you signed up with.');
@@ -127,6 +138,8 @@ class _SignInPageState extends ConsumerState<SignInPage> {
   }
 
   Future<void> _google() async {
+    if (!_accepted) return;
+
     setState(() {
       _sending = true;
       _error = null;
@@ -253,12 +266,30 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                         ),
                         onSubmitted: (_) => _send(),
                       ),
-                      const SizedBox(height: ZopiqSpacing.lg),
+                      const SizedBox(height: ZopiqSpacing.md),
+                      // Above both buttons, because it gates both. A rider signs
+                      // a handbook and a verification policy by working here;
+                      // this is where they are told so.
+                      LegalConsentCheckbox(
+                        value: _accepted,
+                        enabled: !_sending,
+                        onChanged: (bool next) {
+                          setState(() => _accepted = next);
+                          // Carried out of this screen: the sign-in it
+                          // authorises finishes on the OTP screen.
+                          ref.read(pendingConsentProvider.notifier).state = next;
+                        },
+                        onOpenDocument: (String slug) => context.pushNamed(
+                          Routes.legalDocument,
+                          pathParameters: <String, String>{'slug': slug},
+                        ),
+                      ),
+                      const SizedBox(height: ZopiqSpacing.md),
                       ZopiqButton(
                         label: 'Send Verification Code',
                         variant: ZopiqButtonVariant.cta,
                         isLoading: _sending,
-                        onPressed: _send,
+                        onPressed: _accepted ? _send : null,
                       ),
                       const SizedBox(height: ZopiqSpacing.lg),
                       Row(
@@ -284,13 +315,28 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                         label: 'Continue with Google',
                         icon: Icons.account_circle_outlined,
                         variant: ZopiqButtonVariant.outline,
-                        onPressed: _sending ? null : _google,
+                        onPressed: _sending || !_accepted ? null : _google,
                       ),
                     ],
                   ),
                 ),
 
-                const SizedBox(height: ZopiqSpacing.xl),
+                const SizedBox(height: ZopiqSpacing.lg),
+
+                // The rest of the corpus, reachable before signing in — the
+                // handbook and the verification policy are exactly what
+                // somebody deciding whether to ride for us wants to read.
+                Center(
+                  child: TextButton(
+                    onPressed: () => context.pushNamed(Routes.legal),
+                    child: Text(
+                      'All legal documents',
+                      style: t.bodySmall?.copyWith(color: zc.textMuted),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: ZopiqSpacing.sm),
 
                 Center(
                   child: Row(

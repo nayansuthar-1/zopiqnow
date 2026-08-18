@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:zopiq_legal/zopiq_legal.dart';
 
 import 'package:zopiq_rider/app/rider_shell.dart';
 import 'package:zopiq_rider/features/auth/presentation/pages/auth_pages.dart';
@@ -14,6 +15,8 @@ abstract final class Routes {
   static const String otp = 'otp';
   static const String notPartner = 'notPartner';
   static const String notifications = 'notifications';
+  static const String legal = 'legal';
+  static const String legalDocument = 'legalDocument';
 }
 
 /// The root navigator, held so that code with no widget of its own can still
@@ -35,6 +38,7 @@ const String _splashPath = '/splash';
 const String _loginPath = '/login';
 const String _notPartnerPath = '/not-a-partner';
 const String _notificationsPath = '/notifications';
+const String _legalPath = '/legal';
 
 /// Bridges Riverpod's auth state to the [Listenable] GoRouter wants.
 ///
@@ -69,6 +73,14 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       final String location = state.matchedLocation;
       final bool onAuthRoute = location.startsWith(_loginPath);
 
+      // The documents are outside the guard, and have to be. The sign-in screen
+      // will not let a rider in until they have agreed to two of them, and a
+      // guard that bounced them back to that screen the moment they tried to
+      // read one would be asking them to agree to something they are not
+      // allowed to open. Nothing here is anybody's address — it is the same
+      // text that is on the public website.
+      if (location.startsWith(_legalPath)) return null;
+
       return switch (auth) {
         AuthUnknown() => location == _splashPath ? null : _splashPath,
         AuthNotPartner() => location == _notPartnerPath ? null : _notPartnerPath,
@@ -98,6 +110,29 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: _notificationsPath,
         name: Routes.notifications,
         builder: (_, _) => const NotificationsPage(),
+      ),
+      // Outside the guard (see the redirect above). Filtered to the five
+      // documents addressed to a rider — the terms, the privacy policy, their
+      // handbook, the verification policy that decides whether they can work,
+      // and how they are paid.
+      GoRoute(
+        path: _legalPath,
+        name: Routes.legal,
+        builder: (BuildContext context, _) => LegalIndexPage(
+          audience: LegalAudience.rider,
+          onOpenDocument: (String slug) => context.pushNamed(
+            Routes.legalDocument,
+            pathParameters: <String, String>{'slug': slug},
+          ),
+        ),
+        routes: <RouteBase>[
+          GoRoute(
+            path: ':slug',
+            name: Routes.legalDocument,
+            builder: (BuildContext context, GoRouterState state) =>
+                LegalDocumentPage(slug: state.pathParameters['slug']!),
+          ),
+        ],
       ),
       GoRoute(
         path: _notPartnerPath,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_rider/app/providers/consent_recorder.dart';
 import 'package:zopiq_rider/app/router.dart';
 
 /// The delivery-partner app.
@@ -14,6 +15,13 @@ class RiderApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watched, not read: a Provider nobody watches is never created, so its
+    // `ref.listen` on the auth state would never be registered and the
+    // acceptance would never be written. Here because this widget outlives
+    // every route — the sign-in screen is gone by the time the sign-in it is
+    // recording completes on the OTP screen.
+    ref.watch(consentRecorderProvider);
+
     return MaterialApp.router(
       // Was 'Zopiqnow Partner' — the vendor app's title, copied along with the
       // rest of this file. It is what Android shows in the task switcher, and a

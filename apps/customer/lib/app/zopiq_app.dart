@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/app/providers/consent_recorder.dart';
+import 'package:zopiqnow/app/providers/locale_provider.dart';
 import 'package:zopiqnow/app/providers/theme_mode_provider.dart';
 import 'package:zopiqnow/app/router.dart';
+import 'package:zopiqnow/core/l10n/strings.dart';
 import 'package:zopiqnow/features/notifications/push_service.dart';
 
 /// Root of the zopiqnow customer app. Wires the design-system themes
@@ -50,6 +53,14 @@ class _ZopiqAppState extends ConsumerState<ZopiqApp> {
   Widget build(BuildContext context) {
     final GoRouter router = ref.watch(routerProvider);
     final ThemeMode themeMode = ref.watch(themeModeProvider);
+    final AppStrings strings = ref.watch(appStringsProvider);
+
+    // Watched, not read: a Provider is created lazily and one that nobody
+    // watches never runs, so its `ref.listen` on the auth state would never be
+    // registered and the acceptance would never be written. Here because this
+    // is the one widget that outlives every route — the sign-in screen it
+    // belongs to is gone by the time the sign-in it is recording completes.
+    ref.watch(consentRecorderProvider);
 
     return MaterialApp.router(
       title: 'zopiqnow',
@@ -58,6 +69,22 @@ class _ZopiqAppState extends ConsumerState<ZopiqApp> {
       darkTheme: ZopiqTheme.dark,
       themeMode: themeMode,
       routerConfig: router,
+      // The string table goes in through `builder` rather than by wrapping
+      // `MaterialApp` itself, because this is the one place that is *inside*
+      // the app and still above every routed screen. Wrapping from outside
+      // would put it above the Navigator, where the routes could not see it.
+      //
+      // **`locale:` is deliberately not set.** Without `flutter_localizations`
+      // — the dependency this whole approach exists to avoid — Flutter has no
+      // Material delegates for `hi`, so naming the locale would either assert
+      // or silently resolve back to English while doing nothing for our own
+      // copy. Our strings switch on the provider above; Flutter's own built-in
+      // widget text (the text-selection menu, date pickers) stays English.
+      // That is the accepted cost of the zero-dependency route.
+      builder: (BuildContext context, Widget? child) => AppStringsScope(
+        strings: strings,
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }

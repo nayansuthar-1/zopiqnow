@@ -1,13 +1,13 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:zopiq_legal/zopiq_legal.dart';
 
 import 'package:zopiqnow/app/app_shell.dart';
 import 'package:zopiqnow/app/providers/splash_gate_provider.dart';
 import 'package:zopiqnow/features/about/presentation/licenses_page.dart';
 import 'package:zopiqnow/features/account/presentation/pages/account_page.dart';
 import 'package:zopiqnow/features/account/presentation/pages/delete_account_page.dart';
-import 'package:zopiqnow/features/account/presentation/pages/legal_page.dart';
 import 'package:zopiqnow/features/account/presentation/pages/profile_details_page.dart';
 import 'package:zopiqnow/features/auth/presentation/pages/email_page.dart';
 import 'package:zopiqnow/features/auth/presentation/pages/otp_page.dart';
@@ -69,6 +69,7 @@ abstract final class Routes {
   static const String profile = 'profile';
   static const String deleteAccount = 'deleteAccount';
   static const String legal = 'legal';
+  static const String legalDocument = 'legalDocument';
   static const String notifications = 'notifications';
   static const String splash = 'splash';
   static const String login = 'login';
@@ -558,13 +559,31 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             name: Routes.deleteAccount,
             builder: (_, _) => const DeleteAccountPage(),
           ),
-          // `:doc` is 'privacy' or 'terms' — one screen, two documents, because
-          // they differ only in which text they render.
+          // The whole corpus, grouped, filtered to the documents a customer is
+          // addressed by — twenty-one titles with the Merchant SLA among them
+          // is a filing cabinet, not a screen.
           GoRoute(
-            path: 'legal/:doc',
+            path: 'legal',
             name: Routes.legal,
-            builder: (BuildContext context, GoRouterState state) =>
-                LegalPage(document: state.pathParameters['doc'] ?? 'privacy'),
+            builder: (BuildContext context, _) => LegalIndexPage(
+              audience: LegalAudience.customer,
+              onOpenDocument: (String slug) => context.pushNamed(
+                Routes.legalDocument,
+                pathParameters: <String, String>{'slug': slug},
+              ),
+            ),
+            routes: <RouteBase>[
+              // Nested, so `/account/legal/privacy-policy` is a link somebody
+              // can be sent and Back from it lands on the index. `:slug` rather
+              // than one screen per document, because they differ only in which
+              // text they render.
+              GoRoute(
+                path: ':slug',
+                name: Routes.legalDocument,
+                builder: (BuildContext context, GoRouterState state) =>
+                    LegalDocumentPage(slug: state.pathParameters['slug']!),
+              ),
+            ],
           ),
         ],
       ),

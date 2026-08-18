@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/router.dart';
+import 'package:zopiqnow/core/l10n/strings.dart';
 import 'package:zopiqnow/features/home/domain/entities/dish_suggestion.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
@@ -88,7 +89,14 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
             delegate: HomeFilterChipsHeader(),
           ),
           _RecommendedSection(label: selected.label),
-          _CategoryListSection(label: selected.label),
+          // Both are passed: `label` is the English matching key the providers
+          // filter on, `categoryId` is what the display name is looked up by.
+          // See `AppStrings.categoryName` for why they must not be the same
+          // string.
+          _CategoryListSection(
+            categoryId: selected.id,
+            label: selected.label,
+          ),
         ],
       ),
     );
@@ -201,8 +209,8 @@ class _RecommendedSection extends ConsumerWidget {
 
     return SliverMainAxisGroup(
       slivers: <Widget>[
-        const SliverToBoxAdapter(
-          child: SectionHeader(title: 'Recommended for you'),
+        SliverToBoxAdapter(
+          child: SectionHeader(title: context.l10n.homeRecommendedForYou),
         ),
         SliverToBoxAdapter(
           child: DishRail(
@@ -216,8 +224,12 @@ class _RecommendedSection extends ConsumerWidget {
 }
 
 class _CategoryListSection extends ConsumerWidget {
-  const _CategoryListSection({required this.label});
+  const _CategoryListSection({required this.categoryId, required this.label});
 
+  /// Looks up the translated caption. Display only.
+  final String categoryId;
+
+  /// The English matching key the providers filter on. **Never translated.**
   final String label;
 
   @override
@@ -237,7 +249,7 @@ class _CategoryListSection extends ConsumerWidget {
         child: HomeErrorView(
           message: error is RestaurantLoadFailure
               ? error.message
-              : 'Please check your connection and try again.',
+              : context.l10n.homeConnectionError,
           onRetry: () => ref.invalidate(nearbyRestaurantsProvider),
         ),
       ),
@@ -246,7 +258,9 @@ class _CategoryListSection extends ConsumerWidget {
           return SliverFillRemaining(
             hasScrollBody: false,
             child: HomeNoMatchesView(
-              message: 'No $label near you yet. Try another category.',
+              message: context.l10n.homeNoCategoryNearby(
+                context.l10n.categoryName(categoryId, label),
+              ),
             ),
           );
         }

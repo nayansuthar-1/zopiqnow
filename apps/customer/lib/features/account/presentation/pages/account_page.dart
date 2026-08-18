@@ -5,10 +5,13 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/router.dart';
+import 'package:zopiqnow/app/providers/locale_provider.dart';
 import 'package:zopiqnow/app/providers/theme_mode_provider.dart';
+import 'package:zopiqnow/core/l10n/app_language.dart';
+import 'package:zopiqnow/core/l10n/strings.dart';
 import 'package:zopiqnow/features/auth/domain/entities/auth_user.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
-import 'package:zopiqnow/features/account/domain/legal_documents.dart';
+import 'package:zopiqnow/features/account/domain/contact.dart';
 import 'package:zopiqnow/features/account/presentation/providers/veg_mode_provider.dart';
 import 'package:zopiqnow/features/account/presentation/widgets/profile_avatar.dart';
 
@@ -31,19 +34,16 @@ class AccountPage extends ConsumerWidget {
   /// exists, a customer with a problem needs somewhere to send it, and the Play
   /// listing needs the same address to be reachable from inside the app.
   void _showSupport(BuildContext context) {
+    final AppStrings l10n = context.l10n;
     showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('Help & support'),
-        content: const Text(
-          'Email us and a person will answer.\n\n$supportEmail\n\n'
-          'If it is about an order, send the order number — it is on the order '
-          'in My orders.',
-        ),
+        title: Text(l10n.accountHelpSupport),
+        content: Text(l10n.accountSupportBody(supportEmail)),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Close'),
+            child: Text(l10n.close),
           ),
         ],
       ),
@@ -53,31 +53,33 @@ class AccountPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AuthState auth = ref.watch(authControllerProvider);
+    final AppStrings l10n = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Account')),
+      appBar: AppBar(title: Text(l10n.accountTitle)),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.lg),
         children: <Widget>[
           _ProfileCard(auth: auth),
           const SizedBox(height: ZopiqSpacing.lg),
 
-          const _SectionLabel('My Preferences'),
+          _SectionLabel(l10n.accountMyPreferences),
           const _SectionCard(
             children: <Widget>[
               _VegModeTile(),
               _AppearanceTile(),
+              _LanguageTile(),
             ],
           ),
 
           const SizedBox(height: ZopiqSpacing.lg),
-          const _SectionLabel('Food Delivery'),
+          _SectionLabel(l10n.accountFoodDelivery),
           _SectionCard(
             children: <Widget>[
               _AccountTile(
                 icon: Icons.receipt_long_rounded,
-                title: 'My orders',
-                subtitle: 'Track and reorder past orders',
+                title: l10n.accountMyOrders,
+                subtitle: l10n.accountMyOrdersSubtitle,
                 onTap: () => context.pushNamed(Routes.orders),
               ),
               // Its own tile beside "My orders" rather than a filter inside it:
@@ -86,21 +88,21 @@ class AccountPage extends ConsumerWidget {
               // (a courier, days) would be one word doing two jobs.
               _AccountTile(
                 icon: Icons.card_giftcard_rounded,
-                title: 'Gift orders',
-                subtitle: 'Gifts you bought, and where they are',
+                title: l10n.accountGiftOrders,
+                subtitle: l10n.accountGiftOrdersSubtitle,
                 onTap: () => context.pushNamed(Routes.giftOrders),
               ),
               _AccountTile(
                 icon: Icons.location_on_rounded,
-                title: 'My addresses',
-                subtitle: 'Manage your delivery addresses',
+                title: l10n.accountMyAddresses,
+                subtitle: l10n.accountMyAddressesSubtitle,
                 onTap: () => context.pushNamed(Routes.addresses),
               ),
               _AccountTile(
                 icon: Icons.favorite_rounded,
                 iconColor: context.zc.nonVeg,
-                title: 'Your collection',
-                subtitle: 'Restaurants you saved',
+                title: l10n.accountCollection,
+                subtitle: l10n.accountCollectionSubtitle,
                 // `go`, not `push`: Favourites is the Collection tab now, so
                 // this switches to it rather than stacking a second copy on top
                 // of Account and leaving a back arrow over a primary tab.
@@ -110,40 +112,33 @@ class AccountPage extends ConsumerWidget {
           ),
 
           const SizedBox(height: ZopiqSpacing.lg),
-          const _SectionLabel('More'),
+          _SectionLabel(l10n.accountMore),
           _SectionCard(
             children: <Widget>[
               _AccountTile(
                 icon: Icons.headset_mic_rounded,
-                title: 'Help & support',
+                title: l10n.accountHelpSupport,
                 subtitle: supportEmail,
                 onTap: () => _showSupport(context),
               ),
+              // One row, not two. There are twenty-one documents now, and the
+              // two that used to sit here were never the only ones somebody
+              // needed — the refund policy is the one a customer actually goes
+              // looking for, and it had nowhere to be reached from.
               _AccountTile(
                 icon: Icons.shield_outlined,
-                title: 'Privacy policy',
-                onTap: () => context.pushNamed(
-                  Routes.legal,
-                  pathParameters: const <String, String>{'doc': 'privacy'},
-                ),
-              ),
-              _AccountTile(
-                icon: Icons.description_outlined,
-                title: 'Terms of service',
-                onTap: () => context.pushNamed(
-                  Routes.legal,
-                  pathParameters: const <String, String>{'doc': 'terms'},
-                ),
+                title: l10n.accountLegal,
+                onTap: () => context.pushNamed(Routes.legal),
               ),
               _AccountTile(
                 icon: Icons.info_outline_rounded,
-                title: 'Licenses & credits',
+                title: l10n.accountLicenses,
                 onTap: () => context.pushNamed(Routes.licenses),
               ),
               if (kDebugMode)
                 _AccountTile(
                   icon: Icons.palette_outlined,
-                  title: 'Design system',
+                  title: l10n.accountDesignSystem,
                   onTap: () => context.pushNamed(Routes.showcase),
                 ),
             ],
@@ -167,7 +162,7 @@ class AccountPage extends ConsumerWidget {
               child: TextButton(
                 onPressed: () => context.pushNamed(Routes.deleteAccount),
                 child: Text(
-                  'Delete account',
+                  l10n.accountDeleteAccount,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: context.zc.textMuted,
                     decoration: TextDecoration.underline,
@@ -193,6 +188,7 @@ class _ProfileCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final TextTheme t = Theme.of(context).textTheme;
     final ZopiqColors zc = context.zc;
+    final AppStrings l10n = context.l10n;
     final bool signedIn = auth is AuthSignedIn;
 
     if (!signedIn) {
@@ -210,10 +206,10 @@ class _ProfileCard extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text('Welcome to zopiqnow', style: t.titleMedium),
+                  Text(l10n.accountWelcome, style: t.titleMedium),
                   const SizedBox(height: ZopiqSpacing.xxs),
                   Text(
-                    'Log in to track orders and save addresses',
+                    l10n.accountWelcomeSubtitle,
                     style: t.bodySmall?.copyWith(color: zc.textMuted),
                   ),
                 ],
@@ -224,7 +220,7 @@ class _ProfileCard extends ConsumerWidget {
                 Routes.login,
                 queryParameters: const <String, String>{'from': '/account'},
               ),
-              child: const Text('Log in'),
+              child: Text(l10n.accountLogIn),
             ),
           ],
         ),
@@ -287,7 +283,7 @@ class _ProfileCard extends ConsumerWidget {
                   alignment: Alignment.center,
                   children: <Widget>[
                     Text(
-                      name ?? 'Add your name',
+                      name ?? l10n.accountAddYourName,
                       style: name == null
                           ? t.titleLarge?.copyWith(color: zc.textMuted)
                           : t.titleLarge,
@@ -326,9 +322,9 @@ class _VegModeTile extends ConsumerWidget {
       ),
       horizontalTitleGap: 8,
       leading: Icon(Icons.eco_rounded, color: zc.veg, size: 20),
-      title: Text('100% Veg Mode', style: t.titleSmall),
+      title: Text(context.l10n.accountVegMode, style: t.titleSmall),
       subtitle: Text(
-        'Show only vegetarian restaurants',
+        context.l10n.accountVegModeSubtitle,
         style: t.bodySmall?.copyWith(color: zc.textMuted),
       ),
       // Colours come from `switchTheme` rather than from here. This used to pass
@@ -347,6 +343,7 @@ class _AppearanceTile extends ConsumerWidget {
     final ThemeMode mode = ref.watch(themeModeProvider);
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
+    final AppStrings l10n = context.l10n;
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(
@@ -355,32 +352,97 @@ class _AppearanceTile extends ConsumerWidget {
       ),
       horizontalTitleGap: 8,
       leading: const Icon(Icons.color_lens_rounded, size: 20),
-      title: Text('Appearance', style: t.titleSmall),
+      title: Text(l10n.accountAppearance, style: t.titleSmall),
       subtitle: Text(
-        'Light, Dark, or System',
+        l10n.accountAppearanceSubtitle,
         style: t.bodySmall?.copyWith(color: zc.textMuted),
       ),
       trailing: DropdownButton<ThemeMode>(
         value: mode,
         underline: const SizedBox(),
         icon: Icon(Icons.expand_more_rounded, color: zc.textMuted),
-        items: const <DropdownMenuItem<ThemeMode>>[
+        items: <DropdownMenuItem<ThemeMode>>[
           DropdownMenuItem<ThemeMode>(
             value: ThemeMode.light,
-            child: Text('Light', style: TextStyle(fontSize: 14)),
+            child: Text(
+              l10n.accountThemeLight,
+              style: const TextStyle(fontSize: 14),
+            ),
           ),
           DropdownMenuItem<ThemeMode>(
             value: ThemeMode.dark,
-            child: Text('Dark', style: TextStyle(fontSize: 14)),
+            child: Text(
+              l10n.accountThemeDark,
+              style: const TextStyle(fontSize: 14),
+            ),
           ),
           DropdownMenuItem<ThemeMode>(
             value: ThemeMode.system,
-            child: Text('System', style: TextStyle(fontSize: 14)),
+            child: Text(
+              l10n.accountThemeSystem,
+              style: const TextStyle(fontSize: 14),
+            ),
           ),
         ],
         onChanged: (ThemeMode? newMode) {
           if (newMode != null) {
             ref.read(themeModeProvider.notifier).set(newMode);
+          }
+        },
+      ),
+    );
+  }
+}
+
+/// The language picker, sitting directly under Appearance.
+///
+/// Shaped exactly like [_AppearanceTile] on purpose — it is the same kind of
+/// setting (a preference with a small closed list of values), and a customer
+/// who has found one should recognise the other without reading it.
+///
+/// Each option is labelled in its **own** language rather than in the language
+/// currently selected. An English-speaking user hunting for Hindi is looking
+/// for "हिन्दी"; showing them the word "Hindi" in Latin script means the one
+/// person who most needs the setting cannot spot it.
+class _LanguageTile extends ConsumerWidget {
+  const _LanguageTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AppLanguage language = ref.watch(appLanguageProvider);
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+    final AppStrings l10n = context.l10n;
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: ZopiqSpacing.pageGutter,
+        vertical: ZopiqSpacing.xxs,
+      ),
+      horizontalTitleGap: 8,
+      leading: const Icon(Icons.translate_rounded, size: 20),
+      title: Text(l10n.accountLanguage, style: t.titleSmall),
+      subtitle: Text(
+        l10n.accountLanguageSubtitle,
+        style: t.bodySmall?.copyWith(color: zc.textMuted),
+      ),
+      trailing: DropdownButton<AppLanguage>(
+        value: language,
+        underline: const SizedBox(),
+        icon: Icon(Icons.expand_more_rounded, color: zc.textMuted),
+        items: <DropdownMenuItem<AppLanguage>>[
+          for (final AppLanguage option in AppLanguage.values)
+            DropdownMenuItem<AppLanguage>(
+              value: option,
+              child: Text(
+                option.nativeName,
+                style: const TextStyle(fontSize: 14),
+              ),
+            ),
+        ],
+        onChanged: (AppLanguage? chosen) {
+          if (chosen != null) {
+            ref.read(appLanguageProvider.notifier).set(chosen);
           }
         },
       ),
@@ -468,7 +530,10 @@ class _LogoutButton extends StatelessWidget {
       child: OutlinedButton.icon(
         onPressed: onTap,
         icon: Icon(Icons.logout_rounded, color: zc.nonVeg),
-        label: Text('Log out', style: TextStyle(color: zc.nonVeg)),
+        label: Text(
+          context.l10n.accountLogOut,
+          style: TextStyle(color: zc.nonVeg),
+        ),
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
           side: BorderSide(color: zc.divider),

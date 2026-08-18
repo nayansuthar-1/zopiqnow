@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/router.dart';
+import 'package:zopiqnow/core/l10n/strings.dart';
 import 'package:zopiqnow/features/account/presentation/providers/veg_mode_provider.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
@@ -83,7 +84,7 @@ class MoreCategoriesSheet extends ConsumerWidget {
                   children: <Widget>[
                     Expanded(
                       child: Text(
-                        'What\'s on your mind?',
+                        context.l10n.homeWhatsOnYourMind,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
@@ -95,7 +96,7 @@ class MoreCategoriesSheet extends ConsumerWidget {
                       const ZopiqVegIndicator(isVeg: true),
                       const SizedBox(width: ZopiqSpacing.xs),
                       Text(
-                        'Veg only',
+                        context.l10n.homeVegOnly,
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: zc.veg,
                           fontWeight: FontWeight.w700,
@@ -189,7 +190,7 @@ class _CategoryGridTile extends StatelessWidget {
           const SizedBox(height: ZopiqSpacing.sm),
           Expanded(
             child: Text(
-              category.label,
+              context.l10n.categoryName(category.id, category.label),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,

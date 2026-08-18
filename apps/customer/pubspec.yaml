@@ -36,6 +36,12 @@ dependencies:
   zopiq_ui:
     path: ../../packages/zopiq_ui
 
+  # The legal corpus — the terms, the privacy policy and the nineteen documents
+  # beside them, generated from the Word originals in `legal/source/`. Shared
+  # with the vendor and rider apps so one edit reaches all three.
+  zopiq_legal:
+    path: ../../packages/zopiq_legal
+
   # The delivery map: Ola's tiles, Ola's road, the layer switcher. In-repo, and
   # shared with the rider app so the two screens cannot drift apart.
   zopiq_map:

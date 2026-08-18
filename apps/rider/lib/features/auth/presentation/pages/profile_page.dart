@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_rider/app/router.dart';
 import 'package:zopiq_rider/core/widgets/rider_animations.dart';
 import 'package:zopiq_rider/core/widgets/rider_svg_icons.dart';
 import 'package:zopiq_rider/features/auth/domain/entities/rider.dart';
@@ -190,7 +192,22 @@ class ProfilePage extends ConsumerWidget {
               ),
             ),
 
-            const SizedBox(height: ZopiqSpacing.xl),
+            const SizedBox(height: ZopiqSpacing.lg),
+
+            // The five documents a rider is bound by, including the two they
+            // ticked to get in and the verification policy that decides whether
+            // they can work at all.
+            RiderFadeSlide(
+              delay: const Duration(milliseconds: 130),
+              child: ZopiqButton(
+                label: 'Legal & policies',
+                icon: Icons.shield_outlined,
+                variant: ZopiqButtonVariant.outline,
+                onPressed: () => context.pushNamed(Routes.legal),
+              ),
+            ),
+
+            const SizedBox(height: ZopiqSpacing.lg),
 
             RiderFadeSlide(
               delay: const Duration(milliseconds: 150),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_vendor/app/providers/consent_recorder.dart';
 import 'package:zopiq_vendor/app/router.dart';
 
 /// The partner app.
@@ -15,6 +16,13 @@ class VendorApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watched, not read: a Provider nobody watches is never created, so its
+    // `ref.listen` on the auth state would never be registered and the
+    // acceptance would never be written. Here because this widget outlives
+    // every route — the sign-in screen is gone by the time the sign-in it is
+    // recording completes on the OTP screen.
+    ref.watch(consentRecorderProvider);
+
     return MaterialApp.router(
       title: 'Zopiq Partner',
       debugShowCheckedModeBanner: false,

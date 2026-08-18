@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:zopiq_legal/zopiq_legal.dart';
 
 import 'package:zopiq_vendor/app/vendor_shell.dart';
 import 'package:zopiq_vendor/features/auth/presentation/pages/not_staff_page.dart';
@@ -48,12 +49,15 @@ abstract final class Routes {
   static const String login = 'login';
   static const String otp = 'otp';
   static const String notStaff = 'notStaff';
+  static const String legal = 'legal';
+  static const String legalDocument = 'legalDocument';
 }
 
 const String _homePath = '/home';
 const String _splashPath = '/splash';
 const String _loginPath = '/login';
 const String _notStaffPath = '/not-a-partner';
+const String _legalPath = '/legal';
 
 /// Bridges Riverpod's auth state to the [Listenable] GoRouter wants. Without it,
 /// signing in changes state but never re-runs `redirect`.
@@ -93,6 +97,13 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       final VendorAuthState auth = ref.read(vendorAuthControllerProvider);
       final String location = state.matchedLocation;
       final bool onAuthRoute = location.startsWith(_loginPath);
+
+      // The one unguarded route, and it has to be. The sign-in screen will not
+      // let a kitchen in until they have agreed to two of these documents, and
+      // a guard that bounced them back to that screen the moment they tried to
+      // open one would be asking them to agree to something unreadable. Nothing
+      // here is anybody's order book — it is the text on the public website.
+      if (location.startsWith(_legalPath)) return null;
 
       return switch (auth) {
         // The session is still being read from the Keystore. Park on the splash.
@@ -253,6 +264,29 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: _splashPath,
         name: Routes.splash,
         builder: (_, _) => const SplashPage(),
+      ),
+      // Outside the guard (see the redirect above). Filtered to the documents a
+      // restaurant is addressed by — the terms, the privacy policy, the
+      // handbook, the SLA they are measured against, the verification policy,
+      // and how and when they get paid.
+      GoRoute(
+        path: _legalPath,
+        name: Routes.legal,
+        builder: (BuildContext context, _) => LegalIndexPage(
+          audience: LegalAudience.restaurant,
+          onOpenDocument: (String slug) => context.pushNamed(
+            Routes.legalDocument,
+            pathParameters: <String, String>{'slug': slug},
+          ),
+        ),
+        routes: <RouteBase>[
+          GoRoute(
+            path: ':slug',
+            name: Routes.legalDocument,
+            builder: (BuildContext context, GoRouterState state) =>
+                LegalDocumentPage(slug: state.pathParameters['slug']!),
+          ),
+        ],
       ),
       GoRoute(
         path: _notStaffPath,

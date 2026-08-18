@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:zopiq_legal/zopiq_legal.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiq_vendor/app/providers/consent_recorder.dart';
+import 'package:zopiq_vendor/app/router.dart';
 import 'package:zopiq_vendor/features/auth/data/vendor_auth_datasource.dart';
 import 'package:zopiq_vendor/features/auth/presentation/providers/auth_providers.dart';
 
@@ -30,6 +34,11 @@ class SignInPage extends ConsumerStatefulWidget {
 class _SignInPageState extends ConsumerState<SignInPage> {
   final TextEditingController _email = TextEditingController();
   bool _sending = false;
+
+  /// The consent gate. Never pre-ticked — a box that arrives ticked is not
+  /// consent, it is a notice with a checkbox drawn on it.
+  bool _accepted = false;
+
   String? _error;
 
   @override
@@ -39,6 +48,8 @@ class _SignInPageState extends ConsumerState<SignInPage> {
   }
 
   Future<void> _send() async {
+    if (!_accepted) return;
+
     final String email = _email.text.trim();
     if (!email.contains('@')) {
       setState(
@@ -66,6 +77,8 @@ class _SignInPageState extends ConsumerState<SignInPage> {
   }
 
   Future<void> _google() async {
+    if (!_accepted) return;
+
     setState(() {
       _sending = true;
       _error = null;
@@ -91,13 +104,20 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     final TextTheme t = Theme.of(context).textTheme;
 
     return Scaffold(
+      // Scrollable since the consent box arrived, and the two `Spacer`s that
+      // used to centre this column are gone with it — a Spacer needs a bounded
+      // height and a scroll view offers none. The screen now carries an input,
+      // a two-line tick box, three buttons and a divider; with the keyboard up
+      // on a short tablet that is taller than the viewport, and an unscrollable
+      // Column does not clip there, it throws a layout overflow and paints the
+      // yellow-and-black stripes over the sign-in screen.
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(ZopiqSpacing.xl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Spacer(),
+              const SizedBox(height: ZopiqSpacing.xxl),
               Icon(Icons.storefront_rounded, size: 56, color: zc.primary),
               const SizedBox(height: ZopiqSpacing.lg),
               Text('Zopiqnow for restaurants', style: t.headlineSmall),
@@ -117,12 +137,30 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                 ),
                 onSubmitted: (_) => _send(),
               ),
-              const SizedBox(height: ZopiqSpacing.lg),
+              const SizedBox(height: ZopiqSpacing.md),
+              // Above both buttons, because it gates both. A restaurant signs
+              // an SLA and a verification policy by trading here; this is where
+              // they are told so, before the first order rather than after it.
+              LegalConsentCheckbox(
+                value: _accepted,
+                enabled: !_sending,
+                onChanged: (bool next) {
+                  setState(() => _accepted = next);
+                  // Carried out of this screen: the sign-in it authorises
+                  // finishes on the OTP screen.
+                  ref.read(pendingConsentProvider.notifier).state = next;
+                },
+                onOpenDocument: (String slug) => context.pushNamed(
+                  Routes.legalDocument,
+                  pathParameters: <String, String>{'slug': slug},
+                ),
+              ),
+              const SizedBox(height: ZopiqSpacing.md),
               ZopiqButton(
                 label: 'Send code',
                 variant: ZopiqButtonVariant.cta,
                 isLoading: _sending,
-                onPressed: _send,
+                onPressed: _accepted ? _send : null,
               ),
               const SizedBox(height: ZopiqSpacing.lg),
               Row(
@@ -147,9 +185,22 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                 label: 'Continue with Google',
                 icon: Icons.account_circle_outlined,
                 variant: ZopiqButtonVariant.outline,
-                onPressed: _sending ? null : _google,
+                onPressed: _sending || !_accepted ? null : _google,
               ),
-              const Spacer(flex: 2),
+              const SizedBox(height: ZopiqSpacing.md),
+              // The rest of the corpus, reachable before signing in — the
+              // handbook and the SLA are exactly what somebody deciding whether
+              // to list their kitchen here wants to read.
+              Center(
+                child: TextButton(
+                  onPressed: () => context.pushNamed(Routes.legal),
+                  child: Text(
+                    'All legal documents',
+                    style: t.bodySmall?.copyWith(color: zc.textMuted),
+                  ),
+                ),
+              ),
+              const SizedBox(height: ZopiqSpacing.xxl),
             ],
           ),
         ),

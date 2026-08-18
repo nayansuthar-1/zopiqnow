@@ -1,0 +1,34 @@
+name: zopiq_legal
+description: "Zopiq's legal corpus — the terms, the privacy policy and the nineteen documents beside them, as data, rendered identically in all three apps and on the web."
+version: 0.1.0
+publish_to: "none"
+
+# Part of the workspace: shares the root lockfile.
+resolution: workspace
+
+environment:
+  sdk: ^3.12.2
+  flutter: ">=3.44.5"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # The design system, so a policy read in the rider app looks like a policy
+  # read in the customer app.
+  zopiq_ui:
+    path: ../zopiq_ui
+
+  # **Not a new version** (Rule 3). All three apps already depend on exactly
+  # 2.8.0 and the root lockfile already holds it; this changes no pin. It is
+  # here so that recording an acceptance is written once instead of three
+  # times — the one thing all three sign-in screens do identically.
+  supabase_flutter: 2.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: 6.0.0
+
+flutter:
+  uses-material-design: true

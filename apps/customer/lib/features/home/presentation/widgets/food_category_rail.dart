@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/core/l10n/strings.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/category_art.dart';
 
@@ -176,7 +177,7 @@ class _CategoryTile extends StatelessWidget {
             CategoryArt(category: category, size: FoodCategoryRail.artSize),
             const SizedBox(height: ZopiqSpacing.sm),
             Text(
-              category.label,
+              context.l10n.categoryName(category.id, category.label),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,

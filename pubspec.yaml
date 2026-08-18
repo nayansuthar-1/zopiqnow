@@ -14,6 +14,7 @@ workspace:
   - apps/vendor
   - apps/rider
   - packages/zopiq_ui
+  - packages/zopiq_legal
   - packages/zopiq_live_card
   - packages/zopiq_map
   - packages/zopiq_uploads

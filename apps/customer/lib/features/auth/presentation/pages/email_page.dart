@@ -1,11 +1,12 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:zopiq_legal/zopiq_legal.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/app/providers/consent_recorder.dart';
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/auth/domain/repositories/auth_repository.dart';
 import 'package:zopiqnow/features/auth/presentation/providers/auth_providers.dart';
@@ -92,6 +93,12 @@ class _EmailPageState extends ConsumerState<EmailPage> {
   bool _sending = false;
   bool _sendingSms = false;
   bool _googleBusy = false;
+
+  /// The consent gate. Starts false and is never pre-ticked — a box that
+  /// arrives ticked is not consent, it is a notice with a checkbox drawn on it,
+  /// and every regulator that has looked at the pattern has said so.
+  bool _accepted = false;
+
   String? _error;
   String? _phoneError;
 
@@ -102,6 +109,10 @@ class _EmailPageState extends ConsumerState<EmailPage> {
     super.dispose();
   }
 
+  /// Both halves of "can this button be pressed": the field has to be plausible
+  /// *and* the terms have to have been accepted. Kept as two getters and
+  /// combined at each button, so the disabled state is one expression rather
+  /// than three places that could disagree about what enables a sign-in.
   bool get _isValid => isPlausibleEmail(_controller.text);
 
   bool get _isPhoneValid => isPlausibleIndianMobile(_phoneController.text);
@@ -111,8 +122,14 @@ class _EmailPageState extends ConsumerState<EmailPage> {
   /// typing the one that arrived first into a screen expecting the other.
   bool get _busy => _sending || _sendingSms || _googleBusy;
 
+  /// The gate, restated in code at the top of every path that creates an
+  /// account. The disabled buttons are the visible half; this is the half that
+  /// still holds if a keyboard's "done" key, an autofill, or a future edit to
+  /// this screen finds a way past them.
+  bool get _gateOpen => _accepted;
+
   Future<void> _submitPhone() async {
-    if (!_isPhoneValid || _busy) return;
+    if (!_isPhoneValid || _busy || !_gateOpen) return;
     setState(() {
       _sendingSms = true;
       _phoneError = null;
@@ -131,7 +148,7 @@ class _EmailPageState extends ConsumerState<EmailPage> {
   }
 
   Future<void> _submit() async {
-    if (!_isValid || _busy) return;
+    if (!_isValid || _busy || !_gateOpen) return;
     setState(() {
       _sending = true;
       _error = null;
@@ -149,7 +166,7 @@ class _EmailPageState extends ConsumerState<EmailPage> {
   }
 
   Future<void> _signInWithGoogle() async {
-    if (_busy) return;
+    if (_busy || !_gateOpen) return;
     setState(() {
       _googleBusy = true;
       _error = null;
@@ -179,6 +196,27 @@ class _EmailPageState extends ConsumerState<EmailPage> {
       if (mounted) setState(() => _googleBusy = false);
     }
   }
+
+  /// The gate itself. One instance, referenced from whichever of the two
+  /// placements below is live, so the two configurations of this screen cannot
+  /// end up with two subtly different consent boxes.
+  Widget get _consent => LegalConsentCheckbox(
+    value: _accepted,
+    // Locked while a sign-in is in flight: un-ticking the box underneath a
+    // request that was sent on the strength of it would leave the screen
+    // claiming consent was refused while the account is being created.
+    enabled: !_busy,
+    onChanged: (bool next) {
+      setState(() => _accepted = next);
+      // Carried out of this screen, because the sign-in it authorises finishes
+      // on the OTP screen — one route after this widget is gone.
+      ref.read(pendingConsentProvider.notifier).state = next;
+    },
+    onOpenDocument: (String slug) => context.pushNamed(
+      Routes.legalDocument,
+      pathParameters: <String, String>{'slug': slug},
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -217,7 +255,13 @@ class _EmailPageState extends ConsumerState<EmailPage> {
                 style: t.bodyMedium?.copyWith(color: zc.textMuted),
               ),
               const SizedBox(height: ZopiqSpacing.xl),
+              // Above the SMS block when it is drawn, because the block ends in
+              // a button and the gate has to be above every button on the
+              // screen, not only the last one. With SMS off the copy below the
+              // email field is the first button, and the box sits there instead.
               if (smsSignInEnabled) ...<Widget>[
+                _consent,
+                const SizedBox(height: ZopiqSpacing.md),
                 TextField(
                   controller: _phoneController,
                   autofocus: true,
@@ -253,7 +297,9 @@ class _EmailPageState extends ConsumerState<EmailPage> {
                   variant: ZopiqButtonVariant.cta,
                   isLoading: _sendingSms,
                   expand: true,
-                  onPressed: _isPhoneValid && !_busy ? _submitPhone : null,
+                  onPressed: _isPhoneValid && !_busy && _gateOpen
+                      ? _submitPhone
+                      : null,
                 ),
                 const SizedBox(height: ZopiqSpacing.lg),
                 Row(
@@ -293,6 +339,11 @@ class _EmailPageState extends ConsumerState<EmailPage> {
                 ),
               ),
               const SizedBox(height: ZopiqSpacing.lg),
+              // The gate, when the SMS block above is not there to carry it.
+              if (!smsSignInEnabled) ...<Widget>[
+                _consent,
+                const SizedBox(height: ZopiqSpacing.md),
+              ],
               ZopiqButton(
                 label: smsSignInEnabled ? 'Continue with email' : 'Continue',
                 // Secondary only while the mobile path is above it: two
@@ -304,7 +355,7 @@ class _EmailPageState extends ConsumerState<EmailPage> {
                     : ZopiqButtonVariant.cta,
                 isLoading: _sending,
                 expand: true,
-                onPressed: _isValid && !_busy ? _submit : null,
+                onPressed: _isValid && !_busy && _gateOpen ? _submit : null,
               ),
               const SizedBox(height: ZopiqSpacing.lg),
               Row(
@@ -324,7 +375,7 @@ class _EmailPageState extends ConsumerState<EmailPage> {
               ),
               const SizedBox(height: ZopiqSpacing.lg),
               OutlinedButton.icon(
-                onPressed: _busy ? null : _signInWithGoogle,
+                onPressed: _busy || !_gateOpen ? null : _signInWithGoogle,
                 icon: _googleBusy
                     // Sized to the icon it replaces, so the label does not
                     // shift sideways when the spinner appears.
@@ -343,43 +394,21 @@ class _EmailPageState extends ConsumerState<EmailPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: ZopiqSpacing.xl),
+              const SizedBox(height: ZopiqSpacing.lg),
 
-              // Consent, at the point of consenting. This screen is where an
-              // account is created — an unknown address is signed up, not
-              // rejected — so this is the only honest place to say what that
-              // agrees to, and both documents are one tap away rather than
-              // named and left unfindable.
-              Text.rich(
-                TextSpan(
-                  style: t.bodySmall?.copyWith(color: zc.textMuted, height: 1.4),
-                  children: <InlineSpan>[
-                    const TextSpan(text: 'By continuing you agree to our '),
-                    TextSpan(
-                      text: 'Terms of Service',
-                      style: TextStyle(color: zc.primary),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () => context.pushNamed(
-                          Routes.legal,
-                          pathParameters: const <String, String>{'doc': 'terms'},
-                        ),
-                    ),
-                    const TextSpan(text: ' and '),
-                    TextSpan(
-                      text: 'Privacy Policy',
-                      style: TextStyle(color: zc.primary),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () => context.pushNamed(
-                          Routes.legal,
-                          pathParameters: const <String, String>{
-                            'doc': 'privacy',
-                          },
-                        ),
-                    ),
-                    const TextSpan(text: '.'),
-                  ],
+              // Where the rest of the corpus lives. Two documents gate the
+              // sign-in; the other nineteen are reference material, and burying
+              // them behind an account somebody cannot yet create would put the
+              // refund policy out of reach of exactly the person deciding
+              // whether to sign up.
+              Center(
+                child: TextButton(
+                  onPressed: () => context.pushNamed(Routes.legal),
+                  child: Text(
+                    'All legal documents',
+                    style: t.bodySmall?.copyWith(color: zc.textMuted),
+                  ),
                 ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),

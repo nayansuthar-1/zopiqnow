@@ -24,6 +24,12 @@ dependencies:
   zopiq_ui:
     path: ../../packages/zopiq_ui
 
+  # The legal corpus, shared with the other two apps. A restaurant sees the
+  # terms, the privacy policy, their handbook, the SLA they are measured
+  # against, and how and when they get paid.
+  zopiq_legal:
+    path: ../../packages/zopiq_legal
+
   flutter_riverpod: 2.6.1
   go_router: 14.8.1
 

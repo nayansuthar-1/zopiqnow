@@ -135,6 +135,15 @@ class MorePage extends ConsumerWidget {
                 onTap: () => context.pushNamed(Routes.reviews),
               ),
             ),
+            VendorFadeSlide(
+              delay: const Duration(milliseconds: 280),
+              child: _Row(
+                svgType: VendorSvgType.verifiedCheck,
+                label: 'Legal & policies',
+                subtitle: 'The terms, the SLA, and how you get paid',
+                onTap: () => context.pushNamed(Routes.legal),
+              ),
+            ),
 
             const SizedBox(height: ZopiqSpacing.xl),
           ],
