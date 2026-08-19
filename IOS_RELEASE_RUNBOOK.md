@@ -245,6 +245,14 @@ Live Activities do not work usefully in the simulator. Test on a real device.
 New ground: `IOS_HANDOVER.md` stops before this. Two traps here will cost days if
 they are met at submission time rather than now.
 
+> **Both traps were decided on 2026-08-20, and the metadata is written.**
+> Scope is the **customer app only** (Trap 2), and the reviewer signs in with a
+> **fixed-OTP demo account** (Trap 1). Every field App Store Connect asks for —
+> name, subtitle, keywords, description, review notes, the App Privacy answers,
+> the screenshot list — is written out ready to paste in
+> **`IOS_APP_STORE_LISTING.md`**. Work from that file for D1–D3; the sections
+> below stay as the reasoning behind it.
+
 ### ⚠️ D0. Read these two before writing any metadata
 
 **Trap 1 — App Review cannot log in.** The customer app signs in with an **email

@@ -468,6 +468,18 @@ with everything else correct.
 4. **`apps/vendor` has no Maps and no Google Sign-In**, so it has no
    `Secrets.xcconfig` at all. That is correct, not an omission.
 
+   **Correction, 2026-08-20 — the second half of that is wrong.** The vendor app
+   *does* have Google Sign-In: `google_sign_in` 7.2.0 is in its pubspec and
+   `sign_in_page.dart` calls it. So does the rider. What neither has is any way
+   to authenticate on iOS — none of the three `GoogleService-Info.plist` files
+   carry `CLIENT_ID` or `REVERSED_CLIENT_ID`, the rider's
+   `Secrets.xcconfig.example` declares only `MAPS_API_KEY`, and the vendor has no
+   xcconfig at all. Only the customer app has an iOS OAuth client wired. **On an
+   iPhone today the Google button in rider and vendor has nothing behind it**,
+   and that is the button a store reviewer is given on Android. Each needs its
+   own iOS OAuth client before either app is submitted — see
+   `IOS_APP_STORE_LISTING.md` §8.
+
 ---
 
 ## 7. If you are a Claude session picking this up
