@@ -40,15 +40,53 @@ now actionable.
 | Device compile (arm64) | customer 208.9 MB, rider 39.8 MB, vendor 22.7 MB | Proven |
 | `GoogleService-Info.plist` ×3 | Confirmed inside the built `.app` | Proven |
 | `Secrets.xcconfig` (customer, rider) | Present, gitignored, values substituting | Proven |
-| `Runner.entitlements` (`aps-environment`) | Written, wired into all 9 configurations | **Unverified** — a `--no-codesign` build never reads it |
-| Code signing | Never done | Not started |
+| `Runner.entitlements` (`aps-environment`) | `production`, read out of the signed binary | **Proven** 2026-08-20 — see below |
+| Code signing | Two identities on this Mac; customer archives and signs | Proven 2026-08-20 |
 | APNs `.p8` upload | Never done | Not started |
 | Live Activity extension target | Never created | Not started |
 | `send-notification` redeploy | Never run | Not started |
 | End-to-end push on iOS | Never observed | Not started |
-| App Store Connect records | Never created | Not started |
+| App Store Connect records | customer exists, builds 16 and 17 uploaded and `VALID`; rider and vendor have none | Proven 2026-08-20 |
 
 Verified on macOS 26.4, Xcode 26.6, CocoaPods 1.17.0, **Flutter 3.44.8**.
+
+### Corrections from 2026-08-20
+
+Three rows above used to read "Never done". They were written on Windows by a
+session that could not check, and the Mac had moved on without them — worth
+remembering the next time this table disagrees with the machine.
+
+**Signing is done.** `security find-identity -v -p codesigning` reports two valid
+identities (Apple Development and Apple Distribution, team `759C76D23N`), and
+`DEVELOPMENT_TEAM = 759C76D23N` is set across all three configurations in all
+three projects. `flutter build ios --release` on the customer app exits 0 —
+57.7 MB, signed by *Apple Distribution: Hitesh Solanki* — with no Swift errors.
+
+**`Runner.entitlements` is proven**, which was this table's flagged unknown. Read
+out of the signed `.app`:
+
+```
+application-identifier   759C76D23N.com.siteonlab.zopiqnow
+aps-environment          production
+beta-reports-active      true
+get-task-allow           false
+```
+
+⚠️ **The verify command in §A2 lies.** The `plutil -p -o - -- -` chain prints
+*nothing at all* even when the entitlements are correct — a false negative that
+sends you hunting a problem you do not have. Drop the `plutil` half and read
+`codesign`'s own output:
+
+```bash
+codesign -d --entitlements - build/ios/iphoneos/Runner.app
+```
+
+**App Store Connect is further along than "never created".** The customer app has
+a record (`6802838096`) and Apple already holds builds 16 and 17, both `VALID`;
+version 1.0 sits in `PREPARE_FOR_SUBMISSION`. Rider and vendor have no record and
+no registered bundle id — and the API cannot create either, so that stays a
+human at the web UI. `node tool/ship_ios.mjs --check` prints the live state;
+`RELEASING_IOS.md` has the rest.
 
 ### One correction carried forward
 
@@ -124,12 +162,19 @@ In Xcode, for each of `apps/customer/ios/Runner.xcworkspace`,
 signed build, confirm `aps-environment` is actually present:
 
 ```bash
-codesign -d --entitlements - --xml \
-  build/ios/iphoneos/Runner.app 2>/dev/null | plutil -p -o - -- -
+codesign -d --entitlements - build/ios/iphoneos/Runner.app
 ```
 
 If `aps-environment` is missing, push will fail later in a way that looks like a
 server problem. Catch it here.
+
+> This command used to pipe through `plutil -p -o - -- -`, which prints an empty
+> result whether the entitlements are absent *or* perfectly correct. Confirmed
+> 2026-08-20 on a binary that does carry `aps-environment: production`. Read
+> `codesign`'s own output instead — it is already legible.
+>
+> **Done for customer on 2026-08-20**: `aps-environment` is `production`. Rider
+> and vendor are still unchecked, because neither has been signed yet.
 
 ### A3. Run
 
