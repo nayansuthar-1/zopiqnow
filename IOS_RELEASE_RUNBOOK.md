@@ -201,6 +201,52 @@ for a few more of that class. They are cheap once the compiler is looking.
   found during the port — the iOS path exists now, but nobody has watched it.
 - Vendor: sign in; confirm the orders board loads and a new order **rings**.
 
+### A4. Checking a feed on the simulator, without a device or an OTP
+
+Not everything needs the phone. Anything that is Dart plus a network call — the
+town lock is the worked example — can be watched on the simulator, and two facts
+make it cheap:
+
+**Home is not behind sign-in.** `_protectedPrefixes` in `router.dart` covers
+checkout, orders, addresses and favourites; browsing the catalogue is open. So
+no email OTP is needed to look at a feed.
+
+**The selected address is plain `SharedPreferences`**, under the key
+`flutter.zopiq.location.selected_address` — note the `flutter.` prefix the plugin
+adds. Seed it and the app opens on whatever town you like:
+
+```bash
+SIM=<device-udid>
+xcrun simctl terminate  $SIM com.siteonlab.zopiqnow
+xcrun simctl uninstall  $SIM com.siteonlab.zopiqnow   # ← see the trap below
+xcrun simctl install    $SIM apps/customer/build/ios/iphonesimulator/Runner.app
+xcrun simctl privacy    $SIM grant location-always com.siteonlab.zopiqnow
+# write {"id","line1","city","latitude","longitude","label","delivery_notes",
+#        "service_area_id"} as a JSON *string* into
+#   <data-container>/Library/Preferences/com.siteonlab.zopiqnow.plist
+xcrun simctl launch     $SIM com.siteonlab.zopiqnow
+xcrun simctl io         $SIM screenshot out.png
+```
+
+Leave `service_area_id` **null**. The app then resolves the town itself through
+`delivery_area_check` and writes the answer back — which is the thing worth
+watching, and it is real evidence rather than a value you fed it.
+
+⚠️ **The trap: a running app clobbers the file.** Flutter's `SharedPreferences`
+holds the whole map in memory and flushes it on exit, so seeding a new address
+while the app is alive — or seeding it and launching before the old process has
+fully gone — silently restores the previous town. It costs a full cycle each
+time, and the screenshot looks plausible. Uninstall first (that wipes the
+container), then seed, then launch. Verify the file *before* launching, and read
+the header on the screenshot to confirm which town actually loaded.
+
+Grant `location-always` too, or a fresh install raises the permission alert over
+the feed — and per `IOS_HANDOVER.md` §0, an unanswered alert blocks the whole
+simulator.
+
+**What a simulator cannot show you:** APNs, Live Activities, real GPS drift, and
+anything about signing. Those still need the phone.
+
 ---
 
 ## 4. Phase B — make push actually arrive
