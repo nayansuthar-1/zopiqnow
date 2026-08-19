@@ -61,3 +61,7 @@ dist/
 .env.local
 .env.*.local
 *.tsbuildinfo
+
+# App Store Connect API private keys — one download, never recoverable, and
+# whoever holds one can push builds to the store listing.
+*.p8
