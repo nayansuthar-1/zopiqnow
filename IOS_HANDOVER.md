@@ -40,10 +40,354 @@ Verified on: macOS 26.4, **Xcode 26.6**, CocoaPods 1.17.0, **Flutter 3.44.8**.
 | — | Tests | 133 / 35 / 62, all passing |
 | — | Analyze | 13 / 9 / 0 source issues, all pre-existing, none new |
 
+> **Re-verified 2026-08-18**, at `ae6a6e2`, on Flutter 3.44.8 / Xcode 26.6.
+> `flutter build ios --no-codesign` **exits 0 for all three** — customer 63.9 MB,
+> rider 46.7 MB, vendor 29.1 MB (release; the larger figures in the table above
+> were a different configuration, not a regression). The `channel:` bug below is
+> fixed at HEAD. `flutter pub get` clean, root `pubspec.lock` untouched. The only
+> working-tree changes were two `Podfile.lock` files, and they are **purely
+> additive** — 137 insertions, zero deletions, no existing pod's version or
+> checksum moved, so Rule 3 is intact.
+>
+> ⚠️ **New, and not in the runbook: Google sign-in is wired for iOS on the
+> customer app only.** See §0.1.
+>
+> **First iOS run, 2026-08-18 — customer app, iPhone 17 simulator (iOS 26.5).**
+> It launches and reaches the home feed: categories, promo carousel, search, the
+> location-disclosure sheet, and a session restored from secure storage. So
+> Supabase connectivity, image loading, navigation and secure storage all work on
+> iOS. **The launch screen is brand orange with the Z logo, not white** — `a1fb228`
+> is confirmed, and it had never been seen anywhere until now.
+>
+> A simulator proves none of Phase B or C: no APNs token, no Live Activity. And
+> `security find-identity -v -p codesigning` reports **0 valid identities** on this
+> Mac, so nothing has been signed and nothing can be archived or uploaded yet.
+>
+> **All three, 2026-08-19, same simulator, all freshly built from this HEAD** —
+> each verified by `simctl get_app_container` timestamp and by `GIDClientID`
+> being present in the *installed* binary, not merely in the source:
+>
+> * **customer** — reaches the home feed (categories, carousel, search, the
+>   location-disclosure sheet), session restored from secure storage.
+> * **rider** — sign-in screen renders; the `ae6a6e2` consent checkbox gates both
+>   *Send Verification Code* and *Continue with Google*, which stay disabled until
+>   it is ticked.
+> * **vendor** — sign-in screen renders with the same consent gate, and the
+>   notification permission prompt is raised.
+>
+> ⚠️ **A trap worth knowing.** An earlier rider build from **7 August** was still
+> installed on that simulator and launches happily *without* the consent gate. A
+> screenshot alone cannot tell the two apart. Check the container timestamp before
+> believing any simulator result — a stale build is the easiest way to "verify" a
+> change that is not actually there.
+>
+> Two simulator-only annoyances, neither a bug in the apps: `timeout` does not
+> exist on macOS (use no wrapper), and an unanswered notification permission alert
+> blocks the whole simulator until it is dismissed or the device is rebooted.
+
 One real Swift bug surfaced the moment a compiler saw the code:
 `ZopiqLiveCardPlugin.swift` called `registrar.addMethodCallDelegate(instance,
 on: channel)`. The label is `channel:`. It had never compiled because nothing
 had ever compiled it — exactly the class of error §7 predicted.
+
+### 0.1 Google sign-in on iOS is finished for `customer` only — found 2026-08-18
+
+All three apps depend on `google_sign_in: 7.2.0` and all three call
+`GoogleSignIn.instance.initialize(serverClientId: Env.googleWebClientId)` —
+passing **no** `clientId`. What each app has beside that call is not the same:
+
+| | `GIDClientID` in Info.plist | reversed-id URL scheme | `GOOGLE_IOS_CLIENT_ID` in Secrets | `CLIENT_ID` in GoogleService-Info.plist |
+|---|---|---|---|---|
+| customer | ✅ `$(GOOGLE_IOS_CLIENT_ID)` | ✅ | ✅ | ❌ |
+| rider | ❌ | ❌ | ❌ (file exists, Maps key only) | ❌ |
+| vendor | ❌ | ❌ | ❌ (no Secrets.xcconfig at all) | ❌ |
+
+**Why that matters**, traced in the plugin's own source rather than inferred —
+`google_sign_in_ios-6.3.0/.../FLTGoogleSignInPlugin.m`:
+
+* `configurationWithClientIdentifier:` (l. 331) resolves the client id as
+  `runtimeClientIdentifier ?: googleServiceProperties[@"CLIENT_ID"]`, and
+  **returns `nil` when both are absent** (l. 336).
+* `configureWithParameters:` (l. 182) then simply does not set a configuration,
+  leaving GIDSignIn to populate its default one **from `Info.plist`**.
+
+So the customer app works by landing on that last fallback: `GIDClientID`.
+Rider and vendor reach it too and find nothing there — no client id from any of
+the four sources — so `authenticate()` cannot succeed. **Email OTP is
+unaffected**; it is the *Continue with Google* button that fails, on both staff
+apps.
+
+`OAUTH_SETUP_VENDOR_RIDER.md` confirms the cause rather than contradicting it:
+it registers **four clients, all of type Android**, and contains no iOS mention.
+The iOS half was done for the customer app and never for the other two.
+
+**To fix**, per app (rider, vendor) — the first step is a human's, in the
+console:
+
+1. Create an **iOS** OAuth client in Cloud project `789936942272` with the
+   app's bundle id (`com.siteonlab.zopiqRider`, `com.siteonlab.zopiqVendor`).
+   No client secret; iOS clients are public.
+2. Put its id and its "iOS URL scheme" into that app's `Secrets.xcconfig`
+   (vendor needs the file created; copy the customer's `.example` for wording).
+3. Add `GIDClientID` and the `CFBundleURLTypes` block to that app's
+   `Info.plist`, exactly as `apps/customer/ios/Runner/Info.plist` has them.
+
+#### ⚠️ And a matching risk on the customer app, which is *not* fixed by the above
+
+`OAUTH_SETUP_VENDOR_RIDER.md` states "**No Supabase change** — the provider is
+on and already trusts that client", meaning the shared **web** client. That is
+true on Android, where `requestIdToken(serverClientId)` mints the id token for
+the web client's audience. **It does not carry to iOS.** Because the
+`GIDConfiguration` is discarded above, the `serverClientId` passed from Dart
+never reaches GIDSignIn at all (and no `GIDServerClientID` key exists in any
+Info.plist) — so the id token iOS returns is minted for the **iOS** client.
+
+Supabase verifies `aud` against its configured Google client ids. If only the
+web client is listed there, `signInWithIdToken` rejects the token and the app
+takes its own `on AuthException` branch — on screen, the same one sentence as
+every other Google failure.
+
+The fix is a dashboard change, not code: add each **iOS** client id to the
+Supabase Google provider's authorized client ids. **This is reasoned from the
+source, not observed** — nobody has run Google sign-in on an iOS device yet. It
+is cheap to settle during the Phase A smoke test, and expensive to meet for the
+first time during App Review.
+
+### 0.2 Signed, uploadable App Store build — 2026-08-19, **no device required**
+
+The runbook and §0 above both assume a registered iPhone is the gate. **It is not
+— for distribution.** A full App Store IPA was produced on a Mac with no device
+ever attached, and the `aps-environment` row in the table below is now settled.
+
+**What was proven, and what it cost.** Automatic signing genuinely *cannot*
+proceed without a registered device — `flutter build ios`, `flutter build ipa`
+and a bare `xcodebuild archive -allowProvisioningUpdates` all fail identically
+with *"Your team has no devices from which to generate a provisioning profile"*.
+Removing the legacy project-level `CODE_SIGN_IDENTITY = "iPhone Developer"` pin
+does **not** help; that theory was tested and reverted.
+
+The route that works is **manual signing**, which needs no devices at all:
+
+1. CSR generated with `openssl`, kept in `~/zopiq-signing/` (outside this repo —
+   it is public). **That private key cannot be re-downloaded; back it up.**
+2. `Apple Distribution: Hitesh Solanki (759C76D23N)` created in the portal and
+   imported with `security import -T /usr/bin/codesign`.
+3. App ID registered **with Push Notifications**, and an App Store profile
+   (`Zopiq Customer App Store`) generated and installed into *both*
+   `~/Library/MobileDevice/Provisioning Profiles/` and Xcode 16+'s
+   `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`.
+4. Only the **Release** config switched to manual signing — Debug and Profile
+   stay automatic, so device builds still work once a phone is registered.
+5. `flutter build ipa` archives correctly but **its default export fails**:
+   *"requires a provisioning profile with the Push Notifications feature"*,
+   because Flutter exports with automatic signing. The fix is an explicit
+   `ios/ExportOptions.plist` (`signingStyle: manual`, the profile named per
+   bundle id) driven by `xcodebuild -exportArchive`.
+
+**Result** — `build/ios/ipa/zopiqnow.ipa`, 40 MB, version 1.0.0 build 16:
+
+```
+Authority=Apple Distribution: Hitesh Solanki (759C76D23N)
+Authority=Apple Worldwide Developer Relations Certification Authority
+TeamIdentifier=759C76D23N
+aps-environment          production      <-- the §0 "unverified" row, closed
+application-identifier   759C76D23N.com.siteonlab.zopiqnow
+get-task-allow           false
+codesign --verify --deep --strict: valid on disk, satisfies its Designated Requirement
+```
+
+> ⚠️ **What this does NOT prove.** The app has still never run on real hardware.
+> Push, the Live Activity and the payment flow remain unobserved on a device, and
+> `flutter build ipa` warns the launch image is still Flutter's placeholder asset
+> (cosmetic — the orange launch *screen* is correct). Send this build to
+> TestFlight and put it on a phone before submitting for review.
+
+### 0.3 First build uploaded to App Store Connect — 2026-08-19
+
+`zopiqnow.ipa` (1.0.0 build 16) was accepted by Apple.
+
+```
+VERIFY SUCCEEDED with no errors, 1 warning
+UPLOAD SUCCEEDED with no errors, 1 warning
+Delivery UUID: b77a6b30-4946-4a33-b776-bd6bab7ca4b7
+Transferred 42391521 bytes in 18.315 seconds
+```
+
+Uploaded with `xcrun altool --upload-app` using an App Store Connect API key
+(`--apiKey` / `--apiIssuer`), which needs no password and no device. The key
+lives in `~/.appstoreconnect/private_keys/` and is **not** in this repo.
+
+**Build number 16 is now permanently consumed** — App Store Connect refuses a
+reused build number, so the next upload must be 17 even if this build is deleted.
+
+⚠️ **One warning, not blocking today.** `MinimumOSVersion` is 14.0; from **Spring
+2027** Apple requires 15.0 or later for any upload. Raising
+`IPHONEOS_DEPLOYMENT_TARGET` is a deliberate decision (it drops iOS 14 devices and
+touches all three apps plus the Live Activity's 14.0 target), so it is recorded
+here rather than changed quietly.
+
+**This is TestFlight, not a submission.** The build has still never run on real
+hardware — push, the Live Activity and payments remain unobserved on a device.
+Install it via TestFlight on a phone before anything is submitted for review.
+
+### 0.4 Build 18 to TestFlight, and two warnings that stay — 2026-08-20
+
+`1.0.0+18` built from `3b90b95` and uploaded by `node tool/ship_ios.mjs customer
+2986bf4e-c118-4100-a878-3c1883efb451`. This is the first build carrying the two
+home-feed fixes (`35eeecd`, `dd860d3`) that Android testers already had, which is
+why build 17 was not simply reassigned.
+
+```
+UPLOAD SUCCEEDED with no errors, 1 warning
+Delivery UUID: 3488c3fe-0b69-42b8-8a8b-1126ab8be1a9
+Transferred 42390664 bytes in 49.523 seconds (855.98KB/s, 6.848Mbps)
+  9:40:16 PM  VALID
+Could NOT assign to "Zopiq team" — HTTP 422. Build 18 is uploaded but unassigned.
+```
+
+⚠️ **That last line is wrong, and the script prints `Done. customer 1.0.0+18 is
+on TestFlight.` immediately after it.** The 422 body, which `ship_ios.mjs:307`
+discards, reads *"Builds cannot be assigned to this internal group. / Cannot add
+internal group to a build."* The internal group has **`hasAccessToAllBuilds:
+true`** — automatic distribution — so Apple refuses the manual assignment as
+redundant, having already delivered the build. Confirmed by asking for the
+group's own build list, which returns `18, 17, 16`, and by
+`buildBetaDetail.internalBuildState = IN_BETA_TESTING`.
+
+So `ship_ios.mjs:318`'s warning inverts here: a 4xx normally means the build is
+on Apple and in nobody's TestFlight, but against an auto-distribution internal
+group it is the *expected* response and means the opposite. **Check the group's
+build list, not the exit code or the closing line** — the script exits 0 either
+way.
+
+The external group (`bc79d724-…`, public link, no auto-distribution) was assigned
+separately: `HTTP 204`, and its build list moved from `17, 16` to `18, 17, 16`.
+
+⚠️ **External testers do not have build 18 yet.** Assignment is not distribution:
+`externalBuildState` is **`READY_FOR_BETA_SUBMISSION`** and its
+`betaAppReviewSubmission` is `null`. Build 17 by contrast shows `APPROVED`
+(submitted 2026-08-19) and `IN_BETA_TESTING`. Beta App Review must be submitted
+from App Store Connect — deliberately not automated, per `ship_ios.mjs`'s own
+header. Until then the public link still serves **17**.
+
+#### The two delivery-email warnings — recorded, not fixed
+
+Both are non-blocking for TestFlight and **neither is being changed**.
+
+* **ITMS-90068**, `MinimumOSVersion` 14.0 — already recorded in §0.3 and still
+  true at build 18. A calendar item for **Spring 2027**, not a defect. 14.0 is
+  forced by `google_maps_flutter_ios`, so raising it is a version-freeze change
+  request with its own testing, and it drops every iOS 14 device.
+* **ITMS-90683**, missing `NSLocationAlwaysAndWhenInUseUsageDescription` — the
+  omission is deliberate (`apps/customer/ios/Runner/Info.plist:82-87`). Apple's
+  static scanner fires because the `location` 8.0.1 pod references
+  `requestAlwaysAuthorization` in its own source, not because this app calls it.
+  It becomes a Guideline 5.1.1 problem only at **public** review, which is not
+  what today was.
+
+#### A correction to the comment at `Runner/Info.plist:85` — decide before any public submission
+
+The omission is right; **the stated reason is wrong for iOS.** The comment claims
+adding the Always key "would put an *Always* option in the dialog." iOS derives
+the prompt's buttons from *which authorization the app requests*, not from which
+keys are present — request `whenInUse` and the dialog reads Allow Once / While
+Using / Don't Allow regardless of what else is declared. Keys gate what you may
+*request* (calling `requestAlwaysAuthorization` without the key silently does
+nothing); they do not add buttons. The reasoning is sound for the **Android**
+manifest, where `ACCESS_BACKGROUND_LOCATION` genuinely changes the grant, and it
+was carried across to iOS where it does not apply.
+
+The rider comment at `apps/rider/ios/Runner/Info.plist:84-93` states a different
+mechanism — that declaring the key "would make `geolocator` call
+`requestAlwaysAuthorization`". **That is also wrong**, and the plugin's source
+settles it. `geolocator_apple-2.3.14/.../Handlers/PermissionHandler.m:72-78`:
+
+```objc
+if ([[NSBundle mainBundle] objectForInfoDictionaryKey:@"NSLocationWhenInUseUsageDescription"] != nil) {
+  [locationManager requestWhenInUseAuthorization];
+}
+else if ([self containsLocationAlwaysDescription]) {
+  [locationManager requestAlwaysAuthorization];
+}
+```
+
+The WhenInUse branch is tested **first** and short-circuits. Both apps declare
+that key, so the Always branch is unreachable for either of them and adding the
+Always key would change no prompt in either app. Whatever the argument for
+leaving it out, "it would alarm the user" is not it.
+
+**Where it actually matters is rider, and there it is a real question rather than
+a formality.** Rider declares the `location` background mode
+(`Runner/Info.plist:127-130`) and does genuine background location, yet line 99
+carries only the when-in-use string. Its *conclusion* still looks correct:
+WhenInUse + the background mode + `allowBackgroundLocationUpdates: true` and
+`showBackgroundLocationIndicator: true` (`location_reporter.dart:168-174`) is
+enough to keep fixes arriving with the blue indicator showing. `Always` buys
+relaunch-after-termination and geofencing, and the app does neither today. So
+the decision stands on its own merits — but it stands on *those* merits, not the
+ones written down.
+
+**Settle this before any public submission**, on both apps, and rewrite both
+comments to the real reason.
+
+### 0.5 Phase B — the server half is done, the device half is untouched — 2026-08-20
+
+The APNs `.p8` was uploaded to `zopiq-de276` for `com.siteonlab.zopiqnow`
+(**owner's report — nothing on this Mac can confirm it**, and the Mac needs no
+copy of the key).
+
+**`send-notification` is redeployed**: version **12**, `ACTIVE`, with the `apns`
+block live and verified by downloading the deployed source back and diffing it
+byte-for-byte against the working tree. `supabase login` was never used — it
+needs a TTY — and `link` was skipped along with its database-password prompt; the
+exact no-TTY recipe is in `IOS_RELEASE_RUNBOOK.md` §1.
+
+So the ceiling has moved: the function now emits APNs-shaped payloads, where
+before this it could not have. **That is the server half only.** No push has been
+delivered to any device, and none can be from this Mac.
+
+#### The five-link chain — what was observed, and what was only read
+
+**There is no iPhone on this Mac, so links 1, 2, 4 and 5 cannot be reached at
+all.** They are not "passing"; they are unreachable. What follows is a static
+review of the code each link depends on, which is a different and weaker claim.
+
+| # | Link | Status |
+|---|---|---|
+| 1 | APNs token | **Unobservable** — needs a device. `aps-environment = production` was read out of the signed binary on 2026-08-19, so the entitlement side is proven; registration is not. |
+| 2 | FCM token | **Unobservable** — needs a device and a live APNs registration. |
+| 3 | `device_tokens.platform = 'ios'` | **Read in code, not observed in the DB.** No credentials to query it, and with no iPhone no iOS row can exist yet. |
+| 4 | Webhook fired | **Unobservable** — nothing upstream can produce a row to fire it. |
+| 5 | Function logs | **Unobservable** — the function is now the correct build, but nothing has invoked it, because nothing upstream can produce a token. |
+
+**Link 3 in code, which is the one that was asked for.** The hardcoded `'android'`
+is gone in all three apps — `push_service.dart` sends
+`'p_platform': Platform.isIOS ? 'ios' : 'android'` (customer l. 213, rider l. 144,
+vendor l. 181). The schema accepts it: `0020_device_tokens.sql:24` constrains
+`platform` to `check (platform in ('android', 'ios'))`, and the current RPC
+(`0060_a_token_belongs_to_an_app.sql`, which supersedes 0020's) carries
+`p_platform` through to the insert for all three audiences. So the write path is
+correct end to end **on paper**; a row has still never been seen.
+
+#### ⚠️ A comment that overstates the bug — `push_service.dart:209-213`
+
+The comment says `device_tokens.platform` is "what `send-notification` reads to
+decide whether a payload needs an APNs block". **It reads no such thing.** The
+function selects `.select("token")` only (`index.ts:272`) and never mentions
+`platform` anywhere in its body — the sole occurrences of the word are two prose
+comments. The `apns` block is attached to **every** message unconditionally
+(`index.ts:337, 346`), and FCM discards it for an Android token.
+
+The practical consequence is the reassuring direction: **a row mislabelled
+`'android'` would not actually have broken iOS push**, because the APNs block
+would have been sent anyway. The column is diagnostic today, not load-bearing for
+delivery. The fix is still right and the column should still be accurate — but
+the stated stakes ("a push that arrives shaped for the wrong OS") do not match
+the function as written, and anyone debugging silent iOS push should not spend
+time on the `platform` value on the strength of that comment.
+
+Worth settling alongside the location-key comments in §0.4: same failure mode, a
+plausible mechanism written down without being checked against the source.
 
 ### Written but NOT verified
 

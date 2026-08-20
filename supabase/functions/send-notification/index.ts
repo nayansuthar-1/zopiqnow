@@ -15,7 +15,9 @@
 //                                      live in ONE Firebase project (recommended);
 //   * FCM_SERVICE_ACCOUNT_CUSTOMER   — optional per-audience overrides, for the
 //   * FCM_SERVICE_ACCOUNT_RIDER        case where an app has its own Firebase
-//   * FCM_SERVICE_ACCOUNT_RESTAURANT   project (the vendor already does).
+//   * FCM_SERVICE_ACCOUNT_RESTAURANT   project. **None does.** All three live in
+//                                      `zopiq-de276`, so these three are unused and
+//                                      the APNs .p8 is one upload, not three.
 // An audience with no service account (neither its own nor the default) is
 // skipped, not an error — push for it is simply not configured yet.
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by the platform.

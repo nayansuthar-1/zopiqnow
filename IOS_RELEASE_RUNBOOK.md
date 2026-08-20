@@ -42,11 +42,11 @@ now actionable.
 | `Secrets.xcconfig` (customer, rider) | Present, gitignored, values substituting | Proven |
 | `Runner.entitlements` (`aps-environment`) | `production`, read out of the signed binary | **Proven** 2026-08-20 — see below |
 | Code signing | Two identities on this Mac; customer archives and signs | Proven 2026-08-20 |
-| APNs `.p8` upload | Never done | Not started |
+| APNs `.p8` upload | Uploaded to `zopiq-de276` 2026-08-20 | **Reported by owner** — not checkable from this Mac |
 | Live Activity extension target | Never created | Not started |
-| `send-notification` redeploy | Never run | Not started |
+| `send-notification` redeploy | **Deployed 2026-08-20**, version 12 `ACTIVE`; `apns` block confirmed in the downloaded live source | **Proven** — see §1 note below |
 | End-to-end push on iOS | Never observed | Not started |
-| App Store Connect records | customer exists, builds 16 and 17 uploaded and `VALID`; rider and vendor have none | Proven 2026-08-20 |
+| App Store Connect records | customer exists, builds 16, 17 and **18** uploaded and `VALID`; 18 is in internal beta testing; rider and vendor have none | Proven 2026-08-20 |
 
 Verified on macOS 26.4, Xcode 26.6, CocoaPods 1.17.0, **Flutter 3.44.8**.
 
@@ -87,6 +87,64 @@ version 1.0 sits in `PREPARE_FOR_SUBMISSION`. Rider and vendor have no record an
 no registered bundle id — and the API cannot create either, so that stays a
 human at the web UI. `node tool/ship_ios.mjs --check` prints the live state;
 `RELEASING_IOS.md` has the rest.
+
+### The redeploy, and how to run it without a TTY — 2026-08-20
+
+**Done.** `send-notification` is at **version 12, `ACTIVE`**, and the `apns` block
+is live.
+
+§4 B2's `supabase login` **cannot be run by a Claude session** — it needs a TTY,
+and refuses outright without one:
+
+```
+$ supabase login < /dev/null
+LegacyLoginMissingTokenError: Cannot use automatic login flow inside non-TTY
+ environments. Please provide --token flag or set the SUPABASE_ACCESS_TOKEN
+ environment variable.
+```
+
+**The working recipe, and it needs no TTY, no Docker and no `link`:**
+
+```bash
+SUPABASE_ACCESS_TOKEN=<from .env> \
+  supabase functions deploy send-notification --project-ref ofjjuzrxnksbyglzwaah
+```
+
+`--project-ref` replaces `supabase link`, which is worth doing deliberately:
+`link` prompts for the **database password**, which is a second interactive stop
+this avoids entirely. `WARNING: Docker is not running` is printed and is **not
+fatal** — the asset uploads over the API regardless.
+
+```
+Uploading asset (send-notification): supabase/functions/send-notification/index.ts
+{"project_ref":"ofjjuzrxnksbyglzwaah","functions":["send-notification"],
+ "message":"Deployed Functions."}
+```
+
+⚠️ **`SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` now live in `.env`.** That
+file is gitignored and untracked — **verified before pushing**, because this repo
+is public and either value would be a live credential in the open. Keep it that
+way: never `git add -f` it, and never paste either value into a doc.
+
+**Verified rather than assumed.** `supabase functions download send-notification`
+pulls the *deployed* source back, and it diffs **byte-identical** to the working
+tree, with the `apns` block at `index.ts:322-332`:
+
+```
+const apns: Record<string, unknown> = silent
+  ? { headers: { "apns-push-type": "background", "apns-priority": "5" },
+      payload: { aps: { "content-available": 1 } } }
+  : { headers: { "apns-push-type": "alert", "apns-priority": "10" },
+      payload: { aps: { sound: "default" } } };
+```
+
+That is the check worth repeating after any redeploy — "Deployed Functions." is
+the CLI's report of an upload, not evidence of what is running.
+
+**What this does and does not buy.** The server half of iOS push is now real: a
+payload leaving this function carries the APNs headers it needs. Nothing about
+delivery to a device has been observed, and it cannot be from this Mac — see
+`IOS_HANDOVER.md` §0.5 for the five links and which of them remain unreachable.
 
 ### One correction carried forward
 
