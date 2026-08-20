@@ -206,20 +206,28 @@ fast Guideline 2.1 rejection and it repeats until it is fixed.
 > **publicly readable disposable mailbox**, with the inbox URL written into the
 > review notes so the reviewer fetches their own code without contacting anybody.
 >
-> ⚠️ **Not yopmail.** Tried 2026-08-20 and rejected on evidence: the OTP request
-> itself succeeded (`POST /auth/v1/otp` → HTTP 200), but the public inbox is
-> behind a reCAPTCHA that was *already over its free quota* — "This site is
-> exceeding reCAPTCHA Enterprise free quota." A reviewer following these notes
-> would reach a sign-in screen, request a code, open the inbox URL, and be asked
-> to prove they are not a robot by a gate that is failing. **That is a 5.1.1
-> rejection even if the mail arrives**, which is why deliverability was never
-> established — the wall came first.
+> ⚠️ **yopmail works, intermittently — and the two halves of that were learned an
+> hour apart.** Both of these happened on 2026-08-20 and both are true:
 >
-> Pick a mailbox whose inbox is plainly readable and, ideally, has an API so
-> delivery can be *proven* rather than eyeballed: `maildrop.cc`
+> - **Scripted access hit a wall.** `POST /auth/v1/otp` returned HTTP 200, but the
+>   public inbox answered with a reCAPTCHA *already over its free quota* — "This
+>   site is exceeding reCAPTCHA Enterprise free quota." A gate that cannot be
+>   completed is worse than one that can.
+> - **A human read the same inbox and signed in fine.** The owner did the whole
+>   flow by hand on the simulator with `zopiqreview@yopmail.com` — code arrived,
+>   sign-in succeeded. **So Brevo does deliver to yopmail**, which was the larger
+>   unknown, and the inbox is not permanently blocked.
+>
+> The honest reading: the CAPTCHA is **intermittent**, likelier against automated
+> access than a person with a browser. That is not disqualifying, but it is a coin
+> flip sitting directly in front of a reviewer, and losing it costs a review
+> cycle rather than three minutes.
+>
+> Prefer a mailbox with no CAPTCHA at all, and prove it the same way — by hand,
+> end to end — before it goes anywhere near Test Information. `maildrop.cc`
 > (`https://maildrop.cc/inbox/?mailbox=NAME`, GraphQL at `api.maildrop.cc`) and
-> `inboxkitten.com` are both reachable and un-gated. Test the real address end to
-> end before it goes anywhere near Test Information.
+> `inboxkitten.com` are both reachable and un-gated. If neither delivers, yopmail
+> is a proven-working fallback rather than a disqualified one.
 >
 > **Internal TestFlight needs none of this**: no Beta App Review, no demo
 > account. Only external testing and public App Review do.
