@@ -203,11 +203,23 @@ fast Guideline 2.1 rejection and it repeats until it is fixed.
 > alive and fail for every real user.
 >
 > **What actually works**, since email OTP is the only door: a demo account on a
-> **publicly readable disposable mailbox** (a Mailinator-style public inbox), with
-> the inbox URL written into the review notes so the reviewer fetches their own
-> code without contacting anybody. Two things to prove before relying on it —
-> that Brevo delivers to that domain at all, and that the account has a Falna
-> address saved. Neither is safe to assume.
+> **publicly readable disposable mailbox**, with the inbox URL written into the
+> review notes so the reviewer fetches their own code without contacting anybody.
+>
+> ⚠️ **Not yopmail.** Tried 2026-08-20 and rejected on evidence: the OTP request
+> itself succeeded (`POST /auth/v1/otp` → HTTP 200), but the public inbox is
+> behind a reCAPTCHA that was *already over its free quota* — "This site is
+> exceeding reCAPTCHA Enterprise free quota." A reviewer following these notes
+> would reach a sign-in screen, request a code, open the inbox URL, and be asked
+> to prove they are not a robot by a gate that is failing. **That is a 5.1.1
+> rejection even if the mail arrives**, which is why deliverability was never
+> established — the wall came first.
+>
+> Pick a mailbox whose inbox is plainly readable and, ideally, has an API so
+> delivery can be *proven* rather than eyeballed: `maildrop.cc`
+> (`https://maildrop.cc/inbox/?mailbox=NAME`, GraphQL at `api.maildrop.cc`) and
+> `inboxkitten.com` are both reachable and un-gated. Test the real address end to
+> end before it goes anywhere near Test Information.
 >
 > **Internal TestFlight needs none of this**: no Beta App Review, no demo
 > account. Only external testing and public App Review do.
@@ -235,16 +247,35 @@ Then fill in **App Review Information → Sign-in required**:
 | Password | *(the fixed six-digit OTP — Apple's "password" field is where it goes)* |
 | Contact | Nayan Suthar · `zopiqnow@gmail.com` |
 
+### ⚠️ The demo address goes in Sadri, not Falna
+
+Corrected 2026-08-20, from the live catalogue rather than from habit. Every
+earlier draft of these notes said Falna, and **Falna is the emptiest town in the
+product**:
+
+| Town | Live restaurants |
+|---|---|
+| Sadri | **8** |
+| Falna | **1** — Hotel Wing Orbit |
+| Ranakpur | shares Sadri's catalogue ([[zopiqnow-town-lock]], 0126) |
+| Ghanerao | seeded, `is_active = false` |
+
+A reviewer who signs in and sees a single restaurant is looking at something
+that reads as broken or unfinished, and "1 RESTAURANTS DELIVERING TO YOU" —
+observed on the iOS build 2026-08-20 — is a plural bug that only shows itself at
+exactly that count. Both problems disappear at eight. **Save the demo account's
+address in Sadri.**
+
 ### Review notes
 
 ```
 ZopiQ is a hyperlocal food delivery app operating in three towns in Rajasthan, India: Falna, Ranakpur and Sadri.
 
 SIGNING IN
-The app uses a one-time code sent by email. The account provided above is configured with a FIXED code — enter the address, then enter the code above when the app asks for it. No mailbox access is needed.
+The app sends a 6-digit code by email. The demo address is a public mailbox that needs no password: enter it in the app, then open the inbox URL given above in any browser to read the code. No contact with us is required.
 
 SEEING THE APP WITH CONTENT
-The account already has a saved delivery address in Falna, so restaurants appear as soon as you sign in. The app deliberately shows nothing before an address is set, because it only lists kitchens that can reach you — this is intended behaviour, not an empty state.
+The account already has a saved delivery address in Sadri, so restaurants appear as soon as you sign in. The app deliberately shows nothing before an address is set, because it only lists kitchens that can reach you — this is intended behaviour, not an empty state.
 
 LOCATION
 Location is requested only while choosing a delivery address, and only when in use. There is no background location in this app. An in-app explanation is shown before the system prompt. Declining is fully supported — the address can be typed by hand and every screen remains reachable.
