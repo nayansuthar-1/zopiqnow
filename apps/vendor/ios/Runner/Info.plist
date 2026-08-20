@@ -103,6 +103,28 @@
 		<string>remote-notification</string>
 	</array>
 
+	<!-- Native Google sign-in. `GIDClientID` is the *iOS* OAuth client; the web
+	     client in `Env.googleWebClientId` is the `serverClientId` and stays
+	     where it is. The URL scheme is that same id reversed, and is how Safari
+	     hands the result back to the app. Both come from Secrets.xcconfig.
+
+	     Without these the plugin finds no client id in any of the four places it
+	     looks and `authenticate()` cannot succeed -- see IOS_HANDOVER.md 0.1.
+	     Email OTP is unaffected either way. -->
+	<key>GIDClientID</key>
+	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_IOS_URL_SCHEME)</string>
+			</array>
+		</dict>
+	</array>
+
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 </dict>

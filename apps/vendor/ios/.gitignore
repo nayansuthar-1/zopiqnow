@@ -32,3 +32,8 @@ Runner/GeneratedPluginRegistrant.*
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
+
+# The build-time secrets, mirroring `android/local.properties`. The `.example`
+# beside it is committed and documents every key. Pulled in by Debug/Release
+# with `#include?`, so its absence leaves the values empty rather than failing.
+Flutter/Secrets.xcconfig
