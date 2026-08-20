@@ -182,14 +182,44 @@ The first release of ZopiQ on iPhone.
 wait for a code that goes to a mailbox they do not own, and be stuck. That is a
 fast Guideline 2.1 rejection and it repeats until it is fixed.
 
-The fix, chosen over a demo Google account because it changes no app code and
-weakens no real account: **a fixed OTP for one test address**, configured in
-Supabase Auth.
+> ⚠️ **Corrected 2026-08-20: the fixed-OTP plan below does not exist.** This
+> section used to say GoTrue supports pre-set OTPs for specific test *addresses*.
+> It does not. Read live from
+> `GET https://api.supabase.com/v1/projects/{ref}/config/auth`, the only such
+> field is **`sms_test_otp`** — phone numbers, not email:
+>
+> ```
+> "sms_test_otp": null          "sms_test_otp_valid_until": null
+> "external_phone_enabled": false      "external_email_enabled": true
+> ```
+>
+> There is no *Test OTPs* control under the Email provider to find, however you
+> sign in to the dashboard. **Do not go looking for it.**
+>
+> **The phone route is also closed, and opening it would be a bug.**
+> `external_phone_enabled` is `false` and there is no working SMS provider —
+> [[zopiqnow-sms-otp-msg91]] is parked pending DLT. Enabling phone auth so that
+> one test number works would make the dead phone field on the login screen look
+> alive and fail for every real user.
+>
+> **What actually works**, since email OTP is the only door: a demo account on a
+> **publicly readable disposable mailbox** (a Mailinator-style public inbox), with
+> the inbox URL written into the review notes so the reviewer fetches their own
+> code without contacting anybody. Two things to prove before relying on it —
+> that Brevo delivers to that domain at all, and that the account has a Falna
+> address saved. Neither is safe to assume.
+>
+> **Internal TestFlight needs none of this**: no Beta App Review, no demo
+> account. Only external testing and public App Review do.
 
-1. Supabase Dashboard → **Authentication → Sign In / Providers → Email** →
-   *Test OTPs*. Add one entry mapping a demo address to a fixed six-digit code.
-2. Use an obvious throwaway address on a domain you control, and a code that is
-   not `123456`.
+The original plan, kept for the reasoning rather than the mechanism — it was
+chosen over a demo Google account because it changes no app code and weakens no
+real account:
+
+1. ~~Supabase Dashboard → **Authentication → Sign In / Providers → Email** →
+   *Test OTPs*. Add one entry mapping a demo address to a fixed six-digit code.~~
+   **No such control exists.**
+2. Use an obvious throwaway address, and a code that is not `123456`.
 3. **Sign in with it on a real iPhone before you submit.** A fixed OTP that was
    configured but never exercised is the same as no demo account at all.
 4. Add a delivery address inside one of the live towns to that account, so the

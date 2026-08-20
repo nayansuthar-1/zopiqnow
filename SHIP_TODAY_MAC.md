@@ -98,11 +98,14 @@ TestFlight tab → **Test Information**. Required before Beta App Review:
 - **Feedback Email** — `zopiqnow@gmail.com`.
 - **Privacy Policy URL** — `https://nayansuthar-1.github.io/zopiqnow/privacy.html`
 - **Sign-in required: Yes**, with a working account. The app is email-OTP only, so
-  a reviewer cannot receive a code. Use the **fixed-OTP demo account** from
-  `IOS_APP_STORE_LISTING.md` §4: Supabase Dashboard → Authentication → Sign In /
-  Providers → Email → **Test OTPs**, mapping a throwaway address to a fixed
-  six-digit code that is **not** `123456`. Save a **delivery address in Falna**
-  on that account, or the reviewer sees an empty feed.
+  a reviewer cannot receive a code. ⚠️ **The fixed-OTP demo account this file
+  originally pointed at does not exist** — Supabase has `sms_test_otp` for phone
+  numbers and nothing equivalent for email, confirmed against the live auth
+  config on 2026-08-20, and phone auth is disabled. See the correction box in
+  `IOS_APP_STORE_LISTING.md` §4. The working answer is a demo account on a
+  **publicly readable disposable mailbox**, with the inbox URL in the review
+  notes. Prove Brevo delivers there before relying on it, and save a **delivery
+  address in Falna** on the account or the reviewer sees an empty feed.
 - **What to Test** — per build, and worth writing honestly: *"Payment is a test
   gateway in this build; no money moves."* A beta reviewer who is told that will
   not treat it as a bug.
