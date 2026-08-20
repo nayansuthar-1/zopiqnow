@@ -28,38 +28,57 @@ class DishDiscoveryDataSource {
   /// `restaurant_id` to join on, `category` to rank by.
   static const String _columns = '$menuItemColumns, restaurant_id, category';
 
-  /// Candidate dishes for the Recommended rail.
+  /// Candidate dishes for the Recommended rail, from the kitchens in
+  /// [restaurantIds] and no others.
+  ///
+  /// **Scoped to the feed, and that is the fix rather than an optimisation.**
+  /// This used to read the whole platform and let `joinDishes` throw away
+  /// whatever came from another town — so a Sadri customer downloaded Hotel
+  /// Wing Orbit's 228 Falna dishes, a third of the payload, to discard every one
+  /// of them. Worse, they were discarded *after* the cap, so they were 228 of
+  /// the 200 places two Sadri kitchens never got. Bharkadevi Ice Cream and
+  /// Mamaji Snacks could not be recommended at all.
   ///
   /// The ordering is not what the customer sees — `rankDishes` re-sorts the
-  /// whole pool against their search history before anything is shown. It is
-  /// what decides which dishes make it into the pool at all when a platform
-  /// outgrows [limit], and "the bestsellers, then the best-rated" is the right
-  /// answer to that: a dish nobody ordered and nobody rated is the one to drop.
+  /// whole pool against their search history before anything is shown. It
+  /// decides which dishes make it into the pool at all if a town ever outgrows
+  /// [limit], and each `order` earns its place there:
   ///
-  /// [limit] is well below the visible menu — 200 of 703 dishes — so this *is*
-  /// a shortlist, and a thin one: nothing on the platform is rated and only 42
-  /// dishes are bestsellers, so the ordering runs out and the tiebreak decides
-  /// most of the pool. Category pages no longer read it for that reason; they
-  /// ask `fetchCategory` for their own category instead.
+  ///  * bestsellers first, so the dishes a kitchen sells are never the ones cut;
+  ///  * then rating, which does nothing today — no dish on the platform is rated
+  ///    — but is what should decide once any of them is;
+  ///  * then `id`, which is a uuid and therefore shuffles the kitchens together.
+  ///    That is deliberate: a truncated pool samples the whole town instead of
+  ///    filling up with whichever kitchen sorts first, which is the shape of bug
+  ///    this method just had.
+  ///
+  /// [limit] sits above the largest town's whole menu (Sadri, 475 dishes), so
+  /// nothing is dropped today. It is a ceiling against a runaway request, not a
+  /// shortlist — a category page has its own query in [fetchCategory].
   ///
   /// Option groups ride along (see [menuItemColumns]) and are load-bearing here.
   /// The rail has its own ADD button, and a customisable dish added without its
   /// groups would go into the cart at its base price with no variant chosen —
   /// which `place_order` would then price differently from the card.
-  Future<List<DishRow>> fetchPool({int limit = 200}) async {
+  Future<List<DishRow>> fetchPool({
+    required List<String> restaurantIds,
+    int limit = 600,
+  }) async {
+    // No town, no feed, no dishes — and no request. Home shows "set a location"
+    // in this state, so a pool fetched here could only ever be discarded whole.
+    if (restaurantIds.isEmpty) return const <DishRow>[];
+
     final List<Map<String, dynamic>> rows = await _db
         .from('menu_items')
         .select(_columns)
+        .inFilter('restaurant_id', restaurantIds)
         // `ascending` is stated on every order in this app: postgrest-dart
-        // defaults it to DESCENDING, which is what these two want but is not
+        // defaults it to DESCENDING, which is what the first two want but is not
         // something a reader should have to know.
         .order('is_bestseller', ascending: false)
         // Nulls last, so unrated dishes fall to the back of the pool rather than
         // the front — "unrated" is not "rated zero", but it is not "best" either.
         .order('rating', ascending: false, nullsFirst: false)
-        // The tiebreak, and it is not decoration: with nothing on the platform
-        // rated, it is what picks 158 of the 200 rows. Stated so the pool is the
-        // same pool on every launch rather than whatever order Postgres returns.
         .order('id', ascending: true)
         .limit(limit);
     return rows.map(_toRow).toList(growable: false);
@@ -67,13 +86,14 @@ class DishDiscoveryDataSource {
 
   /// Every dish a category tile could contain, by dish name or menu section.
   ///
-  /// A category page asks for its own category rather than filtering the
-  /// [fetchPool] shortlist, and that is not an optimisation — it is the fix for
-  /// "I tap Dosa and there is no dosa". The pool is capped at 200 of the 703
-  /// dishes on the platform and ordered by bestseller then rating; nothing is
-  /// rated, so the ordering ran out after 42 rows and Postgres filled the rest
-  /// in whatever order it liked. Whole kitchens never made the cut — the three
-  /// dosas among them.
+  /// A category page asks for its own category rather than filtering
+  /// [fetchPool], and that is not an optimisation — it is the fix for "I tap
+  /// Dosa and there is no dosa". The pool was capped at 200 of the 703 dishes on
+  /// the platform and ordered by bestseller then rating; nothing is rated, so
+  /// the ordering ran out after 42 rows and Postgres filled the rest in whatever
+  /// order it liked. Whole kitchens never made the cut — the three dosas among
+  /// them. [fetchPool] no longer truncates like that, but it is still the *feed's*
+  /// dishes rather than a category's, and a category wants all of its own.
   ///
   /// [needles] come from `categoryNeedle`, so each is a prefix of every spelling
   /// the client rule accepts: `ilike` returns a superset here and `hasTerm`

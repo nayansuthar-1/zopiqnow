@@ -18,11 +18,13 @@ final Provider<DishDiscoveryDataSource> dishDiscoveryDataSourceProvider =
 
 /// Every dish we could recommend, already paired with its kitchen.
 ///
-/// The join is against the nearby feed rather than a second restaurant query,
-/// and that is not only a saved round trip: it is what makes the rail agree with
-/// the rest of Home. A dish whose restaurant is not in the feed is one we are
-/// not showing anywhere else on the screen, so it is dropped rather than
-/// rendered as a card that names a kitchen the customer cannot find.
+/// The feed comes first and then *bounds* the dish query, rather than filtering
+/// its answer afterwards. Both orders make the rail agree with the rest of Home
+/// — a dish whose restaurant is not in the feed names a kitchen the customer
+/// cannot find — but only this one lets every nearby kitchen into the pool. The
+/// old order asked the platform for 200 dishes and then discarded the ones from
+/// out of town, which is how Bharkadevi Ice Cream's 88 dishes and Mamaji's 17
+/// were never once recommended to anybody.
 ///
 /// Not `autoDispose`, for the same reason [nearbyRestaurantsProvider] is not —
 /// and it rides that provider's refresh for free: watching `.future` means Home's
@@ -35,7 +37,11 @@ final FutureProvider<List<DishSuggestion>> dishPoolProvider =
       );
       final List<DishRow> rows = await ref
           .watch(dishDiscoveryDataSourceProvider)
-          .fetchPool();
+          .fetchPool(
+            restaurantIds: restaurants
+                .map((Restaurant r) => r.id)
+                .toList(growable: false),
+          );
       return joinDishes(rows, restaurants);
     });
 
