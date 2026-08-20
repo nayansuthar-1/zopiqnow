@@ -105,9 +105,9 @@ class AppStrings {
   ///
   /// **Read this before translating a category anywhere else.**
   /// `FoodCategory.label` is not a caption — it is a *matching key*.
-  /// `categoryRestaurantsProvider` and `categoryDishesProvider` pass it to
-  /// `_matchesCategory` and `restaurantTagged`, which compare it against dish
-  /// names and cuisine tags **that arrive from Postgres in English**. Translate
+  /// `categoryDishPoolProvider` passes it to `dishMatchesCategory`, and it
+  /// reaches Postgres as an `ilike` needle besides — both compare it against
+  /// dish names and menu sections **written in English**. Translate
   /// `label` and every category silently matches nothing: the page renders "No
   /// पिज़्ज़ा near you yet" for all thirty-nine of them, with no error anywhere.
   ///

@@ -36,9 +36,11 @@ class DishDiscoveryDataSource {
   /// outgrows [limit], and "the bestsellers, then the best-rated" is the right
   /// answer to that: a dish nobody ordered and nobody rated is the one to drop.
   ///
-  /// [limit] is above the whole visible menu today (114 dishes across the two
-  /// active restaurants), so nothing is being dropped yet — it is a ceiling on
-  /// one request, not a shortlist.
+  /// [limit] is well below the visible menu — 200 of 703 dishes — so this *is*
+  /// a shortlist, and a thin one: nothing on the platform is rated and only 42
+  /// dishes are bestsellers, so the ordering runs out and the tiebreak decides
+  /// most of the pool. Category pages no longer read it for that reason; they
+  /// ask `fetchCategory` for their own category instead.
   ///
   /// Option groups ride along (see [menuItemColumns]) and are load-bearing here.
   /// The rail has its own ADD button, and a customisable dish added without its
@@ -55,6 +57,53 @@ class DishDiscoveryDataSource {
         // Nulls last, so unrated dishes fall to the back of the pool rather than
         // the front — "unrated" is not "rated zero", but it is not "best" either.
         .order('rating', ascending: false, nullsFirst: false)
+        // The tiebreak, and it is not decoration: with nothing on the platform
+        // rated, it is what picks 158 of the 200 rows. Stated so the pool is the
+        // same pool on every launch rather than whatever order Postgres returns.
+        .order('id', ascending: true)
+        .limit(limit);
+    return rows.map(_toRow).toList(growable: false);
+  }
+
+  /// Every dish a category tile could contain, by dish name or menu section.
+  ///
+  /// A category page asks for its own category rather than filtering the
+  /// [fetchPool] shortlist, and that is not an optimisation — it is the fix for
+  /// "I tap Dosa and there is no dosa". The pool is capped at 200 of the 703
+  /// dishes on the platform and ordered by bestseller then rating; nothing is
+  /// rated, so the ordering ran out after 42 rows and Postgres filled the rest
+  /// in whatever order it liked. Whole kitchens never made the cut — the three
+  /// dosas among them.
+  ///
+  /// [needles] come from `categoryNeedle`, so each is a prefix of every spelling
+  /// the client rule accepts: `ilike` returns a superset here and `hasTerm`
+  /// narrows it, which is what stops "Classic Cakes" reaching the Lassi tile
+  /// while "Milkshakes" still reaches Shake.
+  ///
+  /// [limit] is a stable ceiling rather than a shortlist — the widest tile today
+  /// is Cake at 84 dishes. Bestsellers first so a truncation that does one day
+  /// happen drops the least interesting rows, then `id` so the same request
+  /// twice returns the same dishes.
+  Future<List<DishRow>> fetchCategory(
+    List<String> needles, {
+    int limit = 300,
+  }) async {
+    final List<String> clean = needles
+        .map(_sanitize)
+        .where((String n) => n.isNotEmpty)
+        .toList(growable: false);
+    if (clean.isEmpty) return const <DishRow>[];
+
+    final String filter = clean
+        .map((String n) => 'name.ilike.%$n%,category.ilike.%$n%')
+        .join(',');
+
+    final List<Map<String, dynamic>> rows = await _db
+        .from('menu_items')
+        .select(_columns)
+        .or(filter)
+        .order('is_bestseller', ascending: false)
+        .order('id', ascending: true)
         .limit(limit);
     return rows.map(_toRow).toList(growable: false);
   }

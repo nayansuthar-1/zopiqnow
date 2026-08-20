@@ -88,15 +88,11 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
             pinned: true,
             delegate: HomeFilterChipsHeader(),
           ),
-          _RecommendedSection(label: selected.label),
-          // Both are passed: `label` is the English matching key the providers
-          // filter on, `categoryId` is what the display name is looked up by.
-          // See `AppStrings.categoryName` for why they must not be the same
-          // string.
-          _CategoryListSection(
-            categoryId: selected.id,
-            label: selected.label,
-          ),
+          // The whole category, not its label: matching needs the tile's kind
+          // and its spelling aliases as well as the word under the picture. See
+          // `category_matching.dart`.
+          _RecommendedSection(category: selected),
+          _CategoryListSection(category: selected),
         ],
       ),
     );
@@ -192,14 +188,14 @@ class _CategoryRailDelegate extends SliverPersistentHeaderDelegate {
 /// A category page is for someone who has already decided what they want to eat,
 /// so recommending them a kitchen was answering a question they had not asked.
 class _RecommendedSection extends ConsumerWidget {
-  const _RecommendedSection({required this.label});
+  const _RecommendedSection({required this.category});
 
-  final String label;
+  final FoodCategory category;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final List<DishSuggestion> dishes =
-        ref.watch(categoryDishesProvider(label)).valueOrNull ??
+        ref.watch(categoryDishesProvider(category)).valueOrNull ??
         const <DishSuggestion>[];
     // Silent when empty: the list below already owns the empty state, and two
     // "nothing here" messages on one screen is one too many.
@@ -224,18 +220,17 @@ class _RecommendedSection extends ConsumerWidget {
 }
 
 class _CategoryListSection extends ConsumerWidget {
-  const _CategoryListSection({required this.categoryId, required this.label});
+  const _CategoryListSection({required this.category});
 
-  /// Looks up the translated caption. Display only.
-  final String categoryId;
-
-  /// The English matching key the providers filter on. **Never translated.**
-  final String label;
+  /// Both the matching key and the caption key: [FoodCategory.label] stays
+  /// English and does the matching, [FoodCategory.id] looks the display name up.
+  /// See `AppStrings.categoryName` for why they must not be the same string.
+  final FoodCategory category;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<Restaurant>> feed = ref.watch(
-      categoryRestaurantsProvider(label),
+      categoryRestaurantsProvider(category),
     );
     final Map<String, List<String>> photos = ref.watch(cardPhotosProvider);
 
@@ -259,7 +254,7 @@ class _CategoryListSection extends ConsumerWidget {
             hasScrollBody: false,
             child: HomeNoMatchesView(
               message: context.l10n.homeNoCategoryNearby(
-                context.l10n.categoryName(categoryId, label),
+                context.l10n.categoryName(category.id, category.label),
               ),
             ),
           );

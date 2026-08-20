@@ -2,8 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:zopiqnow/features/account/presentation/providers/veg_mode_provider.dart';
 import 'package:zopiqnow/features/home/data/datasources/dish_discovery_datasource.dart';
+import 'package:zopiqnow/features/home/domain/category_matching.dart';
 import 'package:zopiqnow/features/home/domain/dish_ranking.dart';
 import 'package:zopiqnow/features/home/domain/entities/dish_suggestion.dart';
+import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_filters.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
@@ -82,95 +84,133 @@ final Provider<AsyncValue<List<DishSuggestion>>> recommendedDishesProvider =
       });
     });
 
+/// Every dish on the platform that belongs to one category tile.
+///
+/// Its own query, rather than a slice of [dishPoolProvider]. That pool is 200 of
+/// 703 dishes chosen by an ordering the data cannot fill — no dish is rated and
+/// only 42 are bestsellers — so entire kitchens were missing from it, and with
+/// them every dosa on the platform. Tapping Dosa found nothing while Shiv Fast
+/// Food was three streets away serving three of them.
+///
+/// `autoDispose`, unlike the recommendation pool: this is one category's answer
+/// and it stops being interesting the moment the page is left. Switching tiles
+/// on the page refetches, which is one small request and the reason the list can
+/// be complete rather than a shortlist.
+final AutoDisposeFutureProviderFamily<List<DishSuggestion>, FoodCategory>
+categoryDishPoolProvider =
+    FutureProvider.autoDispose.family<List<DishSuggestion>, FoodCategory>((
+      Ref ref,
+      FoodCategory category,
+    ) async {
+      final List<Restaurant> restaurants = await ref.watch(
+        nearbyRestaurantsProvider.future,
+      );
+      final List<DishRow> rows = await ref
+          .watch(dishDiscoveryDataSourceProvider)
+          .fetchCategory(
+            categoryTerms(category).map(categoryNeedle).toList(growable: false),
+          );
+
+      // The unfiltered tile list, not the veg-filtered one the rail draws: which
+      // dish a name belongs to is a fact about the menu, and it must not change
+      // shape when somebody turns veg mode on.
+      return dishesInCategory(
+        joinDishes(rows, restaurants),
+        category,
+        ref.watch(allFoodCategoriesProvider),
+      );
+    });
+
 /// The same rail on a category page, narrowed to that category.
 ///
 /// It ignores the chip row, exactly as the restaurant rail it replaces did, so
 /// the section does not empty out while filters are being tried.
-final ProviderFamily<AsyncValue<List<DishSuggestion>>, String>
+final AutoDisposeProviderFamily<AsyncValue<List<DishSuggestion>>, FoodCategory>
 categoryDishesProvider =
-    Provider.family<AsyncValue<List<DishSuggestion>>, String>((
+    Provider.autoDispose.family<AsyncValue<List<DishSuggestion>>, FoodCategory>((
       Ref ref,
-      String label,
+      FoodCategory category,
     ) {
       final List<String> interests = ref.watch(recentSearchesProvider);
       final bool vegOnly = ref.watch(_vegOnlyProvider);
 
-      return ref.watch(dishPoolProvider).whenData((List<DishSuggestion> pool) {
-        final List<DishSuggestion> inCategory =
-            orderableDishes(pool, vegOnly: vegOnly)
-                .where((DishSuggestion d) => _matchesCategory(d, label))
-                .toList(growable: false);
-
-        return diversify(
-          rankDishes(
-            pool: inCategory,
-            interests: interests,
-            rotation: rotationForToday(),
-          ),
-          limit: _railLength,
-        );
-      });
+      return ref
+          .watch(categoryDishPoolProvider(category))
+          .whenData(
+            (List<DishSuggestion> pool) => diversify(
+              rankDishes(
+                pool: orderableDishes(pool, vegOnly: vegOnly),
+                interests: interests,
+                rotation: rotationForToday(),
+              ),
+              limit: _railLength,
+            ),
+          );
     });
 
-/// The restaurants a category page lists.
+/// The restaurants a category page lists, before the chip row.
 ///
-/// A kitchen belongs to "Manchurian" when it *cooks* Manchurian — not only when
-/// the word turns up in its name or cuisine tags. Tags were the whole test, and
-/// on a real device it read as a contradiction: the rail at the top of the page
-/// showed two Manchurian dishes from 9Tiz Cafe, and the list directly underneath
-/// said "No Manchurian near you yet", because 9Tiz is tagged *Chinese*.
+/// A kitchen belongs to "Manchurian" when it *cooks* Manchurian — not when the
+/// word turns up in its cuisine tags. Tags were the whole test once, and it read
+/// as a contradiction on a real device: the rail showed two Manchurian dishes
+/// from 9Tiz Cafe and the list underneath said "No Manchurian near you yet",
+/// because 9Tiz is tagged *Chinese*. Then tags were added *beside* the dishes,
+/// and the contradiction ran the other way — Sadri Restaurent tags itself
+/// *Burgers*, so the Burger page listed a kitchen whose entire menu is Dal Fry
+/// and Jeera Rice.
 ///
-/// So the dish pool decides too. Still no round trip — the pool is already
-/// loaded for the rail — so switching categories stays instant.
-final ProviderFamily<AsyncValue<List<Restaurant>>, String>
-categoryRestaurantsProvider =
-    Provider.family<AsyncValue<List<Restaurant>>, String>((
+/// So for a dish tile the menu decides, alone. A cuisine tile is the one place
+/// tags still answer: "North Indian" is a claim a kitchen makes about itself,
+/// and no dish is going to be named after it.
+final AutoDisposeFutureProviderFamily<List<Restaurant>, FoodCategory>
+_categoryFeedProvider =
+    FutureProvider.autoDispose.family<List<Restaurant>, FoodCategory>((
       Ref ref,
-      String label,
+      FoodCategory category,
+    ) async {
+      final List<Restaurant> all = await ref.watch(
+        nearbyRestaurantsProvider.future,
+      );
+      final List<DishSuggestion> pool = await ref.watch(
+        categoryDishPoolProvider(category).future,
+      );
+
+      // Built from the whole category pool rather than the orderable one: a
+      // kitchen that is shut still belongs on the list, with its card closed.
+      final Set<String> cooking = <String>{
+        for (final DishSuggestion d in pool) d.restaurant.id,
+      };
+
+      return all
+          .where(
+            (Restaurant r) =>
+                cooking.contains(r.id) ||
+                (category.kind == FoodCategoryKind.cuisine &&
+                    restaurantTagged(r, category.label)),
+          )
+          .toList();
+    });
+
+/// [_categoryFeedProvider] with the chip row and veg mode applied.
+///
+/// Split in two so toggling a chip re-filters what is already loaded instead of
+/// dropping the page back to a shimmer — the same shape [filteredRestaurantsProvider]
+/// uses on Home.
+final AutoDisposeProviderFamily<AsyncValue<List<Restaurant>>, FoodCategory>
+categoryRestaurantsProvider =
+    Provider.autoDispose.family<AsyncValue<List<Restaurant>>, FoodCategory>((
+      Ref ref,
+      FoodCategory category,
     ) {
       final HomeFilters filters = ref.watch(homeFiltersProvider);
       final HomeFilters effective = ref.watch(vegModeProvider)
           ? filters.copyWith(pureVeg: true)
           : filters;
 
-      // `valueOrNull`: a pool that has not landed yet must not empty the list.
-      // Tags alone still answer, and the dishes widen it when they arrive.
-      final List<DishSuggestion> pool =
-          ref.watch(dishPoolProvider).valueOrNull ?? const <DishSuggestion>[];
-
-      final Set<String> cooking = <String>{
-        for (final DishSuggestion d in pool)
-          if (_matchesCategory(d, label)) d.restaurant.id,
-      };
-
-      return ref.watch(nearbyRestaurantsProvider).whenData((
-        List<Restaurant> all,
-      ) {
-        final List<Restaurant> inCategory = all
-            .where(
-              (Restaurant r) =>
-                  restaurantTagged(r, label) || cooking.contains(r.id),
-            )
-            .toList();
-        return effective.apply(inCategory);
-      });
+      return ref.watch(_categoryFeedProvider(category)).whenData(effective.apply);
     });
 
 const int _railLength = 12;
-
-/// A dish belongs to a category when the dish says so, its menu section says so,
-/// or its kitchen's cuisine tags say so.
-///
-/// The last two are the same fields the restaurant-level category page matches
-/// on, so a category page's rail and its list agree about what "Pizza" means.
-bool _matchesCategory(DishSuggestion dish, String label) {
-  final String needle = label.toLowerCase();
-  return dish.item.name.toLowerCase().contains(needle) ||
-      dish.category.toLowerCase().contains(needle) ||
-      dish.restaurant.cuisines.any(
-        (String c) => c.toLowerCase().contains(needle),
-      );
-}
 
 /// Rows → suggestions, dropping any dish whose kitchen is not in [restaurants].
 ///

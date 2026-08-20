@@ -171,6 +171,24 @@ final Provider<List<FoodCategory>> foodCategoriesProvider =
       (Ref ref) => ref.watch(homeCatalogDataSourceProvider).fetchCategories(),
     );
 
+/// Every tile the app ships, both rails, unfiltered and without "View More".
+///
+/// Not for display — this is the *vocabulary* `dishMatchesCategory` resolves
+/// against when it asks whether a dish's name already names some other food. It
+/// must stay complete: veg-filter it and a Lassi in the Shakes section stops
+/// being claimed by the Lassi tile the moment somebody turns meat off, and the
+/// Shake page silently changes what it means.
+final Provider<List<FoodCategory>> allFoodCategoriesProvider =
+    Provider<List<FoodCategory>>((Ref ref) {
+      final HomeCatalogDataSource catalog = ref.watch(
+        homeCatalogDataSourceProvider,
+      );
+      return <FoodCategory>[
+        ...catalog.fetchCategories(),
+        ...catalog.fetchMoreCategories(),
+      ]..removeWhere((FoodCategory c) => c.id == 'view_more');
+    });
+
 /// The "View More" sheet's dish list, with Account's "100% Veg Mode" applied.
 ///
 /// Same rule as [filteredRestaurantsProvider]: the mode is a standing
@@ -253,8 +271,9 @@ final Provider<ScrollController> homeScrollControllerProvider =
 /// server's `search_text` column is generated from, so a category page and a
 /// typed search for the same word agree with each other.
 ///
-/// Only half the test a category page applies — see `categoryRestaurantsProvider`
-/// in `dish_providers.dart`, which also asks what each kitchen actually cooks.
+/// Only cuisine tiles read this now. A *dish* tile asks the menu instead — a
+/// kitchen that tags itself "Burgers" and cooks none is not on the Burger page.
+/// See `categoryRestaurantsProvider` in `dish_providers.dart`.
 bool restaurantTagged(Restaurant r, String label) {
   final String needle = label.toLowerCase();
   return r.name.toLowerCase().contains(needle) ||

@@ -37,7 +37,13 @@ class HomeCatalogDataSource {
     FoodCategory(id: 'momos', label: 'Momos', imageAsset: '$_art/momos_hd.png'),
     FoodCategory(id: 'pav_bhaji', label: 'Pav Bhaji', imageAsset: '$_art/pav_bhaji_plate.png'),
     FoodCategory(id: 'dosa', label: 'Dosa', imageAsset: '$_art/dosa_hd.png'),
-    FoodCategory(id: 'aloo_paratha', label: 'Aloo Paratha', imageAsset: '$_art/realistic_aloo_paratha.png'),
+    FoodCategory(
+      id: 'aloo_paratha',
+      label: 'Aloo Paratha',
+      imageAsset: '$_art/realistic_aloo_paratha.png',
+      // Wing Orbit writes the first vowel long.
+      aliases: <String>['Aaloo Paratha'],
+    ),
     FoodCategory(id: 'paneer_tikka', label: 'Paneer Tikka', imageAsset: '$_art/paneer_tikka_hd.png'),
     FoodCategory(id: 'paneer_sabji', label: 'Paneer Sabji', imageAsset: '$_art/paneer_sabji_1.png'),
     FoodCategory(id: 'icecream', label: 'Ice Cream', imageAsset: '$_art/ice_cream_sundae_2.png'),
@@ -52,11 +58,36 @@ class HomeCatalogDataSource {
   static const String _photos = 'assets/icons-2.0';
 
   static const List<FoodCategory> _moreCategories = <FoodCategory>[
-    FoodCategory(id: 'north_indian', label: 'North Indian', imageAsset: '$_photos/north-indian.PNG'),
-    FoodCategory(id: 'south_indian', label: 'South Indian', imageAsset: '$_photos/south-indian.PNG'),
-    FoodCategory(id: 'chinese', label: 'Chinese', imageAsset: '$_photos/chinese.PNG'),
+    // The three cuisines. A kitchen is North Indian because it says so and
+    // because its menu has a North Indian section — never because a dish is
+    // named after the region, which no dish is. See [FoodCategoryKind].
+    FoodCategory(
+      id: 'north_indian',
+      label: 'North Indian',
+      imageAsset: '$_photos/north-indian.PNG',
+      kind: FoodCategoryKind.cuisine,
+    ),
+    FoodCategory(
+      id: 'south_indian',
+      label: 'South Indian',
+      imageAsset: '$_photos/south-indian.PNG',
+      kind: FoodCategoryKind.cuisine,
+    ),
+    FoodCategory(
+      id: 'chinese',
+      label: 'Chinese',
+      imageAsset: '$_photos/chinese.PNG',
+      kind: FoodCategoryKind.cuisine,
+    ),
     FoodCategory(id: 'thali', label: 'Thali', imageAsset: '$_photos/Thali.PNG'),
-    FoodCategory(id: 'chole_bhature', label: 'Chole Bhature', imageAsset: '$_photos/chole-bhature.PNG'),
+    FoodCategory(
+      id: 'chole_bhature',
+      label: 'Chole Bhature',
+      imageAsset: '$_photos/chole-bhature.PNG',
+      // Wing Orbit's menu says "Chola Bhatura" — the bread alone, which is how
+      // it also sells an extra one.
+      aliases: <String>['Bhatura'],
+    ),
     FoodCategory(id: 'chicken_curry', label: 'Chicken Curry', imageAsset: '$_photos/chicken-curry.PNG', isVeg: false),
     FoodCategory(id: 'chicken_tikka', label: 'Chicken Tikka', imageAsset: '$_photos/IMG_7529.PNG', isVeg: false),
     FoodCategory(id: 'mutton', label: 'Mutton', imageAsset: '$_photos/Mutton.PNG', isVeg: false),
@@ -69,7 +100,14 @@ class HomeCatalogDataSource {
     FoodCategory(id: 'vada', label: 'Vada', imageAsset: '$_photos/vada.PNG'),
     FoodCategory(id: 'vadapav', label: 'Vada Pav', imageAsset: '$_photos/vadapav.PNG'),
     FoodCategory(id: 'samosa', label: 'Samosa', imageAsset: '$_photos/samosa.PNG'),
-    FoodCategory(id: 'pakode', label: 'Pakode', imageAsset: '$_photos/pakode.PNG'),
+    FoodCategory(
+      id: 'pakode',
+      label: 'Pakode',
+      imageAsset: '$_photos/pakode.PNG',
+      // Nobody on the platform spells it "pakode" — Purohitji and Wing Orbit
+      // both write "Pakoda", so without this the tile opens on nothing.
+      aliases: <String>['Pakoda'],
+    ),
     FoodCategory(id: 'maggi', label: 'Maggi', imageAsset: '$_photos/maggi.PNG'),
     FoodCategory(id: 'pasta', label: 'Pasta', imageAsset: '$_photos/pasta.PNG'),
     FoodCategory(id: 'white_sauce_pasta', label: 'White Sauce Pasta', imageAsset: '$_photos/white-sauce-pasta.PNG'),
