@@ -1,3 +1,4 @@
+import FirebaseCore
 import Flutter
 import GoogleMaps
 import UIKit
@@ -31,6 +32,25 @@ import UIKit
     GMSServices.provideAPIKey(
       (key?.isEmpty ?? true) ? "MISSING_GMS_API_KEY" : key!
     )
+
+    // **Firebase first, and the order is the whole point.**
+    //
+    // Dart calls `Firebase.initializeApp()` too, from `PushService.start()`, and
+    // that is far too late for APNs. `start()` runs after `runApp` and after
+    // `await supabaseReady` — a network round trip — while the APNs token comes
+    // back a few hundred milliseconds after the registration below. The
+    // messaging plugin catches that callback and hands the token to
+    // `FIRMessaging`, but with no configured `FIRApp` to hand it to, it is
+    // dropped. **iOS never re-delivers it**, so `getAPNSToken()` then returns
+    // null for the entire life of the process, FCM can never mint a token, and
+    // the device registers nothing — which is precisely how 25 Android tokens
+    // came to sit beside zero iOS ones.
+    //
+    // Configuring here closes that window: the default app exists before
+    // anything can answer. Dart's call is then a no-op that adopts this app
+    // rather than a second configuration, which is the documented FlutterFire
+    // arrangement and why it is safe to do both.
+    FirebaseApp.configure()
 
     // APNs, which is what `firebase_messaging` sits on top of. Without this the
     // app never receives a device token, FCM has nothing to map its own token
