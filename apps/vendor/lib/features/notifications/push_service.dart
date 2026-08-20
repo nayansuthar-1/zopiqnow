@@ -67,7 +67,18 @@ class PushService {
 
     // The token can change (reinstall, restore, periodic refresh); each new one
     // has to be re-registered or the sender rings a dead address.
-    messaging.onTokenRefresh.listen(_registerToken);
+    //
+    // Through the same session gate as `_syncTokenToSession`, and not straight
+    // into `_registerToken`: the RPC is scoped to `auth.uid()` and *raises*
+    // without one ("Please sign in before registering for notifications"),
+    // which `_registerToken` then swallows into a `debugPrint` nobody reads on
+    // a released build. A fresh install mints its token before anyone has
+    // signed in, so that was the common case, not the rare one. Skipping here
+    // costs nothing — signing in fires `signedIn`, which registers.
+    messaging.onTokenRefresh.listen((String token) {
+      if (Supabase.instance.client.auth.currentSession == null) return;
+      _registerToken(token);
+    });
 
     // Register now if already signed in, and follow the session from here on:
     // a device only belongs to the kitchen whose staff is signed into it.
@@ -146,26 +157,48 @@ class PushService {
   /// APNs has answered `registerForRemoteNotifications` with a device token,
   /// and asked before that, `getToken()` does not wait or return null — it
   /// **throws** ("APNS token has not been set yet"). At cold start that is the
-  /// ordinary case: AppDelegate's registration is asynchronous and `main`
-  /// reaches here within milliseconds of it. The throw would escape `start()`,
-  /// and since `main` awaits `start()` *before* `runApp`, it would take the
-  /// launch with it — a blank app, over a notification token.
+  /// ordinary case: AppDelegate's registration is asynchronous and this runs
+  /// within a second of it. So iOS must ask APNs first.
   ///
-  /// So iOS asks APNs first and simply leaves if the answer has not arrived.
-  /// Nothing is lost by leaving: `onTokenRefresh` above fires when the token is
-  /// first minted, and that is the path a first launch actually registers on.
+  /// It has to *wait* for the answer rather than leave, and that is the fix for
+  /// 25 Android tokens against zero iOS ones. Leaving was justified by
+  /// `onTokenRefresh` picking the device up later, and it does not: that stream
+  /// fires when the FCM token is minted or rotated, which on every launch after
+  /// the first has already happened. The other two paths do not cover it either
+  /// — a *restored* session emits `initialSession`, not `signedIn`, and
+  /// `tokenRefreshed` waits for the JWT's hourly roll. So a single lost race at
+  /// launch meant the device never registered again, silently, for the life of
+  /// the install.
+  ///
+  /// Waiting is safe here in a way it would not have been before: `main` calls
+  /// `start()` *after* `runApp` and after Supabase is up, so this is behind a
+  /// painted screen and costs no launch time.
   static Future<void> _syncTokenToSession() async {
     if (Supabase.instance.client.auth.currentSession == null) return;
     try {
-      if (Platform.isIOS &&
-          await FirebaseMessaging.instance.getAPNSToken() == null) {
-        return;
-      }
+      if (Platform.isIOS && await _awaitApnsToken() == null) return;
       final String? token = await FirebaseMessaging.instance.getToken();
       if (token != null) await _registerToken(token);
     } on Object catch (e) {
       debugPrint('Could not read push token: $e.');
     }
+  }
+
+  /// The APNs token once Apple has answered, or null if it never does.
+  ///
+  /// Ten seconds, because this is bounded by a real answer rather than a guess:
+  /// a device that is going to register does so in well under a second, and one
+  /// that is not — no network, permission refused at the OS level — would not
+  /// answer if we waited all day. Returning null then is the honest outcome and
+  /// leaves push inert, exactly as before; what changed is that the ordinary
+  /// cold-start case no longer looks like that one.
+  static Future<String?> _awaitApnsToken() async {
+    for (int attempt = 0; attempt < 20; attempt++) {
+      final String? apns = await FirebaseMessaging.instance.getAPNSToken();
+      if (apns != null) return apns;
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    return null;
   }
 
   static Future<void> _registerToken(String token) async {
