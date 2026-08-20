@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
@@ -84,8 +85,27 @@ class PushService {
       // Tapping a tray notification the OS drew itself. Two entry points, because
       // Android has two: one for a running app, one for a cold start.
       FirebaseMessaging.onMessageOpenedApp.listen(_openFromMessage);
-      final RemoteMessage? launch = await messaging.getInitialMessage();
-      if (launch != null) _openFromMessage(launch);
+
+      // **Never awaited, and that is the whole point.** On iOS this future does
+      // not complete — not slowly, at all; it was still pending after five
+      // minutes on a simulator with the app idle in the foreground. Awaiting it
+      // hung `start()` here forever, so the token registration below and the
+      // `onAuthStateChange` subscription under it never ran, on any iPhone, for
+      // the life of the process. That is the exact failure the comment above
+      // this try block describes, arriving through a hang rather than a throw —
+      // which is why the catch never fired and nothing was ever logged.
+      //
+      // It only decides whether a cold-start tap opens an order, so nothing on
+      // the critical path needs its answer. Left running: if it does resolve the
+      // tap is still honoured, and if it never does the cost is one dangling
+      // future rather than a device that can never be reached.
+      unawaited(
+        messaging.getInitialMessage().then((RemoteMessage? launch) {
+          if (launch != null) _openFromMessage(launch);
+        }).catchError((Object e) {
+          debugPrint('Could not read the launch message: $e.');
+        }),
+      );
 
       // The token can change (reinstall, restore, periodic refresh); each new one
       // has to be re-registered or the sender rings a dead address.
