@@ -56,7 +56,20 @@ class AccountPage extends ConsumerWidget {
     final AppStrings l10n = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.accountTitle)),
+      appBar: AppBar(
+        // A signed-out customer who taps "Log in" here goes to
+        // `/login?from=/account`, and the redirect `go`s back to `/account` on
+        // success — which rebuilds the stack from the route tree and leaves
+        // this screen as its only entry. `AppBar` then draws no leading at all
+        // and the account is a dead end, at exactly the moment somebody has
+        // just signed in. Same shape as `/orders`: pop when there is something
+        // to pop, and otherwise go somewhere real.
+        leading: BackButton(
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.goNamed(Routes.home),
+        ),
+        title: Text(l10n.accountTitle),
+      ),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.lg),
         children: <Widget>[

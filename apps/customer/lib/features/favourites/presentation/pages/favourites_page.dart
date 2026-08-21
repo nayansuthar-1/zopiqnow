@@ -27,12 +27,20 @@ class FavouritesPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
+        // A branch root, so there is never anything to pop — and the two ways
+        // in both arrive by `go`: the tab itself, and Account's Collection row.
+        // The arrow is therefore always the fallback, and Delivery is what it
+        // falls back to: the tab a customer came from, and the only one that is
+        // always there.
+        leading: BackButton(
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.goNamed(Routes.home),
+        ),
         title: const Text('Collection'),
         elevation: 0,
         backgroundColor: Colors.transparent,
-        // A branch root, so there is nothing to pop and no leading arrow — which
-        // left the whole top-right of a primary tab empty. The same bell and
-        // face the other two tabs carry, in the on-surface livery.
+        // The same bell and face the other two tabs carry, in the on-surface
+        // livery.
         actions: const <Widget>[
           HeaderActions(onColour: false),
           SizedBox(width: ZopiqSpacing.pageGutter),

@@ -1,0 +1,35 @@
+-- A deleted notification leaves the screen.
+--
+-- 0124 gave the inbox a delete, and the delete works: the RPC removes the row,
+-- and reopening the app shows it gone. On the screen the customer was actually
+-- looking at, it stayed — on iOS and on Android alike, which is the tell that it
+-- was never a client bug.
+--
+-- The inbox is a Realtime stream carrying one filter, `user_id=eq.<caller>` (a
+-- `.stream()` takes exactly one, and it is spent there so the socket carries one
+-- person's inbox rather than being asked to). Realtime evaluates that filter
+-- against the row it finds in the WAL record — and for a DELETE the only row it
+-- has is the *old* one, which under `replica identity default` is the primary
+-- key and nothing else. There is no `user_id` in it, so the filter cannot match,
+-- and the event is dropped before it ever leaves the server. INSERT and UPDATE
+-- carry the whole new row, which is why an arriving notification appears and
+-- "Mark all as read" repaints — the inbox looked live, and was, in the two
+-- directions that were being watched.
+--
+-- `full` puts every column in the old record, so the filter has a `user_id` to
+-- match on and the DELETE reaches the client that asked for it. The cost is WAL
+-- volume on UPDATE and DELETE — the whole prior row rather than the key — and a
+-- notification is a title, a body, and six short columns.
+--
+-- Server-side deliberately: it fixes the builds already on people's phones, and
+-- the same table backs the vendor and rider inboxes.
+
+alter table public.notifications replica identity full;
+
+-- ---------------------------------------------------------------- verification
+--   select relreplident from pg_class
+--    where oid = 'public.notifications'::regclass;  -- must be 'f'; it was 'd'
+--
+-- And end to end, which is the claim worth proving: open the inbox on a device,
+-- select a notification, delete it, and the row must leave the list where it
+-- stands — without a pull-to-refresh and without reopening the app.

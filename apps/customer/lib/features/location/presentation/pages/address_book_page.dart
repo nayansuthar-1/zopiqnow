@@ -64,6 +64,15 @@ class AddressBookPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
+        // `/addresses` is a protected prefix, so a signed-out tap is redirected
+        // to `/login?from=/addresses` and the redirect `go`s here after
+        // sign-in — replacing the stack, so there is nothing to pop and
+        // `AppBar` draws no leading. Same shape as `/orders`: pop when there is
+        // something to pop, and otherwise go somewhere real.
+        leading: BackButton(
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.goNamed(Routes.home),
+        ),
         title: const Text('Address book'),
         elevation: 0,
         backgroundColor: Colors.transparent,
