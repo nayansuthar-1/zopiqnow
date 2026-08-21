@@ -157,6 +157,12 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                 _TextField(
                   controller: _eta,
                   label: 'Prep time (minutes)',
+                  // Spelled out because a cook who types 20 and then reads
+                  // "25–35 min" on their own listing would reasonably think
+                  // something was broken. The customer's card adds the ride to
+                  // this number rather than showing it as the whole wait.
+                  helper: 'Cooking and packing only, not the ride. Customers '
+                      'see this plus travel time to their address.',
                   keyboardType: TextInputType.number,
                   inputFormatters: <TextInputFormatter>[
                     FilteringTextInputFormatter.digitsOnly,
@@ -201,6 +207,7 @@ class _TextField extends StatelessWidget {
     required this.controller,
     required this.label,
     this.hint,
+    this.helper,
     this.keyboardType,
     this.inputFormatters,
     this.validator,
@@ -209,6 +216,10 @@ class _TextField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
   final String? hint;
+
+  /// Standing explanation under the field, unlike [hint] which is the greyed
+  /// example inside it and disappears the moment anyone types.
+  final String? helper;
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final String? Function(String?)? validator;
@@ -225,6 +236,10 @@ class _TextField extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
+          helperText: helper,
+          // Two lines, because the prep-time explanation needs them and a
+          // clipped half-sentence is worse than no sentence.
+          helperMaxLines: 2,
           border: const OutlineInputBorder(),
         ),
       ),

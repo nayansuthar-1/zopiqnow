@@ -36,7 +36,13 @@ class HomeFilters {
   final HomeSort sort;
 
   /// A restaurant arriving within this many minutes counts as "fast delivery".
-  static const int _fastDeliveryMinutes = 30;
+  ///
+  /// Forty, raised from thirty when this started measuring the arrival instead
+  /// of the kitchen's share of it. Thirty was calibrated against prep times
+  /// alone; adding the ride pushed every kitchen in Sadri past it and the chip
+  /// returned an empty feed. Forty draws the line where it was actually meant
+  /// to go — a normal kitchen close by passes, a slow one or a far one does not.
+  static const int _fastDeliveryMinutes = 40;
 
   bool get hasActiveToggle =>
       fastDelivery || ratingAbove4 || pureVeg || greatOffers;
@@ -60,7 +66,12 @@ class HomeFilters {
   /// Filters then sorts [restaurants]. Never mutates the input list.
   List<Restaurant> apply(List<Restaurant> restaurants) {
     final List<Restaurant> result = restaurants.where((Restaurant r) {
-      if (fastDelivery && r.etaMinutes > _fastDeliveryMinutes) return false;
+      // The arrival, not the kitchen's share of it. Filtering on the latter kept
+      // a four-kilometre kitchen with a quick cook under "fast delivery" while
+      // its own card said forty minutes.
+      if (fastDelivery && r.deliveryEta.minutes > _fastDeliveryMinutes) {
+        return false;
+      }
       if (ratingAbove4 && r.rating < 4.0) return false;
       if (pureVeg && !r.isVeg) return false;
       if (greatOffers && r.promoText == null) return false;
@@ -76,7 +87,8 @@ class HomeFilters {
         );
       case HomeSort.deliveryTime:
         result.sort(
-          (Restaurant a, Restaurant b) => a.etaMinutes.compareTo(b.etaMinutes),
+          (Restaurant a, Restaurant b) =>
+              a.deliveryEta.minutes.compareTo(b.deliveryEta.minutes),
         );
       case HomeSort.costLowToHigh:
         result.sort(

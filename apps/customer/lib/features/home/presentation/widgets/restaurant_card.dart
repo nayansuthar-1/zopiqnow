@@ -130,7 +130,9 @@ class RestaurantCard extends StatelessWidget {
                         ),
                         const SizedBox(width: ZopiqSpacing.xs),
                         Text(
-                          '${restaurant.etaMinutes} min',
+                          // Kitchen time plus the ride, not the kitchen's
+                          // number on its own — see Restaurant.deliveryEta.
+                          restaurant.deliveryEta.label,
                           style: t.bodyMedium?.copyWith(color: zc.textMuted),
                         ),
                         // Omitted entirely when we cannot measure it, rather

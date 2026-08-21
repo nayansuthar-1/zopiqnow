@@ -210,10 +210,11 @@ class MenuVitals extends StatelessWidget {
           const SizedBox(height: ZopiqSpacing.xs),
           _VitalRow(
             icon: Icons.timer_outlined,
-            // A single number, not the "25–30 mins" range the big apps show.
-            // The spread in theirs is measured; inventing one by adding five to
-            // ours would be precision we do not have.
-            text: '${restaurant.etaMinutes} mins delivery',
+            // A range now, and the spread is not invented: the ride in it is a
+            // straight-line distance through an assumed speed, so a band is
+            // exactly the precision we have. Falls back to a single figure when
+            // there is no distance to be uncertain about — see DeliveryEta.
+            text: '${restaurant.deliveryEta.label} delivery',
           ),
         ],
       ),

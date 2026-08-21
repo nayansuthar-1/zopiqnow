@@ -201,9 +201,11 @@ export function ReviewStep({
           {[
             ['Name', r.name],
             ['Cuisines', r.cuisines.join(', ') || '—'],
-            // Cost for two and prep time are gone (0101) — neither is asked for
-            // on the Storefront step any more, so reviewing them would be
-            // reviewing a number nobody entered.
+            // Cost for two is still gone (0101) — nobody is asked for it, so
+            // reviewing it would be reviewing a number nobody entered. Prep
+            // time is asked for again (0134) and reaches the customer feed, so
+            // it belongs in front of whoever is about to publish.
+            ['Prep time', `${r.eta_minutes} min`],
             ['Pure veg', r.is_veg ? 'Yes' : 'No'],
             ['Offer line', r.promo_text ?? '—'],
             ['Commission', `${r.commission_bps / 100}%`],

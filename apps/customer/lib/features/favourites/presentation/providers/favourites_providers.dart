@@ -6,6 +6,8 @@ import 'package:zopiqnow/features/favourites/data/datasources/favourites_supabas
 import 'package:zopiqnow/features/favourites/data/repositories/favourites_repository_impl.dart';
 import 'package:zopiqnow/features/favourites/domain/repositories/favourites_repository.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
+import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
+import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 
 /// Data source binding — Postgres, as of Step 7. Tests override it with
 /// `FavouritesMockDataSource`.
@@ -30,7 +32,14 @@ class FavouritesController extends AsyncNotifier<List<Restaurant>> {
     // Signing out must empty the list rather than leave the last account's
     // favourites hearted on screen.
     ref.watch(authControllerProvider);
-    return ref.watch(favouritesRepositoryProvider).getFavourites();
+    // Measured against the delivery address, the same as the feed and search.
+    // These rows go into the same RestaurantCard, and an unmeasured one has no
+    // ride to add to its prep time — so a saved restaurant would quote a
+    // shorter wait here than the identical card on Home.
+    return measureFrom(
+      await ref.watch(favouritesRepositoryProvider).getFavourites(),
+      ref.watch(selectedAddressProvider),
+    );
   }
 
   bool isFavourite(String restaurantId) =>

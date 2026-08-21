@@ -30,6 +30,12 @@ export function StorefrontStep({
   const [isVeg, setIsVeg] = useState(r?.is_veg ?? false)
   const [promo, setPromo] = useState(r?.promo_text ?? '')
   const [imageUrl, setImageUrl] = useState(r?.image_url ?? '')
+  /// Prep time, back on this step in 0134. Held as a string because a number
+  /// input that has been cleared is `''`, not 0, and the two must not be
+  /// confused — the whole point of the migration is that 0 stops reaching the
+  /// feed. Defaults to the column's own 30 on a new draft so a restaurant is
+  /// never created without a usable number.
+  const [eta, setEta] = useState(String(r?.eta_minutes ?? 30))
 
   const [busy, setBusy] = useState(false)
   /// Save is blocked while a photo is uploading. It was not before, and that was
@@ -39,18 +45,29 @@ export function StorefrontStep({
   const [error, setError] = useState<string | null>(null)
 
   async function save() {
+    // Checked here rather than left to the RPC so the admin gets the message
+    // next to the field instead of a red bar at the top of the step. The RPC
+    // refuses <= 0 as well, and the table's check constraint refuses it under
+    // both of them (0134) — this is the courteous layer, not the safe one.
+    const etaMinutes = Number(eta)
+    if (!Number.isInteger(etaMinutes) || etaMinutes <= 0) {
+      setError('Prep time has to be a whole number of minutes, above zero.')
+      return
+    }
+
     setBusy(true)
     setError(null)
-    // No `price_for_two` and no `eta_minutes` (0101). Omitted rather than sent
-    // as zero: the update RPC leaves a field it was not given alone, so a
-    // restaurant onboarded before this keeps whatever it had instead of having
-    // it quietly wiped by a form that no longer asks.
+    // Still no `price_for_two` — 0101 retired it and nothing shows it. Prep
+    // time came back in 0134: it is the kitchen's share of the wait, the only
+    // number the *feed* has, and with nobody able to fill it in four published
+    // restaurants sat at zero and told customers their food arrived in no time.
     const profile = {
       name,
       cuisines,
       is_veg: isVeg,
       promo_text: promo,
       image_url: imageUrl,
+      eta_minutes: etaMinutes,
     }
     try {
       if (!r) {
@@ -96,12 +113,26 @@ export function StorefrontStep({
         suggestions={commonCuisines}
       />
 
-      {/* Cost for two and prep time used to sit here, and both are gone in
-          0101. Prep time depends on what was ordered, and the kitchen answers
-          it per order when it accepts — a single number invented during
-          onboarding was a worse answer competing with a better one. Cost for
-          two is a made-up average on any menu with both chai and thalis. The
-          columns still exist; nobody is asked for them and nobody shows them. */}
+      {/* Cost for two is still gone (0101) — a made-up average on any menu with
+          both chai and thalis, and nothing displays it.
+
+          Prep time came back in 0134. 0101 removed it because the kitchen
+          answers it better per order when it accepts, which is true of the
+          *order's* ETA and only that. The feed is read long before any order
+          exists, and this column is the only number it has — so with nobody
+          able to set it, four published restaurants read "0 min". The vendor
+          can edit the same field from Edit profile in their own app. */}
+      <Field
+        label="Prep time (minutes)"
+        required
+        type="number"
+        min={1}
+        value={eta}
+        onChange={(e) => setEta(e.target.value)}
+        placeholder="30"
+        hint="Cooking and packing only — not the ride. The customer's card adds travel time from this kitchen to their address on top of it."
+      />
+
 
       <Toggle
         label="Pure vegetarian"

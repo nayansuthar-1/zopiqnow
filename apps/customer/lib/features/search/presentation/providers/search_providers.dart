@@ -55,9 +55,17 @@ final AutoDisposeFutureProvider<List<Restaurant>> searchResultsProvider =
   await Future<void>.delayed(searchDebounce);
   if (cancelled) return const <Restaurant>[];
 
-  return ref
-      .watch(restaurantRepositoryProvider)
-      .searchRestaurants(query, areaId: areaId);
+  // Measured against the delivery address, exactly as the feed is. Without
+  // this the same kitchen reads "35–40 min" on Home and "30 min" here, because
+  // an unmeasured restaurant has no ride to add to its prep time — and it also
+  // never showed its distance. The repository does not know where the customer
+  // is; this is the layer that does.
+  return measureFrom(
+    await ref
+        .watch(restaurantRepositoryProvider)
+        .searchRestaurants(query, areaId: areaId),
+    ref.watch(selectedAddressProvider),
+  );
 });
 
 /// Dishes matching the query, ranked — the other half of a search.

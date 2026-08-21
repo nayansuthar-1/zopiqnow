@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:zopiqnow/features/home/domain/delivery_eta.dart';
+
 /// A restaurant as shown in the customer Home discovery list.
 ///
 /// Pure domain entity — no JSON, no Flutter. The data layer maps API/mock
@@ -30,7 +32,22 @@ class Restaurant {
   final List<String> cuisines;
   final double rating;
   final int ratingCount;
+  /// The kitchen's own share of the wait, in minutes — cooking and packing, not
+  /// the ride. Typed in by the admin console or the vendor, and never zero since
+  /// migration 0134.
+  ///
+  /// **Not what the customer reads.** Everything customer-facing goes through
+  /// [deliveryEta], which adds the ride on top of it.
   final int etaMinutes;
+
+  /// What the customer is actually waiting for: [etaMinutes] plus the ride from
+  /// this kitchen to the selected address, whenever [distanceKm] can supply it.
+  ///
+  /// A getter rather than a stored field so it cannot drift from the distance —
+  /// [withDistance] re-measures the same restaurant every time the address
+  /// changes, and this follows without anyone remembering to.
+  DeliveryEta get deliveryEta =>
+      DeliveryEta.from(prepMinutes: etaMinutes, distanceKm: distanceKm);
 
   /// Indicative price for two, in whole rupees.
   final int priceForTwo;
