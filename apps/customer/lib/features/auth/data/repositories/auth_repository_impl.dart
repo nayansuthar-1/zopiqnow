@@ -41,6 +41,9 @@ class AuthRepositoryImpl implements AuthRepository {
   }) => _dataSource.verifyPhoneOtp(phone: phone, code: code);
 
   @override
+  Future<void> prepareGoogleSignIn() => _dataSource.prepareGoogleSignIn();
+
+  @override
   Future<AuthUser> signInWithGoogle() => _dataSource.signInWithGoogle();
 
   @override

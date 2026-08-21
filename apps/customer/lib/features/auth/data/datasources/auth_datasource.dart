@@ -28,6 +28,16 @@ abstract interface class AuthDataSource {
     required String code,
   });
 
+  /// Gets the Google plugin ready before anyone presses the button.
+  ///
+  /// Optional in the sense that [signInWithGoogle] still works without it —
+  /// it does the same preparation itself. Calling this early only moves the
+  /// cost off the tap, where it was a visibly dead button.
+  ///
+  /// Never throws: a warm-up that failed is not a sign-in that failed, and the
+  /// button must stay pressable so the real attempt can report the real error.
+  Future<void> prepareGoogleSignIn();
+
   /// Signs in with a Google account, or throws [GoogleSignInCancelled] if the
   /// user backs out of the sheet.
   Future<AuthUser> signInWithGoogle();

@@ -45,6 +45,11 @@ abstract interface class AuthRepository {
     required String code,
   });
 
+  /// Gets Google sign-in ready ahead of the tap that needs it, so the account
+  /// sheet opens immediately instead of after a plugin round trip the user
+  /// reads as a dead button. Never throws — see the data source.
+  Future<void> prepareGoogleSignIn();
+
   /// Signs in with a Google account, creating it if it is new.
   ///
   /// Throws [GoogleSignInCancelled] when the user dismisses the account sheet —

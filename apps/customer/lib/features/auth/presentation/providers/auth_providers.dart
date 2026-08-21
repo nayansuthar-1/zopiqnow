@@ -103,6 +103,14 @@ class AuthController extends Notifier<AuthState> {
     state = AuthSignedIn(user);
   }
 
+  /// Warms the Google plugin up so the button is ready when it is pressed.
+  ///
+  /// Deliberately not `await`ed by its caller and deliberately incapable of
+  /// throwing: it is an optimisation, and an optimisation that can break a
+  /// screen is not one. Leaves [state] alone — nobody is signing in yet.
+  Future<void> prepareGoogleSignIn() =>
+      ref.read(authRepositoryProvider).prepareGoogleSignIn();
+
   /// Throws [GoogleSignInCancelled] when the user dismisses the sheet — the
   /// email screen swallows that one; everything else it renders.
   Future<void> signInWithGoogle() async {

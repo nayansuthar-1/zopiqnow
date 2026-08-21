@@ -44,6 +44,14 @@ class AuthSupabaseDataSource implements AuthDataSource {
   /// `GoogleSignIn.initialize` must run once before anything else, and only
   /// once. It is deliberately *not* called from `main`: nobody should pay a
   /// plugin round-trip on every cold start for a button most users never press.
+  ///
+  /// It is not called from the *button* either, which is where it used to
+  /// happen. The plugin round trip is slow enough to see, so the first press of
+  /// "Continue with Google" spun before the account sheet appeared and read as
+  /// a button that was not working yet. [prepareGoogleSignIn] starts it when
+  /// the sign-in screen opens instead — still nothing on a cold start, but by
+  /// the time anyone has read the consent line and ticked the box, this is
+  /// done and the sheet opens on the first frame after the tap.
   static Future<void>? _googleReady;
 
   @override
@@ -109,6 +117,20 @@ class AuthSupabaseDataSource implements AuthDataSource {
       return _toDomain(user);
     } on AuthException catch (e) {
       throw _verifyFailure(e);
+    }
+  }
+
+  @override
+  Future<void> prepareGoogleSignIn() async {
+    try {
+      await _ensureGoogleReady();
+    } on Object catch (e, stack) {
+      // Swallowed on purpose. This runs because a screen was opened, not
+      // because anyone asked for a sign-in, so there is no one to tell and
+      // nothing they could do. `_ensureGoogleReady` has already dropped the
+      // cached failure, so the button's own attempt starts fresh and reports
+      // whatever goes wrong there — with a user waiting for the answer.
+      _reportGoogleFailure(e, stack, 'warm-up failed');
     }
   }
 

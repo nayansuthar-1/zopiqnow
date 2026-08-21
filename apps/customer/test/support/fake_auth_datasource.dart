@@ -101,6 +101,10 @@ class FakeAuthDataSource implements AuthDataSource {
     email: 'google@example.com',
   );
 
+  /// Nothing to warm up without a plugin behind it.
+  @override
+  Future<void> prepareGoogleSignIn() async {}
+
   @override
   Future<AuthUser> signInWithGoogle() async {
     if (googleCancels) throw const GoogleSignInCancelled();
