@@ -337,6 +337,33 @@ Deno.serve(async (req) => {
   // row's own `data` (0136) and is already flattened into `data` above.
   const ringData: Record<string, string> = { ...data, body: n.body ?? "" };
 
+  // ⚠️ **One new-order notification per kitchen, not one per row.**
+  //
+  // `device_tokens` is keyed by the FCM token, and a phone does not keep one for
+  // life: it rotates, and a reinstall mints a new one. The app registers the new
+  // token, the old row stays — deliverable, because FCM only reports a token dead
+  // once it decides it is, which can be well after the install that owned it is
+  // gone. So one phone can sit in this table twice, and it did: the test kitchen
+  // had a ringing row from 16:53 and a pre-reinstall row from 09:50, and every
+  // new order sent that phone **both** shapes — the ring the app draws, and the
+  // notification block Android draws for a device that says it cannot ring.
+  //
+  // So a restaurant with any Android device that can ring is a restaurant that
+  // gets the ring, and its non-ringing **Android** rows are skipped rather than
+  // sent the quiet fallback. The fallback exists to protect an install that
+  // predates 0128, and this kitchen has demonstrably updated.
+  //
+  // The cost, stated because it is real: a genuine *second* Android device still
+  // on a pre-0128 build gets no new-order push while the updated one rings. That
+  // is transitional — every launch re-registers and flips the flag — and it is
+  // the lesser fault. The kitchen is still rung; nobody is notified twice.
+  //
+  // iOS is untouched. It cannot ring at all (no Critical Alerts entitlement), so
+  // an iPhone is never the same device as a ringing Android row and always keeps
+  // its alerting message.
+  const kitchenRings = isNewOrder &&
+    tokens.some((t) => t.platform !== "ios" && t.rings_new_orders === true);
+
   // A data-only message is delivered to a sleeping app only at high priority,
   // and even then Android may hold it if the app is dozing. That is the honest
   // ceiling of the live card below Android 16 and it is the same for every
@@ -388,12 +415,19 @@ Deno.serve(async (req) => {
     };
 
   let sent = 0;
+  let skipped = 0;
   for (const { token, platform, rings_new_orders } of tokens) {
     // The ring, or the ordinary message. `priority: high` is what wakes a dozing
     // device to run the background isolate that draws the ring, and is not
     // optional on this branch — nothing else is coming to draw it.
     const canRing = isNewOrder && platform !== "ios" &&
       rings_new_orders === true;
+
+    // A stale row for a phone that is already being rung. See `kitchenRings`.
+    if (kitchenRings && platform !== "ios" && !canRing) {
+      skipped++;
+      continue;
+    }
     const envelope = canRing
       ? { token, android: { priority: "high" }, data: ringData }
       : { token, ...message };
@@ -417,7 +451,9 @@ Deno.serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ devices: tokens.length, sent }), {
+  // `skipped` is reported rather than folded into `sent`, so a kitchen that is
+  // being rung on one device and has rows for others says so in the logs.
+  return new Response(JSON.stringify({ devices: tokens.length, sent, skipped }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
