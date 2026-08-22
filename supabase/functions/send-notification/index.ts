@@ -9,6 +9,9 @@
 // This supersedes `send-order-push` (which rang only the kitchen, only on a new
 // order, straight off the `orders` table). Deploy THIS one and point the webhook
 // at `notifications`; do not run both, or a new order would push twice.
+// **`send-order-push` is dead code and has been since 0058 dropped its webhook.**
+// 0128's call-like ring for a new order was written into it and therefore never
+// fired; 0136 moved that branch here. Change the new-order push *here*.
 //
 // Secrets. At least one service-account JSON must be set as a function secret:
 //   * FCM_SERVICE_ACCOUNT            — used for every audience, if the three apps
@@ -267,9 +270,11 @@ Deno.serve(async (req) => {
     return new Response("Row has no recipient", { status: 200 });
   }
 
+  // `platform` and `rings_new_orders` are read for the ring below: what a device
+  // is sent depends on what that device can draw, not only on what the row says.
   const { data: tokens, error } = await supabase
     .from("device_tokens")
-    .select("token")
+    .select("token, platform, rings_new_orders")
     .eq("audience", n.audience)
     .eq(column, value);
   if (error) {
@@ -296,6 +301,41 @@ Deno.serve(async (req) => {
   }
 
   const silent = SILENT_KINDS.has(n.kind);
+
+  // ⚠️ **The ring (0128), and it is the reason the loop below builds a message
+  // per device rather than one for all of them.**
+  //
+  // A new order is the one notification a kitchen cannot be allowed to miss, so
+  // the vendor app draws it itself: the device's ringtone, on the alarm stream,
+  // repeating until the order is accepted or rejected, with Accept and Reject on
+  // the notification. Only the app can set the flag that repeats it
+  // (`FLAG_INSISTENT`), and Android **will not attach it to a notification it
+  // draws itself** — so a ringing device must be sent **data only, with no
+  // `notification` block**, exactly like the silent kinds above. That is
+  // load-bearing rather than a style choice: put a notification block back and
+  // every kitchen is silently downgraded to one polite ping, with nothing
+  // failing loudly to say so.
+  //
+  // This lived in `send-order-push` from 0128 until 0136, and `send-order-push`
+  // has not been called since 0058 dropped its webhook — so the ring never fired
+  // for a closed app. It belongs here, in the sender that is wired up.
+  //
+  // Not every device may be sent one, hence the per-device check:
+  //   * `rings_new_orders` is the build's own claim that it can draw the ring.
+  //     It is false for any install predating 0128, and sending *those* devices
+  //     data only would show them nothing at all while killed — a missed order
+  //     rather than a quiet one. The flag flips itself when the device updates
+  //     and re-registers its token, so this drains on its own.
+  //   * iOS cannot loop a notification sound without Apple's Critical Alerts
+  //     entitlement, so there is nothing to be gained by withholding the alert
+  //     there; an iPhone keeps the ordinary alerting message.
+  const isNewOrder = n.audience === "restaurant" && n.kind === "new_order";
+
+  // What a ringing device is told. `body` is carried in the data map because a
+  // data-only message has no `notification` block to read it from, and the ring
+  // still has to say which order it is about. `accept_deadline` rides in the
+  // row's own `data` (0136) and is already flattened into `data` above.
+  const ringData: Record<string, string> = { ...data, body: n.body ?? "" };
 
   // A data-only message is delivered to a sleeping app only at high priority,
   // and even then Android may hold it if the app is dozing. That is the honest
@@ -348,14 +388,23 @@ Deno.serve(async (req) => {
     };
 
   let sent = 0;
-  for (const { token } of tokens) {
+  for (const { token, platform, rings_new_orders } of tokens) {
+    // The ring, or the ordinary message. `priority: high` is what wakes a dozing
+    // device to run the background isolate that draws the ring, and is not
+    // optional on this branch — nothing else is coming to draw it.
+    const canRing = isNewOrder && platform !== "ios" &&
+      rings_new_orders === true;
+    const envelope = canRing
+      ? { token, android: { priority: "high" }, data: ringData }
+      : { token, ...message };
+
     const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message: { token, ...message } }),
+      body: JSON.stringify({ message: envelope }),
     });
 
     if (res.ok) {

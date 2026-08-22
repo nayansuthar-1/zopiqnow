@@ -217,8 +217,12 @@ class PushService {
           // This build draws its own new-order notification, so it can be sent
           // a data-only message and ring (0128). Builds that predate the ring
           // do not send this at all and default to false, which is what keeps
-          // `send-order-push` including a notification block for them — a
+          // `send-notification` including a notification block for them — a
           // data-only message to an older install shows nothing while killed.
+          //
+          // ⚠️ A device that reports false gets the quiet ping and nothing else,
+          // so a phone that is not ringing is worth checking here before the
+          // sender is blamed: `select rings_new_orders from device_tokens`.
           'p_rings_new_orders': true,
         },
       );
@@ -326,9 +330,13 @@ class PushService {
 /// This is where the ring for a closed app is drawn, and it has to be drawn
 /// here: a message carrying an FCM `notification` block is posted by Android
 /// itself, and Android will not set `FLAG_INSISTENT` on our behalf. So
-/// `send-order-push` sends **data only**, Android posts nothing, and this
+/// `send-notification` sends **data only**, Android posts nothing, and this
 /// handler owns the whole notification — which is the only way the ring can
 /// have the flags, the alarm-stream sound and the Accept/Reject actions.
+///
+/// The data-only branch lived in `send-order-push` until 0136 and never fired:
+/// that function has had no webhook since 0058, so a closed app was sent a
+/// notification block, Android drew it, and this handler was never called.
 ///
 /// ⚠️ Nothing `start()` did has happened in this isolate. It is a fresh Dart
 /// VM with no plugin registrations, no channel, no initialize. Hence the
