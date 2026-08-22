@@ -49,6 +49,10 @@ class FakeRiderAuthDataSource implements RiderAuthDataSource {
     return isPartner ? testRider : null;
   }
 
+  /// Nothing to warm up without a plugin behind it.
+  @override
+  Future<void> prepareGoogleSignIn() async {}
+
   /// The same question the OTP path asks — does the address Google vouched for
   /// ride for Zopiqnow — so [isPartner] drives both and a test setting it once
   /// gets a consistent answer whichever door it comes through. The email is

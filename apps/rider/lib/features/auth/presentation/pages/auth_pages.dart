@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -101,6 +103,19 @@ class _SignInPageState extends ConsumerState<SignInPage> {
   bool _accepted = false;
 
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start the Google plugin now, while the rider is still reading the screen.
+    // It used to happen on the first press instead, and the round trip is slow
+    // enough to see: the button spun with no account sheet behind it, which
+    // reads as "not ready yet". Not awaited and it cannot throw — the button
+    // stays pressable either way, and a real attempt reports a real error.
+    unawaited(
+      ref.read(riderAuthControllerProvider.notifier).prepareGoogleSignIn(),
+    );
+  }
 
   @override
   void dispose() {

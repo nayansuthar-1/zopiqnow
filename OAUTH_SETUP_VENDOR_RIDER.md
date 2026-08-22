@@ -1,9 +1,13 @@
-# Google Sign-In — the four OAuth clients to register
+# Google Sign-In — the OAuth clients to register
 
-> **Status: all four registered, 6 Aug 2026**, in project `789936942272` (which
+> **Android: all four registered, 6 Aug 2026**, in project `789936942272` (which
 > the console displays as "My First Project"). Kept here because the fingerprints
 > are the thing to check first when sign-in fails, and because a new keystore or
 > a second Play listing means doing this again.
+>
+> **iOS: none registered.** A different mechanism — bundle ids, not fingerprints
+> — and unlike Android it needs a Supabase change too. It is the last section of
+> this file.
 
 The code is done and both apps build. Google Sign-In **will not work until these
 clients exist**, and the failure is silent-ish: the account sheet opens, you
@@ -120,7 +124,9 @@ works perfectly on the build on your desk and fails for every tester.
   `789936942272-82up4pgu8v6in4vmvnogqhiqa8legtl5...` as the `serverClientId` —
   that is the audience the id token is minted for and the value Supabase checks.
   It is already configured in the Supabase Google provider.
-- **No Supabase change.** The provider is on and already trusts that client.
+- **No Supabase change — on Android.** The provider is on and already trusts
+  the web client, which is the audience an Android id token is minted for.
+  **iOS is the exception** and needs one entry per iOS client; see below.
 - **No debug fingerprint.** Debug builds of both apps now sign with the release
   certificate (as the customer app already did), so the registrations above cover
   debug and release both.
@@ -139,3 +145,73 @@ cd apps/vendor && flutter run
 - "Google sign-in didn't work" → the registration is wrong. `adb logcat | grep
   "Invalid key value"` prints the fingerprint the device actually presented,
   which is the one to register.
+
+## iOS — three more clients, and this time Supabase *does* change
+
+> **Status: not registered.** Everything above is Android. On an iPhone the
+> *Continue with Google* button has nothing behind it until these exist.
+
+iOS does not use the Android clients and does not use the fingerprint mechanism
+at all — Google identifies an iOS app by its **bundle identifier**, so each app
+needs its own iOS client.
+
+**Create credentials → OAuth client ID → Application type: iOS**, in the same
+project `789936942272`. Three times.
+
+| App | Bundle ID | Paste the result into |
+|---|---|---|
+| Customer | `com.siteonlab.zopiqnow` | `apps/customer/ios/Flutter/Secrets.xcconfig` |
+| Partner | `com.siteonlab.zopiqVendor` | `apps/vendor/ios/Flutter/Secrets.xcconfig` |
+| Rider | `com.siteonlab.zopiqRider` | `apps/rider/ios/Flutter/Secrets.xcconfig` |
+
+> **The bundle ids are camelCase and the Android package names are not.**
+> `com.siteonlab.zopiqVendor` on iOS, `com.siteonlab.zopiq_vendor` on Android.
+> They are different identifiers for the same app, and Google will accept either
+> in the form without complaint — an Android package name typed into an iOS
+> client produces a client that authenticates nothing.
+
+An iOS client has no client secret and no fingerprint. Its page prints an **iOS
+URL scheme** — the client id with its dot-separated parts reversed. Copy both
+values, rather than deriving the second from the first:
+
+```
+GOOGLE_IOS_CLIENT_ID = 789936942272-….apps.googleusercontent.com
+GOOGLE_IOS_URL_SCHEME = com.googleusercontent.apps.789936942272-…
+```
+
+All three `Info.plist` files already read those two as `GIDClientID` and a
+`CFBundleURLScheme`, and all three `Secrets.xcconfig` files already have the
+empty slots waiting. The files are **gitignored**, so this is per-machine — it
+has to be done again on whichever Mac builds the ipa.
+
+### ⚠️ Supabase must list every iOS client id
+
+This is the step Android genuinely does not need, and it is invisible when you
+skip it: Google signs the user in and Supabase refuses the token.
+
+On Android the plugin passes `serverClientId`, so Google mints the id token for
+the **web** client — which Supabase already trusts. On iOS the plugin drops
+`serverClientId` and Google mints the token for the **iOS** client instead.
+Supabase checks `aud` against its own list, does not find it, and rejects a
+sign-in Google has already approved. On screen that is the same one sentence as
+every other Google failure, which is why this is worth knowing in advance rather
+than debugging.
+
+Add each iOS client id to **Supabase → Authentication → Sign In / Up → Google →
+Authorized Client IDs**. It is a **comma-separated** list, and it currently holds
+two entries: the web client and one other. When this is finished it should hold
+the web client plus one per iOS app.
+
+### Checking it worked, on iOS
+
+There is no `adb logcat` here. Run on a **physical iPhone** — the simulator has
+no Google account and the sheet cannot complete — and read the Xcode console.
+
+- **The sheet never opens.** `GIDClientID` is empty: the build did not see
+  `Secrets.xcconfig`. Check the file exists and that the scheme was rebuilt.
+- **The sheet opens, you pick an account, then "Google sign-in didn't work".**
+  The token was minted and *Supabase* rejected it — that is the Authorized
+  Client IDs list above, not the Cloud console.
+- **"You don't work here" / "You don't ride for us".** OAuth is fine. That is the
+  staff gate doing its job; the account has no `restaurant_staff` or
+  `delivery_partners` row.

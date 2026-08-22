@@ -72,6 +72,10 @@ class FakeVendorAuthDataSource implements VendorAuthDataSource {
     return staff ? testVendor : null;
   }
 
+  /// Nothing to warm up without a plugin behind it.
+  @override
+  Future<void> prepareGoogleSignIn() async {}
+
   /// The same question the OTP path asks — does the address Google vouched for
   /// work at a restaurant — so [staff] drives both and a test setting it once
   /// gets a consistent answer whichever door it comes through. The email is

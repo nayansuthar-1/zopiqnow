@@ -72,6 +72,14 @@ class VendorAuthController extends Notifier<VendorAuthState> {
   Future<void> sendEmailOtp(String email) =>
       ref.read(vendorAuthDataSourceProvider).sendEmailOtp(email);
 
+  /// Warms the Google plugin up so the button is ready when it is pressed.
+  ///
+  /// Deliberately not `await`ed by its caller and deliberately incapable of
+  /// throwing: it is an optimisation, and an optimisation that can break a
+  /// screen is not one. Leaves [state] alone — nobody is signing in yet.
+  Future<void> prepareGoogleSignIn() =>
+      ref.read(vendorAuthDataSourceProvider).prepareGoogleSignIn();
+
   /// Google sign-in, landing in exactly the same three states the OTP path does.
   ///
   /// A Google account that is nobody's staff is [AuthNotStaff], not an error —

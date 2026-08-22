@@ -85,6 +85,14 @@ class RiderAuthController extends Notifier<RiderAuthState> {
     state = rider == null ? AuthNotPartner(email) : AuthSignedIn(rider);
   }
 
+  /// Warms the Google plugin up so the button is ready when it is pressed.
+  ///
+  /// Deliberately not `await`ed by its caller and deliberately incapable of
+  /// throwing: it is an optimisation, and an optimisation that can break a
+  /// screen is not one. Leaves [state] alone — nobody is signing in yet.
+  Future<void> prepareGoogleSignIn() =>
+      ref.read(riderAuthDataSourceProvider).prepareGoogleSignIn();
+
   /// Google sign-in, landing in the same states the OTP path does.
   ///
   /// A Google account belonging to nobody who rides for us is [AuthNotPartner],

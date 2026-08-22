@@ -31,6 +31,16 @@ abstract interface class VendorAuthDataSource {
   /// conversations.
   Future<Vendor?> verifyEmailOtp({required String email, required String code});
 
+  /// Gets the Google plugin ready before anyone presses the button.
+  ///
+  /// Optional in the sense that [signInWithGoogle] still works without it — it
+  /// does the same preparation itself. Calling this early only moves the cost
+  /// off the tap, where it was a visibly dead button.
+  ///
+  /// Never throws: a warm-up that failed is not a sign-in that failed, and the
+  /// button must stay pressable so the real attempt can report the real error.
+  Future<void> prepareGoogleSignIn();
+
   /// Signs in with the device's Google account, then answers the same question
   /// [verifyEmailOtp] does: null when this is a real Google account belonging to
   /// nobody who works here.
@@ -117,6 +127,20 @@ class VendorAuthSupabaseDataSource implements VendorAuthDataSource {
   }
 
   @override
+  Future<void> prepareGoogleSignIn() async {
+    try {
+      await _ensureGoogleReady();
+    } on Object catch (e, stack) {
+      // Swallowed on purpose. This runs because a screen was opened, not
+      // because anyone asked for a sign-in, so there is no one to tell and
+      // nothing they could do. `_ensureGoogleReady` has already dropped the
+      // cached failure, so the button's own attempt starts fresh and reports
+      // whatever goes wrong there — with a restaurant waiting for the answer.
+      _reportGoogleFailure(e, stack, 'warm-up failed');
+    }
+  }
+
+  @override
   Future<({Vendor? vendor, String email})> signInWithGoogle() async {
     try {
       await _ensureGoogleReady();
@@ -185,6 +209,11 @@ class VendorAuthSupabaseDataSource implements VendorAuthDataSource {
 
   /// One initialise per process, and never a cached failure — caching one would
   /// leave the button dead for the rest of the run over a transient fault.
+  ///
+  /// Started by [prepareGoogleSignIn] when the sign-in screen opens rather than
+  /// by the button, which is where it used to happen. The plugin round trip is
+  /// slow enough to see, so the first press spun before the account sheet
+  /// appeared and read as a button that was not working yet.
   static Future<void>? _googleReady;
 
   Future<void> _ensureGoogleReady() async {
