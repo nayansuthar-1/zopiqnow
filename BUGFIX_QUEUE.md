@@ -35,49 +35,6 @@ on the day Razorpay goes live, which is exactly why they sit above the rest.
 
 ## Open
 
-### P11 — Rider pay has no ceiling, and the live payout queue already shows it
-
-**Found 2026-08-12 while verifying 0121. This is the most exposed thing on the
-list.**
-
-`rider_pay_quote` is `base_fee + round(km × per_km_fee)` — ₹25 plus ₹5/km, with
-**no upper bound and no sanity check on `km`**. `claim_delivery` then freezes that
-number onto the delivery, and the weekly payout batch pays what is frozen. So a
-single bad coordinate is an unbounded payout, and nothing between the map and the
-bank account disagrees with it.
-
-It is not hypothetical. Across the 55 orders on the platform:
-
-| | |
-|---|---|
-| Worst quoted ride | **4,387.5 km → ₹21,962** |
-| Average ride | **509.6 km** (in a three-town operation) |
-| Orders over 50 km | 14 |
-| `deliveries` rows with that pay already frozen | yes — worst is ₹21,962 |
-| `rider_payouts` | **5 pending, ₹23,599 total** |
-
-The cause is coordinates, not arithmetic. Three orders carry a delivery point of
-`41.033841, 28.9816861` — that is **Istanbul**, against a kitchen at
-`24.6061, 72.3283` in Rajasthan. Emulator-default location, saved as a real
-address, priced as a real ride.
-
-Two halves, and only one is already closed:
-
-- **New orders can no longer do this.** `orders_within_service_area` (0098, 0117)
-  refuses a delivery point outside Falna, Ranakpur and Sadri. These orders
-  pre-date it.
-- **Nothing bounds the pay itself, and the queue is still holding the money.**
-  The ₹23,599 is test data and no real rider is owed it, but it is `pending` in a
-  live table that a Monday batch drains. Both need dealing with: a ceiling on the
-  quote (or a refusal above a plausible ride), and the existing queue cleared.
-
-Related: [0097](supabase/migrations/0097_one_number_for_one_job.sql) already
-noted `route_km` 174.39 vs `distance_km` 129.40 on ZPQ-1140 and made the *offer*
-binding, which fixed the disagreement between two distances without ever asking
-whether either was plausible.
-
----
-
 ### P1a — `place_order` cannot be called twice in one transaction
 
 Found while building P1's verification. `place_order` opens with
@@ -200,6 +157,90 @@ those are split, or a run errors between the two.
 
 ## Closed
 
+### ~~P11 — Rider pay has no ceiling, and the live payout queue already shows it~~ · migration 0137, 2026-08-24
+
+**Was:** `rider_pay_quote` (0097) is `base_fee + round(km × per_km_fee)` with
+nothing bounding `km`. `claim_delivery` freezes it onto the delivery,
+`run_rider_payout_batch` sums what is frozen, the console pays what it sums — so
+one bad coordinate is an unbounded payout and nothing in between disagrees. The
+worst quote on 2026-08-12 was 4,387.5 km → ₹21,962, from three orders carrying an
+emulator's Istanbul default against a Rajasthan kitchen.
+
+**The live state on 2026-08-24 was not the one this entry described, and the
+difference turned out to be the more interesting half.** Those orders had since
+been deleted: `deliveries` held 15 rows whose worst pay was ₹45 over 4.00 km, and
+the 24 surviving orders averaged 1.96 km. But **`rider_payouts` 15 still said 4
+deliveries, ₹22,737, with exactly one ₹25 delivery still pointing at it.**
+`deliveries_order_id_fkey` is `on delete cascade`, so deleting the orders took
+the deliveries and left the aggregate standing. The money survived; the evidence
+for it did not. Pending queue: 6 rows, ₹22,888, of which ₹22,712 was phantom.
+
+**Fix, in three parts.**
+
+1. **The ceiling is a distance, not a rupee amount.** `rider_pay_rates.max_km`,
+   default 30, and `rider_pay_quote` prices `least(km, max_km)`. A rupee cap
+   would have been simpler and wrong: the console can already change `base_fee`
+   and `per_km_fee`, so a fixed ₹175 quietly becomes an 8.75 km cap the moment
+   somebody sets ₹20/km. A distance ceiling survives every rate change and states
+   the actual belief — no delivery here is 30 km long, and a number that says
+   otherwise is a broken measurement.
+
+   **Why 30**, measured rather than picked: the town lock (0126) means the longest
+   legitimate ride is Sadri↔Ranakpur — 8.50 km centre to centre plus both radii
+   (6.00 + 5.00) = 19.50 km of crow flight at the geometric extreme, ≈27 km by
+   road. It lives on `rider_pay_rates` because a fourth town should be an
+   `update`, not a release. `admin_set_rider_pay_rates` was deliberately not
+   widened — a third argument creates an overload rather than replacing the
+   function, and a rail that only bites at 30 km does not need a weekly knob.
+
+2. **`ride_km` is still returned unclamped.** It is a measurement, and rewriting a
+   measurement so the arithmetic beside it reconciles is the worse lie. The
+   clamped case is precisely the one where somebody should see 4,387 km next to
+   ₹175 and go find the coordinate. 0097's rule that a rider can reproduce the fee
+   from the distance printed next to it holds for every ride under the ceiling,
+   which is all of them.
+
+3. **A delivery a payout has counted can no longer be deleted** —
+   `deliveries_no_delete_when_paid_out`, a `before delete` trigger. This is the
+   mechanism that produced payout 15, and it was not the one this entry suspected.
+   `admin_delete_order` already refuses to delete an order with money owed back to
+   a *customer* and then cascades away a delivery carrying money owed to a
+   *rider*. A trigger rather than a fourth check inside that function because the
+   console is demonstrably not the only path: `admin_order_deletions` holds 8
+   rows, newest 2026-08-08, while the order count fell 55 → 24. It refuses loudly
+   instead of adjusting the payout silently — a payout shrinking because an order
+   was tidied up is how the number stopped meaning anything.
+
+4. **Every pending payout reconciled to the deliveries that point at it**, written
+   as a general statement rather than an update to row 15 so it is checkable
+   afterwards. `pending` only: a `paid` payout that lost deliveries is a bank line,
+   not a mistake to rewrite. `cash_withheld` untouched — it is discharged by a
+   matching `rider_cash_ledger` row, and recomputing it would net the same cash
+   twice.
+
+**Verified against the live database:**
+- *No real order was repriced.* All 24 orders re-quoted through the new function:
+  **0 changed** by the cap.
+- *The cap bites where it should.* ZPQ-1141 forced to `route_km = 4387.5` in a
+  rolled-back transaction quoted `ride_km 4387.50` and `rider_pay 175` — the
+  measurement kept, the pay bounded.
+- *A null distance still pays base only.* Coordinates stripped → `ride_km` null,
+  ₹25, matching 0097's intent that a kitchen with no coordinates pays the base fee
+  and says so.
+- *The guard refuses both paths and only the right rows.* A direct delete of a
+  paid-out delivery raised; the same order's delete raised through the **cascade**;
+  an unattached delivery deleted freely.
+- *Grants read from the catalogue:* `has_function_privilege` says neither
+  `authenticated` nor `anon` may execute `rider_pay_quote`.
+- *The queue is clean:* all 6 pending payouts now equal their deliveries exactly,
+  total **₹22,888 → ₹176**.
+
+**Left open deliberately:** the ceiling is not editable from the admin console,
+for the overload reason above. When a fourth town makes 30 km wrong, it is one
+`update` in psql — or a follow-up that drops and re-creates both pay-rate RPCs.
+
+---
+
 ### ~~P6 + P7 — Dispatcher deadlock, and vendor taps stalling behind it~~ · migration 0121, 2026-08-12
 
 **Was (P6):** `dispatch_deliveries` ran every 20 s with no mutual exclusion,
@@ -243,7 +284,7 @@ front. Two overlapping runs could lock A→B and B→A.
   function, so it was re-run end to end: it picked a rider, wrote the offer, and
   froze the quote onto it.
 
-**That last check is what turned up [P11](#p11--rider-pay-has-no-ceiling-and-the-live-payout-queue-already-shows-it)** — the offer it produced was ₹21,962.
+**That last check is what turned up [P11](#p11--rider-pay-has-no-ceiling-and-the-live-payout-queue-already-shows-it--migration-0137-2026-08-24)** — the offer it produced was ₹21,962.
 
 ---
 
