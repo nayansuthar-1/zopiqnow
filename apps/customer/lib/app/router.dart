@@ -24,6 +24,7 @@ import 'package:zopiqnow/features/favourites/presentation/pages/favourites_page.
 import 'package:zopiqnow/features/gifts/domain/entities/gift_shop.dart';
 import 'package:zopiqnow/features/gifts/presentation/pages/gift_bag_page.dart';
 import 'package:zopiqnow/features/gifts/presentation/pages/gift_checkout_page.dart';
+import 'package:zopiqnow/features/gifts/presentation/pages/gift_item_page.dart';
 import 'package:zopiqnow/features/gifts/presentation/pages/gift_order_detail_page.dart';
 import 'package:zopiqnow/features/gifts/presentation/pages/gift_orders_page.dart';
 import 'package:zopiqnow/features/gifts/presentation/pages/gift_placed_page.dart';
@@ -38,6 +39,7 @@ import 'package:zopiqnow/features/location/presentation/pages/address_form_page.
 import 'package:zopiqnow/features/location/presentation/pages/location_gate_page.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 import 'package:zopiqnow/features/menu/presentation/pages/menu_page.dart';
+import 'package:zopiqnow/features/menu/presentation/pages/restaurant_reviews_page.dart';
 import 'package:zopiqnow/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:zopiqnow/features/search/presentation/pages/search_page.dart';
 
@@ -47,8 +49,10 @@ abstract final class Routes {
   static const String showcase = 'showcase';
   static const String search = 'search';
   static const String menu = 'menu';
+  static const String restaurantReviews = 'restaurantReviews';
   static const String gifts = 'gifts';
   static const String giftShop = 'giftShop';
+  static const String giftItem = 'giftItem';
   static const String giftBag = 'giftBag';
   static const String giftCheckout = 'giftCheckout';
   static const String giftPlaced = 'giftPlaced';
@@ -330,6 +334,16 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                     builder: (BuildContext context, GoRouterState state) =>
                         GiftShopPage(shopId: state.pathParameters['id']!),
                   ),
+                  // One gift. Was a bottom sheet with no route, no back arrow
+                  // and no link — a full screen of content in a container that
+                  // could only be swiped away. Path-based for the same reason
+                  // the shop is: it has to resolve from the id alone.
+                  GoRoute(
+                    path: 'item/:id',
+                    name: Routes.giftItem,
+                    builder: (BuildContext context, GoRouterState state) =>
+                        GiftItemPage(itemId: state.pathParameters['id']!),
+                  ),
                 ],
               ),
             ],
@@ -465,6 +479,18 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           restaurantId: state.pathParameters['id']!,
           onViewCart: () => context.goNamed(Routes.cart),
         ),
+        routes: <RouteBase>[
+          // Nested under the restaurant, so `/restaurant/<id>/reviews` is a
+          // link somebody can be sent and Back from it lands on the menu. The
+          // reviews used to be three cards inlined into that menu with a sheet
+          // behind them; they are a page now, opened from the rating row.
+          GoRoute(
+            path: 'reviews',
+            name: Routes.restaurantReviews,
+            builder: (BuildContext context, GoRouterState state) =>
+                RestaurantReviewsPage(restaurantId: state.pathParameters['id']!),
+          ),
+        ],
       ),
       // --- Gifts: bag, checkout, receipt, history -------------------------
       //

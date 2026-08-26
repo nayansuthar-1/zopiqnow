@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/restaurant_offer.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
+import 'package:zopiqnow/features/menu/presentation/pages/restaurant_reviews_page.dart'
+    show RatingBadge;
 import 'package:zopiqnow/features/menu/presentation/providers/menu_providers.dart';
 
 /// The restaurant page's chrome: a plain bar that searches the menu, then the
@@ -169,29 +173,20 @@ class MenuVitals extends StatelessWidget {
             const SizedBox(height: ZopiqSpacing.md),
           ],
 
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  restaurant.name,
-                  style: t.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    height: 1.15,
-                  ),
-                ),
-              ),
-              const SizedBox(width: ZopiqSpacing.md),
-              // Only when somebody has actually rated it. A 0.0 in a green box
-              // is not a low score, it is an empty one, and it reads as the
-              // former to every customer who sees it.
-              if (restaurant.ratingCount > 0)
-                _RatingBadge(
-                  rating: restaurant.rating,
-                  count: restaurant.ratingCount,
-                ),
-            ],
+          Text(
+            restaurant.name,
+            style: t.headlineLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              height: 1.15,
+            ),
           ),
+          // Directly under the name, and only when somebody has actually rated
+          // it. A 0.0 in a green box is not a low score, it is an empty one, and
+          // it reads as the former to every customer who sees it.
+          if (restaurant.ratingCount > 0) ...<Widget>[
+            const SizedBox(height: ZopiqSpacing.sm),
+            _RatingRow(restaurant: restaurant),
+          ],
           const SizedBox(height: ZopiqSpacing.md),
 
           _VitalRow(
@@ -256,52 +251,58 @@ class _PureVegBadge extends StatelessWidget {
   }
 }
 
-class _RatingBadge extends StatelessWidget {
-  const _RatingBadge({required this.rating, required this.count});
+/// The score, how many people gave it, and the way through to what they wrote.
+///
+/// This replaced the review wall the menu used to inline further down the page:
+/// three reviews and a "see all" sheet, wedged between the vitals and the food
+/// on a screen somebody opened to order. The number is the summary; the button
+/// is for the customer who wants the rest of it.
+class _RatingRow extends StatelessWidget {
+  const _RatingRow({required this.restaurant});
 
-  final double rating;
-  final int count;
+  final Restaurant restaurant;
 
   @override
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Row(
       children: <Widget>[
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: ZopiqSpacing.sm,
-            vertical: ZopiqSpacing.xs,
+        RatingBadge(rating: restaurant.rating),
+        const SizedBox(width: ZopiqSpacing.sm),
+        Expanded(
+          child: Text(
+            '${restaurant.ratingCount} '
+            'rating${restaurant.ratingCount == 1 ? '' : 's'}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: t.bodySmall?.copyWith(color: zc.textMuted),
           ),
-          decoration: BoxDecoration(
-            color: zc.veg,
-            borderRadius: BorderRadius.circular(ZopiqRadii.sm),
+        ),
+        TextButton(
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: ZopiqSpacing.sm),
+            visualDensity: VisualDensity.compact,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          onPressed: () => context.pushNamed(
+            Routes.restaurantReviews,
+            pathParameters: <String, String>{'id': restaurant.id},
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Text(
-                rating.toStringAsFixed(1),
-                style: t.titleMedium?.copyWith(
-                  color: ZopiqPalette.white,
-                  fontWeight: FontWeight.w800,
+                'All reviews',
+                style: t.labelLarge?.copyWith(
+                  color: zc.primary,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(width: ZopiqSpacing.xxs),
-              const Icon(
-                Icons.star_rounded,
-                size: 16,
-                color: ZopiqPalette.white,
-              ),
+              Icon(Icons.chevron_right_rounded, size: 18, color: zc.primary),
             ],
           ),
-        ),
-        const SizedBox(height: ZopiqSpacing.xxs),
-        Text(
-          '$count ratings',
-          style: t.labelSmall?.copyWith(color: zc.textMuted),
         ),
       ],
     );

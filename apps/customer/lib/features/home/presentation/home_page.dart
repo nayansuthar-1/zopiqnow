@@ -23,6 +23,7 @@ import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 import 'package:zopiqnow/features/location/presentation/widgets/address_picker_sheet.dart';
 
+import 'package:zopiqnow/app/app_shell.dart';
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/app/providers/bottom_nav_provider.dart';
 
@@ -323,24 +324,41 @@ class _RestaurantListSection extends ConsumerWidget {
           // fixes. No town yet is asked first: until we know where the customer
           // is we cannot claim there is nothing near them, and the other two
           // sentences both make that claim.
+          final Widget view;
           if (ref.watch(currentAreaIdProvider) == null) {
-            return SliverFillRemaining(
-              hasScrollBody: false,
-              child: HomeNoLocationView(
-                onSetLocation: () =>
-                    withBottomNavHidden(ref, () => showAddressPicker(context)),
-              ),
+            view = HomeNoLocationView(
+              onSetLocation: () =>
+                  withBottomNavHidden(ref, () => showAddressPicker(context)),
             );
+          } else {
+            // An empty *filtered* feed is a different problem from an empty
+            // area.
+            view = ref.read(homeFiltersProvider).hasActiveToggle
+                ? const HomeNoMatchesView()
+                : const HomeEmptyView();
           }
-          // An empty *filtered* feed is a different problem from an empty area.
-          final bool filtersActive = ref
-              .read(homeFiltersProvider)
-              .hasActiveToggle;
           return SliverFillRemaining(
             hasScrollBody: false,
-            child: filtersActive
-                ? const HomeNoMatchesView()
-                : const HomeEmptyView(),
+            // The band the shell's pills float over, reserved.
+            //
+            // Without it the "Set delivery location" button was *unreachable*:
+            // the empty state centres itself in the remaining viewport, which on
+            // a feed that has already spent a hero and two rails is short enough
+            // to put the button in the bottom hundred points — under the pills,
+            // which `extendBody` draws over the body. And because
+            // `SliverFillRemaining` is exactly one viewport tall there was
+            // nothing below to scroll to, so the one control on the screen could
+            // be seen and never pressed.
+            //
+            // Inside the sliver rather than around it: this shrinks the box the
+            // view centres itself in, so the button clears the pills without the
+            // customer having to scroll at all. Content taller than what is left
+            // still grows the sliver and scrolls, which is the case at the
+            // largest system font sizes.
+            child: Padding(
+              padding: EdgeInsets.only(bottom: AppShell.navBarOverlay(context)),
+              child: view,
+            ),
           );
         }
         return SliverPadding(

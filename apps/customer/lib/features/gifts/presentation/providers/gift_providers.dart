@@ -52,6 +52,27 @@ giftItemsByShopProvider =
           ref.watch(giftRepositoryProvider).getItemsByShop(shopId),
     );
 
+/// One gift, for its own page. A family so `/gifts/item/:id` resolves from the
+/// id alone — the detail used to be a bottom sheet handed the object it was
+/// already holding, and a page reached by a link has nothing in hand.
+///
+/// Filtered out of [giftItemsProvider] rather than fetched on its own: that is
+/// the whole available catalogue, it is already the Gifts tab's feed, and one
+/// more `getItemById` down the datasource would be a second way to read a row
+/// this app can already read. The cost is a catalogue read on a cold link,
+/// which is what opening the Gifts tab does anyway.
+final AutoDisposeFutureProviderFamily<GiftItem, String> giftItemByIdProvider =
+    FutureProvider.autoDispose.family<GiftItem, String>((
+      Ref ref,
+      String id,
+    ) async {
+      final List<GiftItem> all = await ref.watch(giftItemsProvider.future);
+      for (final GiftItem item in all) {
+        if (item.id == id) return item;
+      }
+      throw const GiftItemNotFound();
+    });
+
 // --- Ordering (migration 0096) ----------------------------------------------
 
 /// The gift *ordering* data source. Its own binding beside the catalogue one so

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/features/cart/presentation/widgets/cart_fab.dart';
 import 'package:zopiqnow/features/home/domain/entities/dish_suggestion.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/domain/repositories/restaurant_repository.dart';
@@ -116,6 +117,10 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 );
               },
             ),
+      // Search sits outside the shell, so it has no bottom bar — and every dish
+      // result carries its own ADD. Same gap the category page had: a cart with
+      // no door on the screen that filled it.
+      floatingActionButton: const CartFab(),
     );
   }
 }
@@ -232,6 +237,10 @@ class _Results extends ConsumerWidget {
             ),
           ),
         ],
+        // Clear of the cart button, which floats over these results.
+        SliverToBoxAdapter(
+          child: SizedBox(height: CartFab.clearance(ref)),
+        ),
       ],
     );
   }

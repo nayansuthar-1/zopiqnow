@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/providers/bottom_nav_provider.dart';
+import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_bag_bar.dart';
 import 'package:zopiqnow/features/account/presentation/widgets/header_actions.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_item.dart';
@@ -11,7 +13,6 @@ import 'package:zopiqnow/features/gifts/domain/entities/gift_shop.dart';
 import 'package:zopiqnow/features/gifts/domain/repositories/gift_repository.dart';
 import 'package:zopiqnow/features/gifts/presentation/providers/gift_providers.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_item_card.dart';
-import 'package:zopiqnow/features/gifts/presentation/widgets/gift_item_sheet.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_shop_card.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_status_views.dart';
 
@@ -574,16 +575,13 @@ class _GiftShopsRail extends ConsumerWidget {
 }
 
 /// Blinkit Storefront Gift Grid.
-///
-/// A [ConsumerWidget] only so that opening an item can slide the shell's pills
-/// out of the way — the sheet itself takes the ref, so the grid must have one.
-class _GiftGrid extends ConsumerWidget {
+class _GiftGrid extends StatelessWidget {
   const _GiftGrid({required this.items});
 
   final List<GiftItem> items;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return SliverLayoutBuilder(
       builder: (BuildContext context, SliverConstraints constraints) {
         final double width = constraints.crossAxisExtent;
@@ -612,7 +610,10 @@ class _GiftGrid extends ConsumerWidget {
                     return RepaintBoundary(
                       child: GiftItemCard(
                         item: items[i],
-                        onTap: () => showGiftItemSheet(context, ref, items[i]),
+                        onTap: () => context.pushNamed(
+                          Routes.giftItem,
+                          pathParameters: <String, String>{'id': items[i].id},
+                        ),
                       ),
                     );
                   },

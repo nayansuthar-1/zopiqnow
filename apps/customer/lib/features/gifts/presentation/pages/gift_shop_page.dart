@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_item.dart';
 import 'package:zopiqnow/features/gifts/domain/entities/gift_shop.dart';
 import 'package:zopiqnow/features/gifts/domain/repositories/gift_repository.dart';
@@ -10,7 +12,6 @@ import 'package:zopiqnow/features/gifts/presentation/providers/gift_providers.da
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_bag_bar.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_image.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_item_card.dart';
-import 'package:zopiqnow/features/gifts/presentation/widgets/gift_item_sheet.dart';
 import 'package:zopiqnow/features/gifts/presentation/widgets/gift_status_views.dart';
 
 /// A single gift shop's storefront page:
@@ -288,15 +289,14 @@ class _ShopDescription extends StatelessWidget {
   }
 }
 
-/// A [ConsumerWidget] only so that opening an item can slide the shell's pills
-/// out of the way — the sheet itself takes the ref, so this must have one.
-class _ShopItems extends ConsumerWidget {
+/// The shop's gifts, grouped into the shelves the seller put them on.
+class _ShopItems extends StatelessWidget {
   const _ShopItems({required this.items});
 
   final List<GiftItem> items;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     if (items.isEmpty) {
       return const SliverFillRemaining(
         hasScrollBody: false,
@@ -340,7 +340,10 @@ class _ShopItems extends ConsumerWidget {
                       return RepaintBoundary(
                         child: GiftItemCard(
                           item: item,
-                          onTap: () => showGiftItemSheet(context, ref, item),
+                          onTap: () => context.pushNamed(
+                            Routes.giftItem,
+                            pathParameters: <String, String>{'id': item.id},
+                          ),
                         ),
                       );
                     },

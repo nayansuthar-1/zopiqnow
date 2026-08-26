@@ -39,6 +39,21 @@ class AppShell extends ConsumerStatefulWidget {
   /// tab means editing all three.
   static const int cartBranchIndex = 3;
 
+  /// How much of the bottom of the body the pills float over.
+  ///
+  /// `extendBody` is on, so a branch's body runs the full height of the screen
+  /// and `MediaQuery.paddingOf(context).bottom` says *nothing* about the bar —
+  /// which means a screen whose last control lands in this band gets it covered,
+  /// with nothing to scroll to bring it back. Anything that pins content to the
+  /// bottom of a tab has to reserve this for itself.
+  ///
+  /// The three parts of [_ShellNavBar]'s own padding: 16 above the pill, the
+  /// pill, and the gap it leaves beneath.
+  static double navBarOverlay(BuildContext context) =>
+      16.0 +
+      _ShellNavBar._pillHeight +
+      _ShellNavBar._bottomGap(MediaQuery.paddingOf(context).bottom);
+
   @override
   ConsumerState<AppShell> createState() => _AppShellState();
 }

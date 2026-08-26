@@ -178,6 +178,111 @@ class _EmailPageState extends ConsumerState<EmailPage> {
     }
   }
 
+  /// Records that consent was given, wherever it was given — the box on this
+  /// screen or the one in [_askConsentThenGoogle]'s dialog.
+  ///
+  /// Both halves matter and both are easy to forget separately: `_accepted` is
+  /// what re-enables the two OTP buttons on this screen, and
+  /// [pendingConsentProvider] is what carries the tick past this widget to the
+  /// screen that actually writes the acceptance row.
+  void _acceptTerms() {
+    setState(() => _accepted = true);
+    ref.read(pendingConsentProvider.notifier).state = true;
+  }
+
+  /// Google's path through the gate.
+  ///
+  /// The button is live whether or not the box is ticked, which is the point: a
+  /// dead grey button is not an explanation, and a customer who has not noticed
+  /// a checkbox two controls above it reads it as an app that does not work.
+  /// Pressing it un-ticked opens the gate *as a question* — the same consent
+  /// sentence, the same two links, and one button that stays disabled until the
+  /// box is ticked. Consent is still consent; it has just been asked for at the
+  /// moment it is needed rather than guarded silently.
+  Future<void> _onGooglePressed() async {
+    if (_busy) return;
+    if (!_gateOpen) {
+      final bool accepted = await _askConsentThenGoogle();
+      if (!accepted || !mounted) return;
+      _acceptTerms();
+    }
+    await _signInWithGoogle();
+  }
+
+  /// The gate as a dialog. Returns true when the customer ticked the box and
+  /// pressed "Continue with Google"; false on every other exit.
+  Future<bool> _askConsentThenGoogle() async {
+    // Local to the dialog, so backing out of it leaves this screen's own box
+    // exactly as the customer left it — a dismissed dialog is not a decision.
+    bool ticked = false;
+
+    final bool? result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        final ZopiqColors zc = dialogContext.zc;
+        return StatefulBuilder(
+          builder: (BuildContext _, StateSetter setDialogState) =>
+              AlertDialog(
+                shape: const RoundedRectangleBorder(
+                  borderRadius: ZopiqRadii.rLg,
+                ),
+                title: const Text('One thing before we sign you in'),
+                content: LegalConsentCheckbox(
+                  value: ticked,
+                  onChanged: (bool next) =>
+                      setDialogState(() => ticked = next),
+                  // Closes the dialog before opening the document, and it has
+                  // to: this dialog is an imperative route on the *root*
+                  // navigator, which sits above every page go_router pushes —
+                  // so a document opened underneath it would render behind it
+                  // and read as a link that does nothing. Backing out of the
+                  // document lands on this screen, where the same sentence and
+                  // the same box are waiting.
+                  onOpenDocument: (String slug) {
+                    Navigator.pop(dialogContext, false);
+                    context.pushNamed(
+                      Routes.legalDocument,
+                      pathParameters: <String, String>{'slug': slug},
+                    );
+                  },
+                ),
+                actionsPadding: const EdgeInsets.fromLTRB(
+                  ZopiqSpacing.lg,
+                  0,
+                  ZopiqSpacing.lg,
+                  ZopiqSpacing.lg,
+                ),
+                actions: <Widget>[
+                  OutlinedButton.icon(
+                    // Disabled until the box is ticked. This one *is* a gate
+                    // and reads as one: it sits directly under the sentence it
+                    // is waiting on, not two controls away from it.
+                    onPressed: ticked
+                        ? () => Navigator.pop(dialogContext, true)
+                        : null,
+                    icon: SvgPicture.asset(
+                      'assets/icons_zopiq/google_g.svg',
+                      width: 20,
+                      height: 20,
+                    ),
+                    label: const Text('Continue with Google'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      side: BorderSide(color: zc.divider),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: ZopiqRadii.rMd,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+        );
+      },
+    );
+
+    return (result ?? false) && ticked;
+  }
+
   Future<void> _signInWithGoogle() async {
     if (_busy || !_gateOpen) return;
     setState(() {
@@ -388,7 +493,9 @@ class _EmailPageState extends ConsumerState<EmailPage> {
               ),
               const SizedBox(height: ZopiqSpacing.lg),
               OutlinedButton.icon(
-                onPressed: _busy || !_gateOpen ? null : _signInWithGoogle,
+                // Live whether or not the box above is ticked — [_onGooglePressed]
+                // asks for consent in a dialog instead of refusing silently.
+                onPressed: _busy ? null : _onGooglePressed,
                 icon: _googleBusy
                     // Sized to the icon it replaces, so the label does not
                     // shift sideways when the spinner appears.

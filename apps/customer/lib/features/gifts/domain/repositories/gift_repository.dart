@@ -40,6 +40,20 @@ class GiftShopNotFound implements Exception {
   String toString() => 'GiftShopNotFound: $message';
 }
 
+/// The requested gift is not in the catalogue — sold out of the listing, or a
+/// link to something the seller has withdrawn. Like [GiftShopNotFound], a retry
+/// will never turn it into a gift.
+class GiftItemNotFound implements Exception {
+  const GiftItemNotFound([
+    this.message = 'This gift is no longer available.',
+  ]);
+
+  final String message;
+
+  @override
+  String toString() => 'GiftItemNotFound: $message';
+}
+
 /// Domain-level failure for the Gifts catalog. Keeps Flutter/HTTP details out of
 /// the UI, which only needs a human message and the fact that it is retryable.
 class GiftLoadFailure implements Exception {

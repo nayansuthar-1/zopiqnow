@@ -5,6 +5,7 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 
 import 'package:zopiqnow/app/router.dart';
 import 'package:zopiqnow/core/l10n/strings.dart';
+import 'package:zopiqnow/features/cart/presentation/widgets/cart_fab.dart';
 import 'package:zopiqnow/features/home/domain/entities/dish_suggestion.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
@@ -95,6 +96,10 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
           _CategoryListSection(category: selected),
         ],
       ),
+      // This page is outside the shell, so it has no bottom bar — and the dish
+      // rail above lets a dish be added without leaving it. Without this the
+      // only way to the cart was back to Home first.
+      floatingActionButton: const CartFab(),
     );
   }
 }
@@ -282,11 +287,12 @@ class _CategoryListSection extends ConsumerWidget {
               ),
             ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
+              padding: EdgeInsets.fromLTRB(
                 ZopiqSpacing.lg,
                 0,
                 ZopiqSpacing.lg,
-                ZopiqSpacing.lg,
+                // Clear of the cart button, which floats over this list.
+                ZopiqSpacing.lg + CartFab.clearance(ref),
               ),
               sliver: SliverList.separated(
                 itemCount: restaurants.length,

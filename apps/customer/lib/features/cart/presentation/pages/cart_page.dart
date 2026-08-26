@@ -38,7 +38,7 @@ class CartPage extends ConsumerWidget {
       surcharge: ref.watch(deliverySurchargeProvider).value ?? DeliverySurcharge.none,
     );
     final TextTheme t = Theme.of(context).textTheme;
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final ZopiqColors zc = context.zc;
 
     // **A canvas, not a surface.** The page and every card on it were both
     // `colorScheme.surface` — white sections on a white page — so the borders
@@ -59,11 +59,7 @@ class CartPage extends ConsumerWidget {
         leading: BackButton(onPressed: onBrowse),
         title: Text(
           'Your cart',
-          style: t.titleLarge?.copyWith(
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
-            color: isDark ? Colors.white : const Color(0xFF1E1E1E),
-          ),
+          style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900),
         ),
         centerTitle: false,
         backgroundColor: canvas,
@@ -72,20 +68,25 @@ class CartPage extends ConsumerWidget {
         actions: <Widget>[
           if (cart.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.only(right: ZopiqSpacing.md),
               child: TextButton.icon(
                 style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFFE53935),
-                  backgroundColor: const Color(0xFFE53935).withValues(alpha: 0.08),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+                  // The destructive colour the design system already owns,
+                  // rather than a fourth hardcoded red.
+                  foregroundColor: zc.nonVeg,
+                  backgroundColor: zc.nonVeg.withValues(alpha: 0.08),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: ZopiqRadii.rPill,
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ZopiqSpacing.md,
+                    vertical: ZopiqSpacing.xs,
+                  ),
                 ),
                 icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                label: const Text(
+                label: Text(
                   'Clear',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                  style: t.labelMedium?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 onPressed: () => _confirmClear(context, ref),
               ),
@@ -125,9 +126,7 @@ class CartPage extends ConsumerWidget {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: const RoundedRectangleBorder(borderRadius: ZopiqRadii.rLg),
         title: const Text(
           'Empty your cart?',
           style: TextStyle(fontWeight: FontWeight.w800),
@@ -136,18 +135,24 @@ class CartPage extends ConsumerWidget {
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep it', style: TextStyle(fontWeight: FontWeight.w600)),
+            child: const Text(
+              'Keep it',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE53935),
+              backgroundColor: dialogContext.zc.nonVeg,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+              shape: const RoundedRectangleBorder(
+                borderRadius: ZopiqRadii.rSm,
               ),
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Empty cart', style: TextStyle(fontWeight: FontWeight.w800)),
+            child: const Text(
+              'Empty cart',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
         ],
       ),
@@ -156,6 +161,18 @@ class CartPage extends ConsumerWidget {
   }
 }
 
+/// **Two surfaces, not four.**
+///
+/// This screen used to be a stack of four separately-floating cards — the
+/// restaurant, the items, "Add more items", and the bill — each with its own
+/// border, its own shadow and its own corner radius, on a grey canvas. Four
+/// panels of roughly equal weight say nothing about what matters, and the
+/// scroll reads as a pile of boxes rather than as an order.
+///
+/// It is now the order and the bill. The restaurant is the *header* of the
+/// items card and "Add more items" is its last row, because all three are one
+/// thing: what is being bought and from whom. The bill is the other thing, and
+/// it is drawn as a receipt so the difference is visible before it is read.
 class _CartBody extends StatelessWidget {
   const _CartBody({required this.cart, required this.bill});
 
@@ -165,18 +182,16 @@ class _CartBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: const EdgeInsets.fromLTRB(
+        ZopiqSpacing.lg,
+        ZopiqSpacing.md,
+        ZopiqSpacing.lg,
+        ZopiqSpacing.xl,
+      ),
       children: <Widget>[
-        ZopiqReveal(child: _RestaurantHeader(cart: cart)),
-        const SizedBox(height: 14),
-        ZopiqReveal(
-          index: 1,
-          child: _ItemsCard(cart: cart),
-        ),
-        const SizedBox(height: 10),
-        ZopiqReveal(index: 2, child: _AddMoreItems(cart: cart)),
-        const SizedBox(height: 14),
-        ZopiqReveal(index: 3, child: BillSummary(bill: bill)),
+        ZopiqReveal(child: _OrderCard(cart: cart)),
+        const SizedBox(height: ZopiqSpacing.lg),
+        ZopiqReveal(index: 1, child: BillSummary(bill: bill)),
       ],
     );
   }
@@ -223,9 +238,90 @@ class _RestaurantAvatar extends ConsumerWidget {
   }
 }
 
-/// Restaurant Store Card Header
-class _RestaurantHeader extends StatelessWidget {
-  const _RestaurantHeader({required this.cart});
+/// The order: who is cooking it, what is in it, and the way back for the thing
+/// that was forgotten — one card, because those are one subject.
+///
+/// The three floating panels this replaces are described on [_CartBody]. The
+/// rows inside are separated by hairlines rather than by gaps between cards, so
+/// the eye reads a list instead of counting boxes.
+class _OrderCard extends StatelessWidget {
+  const _OrderCard({required this.cart});
+
+  final Cart cart;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark
+            ? Theme.of(context).colorScheme.surfaceContainerHigh
+            : Colors.white,
+        borderRadius: ZopiqRadii.rXl,
+        border: Border.all(color: zc.divider),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      // Clipped so the header row's ink splash stops at the corner instead of
+      // painting a square over it.
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: <Widget>[
+          _KitchenRow(cart: cart),
+          _HairLine(color: zc.divider),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: ZopiqSpacing.lg,
+              vertical: ZopiqSpacing.xs,
+            ),
+            child: Column(
+              children: <Widget>[
+                for (int i = 0; i < cart.lines.length; i++) ...<Widget>[
+                  if (i > 0) _HairLine(color: zc.divider),
+                  _CartLineTile(
+                    key: ValueKey<String>(cart.lines[i].lineId),
+                    line: cart.lines[i],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          // Both or neither: a rule drawn above a row that renders nothing
+          // would be a line resting on the bottom edge of the card.
+          if (cart.restaurantId != null) ...<Widget>[
+            _HairLine(color: zc.divider),
+            _AddMoreRow(restaurantId: cart.restaurantId!),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A full-bleed hairline between rows of the order card.
+class _HairLine extends StatelessWidget {
+  const _HairLine({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Divider(height: 1, color: color);
+}
+
+/// Which kitchen this order is with, and a way back to its menu.
+///
+/// The whole row is the tap target, not a separate button: the customer who
+/// wants the restaurant wants the restaurant, and a chevron on a card people
+/// already read as a heading is the shape every app in this category uses.
+class _KitchenRow extends StatelessWidget {
+  const _KitchenRow({required this.cart});
 
   final Cart cart;
 
@@ -233,104 +329,61 @@ class _RestaurantHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final String? id = cart.restaurantId;
     final int count = cart.itemCount;
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E24) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : const Color(0xFFE8ECEF),
-          width: 1.0,
-        ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: <BoxShadow>[
-                BoxShadow(
-                  color: zc.primary.withValues(alpha: 0.2),
-                  blurRadius: 6,
-                ),
-              ],
+    return InkWell(
+      // Silent when the cart somehow has no restaurant id. That should not
+      // happen — a line cannot be added without one — but a row that navigates
+      // nowhere is the thing this whole screen is trying to stop being.
+      onTap: id == null
+          ? null
+          : () => context.pushNamed(
+              Routes.menu,
+              pathParameters: <String, String>{'id': id},
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: _RestaurantAvatar(restaurantId: cart.restaurantId),
+      child: Padding(
+        padding: const EdgeInsets.all(ZopiqSpacing.lg),
+        child: Row(
+          children: <Widget>[
+            ClipRRect(
+              borderRadius: ZopiqRadii.rMd,
+              child: SizedBox.square(
+                dimension: 44,
+                child: _RestaurantAvatar(restaurantId: id),
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  cart.restaurantName ?? 'Your order',
-                  style: t.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                    color: isDark ? Colors.white : const Color(0xFF1E1E1E),
+            const SizedBox(width: ZopiqSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    cart.restaurantName ?? 'Your order',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: t.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: <Widget>[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: zc.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '$count item${count == 1 ? '' : 's'}',
-                        style: t.labelSmall?.copyWith(
-                          color: zc.primary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 10.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Row(
-                      children: <Widget>[
-                        Icon(
-                          Icons.verified_user_rounded,
-                          size: 12,
-                          color: zc.veg,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          'Hygienic Packaging',
-                          style: t.bodySmall?.copyWith(
-                            color: zc.textMuted,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
+                  const SizedBox(height: ZopiqSpacing.xxs),
+                  Text(
+                    '$count item${count == 1 ? '' : 's'} in this order',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: t.bodySmall?.copyWith(color: zc.textMuted),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            if (id != null)
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 22,
+                color: zc.textMuted,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -347,123 +400,45 @@ class _RestaurantHeader extends StatelessWidget {
 /// Pushed, so the menu arrives *over* the cart and system Back returns to it
 /// with the order intact — going by branch would have swapped tabs and left the
 /// cart behind a tab switch.
-///
-/// Silent when the cart somehow has no restaurant id. That should not happen —
-/// a line cannot be added without one — but a row that navigates nowhere is the
-/// thing this whole screen is trying to stop being.
-class _AddMoreItems extends StatelessWidget {
-  const _AddMoreItems({required this.cart});
+class _AddMoreRow extends StatelessWidget {
+  const _AddMoreRow({required this.restaurantId});
 
-  final Cart cart;
+  final String restaurantId;
 
   @override
   Widget build(BuildContext context) {
-    final String? id = cart.restaurantId;
-    if (id == null) return const SizedBox.shrink();
-
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Material(
-      color: isDark ? const Color(0xFF1E1E24) : Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => context.pushNamed(
-          Routes.menu,
-          pathParameters: <String, String>{'id': id},
-        ),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : const Color(0xFFE8ECEF),
-            ),
-          ),
-          child: Row(
-            children: <Widget>[
-              Icon(Icons.add_rounded, size: 18, color: zc.primary),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Add more items',
-                  style: t.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: isDark ? Colors.white : const Color(0xFF1E1E1E),
-                  ),
+    return InkWell(
+      onTap: () => context.pushNamed(
+        Routes.menu,
+        pathParameters: <String, String>{'id': restaurantId},
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(ZopiqSpacing.lg),
+        child: Row(
+          children: <Widget>[
+            Icon(Icons.add_rounded, size: 20, color: zc.primary),
+            const SizedBox(width: ZopiqSpacing.md),
+            Expanded(
+              child: Text(
+                'Add more items',
+                style: t.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: zc.primary,
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: zc.textMuted,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Container for the list of cart items
-class _ItemsCard extends StatelessWidget {
-  const _ItemsCard({required this.cart});
-
-  final Cart cart;
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E24) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : const Color(0xFFE8ECEF),
-          width: 1.0,
-        ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: <Widget>[
-          for (int i = 0; i < cart.lines.length; i++) ...<Widget>[
-            if (i > 0)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Divider(
-                  height: 1,
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : const Color(0xFFE2E8F0),
-                ),
-              ),
-            _CartLineTile(
-              key: ValueKey<String>(cart.lines[i].lineId),
-              line: cart.lines[i],
             ),
           ],
-        ],
+        ),
       ),
     );
   }
 }
 
+/// One line of the order: the dish, what it costs, and the stepper that changes
+/// how much of it there is. Swipe left to remove, with an undo.
 class _CartLineTile extends ConsumerWidget {
   const _CartLineTile({required this.line, super.key});
 
@@ -474,19 +449,22 @@ class _CartLineTile extends ConsumerWidget {
     final CartNotifier cart = ref.read(cartProvider.notifier);
     final ZopiqColors zc = context.zc;
     final TextTheme t = Theme.of(context).textTheme;
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Dismissible(
       key: ValueKey<String>('dismiss-${line.lineId}'),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
+        padding: const EdgeInsets.only(right: ZopiqSpacing.lg),
         decoration: BoxDecoration(
-          color: const Color(0xFFE53935).withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(14),
+          color: zc.nonVeg.withValues(alpha: 0.12),
+          borderRadius: ZopiqRadii.rMd,
         ),
-        child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFE53935), size: 22),
+        child: Icon(
+          Icons.delete_outline_rounded,
+          color: zc.nonVeg,
+          size: 22,
+        ),
       ),
       onDismissed: (_) {
         HapticFeedback.mediumImpact();
@@ -498,8 +476,8 @@ class _CartLineTile extends ConsumerWidget {
           ..showSnackBar(
             SnackBar(
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+              shape: const RoundedRectangleBorder(
+                borderRadius: ZopiqRadii.rMd,
               ),
               content: Text('${removed.item.name} removed'),
               action: SnackBarAction(
@@ -514,114 +492,97 @@ class _CartLineTile extends ConsumerWidget {
             ),
           );
       },
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: <Widget>[
-          // Dish Image
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox.square(
-              dimension: 52,
-              child: ZopiqNetworkImage(
-                url: line.item.imageUrl,
-                fallback: GradientImagePlaceholder(
-                  seed: line.item.id,
-                  icon: Icons.restaurant_menu_rounded,
-                  iconSize: 20,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: ZopiqSpacing.md),
+        child: Row(
+          children: <Widget>[
+            ClipRRect(
+              borderRadius: ZopiqRadii.rMd,
+              child: SizedBox.square(
+                dimension: 52,
+                child: ZopiqNetworkImage(
+                  url: line.item.imageUrl,
+                  fallback: GradientImagePlaceholder(
+                    seed: line.item.id,
+                    icon: Icons.restaurant_menu_rounded,
+                    iconSize: 20,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
+            const SizedBox(width: ZopiqSpacing.md),
 
-          // Dish details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    ZopiqVegIndicator(isVeg: line.item.isVeg),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        line.item.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: t.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                          color: isDark ? Colors.white : const Color(0xFF1E1E1E),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      ZopiqVegIndicator(isVeg: line.item.isVeg),
+                      const SizedBox(width: ZopiqSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          line.item.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
+                    ],
+                  ),
+                  if (line.options.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: ZopiqSpacing.xxs),
+                    Text(
+                      line.optionsLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: t.bodySmall?.copyWith(color: zc.textMuted),
                     ),
                   ],
-                ),
-                if (line.options.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 3),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: zc.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      line.optionsLabel,
-                      style: t.bodySmall?.copyWith(
-                        color: zc.primary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 10.5,
-                      ),
+                  const SizedBox(height: ZopiqSpacing.xxs),
+                  Text(
+                    '₹${line.unitPrice}',
+                    style: t.bodySmall?.copyWith(
+                      color: zc.textMuted,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
-                const SizedBox(height: 3),
-                Text(
-                  '₹${line.unitPrice}',
-                  style: t.bodySmall?.copyWith(
-                    color: zc.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+              ),
+            ),
+            const SizedBox(width: ZopiqSpacing.sm),
+
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                AddToCartControl(
+                  quantity: line.quantity,
+                  onAdd: () => cart.increment(line.lineId),
+                  onIncrement: () => cart.increment(line.lineId),
+                  onDecrement: () => cart.decrement(line.lineId),
+                  // A shade wider than the 72 the menu rows use: this control is
+                  // always a stepper here (a cart line exists because quantity is
+                  // at least one), and three elements want a little more room than
+                  // the word ADD does.
+                  width: 84,
+                ),
+                const SizedBox(height: ZopiqSpacing.sm),
+                ZopiqAnimatedAmount(
+                  amount: line.lineTotal,
+                  style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: 8),
-
-          // Stepper & Animated Total
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: <Widget>[
-              AddToCartControl(
-                quantity: line.quantity,
-                onAdd: () => cart.increment(line.lineId),
-                onIncrement: () => cart.increment(line.lineId),
-                onDecrement: () => cart.decrement(line.lineId),
-                // A shade wider than the 72 the menu rows use: this control is
-                // always a stepper here (a cart line exists because quantity is
-                // at least one), and three elements want a little more room than
-                // the word ADD does.
-                width: 84,
-              ),
-              const SizedBox(height: 6),
-              ZopiqAnimatedAmount(
-                amount: line.lineTotal,
-                style: t.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 14,
-                  color: isDark ? Colors.white : const Color(0xFF1E1E1E),
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Floating Checkout Bottom Bar
+/// The total and the way out of the cart, docked at the bottom.
 class _CheckoutBar extends StatelessWidget {
   const _CheckoutBar({
     required this.bill,
@@ -652,7 +613,12 @@ class _CheckoutBar extends StatelessWidget {
         ],
       ),
       child: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        minimum: const EdgeInsets.fromLTRB(
+          ZopiqSpacing.lg,
+          ZopiqSpacing.md,
+          ZopiqSpacing.lg,
+          ZopiqSpacing.lg,
+        ),
         child: Row(
           children: <Widget>[
             Column(
@@ -661,48 +627,46 @@ class _CheckoutBar extends StatelessWidget {
               children: <Widget>[
                 ZopiqAnimatedAmount(
                   amount: bill.total,
-                  style: t.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 22,
-                    color: isDark ? Colors.white : const Color(0xFF1E1E1E),
-                  ),
+                  style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900),
                 ),
                 Text(
                   'Total · $itemCount item${itemCount == 1 ? '' : 's'}',
                   style: t.labelSmall?.copyWith(
                     color: zc.textMuted,
-                    fontSize: 11.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: ZopiqSpacing.lg),
             Expanded(
               child: SizedBox(
-                height: 50,
+                height: 52,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: zc.primary,
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: ZopiqRadii.rMd,
                     ),
                   ),
                   onPressed: onCheckout,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      Text(
-                        'Proceed to checkout',
-                        style: t.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
+                      Flexible(
+                        child: Text(
+                          'Proceed to checkout',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.titleSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: ZopiqSpacing.sm),
                       const Icon(
                         Icons.arrow_forward_rounded,
                         size: 18,
