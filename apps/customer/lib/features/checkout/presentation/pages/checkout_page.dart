@@ -251,7 +251,7 @@ class CheckoutPage extends ConsumerWidget {
             ? refusal.headline
             : wrongTown
             ? 'We deliver within a town, not between them'
-            : 'Test gateway — no money moves until the Razorpay keys are live.',
+            : 'Payment is taken before the kitchen is told.',
         isLoading: checkout.isPlacingOrder,
         // The route is auth-guarded, so `auth` is AuthSignedIn here. The pattern
         // match is what proves it rather than a `!`.
@@ -593,9 +593,16 @@ class _OfferChip extends StatelessWidget {
 /// than disabled — a greyed-out row is an invitation to ask when it is coming
 /// back, and the answer is that it is not.
 ///
-/// The card stays even though it decides nothing. What the customer is about to
-/// be charged through, and that it is a test gateway, are both things checkout
-/// owes them before the button rather than after it.
+/// The card stays even though it decides nothing: what they are about to be
+/// charged through is something checkout owes them before the button rather
+/// than after it.
+///
+/// It no longer names a single instrument. Checkout stopped filtering Razorpay's
+/// methods — the merchant account offers whatever it has enabled, and the sheet
+/// is the real picker — so promising "UPI" here would be a promise this screen
+/// is in no position to keep. It also no longer says "test gateway": the keys
+/// are set, and copy that outlives the thing it describes is how a customer gets
+/// told no money moves while it does.
 class _PaymentMethods extends StatelessWidget {
   const _PaymentMethods();
 
@@ -619,21 +626,21 @@ class _PaymentMethods extends StatelessWidget {
             ),
             child: Row(
               children: <Widget>[
-                Icon(Icons.qr_code_rounded, size: 22, color: zc.textStrong),
+                Icon(Icons.lock_rounded, size: 22, color: zc.textStrong),
                 const SizedBox(width: ZopiqSpacing.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        'UPI',
+                        'Pay online',
                         style: t.titleSmall?.copyWith(
                           color: zc.textStrong,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       Text(
-                        'Test gateway · no real money',
+                        'UPI, cards and more · secured by Razorpay',
                         style: t.bodySmall?.copyWith(color: zc.textMuted),
                       ),
                     ],

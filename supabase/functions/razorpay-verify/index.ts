@@ -26,8 +26,20 @@
 // else's real payment — would verify an intent that is not theirs. The signature
 // proves a payment happened; it does not by itself prove whose.
 //
-// Secret: RAZORPAY_KEY_SECRET. SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are
-// injected. Deployed **with** JWT verification.
+// **It also records what actually paid** (0139). Checkout no longer filters
+// Razorpay's methods — the account offers what it has enabled, and ours has UPI
+// off until KYC — so a payment may arrive by card, UPI, netbanking or a wallet.
+// The checkout callback does not say which, so this reads the payment back from
+// Razorpay after the signature has already checked out. It is a courtesy for
+// whoever later answers "the customer says they paid by card", and it is
+// wrapped accordingly: a failed lookup leaves `instrument` null and changes
+// nothing else. Verification has already succeeded by then, and no lookup is
+// worth costing a customer their order.
+//
+// Secrets: RAZORPAY_KEY_SECRET, and RAZORPAY_KEY_ID for the instrument lookup
+// (absent, the lookup is skipped and verification is unaffected). SUPABASE_URL
+// and SUPABASE_SERVICE_ROLE_KEY are injected. Deployed **with** JWT
+// verification.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -112,8 +124,48 @@ Deno.serve(async (req) => {
     return json({ verified: false }, 409);
   }
 
+  // Everything below is bookkeeping. The payment is verified and the customer is
+  // waiting on the answer, so nothing here may throw and nothing here may be
+  // awaited for longer than it deserves — see the header.
+  await recordInstrument(supabase, updated[0].id, paymentId);
+
   return json({ verified: true });
 });
+
+/// Reads back what Razorpay says actually paid — `card`, `upi`, `netbanking`,
+/// a wallet — and files it against the intent (0139). Never throws.
+async function recordInstrument(
+  supabase: ReturnType<typeof createClient>,
+  intentId: number,
+  paymentId: string,
+): Promise<void> {
+  try {
+    const keyId = Deno.env.get("RAZORPAY_KEY_ID");
+    const keySecret = Deno.env.get("RAZORPAY_KEY_SECRET");
+    if (!keyId || !keySecret) return;
+
+    const response = await fetch(
+      `https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}`,
+      { headers: { "Authorization": `Basic ${btoa(`${keyId}:${keySecret}`)}` } },
+    );
+    if (!response.ok) {
+      console.warn(`Instrument lookup for ${paymentId}: HTTP ${response.status}`);
+      return;
+    }
+
+    const payment = await response.json() as { method?: unknown };
+    if (typeof payment.method !== "string" || payment.method.length === 0) return;
+
+    await supabase
+      .from("payment_intents")
+      .update({ instrument: payment.method.slice(0, 40) })
+      .eq("id", intentId);
+  } catch (error) {
+    // A courtesy that failed. The payment is still verified and the order still
+    // goes through; `instrument` stays null, which 0139 treats as an answer.
+    console.warn("Instrument lookup failed:", String(error));
+  }
+}
 
 function asShortString(value: unknown): string | null {
   if (typeof value !== "string") return null;

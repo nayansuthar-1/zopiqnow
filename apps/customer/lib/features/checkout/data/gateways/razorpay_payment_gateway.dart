@@ -20,9 +20,20 @@ import 'package:zopiqnow/features/checkout/domain/gateways/payment_gateway.dart'
 ///    reference the SDK returns is just a string the server was asked to
 ///    believe, which is audit PAY-001 exactly.
 ///
-/// **UPI only**, matching what checkout offers since launch C1: the `method` map
-/// below turns the rest off, so the Razorpay sheet cannot present a card field
-/// the app has decided not to support.
+/// **The instrument is Razorpay's to offer, not ours to filter.** This used to
+/// send `method: {upi: true, card: false, …}`, matching launch C1's UPI-only
+/// decision. That turned out to be a way to show a customer an empty sheet: a
+/// merchant account exposes the methods *it* has enabled, and ours has UPI off
+/// until KYC completes — so a UPI-only filter over a card-only account left
+/// Razorpay with nothing to draw and it said so, in as many words ("No
+/// appropriate payment method found"), at the last step of checkout.
+///
+/// Sending no filter is both the fix and the smaller thing to maintain: the
+/// sheet shows exactly what the account can actually take, card today and UPI
+/// the day it is enabled, with no release in between. Which one they used is
+/// recorded — `razorpay-verify` reads it back from Razorpay — but nothing in
+/// this app branches on it. `payment_method` on the order stays `upi`, which in
+/// this schema has always meant *prepaid*, as against `cod`.
 ///
 /// [fallback] is used **only** when the server answers `configured: false` —
 /// that is, when no Razorpay keys are set yet. A network failure is not a
@@ -154,15 +165,9 @@ class RazorpayPaymentGateway implements PaymentGateway {
         'currency': 'INR',
         'name': 'Zopiq',
         'description': description,
-        // UPI only, matching checkout (launch C1).
-        'method': <String, dynamic>{
-          'upi': true,
-          'card': false,
-          'netbanking': false,
-          'wallet': false,
-          'emi': false,
-          'paylater': false,
-        },
+        // No `method` filter. See the class comment: the account decides what it
+        // can take, and filtering it here is how a customer gets an empty sheet.
+        //
         // Seconds. A sheet left open on a locked phone should not hold a
         // Razorpay order open indefinitely.
         'timeout': 300,
