@@ -31,6 +31,16 @@ class OrderSupabaseDataSource implements OrderDataSource {
 
   SupabaseClient get _db => Supabase.instance.client;
 
+  /// The signed-in customer, or null when there is no session. `orders.user_id`
+  /// is text (0003), and this is the uuid as text, so the two compare directly.
+  String? get _userId => _db.auth.currentUser?.id;
+
+  /// Per account, not per device. Two people sign in on one phone — an owner and
+  /// their customer account, a shared family handset — and a cache keyed only by
+  /// "recent orders" would show the first one's history to the second until it
+  /// aged out.
+  static String _recentOrdersKey(String userId) => 'orders_recent_$userId';
+
   /// Postgres raises `P0001` for the rules we wrote, with a message written for
   /// the customer. Any other code is a bug or an outage — not something to put
   /// in front of a human.
@@ -159,7 +169,10 @@ class OrderSupabaseDataSource implements OrderDataSource {
       // order — their own, the one they will go straight to. Dropped rather than
       // waited out, because a minute of "your order isn't there" on the screen
       // you land on after paying is the worst minute this cache could cause.
-      await JsonDiskCache.invalidate('orders_recent');
+      final String? userId = _userId;
+      if (userId != null) {
+        await JsonDiskCache.invalidate(_recentOrdersKey(userId));
+      }
 
       return PlacedOrder(
         id: receipt['id'] as String,
@@ -218,11 +231,23 @@ class OrderSupabaseDataSource implements OrderDataSource {
 
   @override
   Future<List<CustomerOrder>> fetchOrders({int offset = 0, int limit = 25}) async {
-    // No `.eq('user_id', …)`. The row-level policy on `orders` already answers
-    // "whose?" from the JWT, and a filter here would only be a second, weaker
-    // copy of that rule — one that a bug could get wrong and that an attacker
-    // could simply omit.
+    // `.eq('user_id', …)`, even though a policy already stands on this table.
     //
+    // This file used to say the opposite — that the policy answers "whose?" and
+    // a filter here would only be a weaker copy of it. That was wrong, and it
+    // put strangers' orders in a customer's history. **Two permissive select
+    // policies sit on `orders`** — the buyer's own rows (0005) and every row of
+    // the restaurant a staff member works at (0009) — and Postgres ORs
+    // permissive policies together. An account that is both a customer and
+    // kitchen staff, which every owner testing this app is, read its shop's
+    // entire order book here. The policy answers "may I read this row"; only
+    // this filter answers "is it mine", and they are not the same question.
+    //
+    // `order_invoice` (0063) asks the second question and always did, which is
+    // why the row appeared in the list and then reported itself missing.
+    final String? userId = _userId;
+    if (userId == null) return const <CustomerOrder>[];
+
     // `range` is inclusive at both ends, so the last index is one short of the
     // page size. Ordering by `created_at` alone would be unstable for two orders
     // written in the same millisecond — a row could appear on two pages or on
@@ -230,6 +255,7 @@ class OrderSupabaseDataSource implements OrderDataSource {
     Future<List<Map<String, dynamic>>> fetch() async => _db
         .from('orders')
         .select(_orderColumns)
+        .eq('user_id', userId)
         .order('created_at', ascending: false)
         .order('id', ascending: false)
         .range(offset, offset + limit - 1);
@@ -246,7 +272,7 @@ class OrderSupabaseDataSource implements OrderDataSource {
     // only the row in the list, for at most a minute.
     final List<Map<String, dynamic>> rows = offset == 0
         ? await JsonDiskCache.rows(
-            key: 'orders_recent',
+            key: _recentOrdersKey(userId),
             freshFor: const Duration(minutes: 1),
             fetch: fetch,
           )
@@ -258,12 +284,17 @@ class OrderSupabaseDataSource implements OrderDataSource {
   @override
   Future<CustomerOrder?> fetchOrder(String orderId) async {
     // `maybeSingle`, not `single`: an order that isn't there is an answer, not
-    // an exception. The policy makes "someone else's order" indistinguishable
-    // from "no such order", which is the behaviour we want anyway.
+    // an exception. With the `user_id` filter above it, someone else's order is
+    // indistinguishable from no such order — which is what the screen already
+    // says, and what `order_invoice` has always said.
+    final String? userId = _userId;
+    if (userId == null) return null;
+
     final Map<String, dynamic>? row = await _db
         .from('orders')
         .select(_orderColumns)
         .eq('id', orderId)
+        .eq('user_id', userId)
         .maybeSingle();
 
     return row == null ? null : _orderFrom(row);
