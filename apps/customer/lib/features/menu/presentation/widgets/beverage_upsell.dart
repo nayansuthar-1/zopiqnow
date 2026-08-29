@@ -10,6 +10,7 @@ import 'package:zopiqnow/features/home/presentation/widgets/restaurant_image.dar
 import 'package:zopiqnow/features/menu/domain/entities/menu_category.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
 import 'package:zopiqnow/features/menu/presentation/providers/menu_providers.dart';
+import 'package:zopiqnow/features/menu/presentation/widgets/dish_add_flow.dart';
 
 /// "Add a drink?" — the bottled drinks a kitchen sells, offered at the moment
 /// somebody puts food in the cart, and again on the cart screen.
@@ -57,18 +58,57 @@ bool cartHasABeverage(Cart cart, List<MenuItem> beverages) {
   return cart.lines.any((CartLine l) => ids.contains(l.item.id));
 }
 
-/// Offer a drink after a dish went into the cart.
+/// Whether the drinks sheet has already been raised for the cart as it stands.
+///
+/// One offer per basket, not one per tap. Tapping CART, backing out and tapping
+/// it again is the same customer answering the same question, and asking twice
+/// is how a suggestion becomes a nag.
+///
+/// Resets itself when the basket becomes a different basket — emptied, or moved
+/// to another kitchen. Done by watching those two facts rather than by having
+/// `CartNotifier` reach out and clear a flag: the cart is domain state and
+/// should not have to know that a widget somewhere counts its own prompts.
+final NotifierProvider<BeverageOfferNotifier, bool> beverageOfferShownProvider =
+    NotifierProvider<BeverageOfferNotifier, bool>(BeverageOfferNotifier.new);
+
+class BeverageOfferNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    // Watched, not read. A change to either field rebuilds this notifier, which
+    // is exactly the reset — a new kitchen or an emptied cart gets asked once
+    // more, and adding a second dish to the same basket does not.
+    ref.watch(
+      cartProvider.select((Cart c) => (c.restaurantId, c.isEmpty)),
+    );
+    return false;
+  }
+
+  void markShown() => state = true;
+}
+
+/// Offer a drink alongside what is already in the cart.
+///
+/// Raised from two places since the sheet stopped firing on every add: opening a
+/// dish, and tapping CART. [onceOnly] is what the CART button passes — it is the
+/// trigger the customer hits repeatedly, so it asks once per basket and then
+/// stays quiet.
 ///
 /// Silent — and deliberately so — when the kitchen sells no bottled drink, when
-/// the thing just added *was* a drink, or when there is already one in the cart.
-/// Anything else and the customer sees the strip.
+/// there is already a drink in the cart, or when the cart is empty. That last
+/// one is the point of the whole change: a drink is something to add *to* an
+/// order, so there is nothing to offer against an empty basket.
 Future<void> offerABeverage(
   BuildContext context,
   WidgetRef ref, {
   required String restaurantId,
   required String restaurantName,
-  required MenuItem justAdded,
+  bool onceOnly = false,
 }) async {
+  // An empty cart is not a meal to drink with. Checked before the menu read, so
+  // the common case costs nothing at all.
+  if (ref.read(cartProvider).isEmpty) return;
+  if (onceOnly && ref.read(beverageOfferShownProvider)) return;
+
   final List<MenuItem> beverages = await ref
       .read(beveragesProvider(restaurantId).future)
       // A drink is a nicety. If the menu read fails there is nothing to show and
@@ -76,9 +116,14 @@ Future<void> offerABeverage(
       .catchError((_) => const <MenuItem>[]);
 
   if (beverages.isEmpty) return;
-  if (beverages.any((MenuItem b) => b.id == justAdded.id)) return;
+  // The "you just added a drink" guard went with `justAdded`. It was there for
+  // the old trigger, which fired on the add itself; the only caller now is the
+  // CART button, and the check below already covers the case it protected — a
+  // drink just added is a drink in the cart.
   if (cartHasABeverage(ref.read(cartProvider), beverages)) return;
   if (!context.mounted) return;
+
+  if (onceOnly) ref.read(beverageOfferShownProvider.notifier).markShown();
 
   await showModalBottomSheet<void>(
     context: context,
@@ -200,17 +245,21 @@ class _BeverageCard extends ConsumerWidget {
       cartProvider.select((Cart c) => c.quantityOf(item.id)),
     );
 
-    // "Coca Cola (750 ml)" is one name and two facts, and at 118pt wide it wraps
-    // to "Coca Cola (750" / "ml)" if drawn as one string. Every row migration
-    // 0140 wrote is shaped `Brand (size)`, so the size comes off the end and
-    // becomes the second line; anything that is not shaped that way — a
-    // kitchen's own Bisleri — falls through as its whole name.
-    final int split = item.name.lastIndexOf(' (');
-    final bool splittable = split > 0 && item.name.endsWith(')');
-    final String title = splittable ? item.name.substring(0, split) : item.name;
-    final String? size = splittable
-        ? item.name.substring(split + 2, item.name.length - 1)
-        : null;
+    // The name is the whole name again. 0140 wrote these as `Brand (size)`
+    // because it seeded a row per size, and this card used to split the size off
+    // the end so "Coca Cola (750 ml)" did not wrap to "Coca Cola (750" / "ml)"
+    // at 118pt. Migration 0147 collapsed the two rows into one card with a Size
+    // option group, so there is no size in the name to lift out — a kitchen's
+    // own "Bisleri (1 L)" would now keep its brackets, which is what a name
+    // that genuinely contains a size should do.
+    final String title = item.name;
+
+    // "from ₹30", because ₹30 is the small and the sheet below can add to it.
+    // A bare ₹30 over a card whose ADD button charges ₹50 is the kind of small
+    // lie that gets read as a bug at the bill.
+    final String price = item.isCustomizable
+        ? 'from ₹${item.price}'
+        : '₹${item.price}';
 
     return SizedBox(
       width: _width,
@@ -253,18 +302,13 @@ class _BeverageCard extends ConsumerWidget {
               color: zc.textStrong,
             ),
           ),
-          if (size != null)
-            Text(
-              size,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: t.labelSmall?.copyWith(color: zc.textMuted),
-            ),
           const Spacer(),
           Row(
             children: <Widget>[
               Text(
-                '₹${item.price}',
+                price,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: t.bodySmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: zc.textStrong,
@@ -274,18 +318,21 @@ class _BeverageCard extends ConsumerWidget {
               AddToCartControl(
                 width: 62,
                 quantity: quantity,
-                onAdd: () {
-                  // Always the cart's own restaurant — the strip is only ever
-                  // drawn for the kitchen being ordered from — so this cannot
-                  // return `differentRestaurant` and there is no prompt to run.
-                  ref
-                      .read(cartProvider.notifier)
-                      .add(
-                        restaurantId: restaurantId,
-                        restaurantName: restaurantName,
-                        item: item,
-                      );
-                },
+                // Through `addDishToCart`, not `cart.add`, so ADD asks the size.
+                //
+                // This card used to add straight to the cart, which was right
+                // while each size was its own row and the card already named
+                // one. After 0147 a drink is one card carrying a required Size
+                // group, and adding straight would silently take the 250 ml
+                // every time — the customer would have no way to buy the large
+                // at all.
+                onAdd: () => addDishToCart(
+                  context,
+                  ref,
+                  item: item,
+                  restaurantId: restaurantId,
+                  restaurantName: restaurantName,
+                ),
                 onIncrement: () =>
                     ref.read(cartProvider.notifier).increment(item.id),
                 onDecrement: () =>

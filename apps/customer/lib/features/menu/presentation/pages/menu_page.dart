@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
+import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
+import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/cart/presentation/widgets/cart_bar.dart';
 import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/domain/repositories/restaurant_repository.dart';
@@ -10,6 +12,7 @@ import 'package:zopiqnow/features/menu/domain/entities/menu_category.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
 import 'package:zopiqnow/features/menu/domain/repositories/menu_repository.dart';
 import 'package:zopiqnow/features/menu/presentation/providers/menu_providers.dart';
+import 'package:zopiqnow/features/menu/presentation/widgets/beverage_upsell.dart';
 import 'package:zopiqnow/features/menu/presentation/widgets/menu_filter_bar.dart';
 import 'package:zopiqnow/features/menu/presentation/widgets/menu_header.dart';
 import 'package:zopiqnow/features/menu/presentation/widgets/menu_item_tile.dart';
@@ -61,7 +64,31 @@ class MenuPage extends ConsumerWidget {
         ),
         data: (Restaurant r) => _MenuBody(restaurant: r),
       ),
-      bottomNavigationBar: CartBar(onViewCart: onViewCart),
+      // The drinks are offered here, on the way to the cart, and not on every
+      // dish added. `onceOnly` keeps it to one prompt per basket, and
+      // `offerABeverage` returns immediately on an empty cart — so tapping CART
+      // with nothing in it just opens the cart.
+      //
+      // Before the sheet rather than after: once the cart page is open the
+      // customer is reading a bill, and a drinks sheet over a bill is an
+      // interruption rather than an offer.
+      bottomNavigationBar: CartBar(
+        onViewCart: () async {
+          final Cart cart = ref.read(cartProvider);
+          final String? id = cart.restaurantId;
+          final String? name = cart.restaurantName;
+          if (id != null && name != null) {
+            await offerABeverage(
+              context,
+              ref,
+              restaurantId: id,
+              restaurantName: name,
+              onceOnly: true,
+            );
+          }
+          if (context.mounted) onViewCart();
+        },
+      ),
     );
   }
 }

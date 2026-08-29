@@ -320,6 +320,10 @@ class _AddOnRail extends ConsumerWidget {
   /// second menu.
   static const int _max = 10;
 
+  /// How many of [_max] may be bottled drinks. Three is a suggestion; eight is
+  /// a fridge.
+  static const int _maxDrinks = 3;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final TextTheme t = Theme.of(context).textTheme;
@@ -350,7 +354,24 @@ class _AddOnRail extends ConsumerWidget {
           });
 
     if (candidates.isEmpty) return const SizedBox.shrink();
-    final List<MenuItem> shown = candidates.take(_max).toList();
+
+    // At most [_maxDrinks] bottled drinks, however well they sort.
+    //
+    // They sort extremely well and that is the problem: every one is ₹30 and
+    // photographed, and the tie-breakers here are photo-then-price-ascending, so
+    // after the handful of bestsellers the rail filled up with eight identical
+    // bottles and the food it exists to suggest fell off the end. A drink is a
+    // companion to a dish, not ten companions.
+    final List<MenuItem> shown = <MenuItem>[];
+    int drinks = 0;
+    for (final MenuItem c in candidates) {
+      if (shown.length == _max) break;
+      if (c.isBottledDrink) {
+        if (drinks == _maxDrinks) continue;
+        drinks++;
+      }
+      shown.add(c);
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

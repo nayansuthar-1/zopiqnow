@@ -18,7 +18,7 @@ import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_image.dart'
     show GradientImagePlaceholder;
-import 'package:zopiqnow/features/menu/presentation/widgets/beverage_upsell.dart';
+import 'package:zopiqnow/features/cart/presentation/widgets/cart_add_ons.dart';
 
 /// The cart page: presents items in cart, order total, bill breakdown, and checkout hand-off.
 class CartPage extends ConsumerWidget {
@@ -191,18 +191,11 @@ class _CartBody extends StatelessWidget {
       ),
       children: <Widget>[
         ZopiqReveal(child: _OrderCard(cart: cart)),
-        // Between the order and the bill, which is where a drink is still an
-        // addition to what you are buying rather than an argument with the
-        // total. Draws nothing when the kitchen sells no bottled drink.
-        if (cart.restaurantId != null && cart.restaurantName != null)
-          ZopiqReveal(
-            index: 1,
-            child: BeverageRail(
-              restaurantId: cart.restaurantId!,
-              restaurantName: cart.restaurantName!,
-              heading: 'Add a drink',
-            ),
-          ),
+        // "Add a drink" was here and is gone. It offered bottles and only
+        // bottles, which made the cart read as a fridge; the rail inside the
+        // order card offers the kitchen's small things — drinks among them —
+        // and carries the route back to the full menu that "Add more items"
+        // used to be.
         const SizedBox(height: ZopiqSpacing.lg),
         ZopiqReveal(index: 2, child: BillSummary(bill: bill)),
       ],
@@ -308,10 +301,14 @@ class _OrderCard extends StatelessWidget {
           ),
           // Both or neither: a rule drawn above a row that renders nothing
           // would be a line resting on the bottom edge of the card.
-          if (cart.restaurantId != null) ...<Widget>[
-            _HairLine(color: zc.divider),
-            _AddMoreRow(restaurantId: cart.restaurantId!),
-          ],
+          if (cart.restaurantId != null && cart.restaurantName != null)
+            ...<Widget>[
+              _HairLine(color: zc.divider),
+              CartAddOnRail(
+                restaurantId: cart.restaurantId!,
+                restaurantName: cart.restaurantName!,
+              ),
+            ],
         ],
       ),
     );
@@ -395,54 +392,6 @@ class _KitchenRow extends StatelessWidget {
                 size: 22,
                 color: zc.textMuted,
               ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// "Add more items" — back to the kitchen the cart belongs to.
-///
-/// The gap this fills was a real dead end: the only route off a non-empty cart
-/// was the app-bar back arrow, which goes to Home rather than to the restaurant
-/// being ordered from. So a customer who forgot a drink had to find that kitchen
-/// again from the feed, and the one obvious-looking control on the screen was
-/// "Clear". Every cart in this category has this row for that reason.
-///
-/// Pushed, so the menu arrives *over* the cart and system Back returns to it
-/// with the order intact — going by branch would have swapped tabs and left the
-/// cart behind a tab switch.
-class _AddMoreRow extends StatelessWidget {
-  const _AddMoreRow({required this.restaurantId});
-
-  final String restaurantId;
-
-  @override
-  Widget build(BuildContext context) {
-    final ZopiqColors zc = context.zc;
-    final TextTheme t = Theme.of(context).textTheme;
-
-    return InkWell(
-      onTap: () => context.pushNamed(
-        Routes.menu,
-        pathParameters: <String, String>{'id': restaurantId},
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(ZopiqSpacing.lg),
-        child: Row(
-          children: <Widget>[
-            Icon(Icons.add_rounded, size: 20, color: zc.primary),
-            const SizedBox(width: ZopiqSpacing.md),
-            Expanded(
-              child: Text(
-                'Add more items',
-                style: t.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: zc.primary,
-                ),
-              ),
-            ),
           ],
         ),
       ),
