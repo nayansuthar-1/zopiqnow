@@ -35,27 +35,6 @@ on the day Razorpay goes live, which is exactly why they sit above the rest.
 
 ## Open
 
-### P1a — `place_order` cannot be called twice in one transaction
-
-Found while building P1's verification. `place_order` opens with
-
-    create temp table _lines (…) on commit drop
-
-and `on commit drop` drops at **commit**, not at statement end. So a second call
-inside the same transaction dies with `relation "_lines" already exists`.
-
-Not reachable today: PostgREST gives every RPC its own transaction, so no customer
-can hit it. It is a landmine for the first thing that ever calls `place_order`
-twice in one transaction — a batch re-order, an admin "place this again" helper, a
-test harness, or a future function that loops. `create temp table if not exists`
-plus a `delete from _lines` would make it safe; so would `on commit drop` becoming
-an explicit `drop` at the end.
-
-Filed rather than fixed with P1 because it is a different bug in a different
-function, and the rule is one at a time.
-
----
-
 ### P3 — Refunds are promised with a date and nothing pays them
 
 `orders_refund_on_termination` inserts the refund already `approved` and pushes the
@@ -69,31 +48,6 @@ money — but the machinery is what ships.
 
 Needs, at minimum, an overdue alarm. Ideally a `razorpay-refund` function so the
 promise the notification makes is one the platform keeps by itself.
-
----
-
-### P4 — The gate ships disarmed and nothing couples arming it to the keys
-
-`require_verified_payment` is `false`, and with it false `place_order` accepts any
-non-empty string as `payment_id`. The design intent is sound — *"the day the keys
-are set as function secrets, every already-installed build starts taking real
-payments"* — but arming the trigger is a **separate manual SQL statement**, and
-nothing fails loudly if it is forgotten. Between setting the keys and running that
-statement, the door is open to anybody holding the publishable key.
-
-Wants a check that refuses to leave the two out of step, or at the very least a
-line in `RELEASING.md` that makes them one step.
-
----
-
-### P5 — Checkout hardcodes "Test gateway — no real money"
-
-[`checkout_page.dart:202`](apps/customer/lib/features/checkout/presentation/pages/checkout_page.dart#L202)
-and [`:583`](apps/customer/lib/features/checkout/presentation/pages/checkout_page.dart#L583)
-are constant strings. The whole point of the gateway binding is that installed
-builds start charging real money with no new release — and those builds will keep
-telling the customer no money moves while it does. `RazorpayPaymentGateway` already
-receives `configured` from the server; the copy should read it.
 
 ---
 
@@ -155,7 +109,181 @@ those are split, or a run errors between the two.
 
 ---
 
+### P12 — A vendor sets the GST slab their own food is taxed at
+
+`menu_items` is the one table `authenticated` may write, correctly scoped by
+`staff_restaurant_id()`. The `update` policy names no column list, so it covers
+`gst_rate_bps` and `hsn_code` alongside price and availability, and
+`place_order` reads the slab straight off the row.
+
+`menu_items_gst_rate_is_a_real_slab` limits it to `{0, 500, 1200, 1800}`, so the
+worst case is a kitchen moving its food to 0% and the platform under-collecting
+the GST it is liable for under s.9(5). Every one of the 1,190 live items is at
+500 today.
+
+**Deliberately not fixed.** 0% is a real slab and some food genuinely sits at it,
+so this cannot be a constraint; and the vendor is arguably the right party to
+classify their own dishes. It is a column-level `grant` decision or an
+approval flow, which is a product question rather than a bug. Recorded so the
+answer is a decision rather than an oversight.
+
+---
+
+### P13 — The gift bag never accounts for the tax inside its delivery fee
+
+`gift_bag_quote` returns `total = subtotal + delivery_fee + taxes` and splits
+`cgst`/`sgst` over `taxes` alone. The food path extracts the GST sitting inside
+its gross fees (`tax_on_fees`, `f × r / (10000 + r)`) and includes it in the
+split; the gift path has no such column and does not.
+
+**No live impact:** `gift_settings.delivery_fee` is ₹0, so there is nothing
+inside to extract. It becomes a real under-declaration the day somebody sets a
+gift delivery fee in the console, which `admin_set_gift_delivery_fee` allows in
+one call.
+
+---
+
+### P14 — The vendor's Earnings screen and their statement will not agree
+
+`vendor_earnings_summary` computes `net_earnings = (gross − own_offers) −
+commission`. `run_settlement_batch` computes `net_payable = (gross − own_offers)
+− commission − refunds + adjustments`. So a restaurant that has funded a refund
+reads one number on the Payments screen and is paid a smaller one, with nothing
+on either screen explaining the gap.
+
+Defensible as written — the screen is a live earnings figure and the statement is
+a payout — and the entity doc says so. It is still the single most likely vendor
+support call on that screen, and the fix is small: carry `refunds` in the summary
+and label it the way the statement does.
+
+---
+
 ## Closed
+
+### ~~Money sweep 2026-08-29 — five more, found by walking the rupee end to end~~ · migration 0141
+
+A pass over the whole money path — cart, preflight, gateway, `place_order`,
+refunds, settlements, rider payouts, gifts, and the console's own arithmetic.
+The healthy majority is worth recording because it is what made the exceptions
+findable: every money table is `select`-only to `authenticated` and written
+exclusively through `security definer` functions; all 106 `admin_*` RPCs call
+`assert_admin()`; every amount is whole rupees with the paise conversion in
+exactly three places; and `CartBill`, `checkout_preflight` and `place_order`
+agree to the rupee, largest-remainder rounding included.
+
+**1. An order with any earlier refund could never be cancelled.**
+`orders_refund_on_termination` refunded `new.total` and `refund_within_the_order`
+refused anything past the order's total, so the two collided:
+
+    update orders set status = 'cancelled' where id = 'ZPQ-1166';
+    ERROR:  That would refund ₹342 on an order of ₹292 — ₹50 of it is already refunded.
+
+The whole statement aborts, so the order most likely to need cancelling was the
+one nobody could cancel — not the customer, not the kitchen, not an admin. Now it
+refunds the *balance*, and stands down silently when nothing is left owing.
+
+**2. A refund that failed left the restaurant paying for it.** A vendor-funded
+refund is charged to the open statement on approval; when Razorpay refused it and
+`pay_approved_refunds` moved it to `failed`, the trigger saw `settlement_id is not
+null` and returned early. Proven live: settlement 20 went `refunds 250 → 350` on
+approval and stayed at 350 after the failure. The customer got nothing back and
+the restaurant was still short ₹100. Now reversed — in place while the statement
+is `pending`, and as an admin alert asking for a credit on the next one when it
+has already been paid out.
+
+**3. Two refunds at once could jointly exceed the order.** `refund_within_the_order`
+read the order and its existing refunds without a lock. One `for update` on the
+order row.
+
+**4. Cancelling a paid gift order kept the money and said nothing.** Gifts are
+prepaid and have no refund ledger — 0116 removed it deliberately — so an admin
+cancel wrote no refund row, sent no notification, and left no record that money
+was owed. *"Gifts are final"* is a rule about what the customer may call off; it
+was never a licence to cancel and keep the payment. The ledger stays out. A cancel
+now requires a reason, raises a `gift_refund_owed` alert naming the amount and the
+Razorpay id, and tells the customer their money is coming back.
+
+**5. The console's commission tile overstated the platform's cut.** It charged
+commission on the full `subtotal` while `run_settlement_batch` charges it on
+`subtotal - vendor_funded_discount` — despite a comment claiming the two were the
+same arithmetic. No live divergence yet (every coupon on the platform is
+platform-funded, so the vendor-funded discount is ₹0), so this is preventive: it
+would have started lying the first time a restaurant ran its own offer.
+
+Also in 0141: a sweep flagging verified payments that never became an order —
+money captured with nowhere in the schema to record it, which is the residue of
+pay-then-order that P1's preflight narrowed but could not remove — and the
+`PUBLIC` execute grant revoked from the three argument-less trigger functions
+0087/0089/0091 missed.
+
+---
+
+
+### ~~P4 — The gate ships disarmed and nothing couples arming it to the keys~~ · migration 0141, 2026-08-29
+
+**Was:** `payment_settings.require_verified_payment = false`, and with it false
+`orders_require_verified_payment` returns on its first line — so `place_order`
+accepted any non-empty string as `payment_id`.
+
+**What made it urgent rather than theoretical:** the keys went in on **25 August**
+and the statement was never run. `razorpay-order` had been answering
+`configured: true` for four days, the mock fallback was unreachable, real captures
+were landing (ZPQ-1185…1189, by card and UPI), and the door this item describes was
+open the whole time. Anybody signed in could call `place_order` over PostgREST with
+`p_payment_id: 'anything'` and eat for free. The app was never the attack surface;
+the RPC is, and it is `authenticated`-executable by design.
+
+**Now:** armed. Verified against the live schema, every case rolled back:
+
+| case | result |
+|---|---|
+| paid the right amount | order placed, intent `consumed` and linked to it |
+| fabricated payment id | *We couldn't confirm your payment.* |
+| ₹1 paid for a ₹207 order | refused — `intent 54 paid 1 for an order of 207` |
+| another customer's verified payment | refused — `belongs to another customer` |
+| same payment spent twice | first placed, second refused — `is consumed, not verified` |
+| honest retry, same idempotency key | same order id returned, one row written |
+
+**What arming it exposed** — migration 0142. Marking an intent `consumed` is the
+gate's *other* job, and it had not been doing that either. So the five real payments
+taken since 25 August were still sitting at `verified`, and the moment the gate
+started honouring `verified` rows each became a live single-use voucher worth up to
+its own amount — ₹9,930 on the largest. Backfilled to `consumed` against the orders
+they actually bought.
+
+The automatic coupling this item asks for still does not exist. What exists is that
+the statement has been run, and the disarm command is written into 0141's header.
+
+---
+
+### ~~P1a — `place_order` cannot be called twice in one transaction~~ · migration 0143, 2026-08-29
+
+**Was:** `create temp table _lines (…) on commit drop` drops at commit, so a second
+call inside the same transaction died with `relation "_lines" already exists`.
+
+Found again from the other end: this is what stopped the P4 double-spend test above
+from reaching the payment gate at all. A function whose failure mode is *"you may
+not test me twice"* is one nobody can be confident about, which is the cost this
+item predicted.
+
+**Now:** `to_regclass('pg_temp._lines')` and an explicit drop — chosen over
+`drop table if exists`, which raises a NOTICE every time it skips: once per order
+placed, forever, in the logs and on the wire to PostgREST. `on commit drop` stays,
+because it is still what cleans up in the ordinary single-call case.
+
+---
+
+### ~~P5 — Checkout hardcodes "Test gateway — no real money"~~ · already closed in code
+
+Stale entry, cleared on inspection.
+[`checkout_page.dart:591`](apps/customer/lib/features/checkout/presentation/pages/checkout_page.dart#L591)
+now reads *"Pay online · UPI, cards and more · secured by Razorpay"*, and its own
+doc comment says why the old string went: *"copy that outlives the thing it
+describes is how a customer gets told no money moves while it does."* Recorded here
+so the next sweep does not re-find it.
+
+---
+
 
 ### ~~P11 — Rider pay has no ceiling, and the live payout queue already shows it~~ · migration 0137, 2026-08-24
 
