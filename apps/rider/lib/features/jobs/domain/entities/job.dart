@@ -71,6 +71,7 @@ class JobOffer {
     required this.routeKm,
     required this.riderPay,
     required this.placedAt,
+    required this.offeredToOther,
   });
 
   factory JobOffer.fromJson(Map<String, dynamic> json) => JobOffer(
@@ -85,6 +86,7 @@ class JobOffer {
     routeKm: (json['route_km'] as num?)?.toDouble(),
     riderPay: json['rider_pay'] as int? ?? 0,
     placedAt: DateTime.parse(json['placed_at'] as String).toLocal(),
+    offeredToOther: json['offered_to_other'] as bool? ?? false,
   );
 
   final String orderId;
@@ -110,6 +112,16 @@ class JobOffer {
   final bool isReady;
 
   final DateTime placedAt;
+
+  /// Somebody else's fifteen seconds are running on this job right now (0148).
+  ///
+  /// It stays on this rider's board because they were offered it too and their
+  /// own window ran out — before 0148 it simply vanished from their screen the
+  /// moment the dispatcher moved on, which is why a rider 300 m from the kitchen
+  /// could lose a job to one 3 km away by being eight seconds late to their
+  /// phone. They can still take it, and if both of them do, the nearer one gets
+  /// it. The card says so before the tap rather than after.
+  final bool offeredToOther;
 }
 
 /// A job the platform has picked this rider for, with a clock on it (0056).
@@ -191,6 +203,64 @@ class DeliveryOffer {
   }
 
   bool isExpired(DateTime now) => !expiresAt.isAfter(now);
+}
+
+/// What came back from tapping Accept (0148).
+///
+/// Three answers, and the middle one is the reason this is a type rather than a
+/// `void`. Since a job stays on the board of every rider it was offered to,
+/// two or three people can reach for the same order — and the platform's rule is
+/// that the one nearest the restaurant gets it, not the one who tapped first.
+/// So a *contested* accept opens a two-second window, collects everybody, and
+/// then decides. The rider is asked to wait exactly that long and no longer.
+///
+/// An **uncontested** accept — which is nearly all of them, because during a
+/// rider's own fifteen seconds nobody else has been asked yet — comes straight
+/// back as [won] with nothing to wait for.
+@immutable
+class TakeOutcome {
+  const TakeOutcome._(this.state, {this.decideAt, this.message});
+
+  factory TakeOutcome.fromJson(Map<String, dynamic> json) {
+    final String state = json['state'] as String? ?? 'none';
+    final String? at = json['decide_at'] as String?;
+    return TakeOutcome._(
+      state,
+      decideAt: at == null ? null : DateTime.tryParse(at)?.toLocal(),
+      message: json['message'] as String?,
+    );
+  }
+
+  /// `won`, `pending`, `lost`, or — for an order this rider is not contesting at
+  /// all — `none`. Compared through the getters below rather than read directly,
+  /// so the database owns the vocabulary and the app owns none of it.
+  final String state;
+
+  /// When the contest closes, on this device's clock. Only ever set on
+  /// [isPending], and the app waits until it before asking again.
+  final DateTime? decideAt;
+
+  /// The sentence to show a rider who lost, written server-side so it can be
+  /// changed without a release.
+  final String? message;
+
+  bool get isWon => state == 'won';
+  bool get isPending => state == 'pending';
+
+  /// Anything that is not a win and not a wait. `lost` is the ordinary one;
+  /// `none` means the contest was settled before this rider reached it, which
+  /// reads the same way from a kerb.
+  bool get isLost => !isWon && !isPending;
+
+  /// How long is left to wait, floored at zero. A `pending` with no `decide_at`
+  /// — which the database does not send, but a socket could truncate — waits the
+  /// contest window rather than spinning for ever or resolving instantly.
+  Duration waitFrom(DateTime now) {
+    final DateTime? at = decideAt;
+    if (at == null) return const Duration(seconds: 2);
+    final Duration left = at.difference(now);
+    return left.isNegative ? Duration.zero : left;
+  }
 }
 
 /// One line of the thread with the customer waiting for this job (0061).

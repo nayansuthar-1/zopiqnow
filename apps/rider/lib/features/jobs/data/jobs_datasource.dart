@@ -22,9 +22,20 @@ abstract interface class JobsDataSource {
   /// one shape of an offer in the app rather than two that can disagree.
   Stream<void> watchOfferChanges(String partnerEmail);
 
-  /// Yes. Creates the delivery, through the same `claim_delivery` race the board
-  /// has always gone through.
-  Future<void> acceptOffer(String orderId);
+  /// Yes — to an offer, or to a card on the board. One door for both since
+  /// 0148, because both can now be contested and only one of the two old calls
+  /// could say so.
+  ///
+  /// Comes back [TakeOutcome.isWon] straight away when nobody else can see the
+  /// job, and [TakeOutcome.isPending] when they can. Throws [JobFailure] when
+  /// the rider was never allowed to ask — offline, unverified, over the cash
+  /// ceiling, or reaching for a job that is inside somebody else's window.
+  Future<TakeOutcome> takeDelivery(String orderId);
+
+  /// Ask again once the contest window has shut. Idempotent, and safe for every
+  /// contestant to call — whoever gets there first settles it and everybody is
+  /// told their own answer.
+  Future<TakeOutcome> resolveContest(String orderId);
 
   /// No. The order moves to the next partner immediately, not when the
   /// countdown runs out.
@@ -41,9 +52,6 @@ abstract interface class JobsDataSource {
 
   /// This rider's own jobs, live ones first.
   Future<List<Job>> fetchMine();
-
-  /// Take a job. Refuses if someone else got there first.
-  Future<void> claim(String orderId);
 
   /// Put an unstarted job back on the board.
   Future<void> abandon(String orderId);
@@ -173,12 +181,26 @@ class JobsSupabaseDataSource implements JobsDataSource {
   }
 
   @override
-  Future<void> acceptOffer(String orderId) => _guard<void>(
-    () => _db.rpc<void>(
-      'accept_offer',
-      params: <String, dynamic>{'p_order_id': orderId},
-    ),
-  );
+  Future<TakeOutcome> takeDelivery(String orderId) async =>
+      TakeOutcome.fromJson(
+        await _guard<Map<String, dynamic>>(
+          () => _db.rpc<Map<String, dynamic>>(
+            'take_delivery',
+            params: <String, dynamic>{'p_order_id': orderId},
+          ),
+        ),
+      );
+
+  @override
+  Future<TakeOutcome> resolveContest(String orderId) async =>
+      TakeOutcome.fromJson(
+        await _guard<Map<String, dynamic>>(
+          () => _db.rpc<Map<String, dynamic>>(
+            'resolve_delivery_contest',
+            params: <String, dynamic>{'p_order_id': orderId},
+          ),
+        ),
+      );
 
   @override
   Future<void> declineOffer(String orderId) => _guard<void>(
@@ -216,14 +238,6 @@ class JobsSupabaseDataSource implements JobsDataSource {
         .map(Job.fromJson)
         .toList(growable: false);
   }
-
-  @override
-  Future<void> claim(String orderId) => _guard<void>(
-    () => _db.rpc<void>(
-      'claim_delivery',
-      params: <String, dynamic>{'p_order_id': orderId},
-    ),
-  );
 
   @override
   Future<void> abandon(String orderId) => _guard<void>(

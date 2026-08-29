@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:ui' show DartPluginRegistrant;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -6,15 +7,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:zopiq_rider/features/notifications/offer_ring.dart';
+
 /// The wake: getting a new job to a rider who isn't looking at the app.
 ///
-/// The mirror of the vendor's `PushService`, minus the local new-order chime.
-/// It brings Firebase up, makes the `jobs` channel and asks permission,
+/// The mirror of the vendor's `PushService`, and since 0148 that includes the
+/// ring. It brings Firebase up, makes the `jobs` channel and asks permission,
 /// registers this device's token against the signed-in rider
 /// (`register_device_token`, audience-aware since 0047), and draws a foreground
 /// message the OS would otherwise swallow. The Edge Function `send-notification`
-/// is what actually *sends*; this is only the ear. Once it is live the board can
-/// stop polling every 20s (see ZOMATO_PARITY.md B0/B3).
+/// is what actually *sends*; this is only the ear.
 ///
 /// A plain object started once from `main`, not a widget or provider — it speaks
 /// to platform channels (Firebase, the OS tray) that don't exist under
@@ -40,7 +42,14 @@ class PushService {
       return;
     }
 
+    // The channels exist after this, so the ring has somewhere to sound.
+    // `OfferRing` refuses to ring until it has been handed the plugin here.
     await _initLocalNotifications();
+
+    // A ring left over from a previous run is a phone that starts ringing for
+    // an offer that expired an hour ago. `ongoing` notifications survive the
+    // process that posted them, so clearing on start is not paranoia.
+    await OfferRing.stop();
 
     final FirebaseMessaging messaging = FirebaseMessaging.instance;
     // On Android 13+ this raises the POST_NOTIFICATIONS prompt; on older
@@ -97,6 +106,11 @@ class PushService {
     );
     await _local.initialize(
       const InitializationSettings(android: android, iOS: darwin),
+      onDidReceiveNotificationResponse: _onNotificationResponse,
+      // Answering the ring from a killed app runs here instead, in its own
+      // isolate. Without it, tapping a ring the app did not draw itself would
+      // silence the phone and tell this app nothing.
+      onDidReceiveBackgroundNotificationResponse: onBackgroundNotificationTap,
     );
 
     // The channel a new-job notification lands on. Must match the id named in
@@ -111,6 +125,25 @@ class PushService {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
+
+    // The loud one, alongside it rather than instead of it. `jobs` still carries
+    // everything else `send-notification` sends a rider; only an *offer* rings.
+    await OfferRing.install(_local);
+  }
+
+  /// The rider answered the ring — from the tray, or by tapping the body.
+  ///
+  /// It does two things: stop the noise, and remember which order it was so the
+  /// app can open on the Jobs tab rather than wherever the rider last happened
+  /// to be. Accepting stays in the app, because accepting is now a call that can
+  /// come back "somebody was closer" (0148) and a tray action has nowhere to put
+  /// that sentence.
+  static void _onNotificationResponse(NotificationResponse response) {
+    OfferRing.stop();
+    final String? orderId = response.payload;
+    if (orderId != null && orderId.isNotEmpty) {
+      OfferRing.answered.value = orderId;
+    }
   }
 
   /// Register only if there is a signed-in session; the RPC is scoped to the
@@ -179,6 +212,18 @@ class PushService {
           // restaurant would otherwise have had this phone filed as a
           // restaurant device.
           'p_audience': 'rider',
+          // This build draws its own job-offer notification, so it can be sent
+          // a data-only message and ring (0148). The column is generic; 0128
+          // named it after the kitchen's use because it was the only one.
+          // Builds that predate the ring do not send this at all and default to
+          // false, which is what keeps `send-notification` including a
+          // notification block for them — a data-only message to an older
+          // install shows nothing while killed.
+          //
+          // ⚠️ A device that reports false gets the quiet ping and nothing else,
+          // so a phone that is not ringing is worth checking here before the
+          // sender is blamed: `select rings_new_orders from device_tokens`.
+          'p_rings_new_orders': true,
         },
       );
     } on Object catch (e) {
@@ -199,7 +244,65 @@ class PushService {
     }
   }
 
+  /// Bring the notification plugin up inside the FCM background isolate.
+  ///
+  /// A background isolate starts with nothing registered — [Firebase] handed it
+  /// a message and that is all. `DartPluginRegistrant.ensureInitialized()` is
+  /// what makes `flutter_local_notifications` reachable at all here, and it is
+  /// also why the alarm-volume boost in [OfferRing] is optional: that one lives
+  /// in `android/app`, which never reaches a background isolate.
+  static Future<void> prepareBackgroundIsolate() async {
+    DartPluginRegistrant.ensureInitialized();
+    await _initLocalNotifications();
+  }
+
+  /// True when this message is the "this job is yours for fifteen seconds" wake,
+  /// as opposed to any of the ordinary notifications `send-notification` sends.
+  static bool _isJobOffer(RemoteMessage message) =>
+      message.data['kind'] == 'job_offer';
+
+  /// Ring for an offer. Shared by the foreground listener and the background
+  /// isolate, because a woken rider and one already holding the phone should
+  /// hear the same thing — they cannot tell which state the app was in, and
+  /// should not have to.
+  static Future<void> _ringForOffer(RemoteMessage message) async {
+    final String? orderId = message.data['order_id'] as String?;
+    if (orderId == null || orderId.isEmpty) return;
+    await OfferRing.ring(
+      orderId: orderId,
+      // The server's title carries the fee — "New delivery — ₹58". Worth
+      // sounding for; worth reading before unlocking anything.
+      title: (message.data['title'] as String?) ?? 'New delivery',
+      body: (message.data['body'] as String?) ?? 'A delivery is offered to you.',
+      ringFor: _windowLeft(message.data['expires_at'] as String?),
+    );
+  }
+
+  /// How long is left of this rider's exclusive window. The server sends the
+  /// offer's `expires_at` (0097); a message that sat in a Doze queue for twelve
+  /// seconds should ring for the three that remain, not for a fresh fifteen.
+  static Duration _windowLeft(String? expiresAt) {
+    // What the offer window is today (0148 shipped 15s, tunable in
+    // `dispatch_settings`). Used only when the payload carries no deadline at
+    // all, which is an older sender rather than a normal case.
+    const Duration fallback = Duration(seconds: 15);
+    // A ceiling the payload cannot argue with, so a wrong clock or a malformed
+    // instant cannot pin the alarm stream open.
+    const Duration ceiling = Duration(minutes: 1);
+    if (expiresAt == null) return fallback;
+    final DateTime? at = DateTime.tryParse(expiresAt);
+    if (at == null) return fallback;
+    final Duration left = at.difference(DateTime.now().toUtc());
+    return left <= Duration.zero
+        ? Duration.zero
+        : (left > ceiling ? ceiling : left);
+  }
+
   static Future<void> _showForeground(RemoteMessage message) async {
+    if (_isJobOffer(message)) {
+      await _ringForOffer(message);
+      return;
+    }
     final RemoteNotification? n = message.notification;
     if (n == null) return;
     await _local.show(
@@ -227,11 +330,36 @@ class PushService {
 }
 
 /// Runs in its own isolate when a message arrives with the app killed or
-/// backgrounded. Android posts a *notification* message to the tray on its own;
-/// this exists so a *data* message still has an entry point, and so the plugin
-/// stops warning that none is registered. Top-level and annotated, as
-/// firebase_messaging requires.
+/// backgrounded. Top-level and annotated, as firebase_messaging requires.
+///
+/// This is where the ring for a closed app is drawn, and it has to be drawn
+/// here: a message carrying an FCM `notification` block is posted by Android
+/// itself, and Android will not set `FLAG_INSISTENT` on our behalf. So
+/// `send-notification` sends a `job_offer` **data only** (0148), Android posts
+/// nothing, and this handler owns the whole notification — which is the only way
+/// the ring can have the flags and the alarm-stream sound.
+///
+/// Everything else still falls through to Android, which draws the tray entry
+/// from the message's own `notification` block exactly as it always has.
+///
+/// ⚠️ Nothing `start()` did has happened in this isolate. It is a fresh Dart VM
+/// with no plugin registrations, no channel, no initialize. Hence the two lines
+/// of setup before anything is shown; skip them and `show` throws.
 @pragma('vm:entry-point')
 Future<void> _onBackgroundMessage(RemoteMessage message) async {
-  // Intentionally minimal: the tray notification is Android's to draw here.
+  if (message.data['kind'] != 'job_offer') return;
+  await PushService.prepareBackgroundIsolate();
+  await PushService._ringForOffer(message);
+}
+
+/// Answering the ring while the app is killed lands here — a separate isolate
+/// again, and a separate entry point from [_onBackgroundMessage].
+///
+/// All it can usefully do is stop the noise. Tapping the notification also
+/// launches the app, and the launched app's own `start()` clears any leftover
+/// ring and picks the offer up off the realtime stream, so accepting happens
+/// there with the whole job in view.
+@pragma('vm:entry-point')
+void onBackgroundNotificationTap(NotificationResponse response) {
+  OfferRing.stop();
 }

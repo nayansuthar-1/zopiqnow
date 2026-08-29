@@ -347,15 +347,51 @@ class JobsController extends Notifier<void> {
 
   JobsDataSource get _ds => ref.read(jobsDataSourceProvider);
 
-  Future<String?> claim(String orderId) =>
-      _write(() => _ds.claim(orderId), 'We couldn\'t take that job.');
+  /// Yes — from the offer sheet or from a card on the board; there is one door
+  /// for both since 0148.
+  ///
+  /// Returns null when the job is this rider's, and a sentence to show when it
+  /// is not. The database's own refusals are passed straight through, because
+  /// they are already written for a human: "You are offline. Go online to take
+  /// deliveries.", "Another partner was closer to the restaurant."
+  ///
+  /// **The wait.** An accept on a job only this rider can see comes straight
+  /// back. An accept on one two or three riders can see opens a two-second
+  /// window so the nearest of them wins rather than the fastest — and then this
+  /// method sleeps out the window and asks for the verdict. [onContested] fires
+  /// on that branch and only that branch, so a button can say "Confirming…"
+  /// instead of spinning silently at somebody standing over a bike.
+  ///
+  /// Waiting on the device rather than in the database is deliberate: holding a
+  /// connection open with `pg_sleep` for every accept on a 60-connection
+  /// instance is how a busy evening becomes an outage. The verdict is settled by
+  /// whichever contestant asks first, and every other one is told the same
+  /// answer — so a rider whose phone dies mid-wait changes nothing, and the
+  /// dispatch tick settles it for them.
+  Future<String?> take(String orderId, {void Function()? onContested}) async {
+    try {
+      TakeOutcome outcome = await _ds.takeDelivery(orderId);
 
-  /// Yes to an offer. The database's refusal sentence is passed straight
-  /// through — "That offer has expired." is already written for a human.
-  Future<String?> acceptOffer(String orderId) => _write(
-    () => _ds.acceptOffer(orderId),
-    'We couldn\'t take that job.',
-  );
+      if (outcome.isPending) {
+        onContested?.call();
+        await Future<void>.delayed(outcome.waitFrom(DateTime.now()));
+        outcome = await _ds.resolveContest(orderId);
+      }
+
+      // Refreshed whichever way it went. A loss moves the board just as much as
+      // a win does — the order now has somebody on it and leaves every list.
+      _refresh();
+
+      if (outcome.isWon) return null;
+      return outcome.message ?? 'Another partner got that one.';
+    } on JobFailure catch (e) {
+      _refresh();
+      return e.message;
+    } on Object {
+      _refresh();
+      return 'We couldn\'t take that job.';
+    }
+  }
 
   /// No. Never reports a failure to the rider, and that is deliberate: the
   /// answer to "we could not record your decline" is the same as the answer to
@@ -440,31 +476,39 @@ class JobsController extends Notifier<void> {
   Future<String?> _write(Future<void> Function() call, String fallback) async {
     try {
       await call();
-      ref
-        ..invalidate(boardProvider)
-        ..invalidate(myJobsProvider)
-        // Accepting retires an offer, declining retires an offer, and claiming
-        // from the board can retire somebody else's. One line covers all three.
-        ..invalidate(offersProvider)
-        // The board is empty while offline and full while on, so a shift change
-        // is a board change — and every job write can be the one that frees a
-        // rider to end their shift.
-        ..invalidate(riderOnlineProvider)
-        // Only `confirmDelivered` can actually move this, but invalidating on
-        // every write costs one request the rider never waits on and removes
-        // the failure mode where a total is stale because the list that feeds
-        // it was refreshed and it was not.
-        ..invalidate(earningsProvider)
-        // Same reasoning, and one more: a claim that was refused for being over
-        // the cash ceiling is a rider who should immediately see the number that
-        // refused them.
-        ..invalidate(cashInHandProvider);
+      _refresh();
       return null;
     } on JobFailure catch (e) {
       return e.message;
     } on Object {
       return fallback;
     }
+  }
+
+  /// Every list a job write can move. Its own method since 0148, because
+  /// [take] needs the same refresh and does not fit [_write]'s
+  /// success-is-void shape — a contest can come back "you lost", which is not a
+  /// failure but still moves every one of these.
+  void _refresh() {
+    ref
+      ..invalidate(boardProvider)
+      ..invalidate(myJobsProvider)
+      // Accepting retires an offer, declining retires an offer, and claiming
+      // from the board can retire somebody else's. One line covers all three.
+      ..invalidate(offersProvider)
+      // The board is empty while offline and full while on, so a shift change
+      // is a board change — and every job write can be the one that frees a
+      // rider to end their shift.
+      ..invalidate(riderOnlineProvider)
+      // Only `confirmDelivered` can actually move this, but invalidating on
+      // every write costs one request the rider never waits on and removes
+      // the failure mode where a total is stale because the list that feeds
+      // it was refreshed and it was not.
+      ..invalidate(earningsProvider)
+      // Same reasoning, and one more: a claim that was refused for being over
+      // the cash ceiling is a rider who should immediately see the number that
+      // refused them.
+      ..invalidate(cashInHandProvider);
   }
 }
 

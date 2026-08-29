@@ -463,13 +463,24 @@ class _OfferCard extends ConsumerStatefulWidget {
 class _OfferCardState extends ConsumerState<_OfferCard> {
   bool _busy = false;
 
+  /// True for the two seconds a contested claim is being decided (0148).
+  bool _contested = false;
+
   Future<void> _claim() async {
     setState(() => _busy = true);
     final String? failure = await ref
         .read(jobsControllerProvider.notifier)
-        .claim(widget.offer.orderId);
+        .take(
+          widget.offer.orderId,
+          onContested: () {
+            if (mounted) setState(() => _contested = true);
+          },
+        );
     if (!mounted) return;
-    setState(() => _busy = false);
+    setState(() {
+      _busy = false;
+      _contested = false;
+    });
     if (failure != null) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -582,10 +593,24 @@ class _OfferCardState extends ConsumerState<_OfferCard> {
               emphasis: o.isCash,
             ),
 
+            // Somebody else's fifteen seconds are running on this one (0148).
+            // Said before the tap, not after: the rider can still take it, and
+            // if both of them do the nearer one wins — but a button that might
+            // lose should say so while there is still a choice to make.
+            if (o.offeredToOther) ...<Widget>[
+              const SizedBox(height: ZopiqSpacing.sm),
+              _SvgInfoRow(
+                svgType: RiderSvgType.deliveryBike,
+                iconColor: zc.textMuted,
+                text: 'Offered to another partner — take it and the one closer '
+                    'to the restaurant gets it',
+              ),
+            ],
+
             const SizedBox(height: ZopiqSpacing.lg),
 
             ZopiqButton(
-              label: 'Claim & Accept Job',
+              label: _contested ? 'Confirming…' : 'Claim & Accept Job',
               variant: ZopiqButtonVariant.cta,
               isLoading: _busy,
               onPressed: _busy ? null : _claim,

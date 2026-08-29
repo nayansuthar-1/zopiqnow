@@ -132,8 +132,18 @@ class FakeJobsDataSource implements JobsDataSource {
   Stream<void> watchOfferChanges(String partnerEmail) =>
       const Stream<void>.empty();
 
+  /// 0148 folded `acceptOffer` and `claim` into one call that can also come back
+  /// "wait, somebody else is reaching for this". The fake never contests —
+  /// [claimLoses] is still how a test asks for a job to be taken away.
   @override
-  Future<void> acceptOffer(String orderId) => claim(orderId);
+  Future<TakeOutcome> takeDelivery(String orderId) async {
+    await _claim(orderId);
+    return TakeOutcome.fromJson(<String, dynamic>{'state': 'won'});
+  }
+
+  @override
+  Future<TakeOutcome> resolveContest(String orderId) async =>
+      TakeOutcome.fromJson(<String, dynamic>{'state': 'won'});
 
   @override
   Future<void> declineOffer(String orderId) async {
@@ -190,8 +200,7 @@ class FakeJobsDataSource implements JobsDataSource {
   @override
   Future<List<Job>> fetchMine() async => List<Job>.unmodifiable(_mine);
 
-  @override
-  Future<void> claim(String orderId) async {
+  Future<void> _claim(String orderId) async {
     if (claimLoses) {
       throw const JobFailure('Another partner just took that one.');
     }
@@ -249,6 +258,8 @@ class FakeJobsDataSource implements JobsDataSource {
         routeKm: job.distanceKm,
         riderPay: job.riderPay,
         placedAt: job.claimedAt,
+        // An abandoned job goes back on an open board; nobody is mid-offer.
+        offeredToOther: false,
       ),
     ];
   }
@@ -451,6 +462,7 @@ JobOffer offer({
   bool isReady = true,
   double? routeKm = 4.2,
   int riderPay = 46,
+  bool offeredToOther = false,
 }) => JobOffer(
   orderId: orderId,
   restaurantName: restaurantName,
@@ -461,6 +473,7 @@ JobOffer offer({
   routeKm: routeKm,
   riderPay: riderPay,
   placedAt: DateTime.now().subtract(const Duration(minutes: 8)),
+  offeredToOther: offeredToOther,
 );
 
 Job job({

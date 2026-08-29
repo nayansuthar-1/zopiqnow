@@ -322,22 +322,46 @@ Deno.serve(async (req) => {
   //
   // Not every device may be sent one, hence the per-device check:
   //   * `rings_new_orders` is the build's own claim that it can draw the ring.
-  //     It is false for any install predating 0128, and sending *those* devices
-  //     data only would show them nothing at all while killed — a missed order
-  //     rather than a quiet one. The flag flips itself when the device updates
-  //     and re-registers its token, so this drains on its own.
+  //     It is false for any install predating the ring — 0128 for a kitchen,
+  //     0148 for a rider — and sending *those* devices data only would show them
+  //     nothing at all while killed: a missed order rather than a quiet one. The
+  //     flag flips itself when the device updates and re-registers its token, so
+  //     this drains on its own. The column is on `device_tokens` generally and
+  //     was written that way in 0128 for exactly this second reader.
   //   * iOS cannot loop a notification sound without Apple's Critical Alerts
   //     entitlement, so there is nothing to be gained by withholding the alert
   //     there; an iPhone keeps the ordinary alerting message.
-  const isNewOrder = n.audience === "restaurant" && n.kind === "new_order";
+  //
+  // **Two notifications ring, not one (0148).** A kitchen must not miss a new
+  // order and a rider must not miss the fifteen seconds they have the job to
+  // themselves — same problem, same answer, same shape of message. The rider
+  // app draws `job_offer` itself on its own `incoming_jobs` channel, exactly as
+  // the vendor app draws `new_order` on `incoming_orders`.
+  //
+  // A rider's ring is bounded by the offer's `expires_at`, which `offer_delivery`
+  // has written into `notifications.data` since 0097 and which is already
+  // flattened into `data` above — the counterpart of the kitchen's
+  // `accept_deadline` (0136). Nothing extra has to be sent for it.
+  const isRing = (n.audience === "restaurant" && n.kind === "new_order") ||
+    (n.audience === "rider" && n.kind === "job_offer");
 
-  // What a ringing device is told. `body` is carried in the data map because a
-  // data-only message has no `notification` block to read it from, and the ring
-  // still has to say which order it is about. `accept_deadline` rides in the
-  // row's own `data` (0136) and is already flattened into `data` above.
-  const ringData: Record<string, string> = { ...data, body: n.body ?? "" };
+  // What a ringing device is told. `title` and `body` are carried in the data
+  // map because a data-only message has no `notification` block to read them
+  // from, and the ring still has to say which order it is about.
+  // `accept_deadline` rides in the row's own `data` (0136) and is already
+  // flattened into `data` above.
+  //
+  // `title` is new in 0148 and is what a rider's ring reads: the kitchen's says
+  // "New order" either way, but a rider's carries the fee — "New delivery —
+  // ₹58" — and a ring that has to be tapped before it says what the job pays is
+  // a ring somebody learns to ignore.
+  const ringData: Record<string, string> = {
+    ...data,
+    title: n.title,
+    body: n.body ?? "",
+  };
 
-  // ⚠️ **One new-order notification per kitchen, not one per row.**
+  // ⚠️ **One ring per recipient, not one per row.**
   //
   // `device_tokens` is keyed by the FCM token, and a phone does not keep one for
   // life: it rotates, and a reinstall mints a new one. The app registers the new
@@ -348,20 +372,25 @@ Deno.serve(async (req) => {
   // new order sent that phone **both** shapes — the ring the app draws, and the
   // notification block Android draws for a device that says it cannot ring.
   //
-  // So a restaurant with any Android device that can ring is a restaurant that
-  // gets the ring, and its non-ringing **Android** rows are skipped rather than
-  // sent the quiet fallback. The fallback exists to protect an install that
-  // predates 0128, and this kitchen has demonstrably updated.
+  // So a recipient with any Android device that can ring is a recipient that
+  // gets the ring, and their non-ringing **Android** rows are skipped rather
+  // than sent the quiet fallback. The fallback exists to protect an install that
+  // predates the ring, and this phone has demonstrably updated.
   //
   // The cost, stated because it is real: a genuine *second* Android device still
-  // on a pre-0128 build gets no new-order push while the updated one rings. That
-  // is transitional — every launch re-registers and flips the flag — and it is
-  // the lesser fault. The kitchen is still rung; nobody is notified twice.
+  // on an older build gets no push while the updated one rings. That is
+  // transitional — every launch re-registers and flips the flag — and it is the
+  // lesser fault. The kitchen, or the rider, is still rung; nobody is notified
+  // twice.
+  //
+  // The same reasoning covers a rider's `job_offer` (0148) without a line of it
+  // changing: a rider's phone rotates its token exactly as a kitchen's does, and
+  // a rider sent both a ring and a quiet ping is the same bug.
   //
   // iOS is untouched. It cannot ring at all (no Critical Alerts entitlement), so
   // an iPhone is never the same device as a ringing Android row and always keeps
   // its alerting message.
-  const kitchenRings = isNewOrder &&
+  const recipientRings = isRing &&
     tokens.some((t) => t.platform !== "ios" && t.rings_new_orders === true);
 
   // A data-only message is delivered to a sleeping app only at high priority,
@@ -420,11 +449,11 @@ Deno.serve(async (req) => {
     // The ring, or the ordinary message. `priority: high` is what wakes a dozing
     // device to run the background isolate that draws the ring, and is not
     // optional on this branch — nothing else is coming to draw it.
-    const canRing = isNewOrder && platform !== "ios" &&
+    const canRing = isRing && platform !== "ios" &&
       rings_new_orders === true;
 
-    // A stale row for a phone that is already being rung. See `kitchenRings`.
-    if (kitchenRings && platform !== "ios" && !canRing) {
+    // A stale row for a phone that is already being rung. See `recipientRings`.
+    if (recipientRings && platform !== "ios" && !canRing) {
       skipped++;
       continue;
     }

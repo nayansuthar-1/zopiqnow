@@ -14,6 +14,7 @@ import 'package:zopiq_rider/features/jobs/presentation/pages/earnings_page.dart'
 import 'package:zopiq_rider/features/jobs/presentation/pages/home_page.dart';
 import 'package:zopiq_rider/features/jobs/presentation/providers/jobs_providers.dart';
 import 'package:zopiq_rider/features/jobs/presentation/widgets/offer_sheet.dart';
+import 'package:zopiq_rider/features/notifications/offer_ring.dart';
 
 /// Three main tabs for the Rider partner experience using custom vector SVG icons.
 class RiderShell extends ConsumerStatefulWidget {
@@ -40,15 +41,52 @@ class _RiderShellState extends ConsumerState<RiderShell> {
   /// up a bag is how an app gets uninstalled.
   static const String _batteryAskedKey = 'battery_prompt_shown';
 
+  @override
+  void initState() {
+    super.initState();
+    // The ring is answered outside the widget tree — from the tray, and for a
+    // killed app from a different isolate entirely — so it arrives as a
+    // [ValueNotifier] rather than a provider. See `OfferRing.answered`.
+    OfferRing.answered.addListener(_onRingAnswered);
+  }
+
+  @override
+  void dispose() {
+    OfferRing.answered.removeListener(_onRingAnswered);
+    super.dispose();
+  }
+
+  /// The rider tapped the ring. Put them where the job is.
+  ///
+  /// Deliberately **not** "open the offer sheet". Fifteen seconds is not long
+  /// enough to unlock a phone, so by the time this runs the window has usually
+  /// passed to the next partner — and since 0148 that no longer means the job is
+  /// gone: it is on the Jobs tab, marked as offered to somebody else, still
+  /// takeable. So this switches to that tab and refreshes it. If the countdown
+  /// did survive, [currentOfferProvider] raises the sheet over the top on its
+  /// own, exactly as it does for an offer that arrived while the app was open.
+  void _onRingAnswered() {
+    final String? orderId = OfferRing.answered.value;
+    if (orderId == null || !mounted) return;
+    OfferRing.answered.value = null;
+    setState(() => _index = 0);
+    ref
+      ..invalidate(offersProvider)
+      ..invalidate(boardProvider);
+  }
+
   /// Puts the sheet up and keeps [_showing] honest for as long as it is there.
   ///
   /// `isDismissible: false` and `enableDrag: false` on purpose, and it is the
   /// one modal in this app that refuses a swipe-away: the two answers are
   /// Accept and Decline, and a third exit that silently means "let it time out"
-  /// costs the customer forty-five seconds the rider had already decided
-  /// against. Declining is one tap and re-offers the job immediately.
+  /// costs the customer fifteen seconds the rider had already decided against.
+  /// Declining is one tap and re-offers the job immediately.
   Future<void> _raise(DeliveryOffer offer) async {
     _showing = offer.orderId;
+    // The rider is looking at the offer, so the phone has done its job and can
+    // stop ringing. Safe when nothing is ringing — see `OfferRing.stop`.
+    unawaited(OfferRing.stop());
     try {
       await showModalBottomSheet<void>(
         context: context,

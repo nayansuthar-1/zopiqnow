@@ -8,7 +8,8 @@ import 'package:zopiq_rider/core/widgets/rider_svg_icons.dart';
 import 'package:zopiq_rider/features/jobs/domain/entities/job.dart';
 import 'package:zopiq_rider/features/jobs/presentation/providers/jobs_providers.dart';
 
-/// The job, offered. Forty-five seconds to say yes or no (0056).
+/// The job, offered. Fifteen seconds in which it is this rider's alone (0148,
+/// down from 0056's forty-five, and read off `dispatch_settings`).
 ///
 /// **Why a sheet and not a card in the list.** An offer is not information, it
 /// is a question with a deadline, and a question with a deadline that a rider
@@ -17,14 +18,22 @@ import 'package:zopiq_rider/features/jobs/presentation/providers/jobs_providers.
 ///
 /// **Why the countdown is drawn from an absolute instant.** [DeliveryOffer]
 /// carries `expires_at`, not "seconds left". A phone that was in a pocket for
-/// thirty seconds opens this sheet showing fifteen, which is the truth — a timer
-/// started at `initState` would show forty-five and then hand the rider a job
-/// that was already gone.
+/// ten seconds opens this sheet showing five, which is the truth — a timer
+/// started at `initState` would show fifteen and then hand the rider a job whose
+/// window had already passed to somebody else.
 ///
-/// **What happens when it runs out.** The sheet closes itself and says nothing.
-/// It is not a failure, it is not the rider's fault, and there is nothing for
-/// them to do about it — the dispatcher has already moved on to the next
-/// partner. A toast reading "you missed a job" would be a scolding.
+/// **What happens when it runs out.** The sheet closes itself and says nothing —
+/// and since 0148 that is no longer the end of the job. The order stays on this
+/// rider's board, marked as being with somebody else, and they can still take
+/// it; if they and the current offeree both do, the one nearer the restaurant
+/// gets it. So the closing sheet is a handover to the board behind it rather
+/// than a loss, and a toast reading "you missed a job" would be both a scolding
+/// and untrue.
+///
+/// **What Accept can now say back.** On a contested job the answer is not
+/// immediate: the platform holds two seconds, collects everyone reaching for it,
+/// and awards it to the nearest. [_contested] is that wait, and it is why the
+/// button changes its label rather than only spinning.
 class OfferSheet extends ConsumerStatefulWidget {
   const OfferSheet({required this.offer, super.key});
 
@@ -39,6 +48,9 @@ class _OfferSheetState extends ConsumerState<OfferSheet> {
   late Duration _left;
   bool _busy = false;
 
+  /// True for the two seconds a contested accept is being decided (0148).
+  bool _contested = false;
+
   @override
   void initState() {
     super.initState();
@@ -49,7 +61,11 @@ class _OfferSheetState extends ConsumerState<OfferSheet> {
       if (!mounted) return;
       final Duration left = widget.offer.remaining(DateTime.now());
       setState(() => _left = left);
-      if (left == Duration.zero) _close();
+      // Not while an accept is in flight. A contested accept is decided up to
+      // two seconds after the tap, which can be two seconds after the window
+      // shut — and closing the sheet out from under it would leave the verdict
+      // with nowhere to be shown.
+      if (left == Duration.zero && !_busy) _close();
     });
   }
 
@@ -68,9 +84,22 @@ class _OfferSheetState extends ConsumerState<OfferSheet> {
     setState(() => _busy = true);
     final String? failure = await ref
         .read(jobsControllerProvider.notifier)
-        .acceptOffer(widget.offer.orderId);
+        .take(
+          widget.offer.orderId,
+          // Somebody else is reaching for this one too, and the platform is
+          // about to decide it on who is nearer the kitchen rather than who
+          // tapped first (0148). Two seconds of "Confirming…" is short, but a
+          // spinner that says nothing for two seconds at a rider standing over
+          // a bike reads as a broken button.
+          onContested: () {
+            if (mounted) setState(() => _contested = true);
+          },
+        );
     if (!mounted) return;
-    setState(() => _busy = false);
+    setState(() {
+      _busy = false;
+      _contested = false;
+    });
     _close();
     if (failure != null) {
       ScaffoldMessenger.of(context)
@@ -238,7 +267,11 @@ class _OfferSheetState extends ConsumerState<OfferSheet> {
                 Expanded(
                   flex: 2,
                   child: ZopiqButton(
-                    label: 'Accept',
+                    // "Confirming…" is only ever shown when somebody else is
+                    // reaching for the same job, so it is information and not
+                    // decoration: it is the two seconds in which being nearer
+                    // the restaurant is about to win or lose it.
+                    label: _contested ? 'Confirming…' : 'Accept',
                     variant: ZopiqButtonVariant.cta,
                     isLoading: _busy,
                     onPressed: _busy ? null : _accept,
