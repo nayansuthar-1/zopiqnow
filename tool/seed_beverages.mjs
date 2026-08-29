@@ -165,7 +165,11 @@ async function upload(slug, file, { cloud, key, secret }) {
     // rail draws them all into one box, so a bottle that is not normalised here
     // is a bottle cropped at the neck there. `c_pad` never crops: it fits the
     // whole bottle and fills the rest, which is what a packshot wants.
-    transformation: 'c_pad,w_800,h_800,b_white',
+    // 600 and not 800: several of the supplied packshots are ~200px search
+    // thumbnails, and the canvas is the upscale factor. The rail draws the art
+    // at 118dp — about 354px on a 3x phone — so 600 still has pixels to spare
+    // while asking a 225px Limca to stretch less than half as far.
+    transformation: 'c_pad,w_600,h_600,b_white',
   }
   const form = new FormData()
   form.set('file', file)
