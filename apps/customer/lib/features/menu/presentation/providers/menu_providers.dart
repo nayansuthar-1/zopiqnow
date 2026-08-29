@@ -134,18 +134,18 @@ browsableMenuProvider = FutureProvider.autoDispose
 /// thing somebody looks for and half the dishes that have it do not say so in
 /// their name.
 ///
-/// **The seeded bottled drinks are not in here while the customer is browsing.**
-/// Migration 0140 put sixteen of them on every kitchen, which is sixteen tiles of
-/// fridge between somebody and the food they opened the menu for. They are
-/// offered instead where a drink is actually a thought — the strip after a dish
-/// goes in the cart, and the rail on the cart page — which is what
-/// `beveragesProvider` reads [menuProvider] (not this) for.
+/// **The seeded bottled drinks are never in here.** Migration 0140 put sixteen
+/// of them on every kitchen, which is sixteen tiles of fridge between somebody
+/// and the food they opened the menu for. They are offered only where a drink is
+/// an addition to a meal — the strip after a dish goes in the cart, and the rail
+/// on the cart page — which is what `beveragesProvider` reads [menuProvider]
+/// (not this) for.
 ///
-/// **A typed search still finds them.** Hiding a Coke from somebody who has
-/// typed "coke" is not decluttering, it is a dead end, and the same reasoning
-/// put the cart rail on an empty cart. So the drinks come back the moment the
-/// query is non-empty, and only then — the veg and bestseller switches are ways
-/// of browsing, not of asking for a drink by name.
+/// **Not even a typed search brings them back.** An earlier pass let a query
+/// through on the reasoning that somebody typing "coke" is asking by name; the
+/// instruction is that these are an add-on rather than a product, and a search
+/// result is a way of finding one. So the filter is unconditional, which also
+/// means it is one clause to remove if that is ever reconsidered.
 final AutoDisposeFutureProviderFamily<List<MenuCategory>, String>
 filteredMenuProvider = FutureProvider.autoDispose
     .family<List<MenuCategory>, String>((Ref ref, String restaurantId) async {
@@ -158,13 +158,10 @@ filteredMenuProvider = FutureProvider.autoDispose
       final String query = ref.watch(menuSearchProvider).trim().toLowerCase();
       final String? focused = ref.watch(focusedCategoryProvider);
 
-      // Only a typed query brings the bottled drinks back. Note there is no
-      // early return for "no filters" any more: hiding them *is* a filter, and
-      // it applies to the plain menu above all.
-      final bool showDrinks = query.isNotEmpty;
-
+      // Note there is no early return for "no filters" any more: hiding the
+      // drinks *is* a filter, and it applies to the plain menu above all.
       bool keep(MenuItem i) =>
-          (showDrinks || !i.isBottledDrink) &&
+          !i.isBottledDrink &&
           (!vegOnly || i.isVeg) &&
           (!bestsellersOnly || i.isBestseller) &&
           (query.isEmpty ||

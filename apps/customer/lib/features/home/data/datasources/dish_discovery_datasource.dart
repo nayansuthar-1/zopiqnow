@@ -160,10 +160,18 @@ class DishDiscoveryDataSource {
   /// among the hits is the client's job — this returns candidates, and
   /// `rankDishes` decides which of them the customer reads first.
   ///
-  /// **The bottled drinks stay in here**, unlike the two queries above and
-  /// unlike the menu's own browse filter. Somebody who has typed "coke" is
-  /// asking for one by name, and answering that with nothing is a dead end
-  /// rather than a tidier screen. Hidden while browsing, found when sought.
+  /// **The bottled drinks are excluded here too**, like everywhere else.
+  ///
+  /// This one had an argument for the other side and lost it: somebody typing
+  /// "coke" is asking by name, and answering with nothing is a dead end. But the
+  /// instruction is that the seeded drinks are an add-on and not a product —
+  /// they exist to be offered alongside food, not to be found, browsed or
+  /// recommended — and a search result is a way of finding one.
+  ///
+  /// The consequence, stated rather than buried: **a drink cannot be ordered on
+  /// its own.** The only routes to one are the strip after a dish goes in the
+  /// cart and the rail on the cart page, and both require food in the basket
+  /// first. Deleting this one filter is what reverses that.
   Future<List<DishRow>> search(String query, {int limit = 40}) async {
     final String needle = _sanitize(query);
     if (needle.isEmpty) return const <DishRow>[];
@@ -176,6 +184,7 @@ class DishDiscoveryDataSource {
           'category.ilike.%$needle%,'
           'description.ilike.%$needle%',
         )
+        .not('id', 'like', _bottledDrinkIdPrefix)
         .order('is_bestseller', ascending: false)
         .order('rating', ascending: false, nullsFirst: false)
         .limit(limit);
