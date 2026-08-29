@@ -65,3 +65,8 @@ dist/
 # App Store Connect API private keys — one download, never recoverable, and
 # whoever holds one can push builds to the store listing.
 *.p8
+
+# Gradle build state. Committed by accident into packages/zopiq_live_card;
+# it re-dirties on every build, which collides with the rule that a release
+# never ships from a dirty tree.
+.gradle/
