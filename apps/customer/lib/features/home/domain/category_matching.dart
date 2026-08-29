@@ -94,19 +94,39 @@ bool dishMatchesCategory(
   DishSuggestion dish,
   FoodCategory category,
   List<FoodCategory> vocabulary,
-) {
+) => namedDishMatchesCategory(
+  name: dish.item.name,
+  section: dish.category,
+  category: category,
+  vocabulary: vocabulary,
+);
+
+/// The matching rule itself, over the only two things it has ever read: the
+/// dish's name and the menu section it sits in.
+///
+/// Extracted from [dishMatchesCategory] so that a caller holding those two
+/// strings and nothing else can ask the same question. That caller is
+/// `orderByPopularity`, which buckets sold order lines into tiles — an
+/// `order_items` row carries a frozen name and no `MenuItem` at all, and
+/// building a fake [DishSuggestion] to satisfy a signature would have meant a
+/// second copy of this rule, free to drift from this one. There is one rule and
+/// two ways in.
+bool namedDishMatchesCategory({
+  required String name,
+  required String section,
+  required FoodCategory category,
+  required List<FoodCategory> vocabulary,
+}) {
   final List<String> terms = categoryTerms(category);
-  final bool inSection = terms.any(
-    (String t) => hasTerm(dish.category, t),
-  );
+  final bool inSection = terms.any((String t) => hasTerm(section, t));
 
   // A cuisine is not a property of a dish's name — a kitchen filing something
   // under "Chinese Spl." is the only claim being made, and its pizzas are not
   // Chinese just because it also cooks Chinese food.
   if (category.kind == FoodCategoryKind.cuisine) return inSection;
 
-  if (terms.any((String t) => hasTerm(dish.item.name, t))) return true;
-  return inSection && !_claimedByAnother(dish, category, vocabulary);
+  if (terms.any((String t) => hasTerm(name, t))) return true;
+  return inSection && !_nameClaimedByAnother(name, category, vocabulary);
 }
 
 /// Whether the dish's own name names some *other* tile.
@@ -120,13 +140,13 @@ bool dishMatchesCategory(
 /// Cuisine tiles are skipped: their sections are what the dishes inside them are
 /// *for*, so a dosa filed under "South Indian" must stay there even though the
 /// Dosa tile also claims it.
-bool _claimedByAnother(
-  DishSuggestion dish,
+bool _nameClaimedByAnother(
+  String name,
   FoodCategory category,
   List<FoodCategory> vocabulary,
 ) => vocabulary.any(
   (FoodCategory other) =>
       other.kind == FoodCategoryKind.dish &&
       other.id != category.id &&
-      categoryTerms(other).any((String t) => hasTerm(dish.item.name, t)),
+      categoryTerms(other).any((String t) => hasTerm(name, t)),
 );

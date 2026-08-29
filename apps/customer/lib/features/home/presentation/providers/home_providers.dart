@@ -2,12 +2,14 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:zopiqnow/features/account/presentation/providers/veg_mode_provider.dart';
+import 'package:zopiqnow/features/home/data/datasources/dish_popularity_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/hero_slide_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/home_catalog_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_photos_datasource.dart';
 import 'package:zopiqnow/features/home/data/datasources/restaurant_supabase_datasource.dart';
 import 'package:zopiqnow/features/home/data/repositories/restaurant_repository_impl.dart';
+import 'package:zopiqnow/features/home/domain/category_popularity.dart';
 import 'package:zopiqnow/features/home/domain/entities/food_category.dart';
 import 'package:zopiqnow/features/home/domain/geo_distance.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
@@ -166,10 +168,43 @@ final FutureProvider<List<HeroSlide>> heroSlidesProvider =
 final Provider<HomeCatalogDataSource> homeCatalogDataSourceProvider =
     Provider<HomeCatalogDataSource>((Ref ref) => const HomeCatalogDataSource());
 
-final Provider<List<FoodCategory>> foodCategoriesProvider =
-    Provider<List<FoodCategory>>(
-      (Ref ref) => ref.watch(homeCatalogDataSourceProvider).fetchCategories(),
+final Provider<DishPopularityDataSource> dishPopularityDataSourceProvider =
+    Provider<DishPopularityDataSource>(
+      (Ref ref) => const DishPopularityDataSource(),
     );
+
+/// Units sold per dish over the last quarter (migration 0145), for the tiles to
+/// sort by.
+///
+/// Not `autoDispose`: it is one small aggregate read that every home rebuild and
+/// every "View More" sheet wants, and re-fetching it each time the rail scrolls
+/// out of view would be a request per glance.
+final FutureProvider<List<DishOrderCount>> dishOrderCountsProvider =
+    FutureProvider<List<DishOrderCount>>(
+      (Ref ref) => ref.watch(dishPopularityDataSourceProvider).fetchCounts(),
+    );
+
+/// The category rail, most-ordered food first.
+///
+/// `valueOrNull ?? const []` rather than an `AsyncValue`, so the tiles render in
+/// their shipped order on the first frame and settle into the popular order when
+/// the counts land. The alternative is a shimmering rail on every cold start, to
+/// decide the order of tiles the customer can already see — a spinner in front of
+/// content that is ready is a worse answer than content in a slightly different
+/// order for one frame.
+final Provider<List<FoodCategory>> foodCategoriesProvider =
+    Provider<List<FoodCategory>>((Ref ref) {
+      final List<FoodCategory> shipped = ref
+          .watch(homeCatalogDataSourceProvider)
+          .fetchCategories();
+
+      return orderByPopularity(
+        categories: shipped,
+        counts: ref.watch(dishOrderCountsProvider).valueOrNull ??
+            const <DishOrderCount>[],
+        vocabulary: ref.watch(allFoodCategoriesProvider),
+      );
+    });
 
 /// Every tile the app ships, both rails, unfiltered and without "View More".
 ///
@@ -201,11 +236,21 @@ final Provider<List<FoodCategory>> moreFoodCategoriesProvider =
           .watch(homeCatalogDataSourceProvider)
           .fetchMoreCategories();
 
-      return ref.watch(vegModeProvider)
+      final List<FoodCategory> visible = ref.watch(vegModeProvider)
           ? all
                 .where((FoodCategory category) => category.isVeg)
                 .toList(growable: false)
           : all;
+
+      // Sorted by the same rule as the rail. The sheet is the rest of the same
+      // list, and two orders for one vocabulary would mean Pizza leading the
+      // rail while the sheet still opened on whatever was written first.
+      return orderByPopularity(
+        categories: visible,
+        counts: ref.watch(dishOrderCountsProvider).valueOrNull ??
+            const <DishOrderCount>[],
+        vocabulary: ref.watch(allFoodCategoriesProvider),
+      );
     });
 
 final Provider<List<Offer>> offersProvider = Provider<List<Offer>>(

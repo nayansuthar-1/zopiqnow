@@ -28,6 +28,16 @@ class DishDiscoveryDataSource {
   /// `restaurant_id` to join on, `category` to rank by.
   static const String _columns = '$menuItemColumns, restaurant_id, category';
 
+  /// The id prefix migration 0140 mints every seeded bottled drink with, and the
+  /// server-side half of `MenuItem.isBottledDrink`.
+  ///
+  /// Stated once here because two of the three queries below exclude it and one
+  /// deliberately does not. It is filtered in SQL rather than in Dart because
+  /// there are 192 of these rows against [fetchPool]'s ceiling of 600 — a third
+  /// of the payload, fetched over mobile data to be dropped on arrival, which is
+  /// the exact shape of the bug the `restaurantIds` scope already fixed once.
+  static const String _bottledDrinkIdPrefix = 'bev-%';
+
   /// Candidate dishes for the Recommended rail, from the kitchens in
   /// [restaurantIds] and no others.
   ///
@@ -72,6 +82,15 @@ class DishDiscoveryDataSource {
         .from('menu_items')
         .select(_columns)
         .inFilter('restaurant_id', restaurantIds)
+        // No bottled drinks in "Recommended for you". The menu feed stopped
+        // drawing them and this rail did not, so the first two recommendations
+        // on the home screen were a Limca and a Maaza — the platform
+        // recommending its own seeded stock over the food a kitchen cooks.
+        //
+        // They are not ranked out, they are excluded: `rankDishes` re-sorts
+        // against the phone's search history, and a customer with no history
+        // gets the pool order, which these sort near the top of.
+        .not('id', 'like', _bottledDrinkIdPrefix)
         // `ascending` is stated on every order in this app: postgrest-dart
         // defaults it to DESCENDING, which is what the first two want but is not
         // something a reader should have to know.
@@ -122,6 +141,11 @@ class DishDiscoveryDataSource {
         .from('menu_items')
         .select(_columns)
         .or(filter)
+        // As in [fetchPool]. No tile means "cold drink" today — the drink-ish
+        // ones are Shake, Lassi and Cold Coffee, all made to order — so this
+        // empties nothing; it stops a seeded Limca turning up under Ice Cream
+        // because both sit in a section somebody called "Beverages".
+        .not('id', 'like', _bottledDrinkIdPrefix)
         .order('is_bestseller', ascending: false)
         .order('id', ascending: true)
         .limit(limit);
@@ -135,6 +159,11 @@ class DishDiscoveryDataSource {
   /// find a dish whose description is the only place the word appears. Ranking
   /// among the hits is the client's job — this returns candidates, and
   /// `rankDishes` decides which of them the customer reads first.
+  ///
+  /// **The bottled drinks stay in here**, unlike the two queries above and
+  /// unlike the menu's own browse filter. Somebody who has typed "coke" is
+  /// asking for one by name, and answering that with nothing is a dead end
+  /// rather than a tidier screen. Hidden while browsing, found when sought.
   Future<List<DishRow>> search(String query, {int limit = 40}) async {
     final String needle = _sanitize(query);
     if (needle.isEmpty) return const <DishRow>[];
