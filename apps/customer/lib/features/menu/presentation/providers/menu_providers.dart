@@ -98,12 +98,54 @@ restaurantOffersProvider =
       }
     });
 
+/// The menu as it can actually be browsed — everything [menuProvider] returns,
+/// less the seeded bottled drinks, less any section they emptied.
+///
+/// Exists for the floating Menu button, which lists sections deliberately
+/// *un*filtered so a customer can reach one the veg switch is hiding. That
+/// argument does not extend to the drinks: they are not hidden by a switch the
+/// customer can flick, so a "Beverages" entry that scrolls to nothing is a dead
+/// control. On the ten kitchens whose `Beverages` section holds only seeded
+/// drinks the entry disappears; on the two that also stock a made-to-order drink
+/// it stays and lists that.
+final AutoDisposeFutureProviderFamily<List<MenuCategory>, String>
+browsableMenuProvider = FutureProvider.autoDispose
+    .family<List<MenuCategory>, String>((Ref ref, String restaurantId) async {
+      final List<MenuCategory> menu = await ref.watch(
+        menuProvider(restaurantId).future,
+      );
+
+      final List<MenuCategory> result = <MenuCategory>[];
+      for (final MenuCategory c in menu) {
+        final List<MenuItem> kept = c.items
+            .where((MenuItem i) => !i.isBottledDrink)
+            .toList(growable: false);
+        if (kept.isNotEmpty) {
+          result.add(MenuCategory(title: c.title, items: kept));
+        }
+      }
+      return result;
+    });
+
 /// The menu with the screen's filters applied, dropping categories that end up
 /// empty so it never renders a heading over nothing.
 ///
 /// Search matches a dish's name **or** its description, because "cheese" is a
 /// thing somebody looks for and half the dishes that have it do not say so in
 /// their name.
+///
+/// **The seeded bottled drinks are not in here while the customer is browsing.**
+/// Migration 0140 put sixteen of them on every kitchen, which is sixteen tiles of
+/// fridge between somebody and the food they opened the menu for. They are
+/// offered instead where a drink is actually a thought — the strip after a dish
+/// goes in the cart, and the rail on the cart page — which is what
+/// `beveragesProvider` reads [menuProvider] (not this) for.
+///
+/// **A typed search still finds them.** Hiding a Coke from somebody who has
+/// typed "coke" is not decluttering, it is a dead end, and the same reasoning
+/// put the cart rail on an empty cart. So the drinks come back the moment the
+/// query is non-empty, and only then — the veg and bestseller switches are ways
+/// of browsing, not of asking for a drink by name.
 final AutoDisposeFutureProviderFamily<List<MenuCategory>, String>
 filteredMenuProvider = FutureProvider.autoDispose
     .family<List<MenuCategory>, String>((Ref ref, String restaurantId) async {
@@ -115,11 +157,14 @@ filteredMenuProvider = FutureProvider.autoDispose
       final bool bestsellersOnly = ref.watch(bestsellersOnlyProvider);
       final String query = ref.watch(menuSearchProvider).trim().toLowerCase();
       final String? focused = ref.watch(focusedCategoryProvider);
-      if (!vegOnly && !bestsellersOnly && query.isEmpty && focused == null) {
-        return menu;
-      }
+
+      // Only a typed query brings the bottled drinks back. Note there is no
+      // early return for "no filters" any more: hiding them *is* a filter, and
+      // it applies to the plain menu above all.
+      final bool showDrinks = query.isNotEmpty;
 
       bool keep(MenuItem i) =>
+          (showDrinks || !i.isBottledDrink) &&
           (!vegOnly || i.isVeg) &&
           (!bestsellersOnly || i.isBestseller) &&
           (query.isEmpty ||

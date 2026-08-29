@@ -10,6 +10,7 @@ import 'package:zopiqnow/features/menu/domain/entities/menu_category.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
 import 'package:zopiqnow/features/menu/domain/repositories/menu_repository.dart';
 import 'package:zopiqnow/features/menu/presentation/providers/menu_providers.dart';
+import 'package:zopiqnow/features/menu/presentation/widgets/beverage_upsell.dart';
 import 'package:zopiqnow/features/menu/presentation/widgets/menu_filter_bar.dart';
 import 'package:zopiqnow/features/menu/presentation/widgets/menu_header.dart';
 import 'package:zopiqnow/features/menu/presentation/widgets/menu_item_tile.dart';
@@ -119,6 +120,29 @@ class _MenuBody extends ConsumerWidget {
                 );
               },
             ),
+            // The bottled drinks, once, under all the food — the only route to
+            // one for somebody who wants a drink and nothing else.
+            //
+            // They are no longer tiles in the sections above, and this is what
+            // keeps that from being a dead end. The cart page's rail cannot
+            // serve this case: emptying a cart resets it to `Cart.empty()`,
+            // which carries no `restaurantId`, so an empty cart does not know
+            // which kitchen's fridge to show. Here the kitchen is the page.
+            //
+            // Draws nothing when the kitchen stocks no bottled drink, and is
+            // hidden mid-search, where the matching drinks are already in the
+            // results above and this would list them a second time.
+            if (ref.watch(menuSearchProvider).trim().isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: ZopiqSpacing.md),
+                  child: BeverageRail(
+                    restaurantId: restaurant.id,
+                    restaurantName: restaurant.name,
+                    heading: 'Add a drink',
+                  ),
+                ),
+              ),
             // Breathing room so neither the cart bar nor the Menu button ever
             // covers the last dish.
             const SliverToBoxAdapter(child: SizedBox(height: 96)),
@@ -142,10 +166,15 @@ class _MenuJumpButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // The *whole* menu, not the filtered one: this is how a customer reaches a
-    // section, so it has to list the sections a filter has hidden.
+    // The whole menu rather than the filtered one: this is how a customer
+    // reaches a section, so it has to list the sections a filter has hidden.
+    //
+    // `browsableMenuProvider` and not `menuProvider`, though — the seeded
+    // bottled drinks are not hidden by a switch the customer can flick, so a
+    // "Beverages" entry pointing at nothing but them is a control that does
+    // nothing when tapped.
     final List<MenuCategory> categories =
-        ref.watch(menuProvider(restaurantId)).valueOrNull ??
+        ref.watch(browsableMenuProvider(restaurantId)).valueOrNull ??
         const <MenuCategory>[];
     // One section is not a menu to navigate.
     if (categories.length < 2) return const SizedBox.shrink();

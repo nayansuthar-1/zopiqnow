@@ -66,6 +66,20 @@ class MenuItem {
 
   bool get isCustomizable => optionGroups.isNotEmpty;
 
+  /// A sealed bottled soft drink seeded onto every kitchen by migration 0140,
+  /// as against a lassi or a shake the kitchen actually makes.
+  ///
+  /// The id prefix is the test because it is the only thing that distinguishes
+  /// them: they sit in the same `Beverages` section as two pre-existing
+  /// made-to-order drinks, so the section name cannot tell them apart. 0140
+  /// mints every one as `bev-<restaurant>-<slug>-<size>`.
+  ///
+  /// **A drink a vendor adds themselves is deliberately not one of these.** It
+  /// gets an ordinary id, stays in the menu feed, and is theirs to sell like any
+  /// other item — which is right: this flag marks the platform's own seeded
+  /// range, not the idea of a beverage.
+  bool get isBottledDrink => id.startsWith('bev-');
+
   Map<String, dynamic> toJson() => <String, dynamic>{
         'id': id,
         'name': name,
