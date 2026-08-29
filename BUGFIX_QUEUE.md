@@ -227,11 +227,17 @@ accepted any non-empty string as `payment_id`.
 
 **What made it urgent rather than theoretical:** the keys went in on **25 August**
 and the statement was never run. `razorpay-order` had been answering
-`configured: true` for four days, the mock fallback was unreachable, real captures
-were landing (ZPQ-1185…1189, by card and UPI), and the door this item describes was
-open the whole time. Anybody signed in could call `place_order` over PostgREST with
+`configured: true` for four days, the mock fallback was unreachable, payments were
+going through it (ZPQ-1185…1189), and the door this item describes was open the
+whole time. Anybody signed in could call `place_order` over PostgREST with
 `p_payment_id: 'anything'` and eat for free. The app was never the attack surface;
 the RPC is, and it is `authenticated`-executable by design.
+
+**Severity, stated honestly:** the keys are `rzp_test_…`, so **no real money has
+moved** and nothing was being stolen. What those four days demonstrate is exactly
+what this item predicted — arming is a separate manual statement and nothing fails
+loudly when it is forgotten. Armed now so that switching to live keys is one step
+instead of two.
 
 **Now:** armed. Verified against the live schema, every case rolled back:
 

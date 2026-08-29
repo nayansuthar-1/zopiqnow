@@ -644,9 +644,17 @@ revoke all on function public.admin_actions_are_append_only() from public, anon,
 --
 -- **It stopped being correct on 25 August**, when the Razorpay keys were set.
 -- `razorpay-order` now answers `configured: true`, so `RazorpayPaymentGateway`
--- never reaches its fallback and real money is being captured — orders ZPQ-1185
--- through ZPQ-1189 were paid by card and UPI and their intents verified. With
--- the gate still down, anyone signed in can call `place_order` over PostgREST
+-- never reaches its fallback and the gateway is genuinely in the path — orders
+-- ZPQ-1185 through ZPQ-1189 went through it and had their intents verified.
+--
+-- The keys are `rzp_test_…`, so **no real money has moved yet** and this was not
+-- costing anything today. It is armed now rather than on the day live keys go in
+-- for the reason P4 in `BUGFIX_QUEUE.md` gives: arming is a separate manual
+-- statement that nothing fails loudly about, and the four days between the test
+-- keys landing and this file are the demonstration that it gets forgotten. Doing
+-- it now means the switch to live keys is one step and not two.
+--
+-- With the gate down, anyone signed in can call `place_order` over PostgREST
 -- with `p_payment_id: 'anything'` and get the food for nothing. The app is not
 -- the attack surface; the RPC is, and it is `authenticated`-executable by
 -- design.
