@@ -36,19 +36,23 @@ import { loadEnv } from './env.mjs'
 // The drinks.
 // ---------------------------------------------------------------------------
 // `liquid` is what is in the bottle, `label` the band around its middle, `cap`
-// the closure. Sprite and 7 Up are both clear-and-green and Fanta and Mirinda
-// both orange, so each pair is pulled apart deliberately — Sprite's darker
-// green against 7 Up's brighter one, Fanta's red-orange against Mirinda's
-// yellow-orange — rather than rendering two identical cards.
+// the closure — matched to the Indian packs rather than to each brand's logo,
+// which is not the same thing. The caps are the part worth getting right and
+// the part most easily assumed: Sprite and Fanta both close **blue**, Thums Up
+// wears a dark blue label with its red mark on it rather than a red one, and
+// Maaza is red-and-yellow, not the orange-and-green a mango drink suggests.
+//
+// Sprite and 7 Up are still both clear-and-green, so they are pulled apart on
+// the cap — Sprite blue, 7 Up green — rather than rendering two identical cards.
 const DRINKS = [
   { slug: 'coca-cola', name: 'Coca Cola', liquid: '#3B1A10', label: '#E4002B', cap: '#E4002B' },
-  { slug: 'thums-up', name: 'Thums Up', liquid: '#3B1A10', label: '#C8102E', cap: '#003876' },
-  { slug: 'sprite', name: 'Sprite', liquid: '#E4F3E7', label: '#006F44', cap: '#006F44' },
-  { slug: 'limca', name: 'Limca', liquid: '#EAF4E4', label: '#0E7A3C', cap: '#E4002B' },
-  { slug: 'fanta', name: 'Fanta', liquid: '#F26522', label: '#F26522', cap: '#F26522' },
-  { slug: 'mirinda', name: 'Mirinda', liquid: '#FFA400', label: '#FF8200', cap: '#F57C00' },
-  { slug: '7up', name: '7Up', liquid: '#E8F5E9', label: '#00A94F', cap: '#00A94F' },
-  { slug: 'maaza', name: 'Maaza', liquid: '#F2A32C', label: '#F08C1A', cap: '#14532D' },
+  { slug: 'thums-up', name: 'Thums Up', liquid: '#3B1A10', label: '#16306B', cap: '#1B4BA0' },
+  { slug: 'sprite', name: 'Sprite', liquid: '#DCEFE0', label: '#00A651', cap: '#1B4BA0' },
+  { slug: 'limca', name: 'Limca', liquid: '#EDF3E8', label: '#5BA829', cap: '#0E7A3C' },
+  { slug: 'fanta', name: 'Fanta', liquid: '#F26522', label: '#F26522', cap: '#1B4BA0' },
+  { slug: 'mirinda', name: 'Mirinda', liquid: '#F58A18', label: '#EE7203', cap: '#EE7203' },
+  { slug: '7up', name: '7Up', liquid: '#DFF0E2', label: '#00954E', cap: '#00954E' },
+  { slug: 'maaza', name: 'Maaza', liquid: '#E8850F', label: '#D0202A', cap: '#F0A81E' },
 ]
 
 // ---------------------------------------------------------------------------
