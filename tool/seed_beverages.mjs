@@ -18,12 +18,16 @@
 // old art orphaned and the new art unreferenced.
 //
 // Usage:
-//   node tool/seed_beverages.mjs            # draw and upload all eight
-//   node tool/seed_beverages.mjs --dry-run  # write the SVGs locally, upload nothing
-//   node tool/seed_beverages.mjs --sql      # print the image_url map as SQL
+//   node tool/seed_beverages.mjs                    # draw and upload all eight
+//   node tool/seed_beverages.mjs --photos <dir>     # upload real photographs instead
+//   node tool/seed_beverages.mjs --dry-run          # write the SVGs locally, upload nothing
+//
+// `--photos` looks for `<slug>.{jpg,jpeg,png,webp}` — coca-cola, thums-up,
+// sprite, limca, fanta, mirinda, 7up, maaza — and falls back to the drawing for
+// any drink it cannot find, so the set is never half-missing.
 
 import { createHash } from 'node:crypto'
-import { writeFile, mkdir } from 'node:fs/promises'
+import { writeFile, mkdir, readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 
 import { loadEnv } from './env.mjs'
@@ -140,7 +144,7 @@ function sign(params, secret) {
   return createHash('sha1').update(base + secret).digest('hex')
 }
 
-async function upload(slug, svg, { cloud, key, secret }) {
+async function upload(slug, file, { cloud, key, secret }) {
   const params = {
     format: 'jpg', // rasterise on the way in — Image.network gets no say in SVG
     // Purge the CDN copy. Without this an overwrite is invisible for hours:
@@ -151,9 +155,16 @@ async function upload(slug, svg, { cloud, key, secret }) {
     overwrite: 'true',
     public_id: `zopiqnow/beverages/${slug}`,
     timestamp: String(Math.floor(Date.now() / 1000)),
+    // Every drink ends up the same square on the same white ground, whatever
+    // shape it arrived in. Product photographs come in wildly different
+    // proportions — a 2 L bottle shot portrait next to a squat Maaza — and the
+    // rail draws them all into one box, so a bottle that is not normalised here
+    // is a bottle cropped at the neck there. `c_pad` never crops: it fits the
+    // whole bottle and fills the rest, which is what a packshot wants.
+    transformation: 'c_pad,w_800,h_800,b_white',
   }
   const form = new FormData()
-  form.set('file', `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`)
+  form.set('file', file)
   form.set('api_key', key)
   form.set('signature', sign(params, secret))
   for (const [k, v] of Object.entries(params)) form.set(k, v)
@@ -175,10 +186,31 @@ async function upload(slug, svg, { cloud, key, secret }) {
 }
 
 // ---------------------------------------------------------------------------
+/// A real photograph for [slug] in [dir], as a data URI, or null if there is
+/// none. Matched case-insensitively and by any common extension, because these
+/// files arrive from a phone or a download folder and not from a build step.
+async function photoFor(slug, dir, names) {
+  const wanted = /\.(jpe?g|png|webp)$/i
+  const hit = names.find(
+    (n) => wanted.test(n) && n.slice(0, n.lastIndexOf('.')).toLowerCase() === slug,
+  )
+  if (!hit) return null
+  const bytes = await readFile(path.join(dir, hit))
+  const ext = hit.slice(hit.lastIndexOf('.') + 1).toLowerCase()
+  const mime = ext === 'png' ? 'png' : ext === 'webp' ? 'webp' : 'jpeg'
+  return `data:image/${mime};base64,${bytes.toString('base64')}`
+}
+
 async function main() {
   await loadEnv()
   const dryRun = process.argv.includes('--dry-run')
-  const asSql = process.argv.includes('--sql')
+
+  const photoFlag = process.argv.indexOf('--photos')
+  const photoDir = photoFlag === -1 ? null : process.argv[photoFlag + 1]
+  if (photoFlag !== -1 && !photoDir) {
+    throw new Error('--photos needs a directory')
+  }
+  const photoNames = photoDir ? await readdir(photoDir) : []
 
   const out = path.resolve(import.meta.dirname, '..', 'build', 'beverages')
   if (dryRun) await mkdir(out, { recursive: true })
@@ -193,10 +225,14 @@ async function main() {
   }
 
   const urls = {}
+  let drawn = 0
   for (const drink of DRINKS) {
-    const svg = svgFor(drink)
+    const photo = photoDir ? await photoFor(drink.slug, photoDir, photoNames) : null
+    if (!photo) drawn++
+    const source = photo ?? `data:image/svg+xml;base64,${Buffer.from(svgFor(drink)).toString('base64')}`
+
     if (dryRun) {
-      await writeFile(path.join(out, `${drink.slug}.svg`), svg, 'utf8')
+      await writeFile(path.join(out, `${drink.slug}.svg`), svgFor(drink), 'utf8')
       urls[drink.slug] = `(dry run) ${drink.slug}.svg`
     } else {
       // Cloudinary's `fetch` has thrown a bare "fetch failed" on a first call
@@ -204,7 +240,7 @@ async function main() {
       let url
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          url = await upload(drink.slug, svg, creds)
+          url = await upload(drink.slug, source, creds)
           break
         } catch (err) {
           if (attempt === 3) throw err
@@ -213,12 +249,16 @@ async function main() {
       }
       urls[drink.slug] = url
     }
-    console.error(`${drink.name.padEnd(12)} ${urls[drink.slug]}`)
+    const kind = photo ? 'photo' : 'drawn'
+    console.error(`${drink.name.padEnd(12)} ${kind.padEnd(6)} ${urls[drink.slug]}`)
   }
 
-  if (asSql) {
-    console.log('-- image_url per drink, generated by tool/seed_beverages.mjs')
-    for (const d of DRINKS) console.log(`--   ${d.name.padEnd(12)} ${urls[d.slug]}`)
+  // Say it plainly rather than leaving a silent fallback to be discovered on a
+  // phone: a missing file means a drawing shipped where a photograph was meant.
+  if (photoDir && drawn > 0) {
+    console.error(
+      `\n${drawn} of ${DRINKS.length} had no photograph in ${photoDir} and were drawn instead.`,
+    )
   }
 }
 

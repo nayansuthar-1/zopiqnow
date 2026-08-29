@@ -131,7 +131,7 @@ class BeverageRail extends ConsumerWidget {
 
   /// Tall enough for the art, two lines of name and the ADD control, which is
   /// the whole card — a horizontal `ListView` needs the number up front.
-  static const double _railHeight = 178;
+  static const double _railHeight = 200;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -220,7 +220,11 @@ class _BeverageCard extends ConsumerWidget {
           ClipRRect(
             borderRadius: ZopiqRadii.rSm,
             child: SizedBox(
-              height: 92,
+              // Square, matching the square every image is padded into on
+              // upload (`c_pad,w_800,h_800`). A bottle is tall and the art is
+              // letterboxed white around it, so a landscape box here would crop
+              // that padding off and take the cap and the base with it.
+              height: _width,
               width: _width,
               child: item.imageUrl.isEmpty
                   ? GradientImagePlaceholder(
