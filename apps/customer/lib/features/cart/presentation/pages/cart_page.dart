@@ -18,6 +18,7 @@ import 'package:zopiqnow/features/home/domain/entities/restaurant.dart';
 import 'package:zopiqnow/features/home/presentation/providers/home_providers.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_image.dart'
     show GradientImagePlaceholder;
+import 'package:zopiqnow/features/menu/presentation/widgets/beverage_upsell.dart';
 
 /// The cart page: presents items in cart, order total, bill breakdown, and checkout hand-off.
 class CartPage extends ConsumerWidget {
@@ -190,8 +191,20 @@ class _CartBody extends StatelessWidget {
       ),
       children: <Widget>[
         ZopiqReveal(child: _OrderCard(cart: cart)),
+        // Between the order and the bill, which is where a drink is still an
+        // addition to what you are buying rather than an argument with the
+        // total. Draws nothing when the kitchen sells no bottled drink.
+        if (cart.restaurantId != null && cart.restaurantName != null)
+          ZopiqReveal(
+            index: 1,
+            child: BeverageRail(
+              restaurantId: cart.restaurantId!,
+              restaurantName: cart.restaurantName!,
+              heading: 'Add a drink',
+            ),
+          ),
         const SizedBox(height: ZopiqSpacing.lg),
-        ZopiqReveal(index: 1, child: BillSummary(bill: bill)),
+        ZopiqReveal(index: 2, child: BillSummary(bill: bill)),
       ],
     );
   }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zopiqnow/features/cart/presentation/providers/cart_providers.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_item.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_option.dart';
+import 'package:zopiqnow/features/menu/presentation/widgets/beverage_upsell.dart';
 import 'package:zopiqnow/features/menu/presentation/widgets/dish_options_sheet.dart';
 
 /// Adding a dish to the cart, with everything that can interrupt it.
@@ -13,6 +14,11 @@ import 'package:zopiqnow/features/menu/presentation/widgets/dish_options_sheet.d
 /// dish asks its questions first, and a cart belonging to another restaurant has
 /// to be emptied before this dish can go in. Neither is a detail of *where* the
 /// customer tapped, which is why this is one function rather than a copy in each.
+///
+/// Once the dish is in, [offerABeverage] asks whether they want something to
+/// drink with it. That lives here, at the end of both successful paths, for the
+/// same reason the new-cart prompt does: every screen that adds a dish should
+/// ask, and none of them should have to remember to.
 ///
 /// The "start a new cart" prompt lives here, at the moment of adding, rather than
 /// on the cart screen — by the time somebody opens the cart, the decision has
@@ -42,7 +48,16 @@ Future<void> addDishToCart(
     item: item,
     options: options,
   );
-  if (result == AddToCartResult.added) return;
+  if (result == AddToCartResult.added) {
+    await offerABeverage(
+      context,
+      ref,
+      restaurantId: restaurantId,
+      restaurantName: restaurantName,
+      justAdded: item,
+    );
+    return;
+  }
 
   final String? existing = ref.read(cartProvider).restaurantName;
   final bool? replace = await showDialog<bool>(
@@ -71,6 +86,17 @@ Future<void> addDishToCart(
       restaurantName: restaurantName,
       item: item,
       options: options,
+    );
+    if (!context.mounted) return;
+    // A cart that just started is the emptiest a cart gets, so this is the one
+    // path that most wants the offer — not the one to skip because the code
+    // above already returned.
+    await offerABeverage(
+      context,
+      ref,
+      restaurantId: restaurantId,
+      restaurantName: restaurantName,
+      justAdded: item,
     );
   }
 }
