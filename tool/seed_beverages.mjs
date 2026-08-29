@@ -11,16 +11,28 @@
 // "a cold bottle of something dark red-capped".
 //
 // **They are meant to be replaced.** Every upload is signed with a deterministic
-// `public_id` (`zopiqnow/beverages/<slug>`) and `overwrite=true`, so dropping in
-// a real photograph later is this same script pointed at a file — same URL, no
-// database change, no migration. That is the whole reason not to use the
-// unsigned preset here, which mints a random id per upload and would leave the
-// old art orphaned and the new art unreferenced.
+// `public_id` (`zopiqnow/beverages/<slug>`) and `overwrite=true`, so the asset is
+// replaced in place rather than duplicated. That is the whole reason not to use
+// the unsigned preset here, which mints a random id per upload and would leave
+// the old art orphaned and the new art unreferenced.
+//
+// **The URL still changes, and must.** This script used to strip Cloudinary's
+// `/v<version>/` segment so that a replacement needed no database write. That is
+// what stopped the real packshots ever reaching a phone: `invalidate=true` purges
+// Cloudinary's CDN, but zopiq_ui's `ZopiqImageStore` keys its 30-day on-disk
+// cache on the URL string and never revalidates, so bytes already on a device are
+// unreachable by anything that does not move the URL. The version segment is
+// therefore kept, and this script writes the `UPDATE`s out for you — see
+// migration 0144.
 //
 // Usage:
 //   node tool/seed_beverages.mjs                    # draw and upload all eight
 //   node tool/seed_beverages.mjs --photos <dir>     # upload real photographs instead
 //   node tool/seed_beverages.mjs --dry-run          # write the SVGs locally, upload nothing
+//
+// A real run ends by writing `build/beverages/update_urls.sql` and printing the
+// psql line to apply it. **Uploading without running that leaves every menu row
+// pointing at the previous version** — the images will not change.
 //
 // `--photos` looks for `<slug>.{jpg,jpeg,png,webp}` — coca-cola, thums-up,
 // sprite, limca, fanta, mirinda, 7up, maaza — and falls back to the drawing for
@@ -185,12 +197,21 @@ async function upload(slug, file, { cloud, key, secret }) {
   if (!res.ok) {
     throw new Error(`${slug}: ${res.status} ${body?.error?.message ?? JSON.stringify(body)}`)
   }
-  // Deliberately NOT `body.secure_url`, which carries a `/v<version>/` segment
-  // that changes on every upload. `menu_items.image_url` should name the drink,
-  // not this particular rendering of it — so replacing the artwork stays a
-  // re-run of this script with no UPDATE to follow it. `invalidate` above is
-  // what makes the un-versioned URL safe to cache.
-  return `https://res.cloudinary.com/${cloud}/image/upload/zopiqnow/beverages/${slug}.jpg`
+  // **With** the `/v<version>/` segment, which is the whole point (migration
+  // 0144). 0140 stripped it so that replacing the artwork needed no UPDATE — and
+  // that is exactly why the real packshots never reached anybody: `invalidate`
+  // purges Cloudinary's CDN, but zopiq_ui's own `ZopiqImageStore` keys its
+  // 30-day on-disk cache on the URL string and never revalidates. A URL that
+  // does not move cannot dislodge bytes a phone already has.
+  //
+  // The version moves on every overwrite, so it invalidates all three layers at
+  // once — CDN, Flutter's in-memory ImageCache, and the disk store. The cost is
+  // that the new URL has to be written down as well as uploaded, which is what
+  // `main` now emits the SQL for.
+  if (!body.version) {
+    throw new Error(`${slug}: Cloudinary returned no version to cache-bust on`)
+  }
+  return `https://res.cloudinary.com/${cloud}/image/upload/v${body.version}/zopiqnow/beverages/${slug}.jpg`
 }
 
 // ---------------------------------------------------------------------------
@@ -268,6 +289,34 @@ async function main() {
       `\n${drawn} of ${DRINKS.length} had no photograph in ${photoDir} and were drawn instead.`,
     )
   }
+
+  if (dryRun) return
+
+  // The URLs now carry a version, so uploading is only half the job: a row still
+  // pointing at the previous version names bytes nobody should be served, and a
+  // phone holding the old URL in `ZopiqImageStore` is what migration 0144 was
+  // written about.
+  //
+  // Emitted as SQL rather than executed. Every credential in `.env` that could
+  // run it is either the anon key — which RLS correctly refuses `menu_items` to
+  // — or the database password, and reaching Postgres from Node means a client
+  // package, which is a version move and not this script's to make. So it writes
+  // the statements and names the command: one paste rather than one dependency.
+  const sql =
+    DRINKS.map(
+      (d) =>
+        `update public.menu_items set image_url = '${urls[d.slug]}'\n` +
+        ` where id like 'bev-%-${d.slug}-%';`,
+    ).join('\n\n') + '\n'
+
+  await mkdir(out, { recursive: true })
+  const sqlPath = path.join(out, 'update_urls.sql')
+  await writeFile(sqlPath, sql, 'utf8')
+
+  console.error(
+    '\nUploaded. The rows still point at the previous version — apply the new URLs:\n' +
+      `  psql "$SUPABASE_DB_URL" -f ${sqlPath}\n`,
+  )
 }
 
 main().catch((err) => {
