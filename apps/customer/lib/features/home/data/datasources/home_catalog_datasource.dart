@@ -88,10 +88,6 @@ class HomeCatalogDataSource {
       // it also sells an extra one.
       aliases: <String>['Bhatura'],
     ),
-    FoodCategory(id: 'chicken_curry', label: 'Chicken Curry', imageAsset: '$_photos/chicken-curry.PNG', isVeg: false),
-    FoodCategory(id: 'chicken_tikka', label: 'Chicken Tikka', imageAsset: '$_photos/IMG_7529.PNG', isVeg: false),
-    FoodCategory(id: 'mutton', label: 'Mutton', imageAsset: '$_photos/Mutton.PNG', isVeg: false),
-    FoodCategory(id: 'egg_curry', label: 'Egg Curry', imageAsset: '$_photos/egg-curry.PNG', isVeg: false),
     FoodCategory(id: 'chilli_paneer', label: 'Chilli Paneer', imageAsset: '$_photos/chilli-paneer.PNG'),
     FoodCategory(id: 'manchurian', label: 'Manchurian', imageAsset: '$_photos/manchurian.PNG'),
     FoodCategory(id: 'pulao', label: 'Pulao', imageAsset: '$_photos/pulao.PNG'),
@@ -115,6 +111,20 @@ class HomeCatalogDataSource {
     FoodCategory(id: 'waffle', label: 'Waffle', imageAsset: '$_photos/waffle.PNG'),
     FoodCategory(id: 'shake', label: 'Shake', imageAsset: '$_photos/shake.PNG'),
     FoodCategory(id: 'lassi', label: 'Lassi', imageAsset: '$_photos/lassi.PNG'),
+
+    // Meat and egg last, after every vegetarian tile.
+    //
+    // They sat in the middle of this list, between Chole Bhature and Chilli
+    // Paneer, which put a Mutton tile four rows into a sheet on a platform
+    // where **no kitchen sells any of these four** — all four match zero dishes
+    // in the whole catalogue today, so each one currently opens on an empty
+    // page. They are kept rather than deleted because the day a kitchen does
+    // sell chicken the tile should already exist; they are simply last until
+    // then. "100% Veg Mode" hides them outright.
+    FoodCategory(id: 'chicken_curry', label: 'Chicken Curry', imageAsset: '$_photos/chicken-curry.PNG', isVeg: false),
+    FoodCategory(id: 'chicken_tikka', label: 'Chicken Tikka', imageAsset: '$_photos/IMG_7529.PNG', isVeg: false),
+    FoodCategory(id: 'mutton', label: 'Mutton', imageAsset: '$_photos/Mutton.PNG', isVeg: false),
+    FoodCategory(id: 'egg_curry', label: 'Egg Curry', imageAsset: '$_photos/egg-curry.PNG', isVeg: false),
   ];
 
   static const List<Offer> _offers = <Offer>[
