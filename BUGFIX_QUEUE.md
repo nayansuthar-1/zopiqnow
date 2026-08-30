@@ -35,32 +35,6 @@ on the day Razorpay goes live, which is exactly why they sit above the rest.
 
 ## Open
 
-### P8 — `claim_delivery` ignores the exclusive offer
-
-`available_deliveries` correctly hides an order that has a live offer to somebody
-else. `claim_delivery` re-checks status, KYC, online and the cash cap — and
-**never looks at `delivery_offers`**. Both are executable by `authenticated`
-(verified against `has_function_privilege` on the live database).
-
-So a rider can call the RPC directly and take a job that is mid-45-second exclusive
-offer to another rider, who then gets *"Another partner just took that one."* The
-dispatch rule is enforced in the read path and missing from the write path.
-
----
-
-### P9 — `delivery_offers_one_live_per_order` ignores `expires_at`
-
-The index is `unique (order_id) where state = 'offered'` — expiry is not part of
-it. `offer_delivery` inserts `on conflict do nothing` and returns null when it
-loses, so a stale `offered` row wedges that order's dispatch permanently: every
-tick tries, conflicts, and returns null.
-
-Safe **only** because one transaction currently expires offers (step 1 of
-`dispatch_deliveries`) and re-offers them (step 2). It becomes real the moment
-those are split, or a run errors between the two.
-
----
-
 ### P10 — Smaller items
 
 - **No upper bound on `quantity` in `place_order`.** `v_qty < 1` is refused;
@@ -143,6 +117,69 @@ and label it the way the statement does.
 ---
 
 ## Closed
+
+### ~~P8 — `claim_delivery` ignores the exclusive offer~~ · migration 0148, 2026-08-29
+
+**Was:** `available_deliveries` hid an order that was mid-offer to somebody
+else; `claim_delivery` re-checked status, KYC, online and the cash cap and never
+looked at `delivery_offers` at all. Both are executable by `authenticated`, so a
+rider could call the RPC directly and take a job out from under another rider's
+exclusive ring. The dispatch rule was enforced in the read path and missing from
+the write path.
+
+**Closed by 0148**, the relay-and-contest migration, which needed the same guard
+for its own reasons and this entry never recorded. `claim_delivery` now refuses
+with *"That job is with another partner right now. If they pass on it, it comes
+back to you."* when a live offer belongs to somebody else.
+
+The guard is deliberately not "only the offer holder may claim". It admits both
+`offered` **and** `expired`, which is 0148's rule: your fifteen seconds are
+exclusive, but when they lapse the job stays on your board rather than vanishing
+from it, and two riders reaching for the same order inside `contest_seconds` are
+settled by distance in `resolve_delivery_contest`. A rider who was never offered
+the job is the only one the guard turns away while the ring is live.
+
+---
+
+### ~~P9 — `delivery_offers_one_live_per_order` ignores `expires_at`~~ · migration 0150, 2026-08-30
+
+**Was:** the index is `unique (order_id) where state = 'offered'` and cannot be
+anything else — `expires_at > now()` is not immutable, so no partial index will
+carry it. A row that had lapsed but was not yet *marked* lapsed therefore still
+held the slot, `offer_delivery`'s `on conflict do nothing` lost to it and
+returned null, and every tick after lost to it again.
+
+**Reproduced before fixing**, on a borrowed order in a rolled-back transaction:
+with one stale `offered` row in place, three consecutive `offer_delivery` calls
+returned null while three other eligible riders sat idle. The control run, with
+no stale row, offered on the first call.
+
+**Why it had never fired:** `dispatch_deliveries` expires the whole board one
+statement before it re-offers, in the same transaction, so the sweeper never
+meets its own stale rows — and the only other caller, `decline_offer`, marks its
+own row `declined` before calling in. Note that the queue's original wording was
+wrong about one of these: a run that *errors* between the two statements does not
+wedge anything, because the whole sweeper is one transaction and the error rolls
+the expiry back with it. The real exposure was always the other half — that the
+guarantee lived in two callers' statement ordering rather than in the function
+depending on it.
+
+**0150** moves it into `offer_delivery`: one `update`, scoped to the order being
+offered, expiring its own lapsed row before it tries to insert. The function no
+longer trusts its callers to have cleared the path. `dispatch_deliveries` keeps
+its board-wide expiry — not redundant, that is what takes a lapsed offer off a
+rider's screen for orders this function never reaches.
+
+The body was taken from `pg_get_functiondef` on the live database rather than
+from 0148's file, so what was replaced is what was actually running; the diff
+against live is the new block and nothing else.
+
+**0148's rule verified intact** after the change: the rider who let the offer
+lapse keeps their row (marked `expired`, not deleted), is not re-offered by the
+candidate query, and `claim_delivery`'s guard still lets them claim. A third
+rider who was never offered the job is still refused while the ring is live.
+
+---
 
 ### ~~P3 — Refunds are promised with a date and nothing pays them~~ · migrations 0138 + 0149, 2026-08-30
 
