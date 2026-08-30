@@ -5,6 +5,7 @@ import 'package:zopiq_legal/zopiq_legal.dart';
 
 import 'package:zopiqnow/app/app_shell.dart';
 import 'package:zopiqnow/app/providers/splash_gate_provider.dart';
+import 'package:zopiqnow/app/route_not_found_page.dart';
 import 'package:zopiqnow/features/about/presentation/licenses_page.dart';
 import 'package:zopiqnow/features/account/presentation/pages/account_page.dart';
 import 'package:zopiqnow/features/account/presentation/pages/delete_account_page.dart';
@@ -147,6 +148,18 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
     initialLocation: '/',
     navigatorKey: ref.watch(rootNavigatorKeyProvider),
     refreshListenable: refresh,
+    // Any path no route below matches. Without this GoRouter draws its own
+    // developer page — the route table and a stack trace — which is the right
+    // screen for whoever wrote the typo and the wrong one for the customer who
+    // received it.
+    //
+    // Nothing reaches it today: `initialLocation` is `/` and no route survives a
+    // launch. It costs one screen to keep it that way, and the paths that would
+    // reach it are the ones nobody tests — a malformed deep link, or a `route`
+    // in a push payload naming a screen this build does not have, which is one
+    // server-side typo away at any time.
+    errorBuilder: (BuildContext context, GoRouterState state) =>
+        RouteNotFoundPage(location: state.uri.toString()),
     redirect: (BuildContext context, GoRouterState state) {
       final AuthState auth = ref.read(authControllerProvider);
       final String location = state.matchedLocation;

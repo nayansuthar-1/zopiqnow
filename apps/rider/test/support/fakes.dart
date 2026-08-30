@@ -221,7 +221,10 @@ class FakeJobsDataSource implements JobsDataSource {
         deliverLng: 72.3163,
         deliveryNotes: null,
         customerPhone: '+919876543210',
-        total: offer.total,
+        // The board hides the total on a prepaid job (0151); a claimed job
+        // still carries it, because `my_deliveries` returns it to the rider who
+        // took it. Zero is the fake standing in for that second read.
+        total: offer.total ?? 0,
         isCash: offer.isCash,
         distanceKm: claimDistanceKm,
         payBase: payBase,

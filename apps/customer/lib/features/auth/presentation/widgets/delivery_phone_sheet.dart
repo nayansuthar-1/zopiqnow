@@ -45,7 +45,16 @@ class _DeliveryPhoneSheetState extends ConsumerState<DeliveryPhoneSheet> {
     super.dispose();
   }
 
-  bool get _isValid => _controller.text.trim().length == 10;
+  /// Ten digits **starting 6–9**, which is what an Indian mobile is (0151).
+  ///
+  /// The length check alone let `1918739985` through, and there is an order in
+  /// the live table carrying exactly that — a number the rider can never reach.
+  /// `place_order` now refuses the same shape server-side; this is here so the
+  /// customer is told at the sheet, where they can still fix it, rather than at
+  /// checkout with a full cart behind them.
+  static final RegExp _mobile = RegExp(r'^[6-9]\d{9}$');
+
+  bool get _isValid => _mobile.hasMatch(_controller.text.trim());
 
   Future<void> _save() async {
     if (!_isValid || _saving) return;

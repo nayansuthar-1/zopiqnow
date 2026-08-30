@@ -55,7 +55,9 @@ final StreamProvider<void> offerSignalProvider = StreamProvider<void>((Ref ref) 
 /// Rows that have already expired are dropped here rather than trusted from the
 /// server, because a sheet is a screen a phone can hold open through a tunnel:
 /// `my_offers` filters on the database's clock at the moment it is asked, and
-/// this filters again on the device's clock at the moment it is drawn.
+/// this filters again at the moment it is drawn — against the database's clock
+/// as well, corrected for this phone's (0151). Filtering on the raw device clock
+/// is what made a phone one minute fast discard every offer it was ever sent.
 final FutureProvider<List<DeliveryOffer>> offersProvider =
     FutureProvider<List<DeliveryOffer>>((Ref ref) async {
       final Rider? rider = ref.watch(riderProvider);
@@ -71,9 +73,8 @@ final FutureProvider<List<DeliveryOffer>> offersProvider =
       final List<DeliveryOffer> offers = await ref
           .watch(jobsDataSourceProvider)
           .fetchOffers();
-      final DateTime now = DateTime.now();
       return offers
-          .where((DeliveryOffer o) => !o.isExpired(now))
+          .where((DeliveryOffer o) => !o.isExpired)
           .toList(growable: false);
     });
 

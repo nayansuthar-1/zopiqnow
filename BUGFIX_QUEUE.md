@@ -35,35 +35,19 @@ on the day Razorpay goes live, which is exactly why they sit above the rest.
 
 ## Open
 
-### P10 — Smaller items
+### P10 — Hero slides name coupon codes that do not exist
 
-- **No upper bound on `quantity` in `place_order`.** `v_qty < 1` is refused;
-  nothing caps it. `unit_price * quantity` overflows `integer` and surfaces to the
-  customer as a raw `integer out of range`.
-- **`p_user_phone` is unvalidated** and never checked against the account. It is
-  the number the rider calls.
-- **The offer countdown trusts the rider's device clock.** `OfferSheet` computes
-  `remaining(DateTime.now())` against a server `expires_at`; a phone a minute fast
-  closes the sheet the instant it opens.
-- **Snackbar fired on a popped route.**
-  [`offer_sheet.dart:74-78`](apps/rider/lib/features/jobs/presentation/widgets/offer_sheet.dart#L74-L78)
-  calls `_close()` — which pops — and then `ScaffoldMessenger.of(context)`. The
-  failure message can be lost or throw.
-- **`announce_open_delivery` announces once, forever.** Its guard is "any
-  `job_available` notification exists for this order", so riders who come online
-  *after* the announcement are never told about the job sitting on the board.
-- **The open board leaks addresses.** `available_deliveries` returns `delivery_to`
-  and `total` for every dispatchable order to every verified rider, not only the
-  ones offered to them.
-- **The customer router has no `errorBuilder`.** Any unmatched path renders
-  GoRouter's raw developer error page. Not reachable today — `initialLocation` is
-  `/` and no route is persisted across launches — but one typo in a push payload
-  or a future deep link puts a stack trace in front of a customer.
-- **Three hero slides name coupon codes that do not exist.** `TRYNEW`,
-  `ZOPIQ150` and `SAVE30` are string constants in `home_hero_carousel.dart`, not
-  rows in `coupons`, so a customer who reads one and types it at checkout is told
-  the code isn't valid. The file's own header has said so for a while. Either
-  issue the codes or rewrite the copy.
+`TRYNEW`, `ZOPIQ150` and `SAVE30` are string constants in
+`home_hero_carousel.dart`, not rows in `coupons`, so a customer who reads one
+and types it at checkout is told the code isn't valid. The file's own header has
+said so for a while.
+
+**Held open deliberately, 2026-08-30.** The other seven items in the original
+P10 are closed below. This one is not a bug to fix but a choice between issuing
+three discounts and rewriting three sentences, and the slides are being replaced
+before production — so creating `TRYNEW` and friends now would mean inventing
+live coupons to match copy that is about to be deleted. It closes when the real
+slides land.
 
 ---
 
@@ -117,6 +101,104 @@ and label it the way the statement does.
 ---
 
 ## Closed
+
+### ~~P10 — Smaller items (seven of eight)~~ · migration 0151, 2026-08-30
+
+Eight findings, worked as one batch. Seven are closed here; the eighth, the hero
+slides naming coupons that do not exist, is **still open above** and held on
+purpose — the slides are being replaced before production.
+
+Four were database, in migration 0151. Three were Dart, in the same commit.
+
+**1. `place_order` could be made to raise Postgres's own error.** `v_qty < 1` was
+refused and nothing capped the other end, and there were two ways through:
+a quantity past 2^31 died at `(v_line ->> 'quantity')::integer` with `value out
+of range for type integer`, *before* any check of ours could run; one inside
+integer range but large — 10,000,000 — died at `v_unit * v_qty` with `integer
+out of range`. Both reached the customer as raw Postgres, from a function whose
+every other refusal is a sentence.
+
+Parsed as `numeric` first, then bounded: whole, ≥ 1, ≤ 50 per line. And ≤ 50
+lines, which the original finding did not ask for and which the fix needs —
+without it, enough lines overflow `v_subtotal` whatever the per-line cap says,
+and the same raw error comes back by another road.
+
+Probed with a forged `sub` in a rolled-back transaction: quantity 3,000,000,000
+and 10,000,000 both now answer *"You can order at most 50 of one item"*, 2.5
+answers *"Your cart has an invalid quantity"*, 51 lines answers *"That is too
+many different items for one order"*, and 50 passes the check and goes on to be
+refused by the payment gate — which is the armed gate from 0141 doing its job on
+a fake `payment_id`, and the proof that the boundary is inclusive.
+
+**2. `p_user_phone` was whatever the caller said.** Now `^\+91[6-9][0-9]{9}$`,
+trimmed and normalised once at the top. The live table has `+911918739985` on a
+real order — the sheet checked that ten digits were typed and nothing checked
+they were a mobile. `DeliveryPhoneSheet` now applies the same rule, so the
+customer is told at the sheet rather than at checkout with a full cart behind
+them.
+
+**Called out as a format check and not an identity check**, in the migration and
+here. There is nothing to check against: `auth.users.phone` is empty for all 55
+accounts and the app reads its number from `user_metadata.delivery_phone`, which
+the client writes and can therefore set to anything. Binding the number a rider
+calls to the account that placed the order needs phone auth (UX-002). The
+finding's second half — "never checked against the account" — is therefore **not
+closed**, and cannot be by a regex.
+
+**3. `announce_open_delivery` announced once, forever.** Its guard was "does any
+`job_available` notification exist for this order", true from the moment the
+first rider is told and never false again — so every rider who came online
+afterwards was never told about the job sitting on the board, which is exactly
+the rider a stale order is waiting for. Per-rider now.
+
+That introduces a way to pester somebody the old guard accidentally protected: a
+rider who was offered this job and *declined* it. They are excluded — a decline
+is an answer. Verified in a transaction: two online riders told, a third comes
+online and is told on the next call, the first two are not told twice, and the
+decliner is never told.
+
+**4. The open board named what the order was worth.** `available_deliveries`
+returned `total` to every verified rider for every dispatchable order. Now only
+on a cash job, where it is the money they will be carrying. On a prepaid job it
+was the customer's bill and nothing the rider could act on; `rider_pay`, beside
+it, is the figure they are deciding on. The board reads "Prepaid online" and
+stops.
+
+**The `delivery_to` half of that finding was checked and not changed**, on the
+evidence: `delivery_to` is the customer's `line1, city` from a reverse-geocode —
+"Mutha Nagar, Sadri" — a locality and a town, never a house number, and
+`available_deliveries` returns no coordinates at all. The door itself is in
+`delivery_notes` and the lat/lng, neither of which is on the board. Stripping
+the locality would make the board unreadable to protect the name of a town the
+rider is standing in.
+
+**5. The offer countdown trusted the phone's clock.** This was the worst of the
+eight and the finding understated it. `OfferSheet` drew `remaining(DateTime.now())`
+against a server `expires_at` — but `offersProvider` *filtered* on the same
+device clock, so a phone a minute fast did not merely mis-draw the ring: **every
+offer was discarded before the sheet was built**, silently, and that rider was
+passed over for as long as the clock was wrong.
+
+`my_offers` now returns `now()` beside the row it applies to; `DeliveryOffer`
+measures the skew at parse and exposes `remaining` and `isExpired` against a
+corrected clock. All four call sites go through it. Adding a column to a
+`returns table` needs a drop and re-create, so the grant is restated with it.
+
+**6. Snackbar fired on a popped route.** `_accept()` called `_close()`, which
+pops, and then `ScaffoldMessenger.of(context)` — a lookup through a defunct
+element, on the only path that ever tells a rider why their accept did not take.
+The messenger is captured before the first await.
+
+**7. The customer router had no `errorBuilder`.** Any unmatched path drew
+GoRouter's developer page — the route table and a stack trace — in front of a
+customer. `RouteNotFoundPage` replaces it. Still not reachable today
+(`initialLocation` is `/`, no route survives a launch); the path that has no
+test is a `route` in a push payload naming a screen the installed build does not
+have, which is one server-side typo away at any time.
+
+Both apps analyze clean: zero errors, and nothing reported in any file touched.
+
+---
 
 ### ~~P8 — `claim_delivery` ignores the exclusive offer~~ · migration 0148, 2026-08-29
 

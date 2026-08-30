@@ -22,6 +22,9 @@ import 'package:zopiq_rider/features/jobs/presentation/providers/jobs_providers.
 /// started at `initState` would show fifteen and then hand the rider a job whose
 /// window had already passed to somebody else.
 ///
+/// The instant is compared against `DeliveryOffer.remaining`, which corrects for
+/// the phone's clock being wrong (0151). Never `DateTime.now()` here.
+///
 /// **What happens when it runs out.** The sheet closes itself and says nothing —
 /// and since 0148 that is no longer the end of the job. The order stays on this
 /// rider's board, marked as being with somebody else, and they can still take
@@ -54,12 +57,12 @@ class _OfferSheetState extends ConsumerState<OfferSheet> {
   @override
   void initState() {
     super.initState();
-    _left = widget.offer.remaining(DateTime.now());
+    _left = widget.offer.remaining;
     // Every second, and not faster: this drives a number and a ring, and a
     // rider glancing at it cannot read tenths.
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      final Duration left = widget.offer.remaining(DateTime.now());
+      final Duration left = widget.offer.remaining;
       setState(() => _left = left);
       // Not while an accept is in flight. A contested accept is decided up to
       // two seconds after the tap, which can be two seconds after the window
@@ -81,6 +84,12 @@ class _OfferSheetState extends ConsumerState<OfferSheet> {
   }
 
   Future<void> _accept() async {
+    // Captured before the first await, and before `_close()` pops this route.
+    // `ScaffoldMessenger.of(context)` afterwards looks the messenger up through
+    // a defunct element: on a good day the failure is shown by a widget that is
+    // already leaving, on a bad one the lookup throws — and this is the only
+    // path that ever tells a rider *why* their accept did not take.
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     setState(() => _busy = true);
     final String? failure = await ref
         .read(jobsControllerProvider.notifier)
@@ -102,7 +111,7 @@ class _OfferSheetState extends ConsumerState<OfferSheet> {
     });
     _close();
     if (failure != null) {
-      ScaffoldMessenger.of(context)
+      messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(failure)));
     }

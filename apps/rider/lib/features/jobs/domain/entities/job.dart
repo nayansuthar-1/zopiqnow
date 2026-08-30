@@ -78,7 +78,7 @@ class JobOffer {
     orderId: json['order_id'] as String,
     restaurantName: json['restaurant_name'] as String? ?? 'Restaurant',
     deliverTo: json['deliver_to'] as String? ?? '',
-    total: json['total'] as int? ?? 0,
+    total: json['total'] as int?,
     isCash: json['payment_method'] == 'cod',
     isReady: json['status'] == 'ready_for_pickup',
     // `num`, not `int`: Postgres `numeric` arrives as either depending on
@@ -92,7 +92,12 @@ class JobOffer {
   final String orderId;
   final String restaurantName;
   final String deliverTo;
-  final int total;
+
+  /// What the customer owes, and **only when the rider is the one collecting it**
+  /// (0151). Null on a prepaid job: the money is already paid, the rider cannot
+  /// act on the figure, and the board has no business naming what a stranger
+  /// spent on dinner. [riderPay] is the number they are deciding on either way.
+  final int? total;
 
   /// How far the ride is, kitchen to door — the road distance when Ola has
   /// answered for this order, the straight line until then (0046). Null only
@@ -135,6 +140,16 @@ class JobOffer {
 /// trick 0052 used for the live card's ETA: the device counts down against its
 /// own clock, so a countdown drawn on a phone that was asleep for thirty seconds
 /// is correct the moment it appears rather than starting again from full.
+///
+/// **Against a corrected clock, though** (0151). An absolute deadline is only as
+/// good as the clock it is compared with, and a phone's is not guaranteed to be
+/// right — a minute fast is enough to make every fifteen-second offer arrive
+/// already expired. That does not merely mis-draw the ring: `offersProvider`
+/// drops expired rows before the sheet is built, so the rider is shown nothing,
+/// is never told why, and keeps being passed over for as long as the clock is
+/// wrong. `my_offers` therefore sends `now()` with the row, and [clockSkew] is
+/// the difference measured the moment it was parsed. Every comparison here goes
+/// through [_now] rather than `DateTime.now()`.
 @immutable
 class DeliveryOffer {
   const DeliveryOffer({
@@ -151,23 +166,36 @@ class DeliveryOffer {
     required this.riderPay,
     required this.offeredAt,
     required this.expiresAt,
+    this.clockSkew = Duration.zero,
   });
 
-  factory DeliveryOffer.fromJson(Map<String, dynamic> json) => DeliveryOffer(
-    orderId: json['order_id'] as String,
-    restaurantName: json['restaurant_name'] as String? ?? 'Restaurant',
-    restaurantLat: (json['restaurant_lat'] as num?)?.toDouble(),
-    restaurantLng: (json['restaurant_lng'] as num?)?.toDouble(),
-    deliverTo: json['deliver_to'] as String? ?? '',
-    total: json['total'] as int? ?? 0,
-    isCash: json['payment_method'] == 'cod',
-    isReady: json['order_status'] == 'ready_for_pickup',
-    routeKm: (json['route_km'] as num?)?.toDouble(),
-    toPickupKm: (json['to_pickup_km'] as num?)?.toDouble(),
-    riderPay: json['rider_pay'] as int? ?? 0,
-    offeredAt: DateTime.parse(json['offered_at'] as String).toLocal(),
-    expiresAt: DateTime.parse(json['expires_at'] as String).toLocal(),
-  );
+  factory DeliveryOffer.fromJson(Map<String, dynamic> json) {
+    // Read once, before anything else in this factory, so the skew measures the
+    // gap between the two clocks and not the cost of parsing the row.
+    final DateTime deviceNow = DateTime.now();
+    final String? serverNow = json['server_now'] as String?;
+
+    return DeliveryOffer(
+      orderId: json['order_id'] as String,
+      restaurantName: json['restaurant_name'] as String? ?? 'Restaurant',
+      restaurantLat: (json['restaurant_lat'] as num?)?.toDouble(),
+      restaurantLng: (json['restaurant_lng'] as num?)?.toDouble(),
+      deliverTo: json['deliver_to'] as String? ?? '',
+      total: json['total'] as int? ?? 0,
+      isCash: json['payment_method'] == 'cod',
+      isReady: json['order_status'] == 'ready_for_pickup',
+      routeKm: (json['route_km'] as num?)?.toDouble(),
+      toPickupKm: (json['to_pickup_km'] as num?)?.toDouble(),
+      riderPay: json['rider_pay'] as int? ?? 0,
+      offeredAt: DateTime.parse(json['offered_at'] as String).toLocal(),
+      expiresAt: DateTime.parse(json['expires_at'] as String).toLocal(),
+      // Absent only against a server that predates 0151, where zero means "trust
+      // the phone" — which is exactly the behaviour that shipped before it.
+      clockSkew: serverNow == null
+          ? Duration.zero
+          : DateTime.parse(serverNow).toLocal().difference(deviceNow),
+    );
+  }
 
   final String orderId;
   final String restaurantName;
@@ -191,18 +219,28 @@ class DeliveryOffer {
   final DateTime offeredAt;
   final DateTime expiresAt;
 
+  /// The database's clock minus this phone's, measured when the row was parsed.
+  /// Zero on a correct phone, and zero against a server that does not send it.
+  final Duration clockSkew;
+
   /// How long the whole countdown was, so a progress ring can draw a fraction
   /// without hard-coding the forty-five seconds the database chose.
   Duration get window => expiresAt.difference(offeredAt);
 
+  /// Now, as the database would have said it. Every deadline on this class is
+  /// measured against this and never against `DateTime.now()` — see the note on
+  /// [clockSkew]. The skew is a constant offset, so a device whose clock merely
+  /// *drifts* over the fifteen seconds of an offer is still fine.
+  DateTime get _now => DateTime.now().add(clockSkew);
+
   /// What is left, floored at zero — a negative duration on a sheet that has not
   /// closed yet would draw a ring past its own start.
-  Duration remaining(DateTime now) {
-    final Duration left = expiresAt.difference(now);
+  Duration get remaining {
+    final Duration left = expiresAt.difference(_now);
     return left.isNegative ? Duration.zero : left;
   }
 
-  bool isExpired(DateTime now) => !expiresAt.isAfter(now);
+  bool get isExpired => !expiresAt.isAfter(_now);
 }
 
 /// What came back from tapping Accept (0148).

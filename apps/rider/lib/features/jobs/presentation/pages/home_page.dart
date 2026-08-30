@@ -587,9 +587,13 @@ class _OfferCardState extends ConsumerState<_OfferCard> {
                   ? RiderSvgType.cashCollect
                   : RiderSvgType.verifiedShield,
               iconColor: o.isCash ? Colors.amber.shade700 : zc.veg,
+              // The amount only on a cash job, because only there is it the
+              // rider's to collect (0151). On a prepaid one the board used to
+              // print the customer's bill, which told the rider nothing they
+              // could act on — the fee panel above is their number.
               text: o.isCash
                   ? 'Collect Cash: ₹${o.total}'
-                  : 'Prepaid Online • ₹${o.total}',
+                  : 'Prepaid online',
               emphasis: o.isCash,
             ),
 

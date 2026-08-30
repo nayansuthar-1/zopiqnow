@@ -182,7 +182,7 @@ class _RiderShellState extends ConsumerState<RiderShell> {
       DeliveryOffer? offer,
     ) {
       if (offer == null || offer.orderId == _showing) return;
-      if (offer.isExpired(DateTime.now())) return;
+      if (offer.isExpired) return;
       unawaited(_raise(offer));
     });
 
