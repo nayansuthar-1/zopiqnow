@@ -35,22 +35,6 @@ on the day Razorpay goes live, which is exactly why they sit above the rest.
 
 ## Open
 
-### P3 — Refunds are promised with a date and nothing pays them
-
-`orders_refund_on_termination` inserts the refund already `approved` and pushes the
-customer *"₹X for order Y is on its way back to you, in your account by DD Mon."*
-Nothing moves `approved → paid`. There is no Razorpay refund call in any of the six
-edge functions, no cron job, and no alert when a refund passes its `expected_by`.
-`admin_mark_refund_paid` is a human clicking a button in the console.
-
-Live: 20 refunds, ₹7,155, every one `approved`, the oldest due five days ago. Mock
-money — but the machinery is what ships.
-
-Needs, at minimum, an overdue alarm. Ideally a `razorpay-refund` function so the
-promise the notification makes is one the platform keeps by itself.
-
----
-
 ### P8 — `claim_delivery` ignores the exclusive offer
 
 `available_deliveries` correctly hides an order that has a live offer to somebody
@@ -159,6 +143,54 @@ and label it the way the statement does.
 ---
 
 ## Closed
+
+### ~~P3 — Refunds are promised with a date and nothing pays them~~ · migrations 0138 + 0149, 2026-08-30
+
+**Was:** `orders_refund_on_termination` inserted the refund already `approved`,
+pushed the customer *"₹X for order Y is on its way back to you, in your account
+by DD Mon."*, and then nothing moved it. No Razorpay refund call in any edge
+function, no cron, and no alarm when `expected_by` passed.
+`admin_mark_refund_paid` was a person clicking a button.
+
+**Closed in two halves, three weeks apart.**
+
+*The paying* was 0138 (24 Aug), and this entry was stale in never recording it.
+`pay_approved_refunds` runs every five minutes, hands each approved refund to
+Razorpay through `pg_net`, and collects the answer on the following tick —
+`paid` with the `rfnd_…` reference on a 200, `failed` with Razorpay's own
+words otherwise. It claims a row into `processing` before firing, so two
+overlapping ticks cannot pay one refund twice, and it never retries a call that
+was never answered. Verified live: **3 refunds paid by it, 1 refused.**
+
+*The watching* is 0149 (30 Aug), and it is what P3 actually asked for.
+`sweep_stalled_refunds` runs every fifteen minutes and keeps one standing
+`refunds_stalled` alert on the console's Alerts page while any refund is
+`approved` past `expected_by`, `processing` for over thirty minutes, or
+`failed`. One alert and not one per refund: the per-item queue is already the
+Refunds page, and a second copy of it would be worked in one place and cleared
+in the other. It clears itself — `resolved_by = 'system'`, with the 0092 audit
+row to match — the moment the queue empties.
+
+The Alerts page was rider-shaped and is now kind-aware. It had been rendering
+*"0 in the last week"* and a **Suspend this rider** button on any alert that was
+not a no-show, which the five `orphan_payment` alerts from 0142 had already
+been hitting.
+
+**What the first run found — the remaining work, and a person's:** 19 refunds,
+₹4,640, 18 of them past the date the customer was promised, the oldest due
+**10 August**. Every one names a `pay_mock_…` capture — taken before Razorpay
+existed, so no money was ever captured for them and none can be sent back.
+`pay_approved_refunds` skips them by design and 0138 left them "for a human to
+decide about"; until 0149 there was nothing to tell the human they were waiting.
+The decision — `declined` with a reason, or settled outside the gateway —
+belongs to whoever knows what those testers were told.
+
+**Still owed, and named in 0138's own header:** a `refund.processed` webhook. A
+200 from Razorpay is recorded as `paid`, but the API answers `processed` *or*
+`pending`, so a refund whose bank has not confirmed yet reads as done a little
+early.
+
+---
 
 ### ~~Money sweep 2026-08-29 — five more, found by walking the rupee end to end~~ · migration 0141
 

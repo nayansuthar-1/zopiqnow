@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import type { AdminAlertRow, RiderNoShowRow } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
@@ -15,24 +16,40 @@ import {
 
 /// What the platform noticed while nobody was looking.
 ///
-/// The first and so far only kind is `rider_no_shows` (migration 0130): a rider
-/// who accepted deliveries and did not collect them, twice or more inside a
-/// week. The sweep that raises it has already done the urgent part — the order
-/// was taken back and given to another rider within ten minutes — so nothing on
-/// this page is time-critical. What is left is the decision the system
-/// deliberately does not make: whether this person should still be working.
+/// `rider_no_shows` (migration 0130) is a rider who accepted deliveries and did
+/// not collect them, twice or more inside a week. The sweep that raises it has
+/// already done the urgent part — the order was taken back and given to another
+/// rider within ten minutes — so nothing about it is time-critical. What is left
+/// is the decision the system deliberately does not make: whether this person
+/// should still be working.
 ///
-/// **The suspend button here is the same `admin_set_rider_active` the Riders
-/// page has**, and not a special one. Stopping somebody earning is one action
-/// with one audit row (0092) however it is reached, and a second path to it
-/// would be a second thing to remember to log.
+/// `refunds_stalled` (migration 0149) is money owed to customers that has
+/// stopped moving: approved past the date they were promised, sitting with the
+/// gateway unconfirmed, or refused outright. It is one standing alert rather
+/// than one per refund, because the queue itself is the Refunds page and a
+/// second copy of it here would be worked in one place and cleared in the other.
+///
+/// **Every action offered here belongs to another page.** Suspending is the same
+/// `admin_set_rider_active` the Riders page calls, and the refunds button only
+/// navigates. One action with one audit row (0092) however it is reached; a
+/// second path to it would be a second thing to remember to log.
 ///
 /// Resolving is not deleting. An alert somebody dismissed, and who dismissed it,
-/// is exactly what the rider's side of a later dispute is made of.
+/// is exactly what the rider's side of a later dispute is made of. A
+/// self-clearing kind offers no Clear button at all — the sweep that raised it
+/// takes it down when the condition ends, and dismissing one by hand would only
+/// mean a fresh copy fifteen minutes later.
 
 type Filter = 'open' | 'all'
 
+/// The kinds this page knows how to do something about. Anything else — a kind
+/// added by a later migration and not taught here yet — still renders its title,
+/// body and date, which is the whole alert; it just carries no buttons.
+const RIDER_NO_SHOWS = 'rider_no_shows'
+const REFUNDS_STALLED = 'refunds_stalled'
+
 export function AlertsPage() {
+  const navigate = useNavigate()
   const [rows, setRows] = useState<AdminAlertRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -152,7 +169,7 @@ export function AlertsPage() {
             title="All clear"
             body={
               filter === 'open'
-                ? 'No rider has accepted orders without collecting them. This page fills itself when one does.'
+                ? 'No rider is ghosting orders and no refund is stuck. This page fills itself when either changes.'
                 : 'Nothing has been raised yet.'
             }
           />
@@ -167,7 +184,11 @@ export function AlertsPage() {
                   {row.resolved_at ? (
                     <Pill tone="neutral">Cleared</Pill>
                   ) : (
-                    <Pill tone="warn">{row.no_show_count} in the last week</Pill>
+                    // `no_show_count` counts rider incidents and is 0 for every
+                    // other kind, whose title already carries its own number.
+                    row.kind === RIDER_NO_SHOWS && (
+                      <Pill tone="warn">{row.no_show_count} in the last week</Pill>
+                    )
                   )}
                   {row.rider_active === false && <Pill tone="danger">Suspended</Pill>}
                 </div>
@@ -216,19 +237,36 @@ export function AlertsPage() {
 
             {!row.resolved_at && (
               <div className="mt-4 flex flex-wrap gap-2">
-                {row.subject && (
-                  <Button variant="secondary" onClick={() => void showIncidents(row.subject!)}>
-                    {openDetail === row.subject ? 'Hide the orders' : 'See the orders'}
+                {row.kind === RIDER_NO_SHOWS && row.subject && (
+                  <>
+                    <Button variant="secondary" onClick={() => void showIncidents(row.subject!)}>
+                      {openDetail === row.subject ? 'Hide the orders' : 'See the orders'}
+                    </Button>
+                    {row.rider_active !== false && (
+                      <Button variant="danger" onClick={() => setSuspending(row)}>
+                        Suspend this rider
+                      </Button>
+                    )}
+                    <Button variant="secondary" onClick={() => void resolve(row)} disabled={busy}>
+                      Clear without suspending
+                    </Button>
+                  </>
+                )}
+
+                {/* Navigation and nothing else. Approving, declining and marking
+                    a refund paid all live on the Refunds page, and this alert
+                    exists to say that page needs opening — not to become it. */}
+                {row.kind === REFUNDS_STALLED && (
+                  <Button variant="secondary" onClick={() => navigate('/refunds')}>
+                    Open the refunds queue
                   </Button>
                 )}
-                {row.subject && row.rider_active !== false && (
-                  <Button variant="danger" onClick={() => setSuspending(row)}>
-                    Suspend this rider
+
+                {row.kind !== RIDER_NO_SHOWS && row.kind !== REFUNDS_STALLED && (
+                  <Button variant="secondary" onClick={() => void resolve(row)} disabled={busy}>
+                    Clear this alert
                   </Button>
                 )}
-                <Button variant="secondary" onClick={() => void resolve(row)} disabled={busy}>
-                  Clear without suspending
-                </Button>
               </div>
             )}
 
