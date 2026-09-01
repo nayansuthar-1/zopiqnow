@@ -19,14 +19,38 @@ back to two typed coordinate fields and says so.
 
 ## Getting in
 
-Email and password, against `auth.users`. There is no sign-up and **no password reset
-link**, and both are deliberate: either would be a way into an ops console that does not
-begin with an existing admin. An admin exists because another admin made them one, from
-Settings, which creates the account and sets the first password
+Two doors, both ending in a Supabase session that `is_admin()` has the final word on.
+
+**Email and password**, against `auth.users`. An admin exists because another admin made
+them one, from Settings, which creates the account and sets the first password
 (`0153_an_admin_is_made_with_a_password_not_a_promise.sql`).
 
-The cost of that decision is the runbook below. A forgotten password is not recoverable
-from inside the console by anybody, including the person who forgot it.
+**A six-digit code**, for an admin without that password to hand. The console does not ask
+GoTrue for it — it asks the `console-otp` edge function, which holds the service-role key,
+checks `platform_admins` (a table RLS closes to every other reader, `0026`), and only then
+asks for a code, with `shouldCreateUser: false`. An address that is not on the roster gets
+no mail; an address with no account gets no account. Both cases return the same body and
+the screen shows the same sentence, because naming which addresses are admins would hand a
+stranger the list worth attacking.
+
+What that door does **not** do is stop a customer or a rider getting a Supabase session —
+the anon key is public and GoTrue's `/otp` endpoint is reachable directly, and the customer
+app is built on asking it for codes. What keeps a non-admin out of the console is
+`is_admin()` on every screen and every RPC behind it. The function's guarantee is narrower:
+the console never mails a sign-in code to somebody who is not an admin.
+
+Deploy it with `supabase functions deploy console-otp --no-verify-jwt` — nobody is signed
+in when it is called, so there is no JWT to verify. It needs no secrets;
+`SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are injected.
+
+There is still no sign-up and **no password reset link**. Both would be a way in that does
+not begin with an existing admin, which is the same reason `platform_admins` has no
+self-service path — and a reset link would make an admin's inbox equivalent to this
+console. The cost of that decision is the runbook below: a forgotten password is not
+recoverable from inside the console by anybody, including the person who forgot it. The
+code door softens it — an admin who has lost the password but still has the inbox gets in
+without SQL — but an admin who has lost both still needs somebody with the database
+password.
 
 ## Locked out: resetting a console password
 
