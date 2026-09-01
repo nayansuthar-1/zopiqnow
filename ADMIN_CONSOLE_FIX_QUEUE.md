@@ -2,13 +2,19 @@
 
 Audit of `apps/admin-web/` on 2026-09-01, against `main` at `f2dd99a`.
 
-**State of the build:** `tsc -b` is clean. `oxlint` reports two `only-export-components`
-warnings and nothing else. Nothing below is a compile error — every item is something
-that is wrong at runtime, wrong on screen, or wrong in what it tells the person using it.
+**State of the build, at the audit:** `tsc -b` clean, `oxlint` reporting two
+`only-export-components` warnings and nothing else. Nothing below was a compile error —
+every item was something wrong at runtime, wrong on screen, or wrong in what it told the
+person using it.
 
-Twenty-two findings. Worked one at a time, top to bottom. Tick the box when it lands.
+**Now:** `tsc -b` clean, `vite build` clean, and `oxlint` exits 0 with no output (F6), with
+`react/exhaustive-deps` enforced on top of what it already checked (F4).
 
-**Done so far:** everything but A3, which is a decision rather than a fix.
+Twenty-four findings (the summary line long said twenty-two; the sections have always
+listed twenty-four). Worked one at a time, top to bottom. Tick the box when it lands.
+
+**All twenty-four are done.** A3 was settled as a decision rather than a fix — the
+reasoning is under its heading.
 
 ---
 
@@ -121,17 +127,42 @@ the same `resolve` against the session already in state, and a success flips `is
 renders the console. A second failure leaves the same screen with the button back to rest.
 
 ### A3 — No way back in from a forgotten password
-- [ ] Decision needed. `src/auth/SignInPage.tsx`
+- [x] **Decided** — no reset link. `apps/admin-web/README.md`
 
-No reset link, by design — the comment argues any reset is a way into an ops console that
-does not start from an existing admin. That reasoning holds, but the consequence is that a
-forgotten password is a permanent lockout requiring SQL, and there is no runbook for it.
+The finding offered two ways out: write the recovery procedure down, or add a reset
+restricted to addresses already in `platform_admins`. **Written down.**
 
-**Fix:** either write the recovery procedure into `apps/admin-web/README.md`, or add a
-reset restricted to addresses already in `platform_admins`. Your call — flagging it so it
-is a decision rather than an omission.
+The reset was refused for the reason A1 refused to set a password on an existing account.
+A reset link makes an admin's email inbox equivalent to the console — and this console
+reads every bank account and licence number on the platform, with no second factor and no
+lockout. The gate would also have been weaker than it sounds: GoTrue mails a recovery link
+to any registered address, so "restricted to `platform_admins`" could only ever have been
+a check in the browser in front of it.
 
----
+So the omission is now a documented decision rather than a gap. The console's README stopped
+being the Vite template and says what the app is, how to run it, that there is deliberately
+no reset, and what to do when somebody is locked out: confirm they are on the roster at
+all, confirm the account is not soft-deleted, re-hash with
+`extensions.crypt(..., extensions.gen_salt('bf', 10))` — cost 10, matching what GoTrue
+writes — and end the sessions the old password opened. Then the two failure modes A1 paid
+for in blood: an HTTP 500 with a body of `{}` is null token columns, and a sign-in refused
+as though the address does not exist is a missing `auth.identities` row.
+
+**The schema claims in that runbook were read off the live database, not copied from the
+migration:** the token indexes really are partial on `!~ '^[0-9 ]*$'`,
+`auth.identities.email` really is `is_generated = ALWAYS`, and `auth.sessions.user_id`
+exists. The runbook ends by saying to sign in at the console afterwards, because a row that
+looks right in `psql` and a row GoTrue accepts are two different claims.
+
+One thing the README does *not* do is hand out SQL for removing an admin: the console
+already has that in Settings, and `admin_remove_admin` (`0038_admin_roster.sql:78`) refuses
+to remove you from your own session and refuses to remove the last admin — guards a typed
+`delete` would not have.
+
+**Still open from A1, deliberately:** an admin cannot change their own password from the
+console. Offered alongside this decision and not taken, so it stays where A1 left it — the
+natural follow-up, and unrelated to recovery, since it only helps somebody who still knows
+the password they have.
 
 ## B. Layout that is visibly broken
 
