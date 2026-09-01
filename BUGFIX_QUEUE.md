@@ -71,20 +71,6 @@ answer is a decision rather than an oversight.
 
 ---
 
-### P13 — The gift bag never accounts for the tax inside its delivery fee
-
-`gift_bag_quote` returns `total = subtotal + delivery_fee + taxes` and splits
-`cgst`/`sgst` over `taxes` alone. The food path extracts the GST sitting inside
-its gross fees (`tax_on_fees`, `f × r / (10000 + r)`) and includes it in the
-split; the gift path has no such column and does not.
-
-**No live impact:** `gift_settings.delivery_fee` is ₹0, so there is nothing
-inside to extract. It becomes a real under-declaration the day somebody sets a
-gift delivery fee in the console, which `admin_set_gift_delivery_fee` allows in
-one call.
-
----
-
 ### P14 — The vendor's Earnings screen and their statement will not agree
 
 `vendor_earnings_summary` computes `net_earnings = (gross − own_offers) −
@@ -101,6 +87,56 @@ and label it the way the statement does.
 ---
 
 ## Closed
+
+### ~~P13 — The gift bag never accounts for the tax inside its delivery fee~~ · migration 0152, 2026-09-01
+
+**Was:** `gift_bag_quote` returned `total = subtotal + delivery_fee + taxes` and
+split `cgst`/`sgst` over `taxes` alone. Every fee on the food path is stored
+*gross* and `orders.tax_on_fees` records the GST already inside it, which is part
+of the split and part of what the platform owes. `gift_orders` had the same gross
+fee and no such column, so the GST inside it would have been collected and never
+declared.
+
+**Nothing had been under-declared**, which is why it was worth closing now rather
+than later: `gift_settings.delivery_fee` is ₹0 and all three live gift orders
+were placed at ₹0, so there had never been anything inside the fee to extract.
+The first call to `admin_set_gift_delivery_fee` (0118) would have started it, from
+a console screen with nothing on it to suggest a tax half was missing.
+
+**0152** adds `gift_orders.tax_on_fees`, extracts it in `gift_bag_quote` with the
+food path's own inclusive formula and rate — `f × r / (10000 + r)` at
+`fee_gst_rate_bps()`, so the two cannot drift apart — splits `cgst`/`sgst` over
+the whole liability, and writes the column in `place_gift_order`. Both function
+bodies were taken from `pg_get_functiondef` on the live database, which matched
+0112 exactly; the diff is the extraction, the split and one insert column.
+
+**Nobody pays a rupee more.** `tax_on_fees` is extracted from the fee, not added
+to it, so the fee, the total and every line are unchanged — verified at ₹0 (all
+zeroes, quote byte-identical) and at a ₹50 fee (`tax_on_fees` 8, total 2408 either
+way). No app change: `my_gift_orders` and `admin_gift_orders` return `taxes` and
+stop there, and neither Flutter screen reads `cgst`/`sgst`.
+
+**The constraint, and what it does not do.** `gift_order_tax_split_is_consistent`
+— `cgst + sgst + igst = taxes + tax_on_fees`, the check `orders` has carried since
+the money model was set and `gift_orders` never got. The three existing rows
+satisfy it (90 + 90 + 0 = 180), so it went on valid with no backfill. It would
+**not** have caught this bug: the old shape wrote `tax_on_fees = 0` and split over
+`taxes` alone, which adds up perfectly — under-declared and internally consistent
+at once. It catches the next mistake instead, and that half of the proof was
+written wrong first and corrected: extracting the fee's tax without widening the
+split, or widening the split without recording what it covers, now fails the
+insert. Nothing ties `tax_on_fees` to `delivery_fee` at the schema level — a check
+would hardcode the rate and refuse its own history the day it moved, and `orders`
+does not do it either. One pricing implementation is what guarantees the
+extraction.
+
+**Found on the way:** the payment gate is **armed** on the live database
+(`payment_settings.require_verified_payment = true` since 2026-08-29), and gifts
+are behind it — `gift_orders_require_verified_payment` refused the proof's test
+order until it was given a verified `payment_intents` row. The live-state table at
+the top of this file still says `false` and is stale; P4 closed that in 0141.
+
+---
 
 ### ~~P10 — Smaller items (seven of eight)~~ · migration 0151, 2026-08-30
 
