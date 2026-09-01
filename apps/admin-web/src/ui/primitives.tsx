@@ -133,7 +133,10 @@ export function Field({
         // grey text a screen reader never reaches.
         aria-describedby={error || hint ? noteId : undefined}
         aria-invalid={error ? true : undefined}
-        className={`h-11 w-full rounded-[8px] border bg-white px-3 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand ${RING} ${
+        // A read-only field that looks editable is one somebody types into and
+        // wonders why nothing happens. Still focusable and still selectable —
+        // the value is usually there to be copied.
+        className={`h-11 w-full rounded-[8px] border bg-white px-3 text-sm text-ink outline-none read-only:bg-canvas read-only:text-ink-muted placeholder:text-ink-muted focus:border-brand ${RING} ${
           error ? 'border-non-veg' : 'border-line'
         }`}
         {...rest}

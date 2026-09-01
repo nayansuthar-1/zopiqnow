@@ -8,7 +8,7 @@ that is wrong at runtime, wrong on screen, or wrong in what it tells the person 
 
 Twenty-two findings. Worked one at a time, top to bottom. Tick the box when it lands.
 
-**Done so far:** A1, all of B, and all of C.
+**Done so far:** A1, and all of B, C and D.
 
 ---
 
@@ -255,53 +255,70 @@ pre-existing `only-export-components` warnings (F6), and `vite build` succeeds.
 
 ## D. Actions that let you do the wrong thing
 
+Three of these are one `disabled` expression each, and the fourth is a field that stops
+claiming to be editable. What they have in common is that the database was never the thing
+that would stop you: it accepts a blank note, it stores a blank reason, and its upsert does
+exactly what an upsert does with a code it has not seen before.
+
 ### D1 — A support ticket can be closed with an empty reply, and the customer sees nothing
-- [ ] **High.** `src/support/SupportPage.tsx:309`
+- [x] **Done** — `src/support/SupportPage.tsx:314`
 
-"Mark answered" is never disabled. `admin_resolve_ticket`
-(`0095_a_customer_with_a_complaint.sql:295`) declares `p_note text default null` and
-normalises blank to null, so the database accepts it happily.
+`disabled={reply.trim() === ''}` on "Mark answered", matching how Live orders gates Cancel
+and Refunds gates Decline. `admin_resolve_ticket` normalises a blank note to null and
+closes the ticket regardless, and 0095 states in its own comment that a ticket cannot be
+reopened — so the one-click close was a complaint resolved, permanently, with nothing said
+to the person who raised it. The field's hint already promised the opposite: *"The customer
+reads this on their own order screen."*
 
-The field's own hint says *"The customer reads this on their own order screen."* A
-one-click close therefore resolves somebody's complaint and tells them nothing, and the
-ticket cannot be reopened — that is stated as a design rule in the same file.
-
-**Fix:** `disabled={reply.trim() === ''}`, matching how Live orders gates Cancel and
-Refunds gates Decline.
+`reply` is cleared when a ticket is opened (`:122`), so the gate cannot be satisfied by
+text left over from the previous ticket.
 
 ### D2 — An order can be destroyed with no reason recorded
-- [ ] **High.** `src/orders/AllOrdersPage.tsx:511`
+- [x] **Done** — `src/orders/AllOrdersPage.tsx:521`
 
-The Delete button is gated on typing the order id and on nothing else.
-`admin_delete_order` takes `p_reason text default ''` and stores
-`left(trim(coalesce(p_reason, '')), 200)`, so blank is stored as blank.
-
-The field's hint reads *"It is the only record that will remain"* — and for a delivered,
-invoiced order it genuinely is: the row, its items, its delivery, its messages and the
-customer's review all go, leaving a permanent gap in that restaurant's GST invoice series.
-An empty string is not a record.
-
-**Fix:** add `reason.trim() !== ''` to the `disabled` expression.
+`reason.trim() !== ''` joins the typed-id check. The two are doing different jobs and the
+comment now says so: typing the id is the pause before deleting the row your mouse happened
+to be over, and the reason is what survives. `admin_delete_order` stores
+`left(trim(coalesce(p_reason, '')), 200)` — a blank stays blank — and once the row, its
+items, its delivery, its messages and the customer's review are gone, that log line is the
+only account of an order that existed and was invoiced.
 
 ### D3 — Editing a coupon's code creates a second coupon instead of renaming it
-- [ ] `src/coupons/CouponsPage.tsx:263`
+- [x] **Done** — `src/coupons/CouponsPage.tsx:53,257,288`, `src/ui/primitives.tsx:139`
 
-`admin_save_coupon` is an upsert keyed on `p_code`. The Code field stays editable when
-editing an existing coupon, so changing `WELCOME50` to `WELCOME60` and saving leaves
-`WELCOME50` live and creates `WELCOME60` alongside it. The modal title already betrays
-this — it flips from the code to "New coupon" the moment the field is touched.
+`Draft` carries `isNew`, and the Code field is `readOnly` when it is false, with a hint
+that says a code cannot be renamed and points at switching it off and writing a new one.
+The modal title reads off the same flag instead of inferring newness by looking up the
+current text in `rows` — which is what made it flip to "New coupon" mid-edit, and which was
+the page telling on itself.
 
-**Fix:** make the Code field read-only when the draft came from an existing row (track an
-`isNew` flag on `Draft`), with a hint saying a code cannot be renamed.
+`Field` gained `read-only:bg-canvas read-only:text-ink-muted`, because a read-only field
+that looks editable is one somebody types into and wonders why nothing happens. Focus and
+selection are untouched — the code is there to be copied. **Verified in the built CSS**,
+per B2's lesson: `.read-only:bg-canvas:read-only{background-color:var(--color-canvas)}` is
+in `dist`, class-scoped and gated on the attribute, so no other `Field` is affected.
 
 ### D4 — A percentage coupon with no cap prints "20% off up to ₹null"
-- [ ] Low. `src/coupons/CouponsPage.tsx:40-44`
+- [x] **Done** — `src/coupons/CouponsPage.tsx:275`. Half of it was not real.
 
-`worth()` interpolates `c.max_off` without a null guard. Save sends `Number('') → 0` for a
-blank cap, so this needs both the read guard and a save-side check.
+The save-side check shipped: Save is disabled while a percentage coupon has no positive
+cap, so the form answers immediately instead of the RPC answering with a banner. That is
+what the field's own hint has always implied by calling an uncapped percentage an open
+cheque.
 
-**Fix:** guard the render, and disable Save when a percentage coupon has no cap — the
-form's own hint already calls an uncapped percentage "an open cheque".
+**The read guard was not added, because `₹null` cannot be rendered.** `coupons` has carried
+`coupon_is_flat_xor_capped_percent` since 0003 — a percentage row without a `max_off` is
+not storable — and both writers refuse it with a sentence before the constraint has to
+(`admin_save_coupon` 0074:160, `vendor_save_offer` 0064:428). Read off the live database
+rather than the migration files, since those two have disagreed before:
+
+| Check | Result |
+|---|---|
+| `coupon_is_flat_xor_capped_percent` still on the table | present, and unchanged from 0003 |
+| `coupons_max_off_check` | `CHECK (max_off > 0)` |
+| Rows with `percent_off is not null and max_off is null` | **0** |
+
+A null guard in `worth()` would be a branch that cannot execute, so there is not one.
 
 ---
 

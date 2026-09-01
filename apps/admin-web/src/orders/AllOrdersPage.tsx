@@ -513,7 +513,15 @@ export function AllOrdersPage() {
                 // Typing the id is not a permission check — the database refuses
                 // nothing here. It is the pause between meaning to delete one
                 // order and deleting the row your mouse happened to be over.
-                disabled={confirmId.trim().toUpperCase() !== deleting.order_id.toUpperCase()}
+                //
+                // The reason is the other half of that. `admin_delete_order`
+                // stores a blank one as blank, and once the row and everything
+                // hanging off it are gone, that log line is the only account of
+                // an order that existed.
+                disabled={
+                  reason.trim() === '' ||
+                  confirmId.trim().toUpperCase() !== deleting.order_id.toUpperCase()
+                }
               >
                 Delete for good
               </Button>

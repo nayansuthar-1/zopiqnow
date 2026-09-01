@@ -307,6 +307,11 @@ export function SupportPage() {
                   variant="primary"
                   onClick={() => void confirmResolve()}
                   loading={busy}
+                  // `admin_resolve_ticket` normalises a blank note to null and
+                  // closes the ticket anyway, and a ticket cannot be reopened.
+                  // So an empty answer is a complaint resolved and nothing said
+                  // to the person who made it.
+                  disabled={reply.trim() === ''}
                 >
                   Mark answered
                 </Button>

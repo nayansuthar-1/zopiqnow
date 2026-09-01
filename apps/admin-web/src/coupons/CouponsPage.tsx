@@ -46,6 +46,11 @@ function worth(c: CouponRow) {
 
 type Draft = {
   code: string
+  /// Whether this draft is a coupon that does not exist yet. `admin_save_coupon`
+  /// is an upsert keyed on the code, so editing the code of an existing coupon
+  /// does not rename it — it leaves the old one live and creates a second one
+  /// beside it. The field is therefore fixed once a coupon has a code.
+  isNew: boolean
   min_subtotal: string
   kind: 'flat' | 'percent'
   flat_off: string
@@ -65,6 +70,7 @@ type Draft = {
 
 const blank: Draft = {
   code: '',
+  isNew: true,
   min_subtotal: '0',
   kind: 'flat',
   flat_off: '',
@@ -200,6 +206,7 @@ export function CouponsPage() {
               onEdit={(c) =>
                 setDraft({
                   code: c.code,
+                  isNew: false,
                   min_subtotal: String(c.min_subtotal),
                   kind: c.flat_off !== null ? 'flat' : 'percent',
                   flat_off: c.flat_off === null ? '' : String(c.flat_off),
@@ -247,11 +254,7 @@ export function CouponsPage() {
         <Modal
           busy={busy}
           onClose={() => setDraft(null)}
-          title={
-            rows?.some((c) => c.code === draft.code.toUpperCase())
-              ? draft.code.toUpperCase()
-              : 'New coupon'
-          }
+          title={draft.isNew ? 'New coupon' : draft.code}
           footer={
             <>
               <Button
@@ -261,7 +264,16 @@ export function CouponsPage() {
               >
                 Cancel
               </Button>
-              <Button onClick={() => void save()} loading={busy}>
+              <Button
+                onClick={() => void save()}
+                loading={busy}
+                // A blank cap is sent as Number('') === 0, which
+                // `admin_save_coupon` refuses with a sentence — and the column
+                // is checked `max_off > 0` behind it. Saying so here saves a
+                // round trip to an error banner for what the hint beside the
+                // field has already called an open cheque.
+                disabled={draft.kind === 'percent' && !(Number(draft.max_off) > 0)}
+              >
                 Save
               </Button>
             </>
@@ -273,7 +285,12 @@ export function CouponsPage() {
                 value={draft.code}
                 onChange={(e) => setDraft({ ...draft, code: e.target.value })}
                 placeholder="WELCOME50"
-                hint="3–16 letters, numbers or hyphens. Upper-cased, and what a customer types at checkout."
+                readOnly={!draft.isNew}
+                hint={
+                  draft.isNew
+                    ? '3–16 letters, numbers or hyphens. Upper-cased, and what a customer types at checkout.'
+                    : 'A code cannot be renamed — customers may already have this one. Switch it off and write a new coupon instead.'
+                }
               />
 
               <div>
