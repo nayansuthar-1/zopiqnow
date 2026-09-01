@@ -134,7 +134,14 @@ class CartPage extends ConsumerWidget {
         ),
         content: const Text('Everything in it will be removed.'),
         actions: <Widget>[
-          TextButton(
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: dialogContext.zc.textMuted,
+              side: BorderSide(color: dialogContext.zc.divider),
+              shape: const RoundedRectangleBorder(
+                borderRadius: ZopiqRadii.rSm,
+              ),
+            ),
             onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text(
               'Keep it',
