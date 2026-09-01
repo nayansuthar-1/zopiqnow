@@ -543,7 +543,17 @@ export function UsersPage() {
         <UserSheet
           user={open}
           onClose={() => setOpen(null)}
-          onBlockToggle={setConfirming}
+          // The sheet closes as the confirmation opens. Both are `Modal`s, and
+          // two of those on screen at once each register a key handler on
+          // `document` and each run a focus trap: one Escape closed both, and
+          // Tab landed wherever the second trap happened to run. `applyBlock`
+          // closes the sheet on success anyway, so this only changes where
+          // Cancel lands — the table rather than the sheet, which is refetched
+          // whenever it is reopened.
+          onBlockToggle={(u) => {
+            setConfirming(u)
+            setOpen(null)
+          }}
         />
       )}
 

@@ -204,7 +204,14 @@ export function AllOrdersPage() {
       setDeleting(null)
       setReason('')
       setConfirmId('')
-      await load({ query: applied, status, range, restaurantId, page })
+      // Reloading the same page after deleting its only row returns nothing,
+      // and an empty page takes the pager with it — Previous included. Step
+      // back instead and let the filter effect do the reload.
+      if (rows?.length === 1 && page > 0) {
+        setPage(page - 1)
+      } else {
+        await load({ query: applied, status, range, restaurantId, page })
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {

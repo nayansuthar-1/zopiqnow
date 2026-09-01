@@ -91,6 +91,14 @@ export function LiveOrdersPage() {
   const appliedRef = useRef('')
   appliedRef.current = applied
 
+  // Same trick for the open confirmation. `acting` holds a captured row, so a
+  // poll that lands while the dialog is up can replace the rider the sentence
+  // on screen is naming. The action itself fires against an order id and stays
+  // correct either way — what goes stale is what the admin read before saying
+  // yes to it.
+  const actingRef = useRef(false)
+  actingRef.current = acting !== null
+
   const load = useCallback(async (q: string) => {
     try {
       const next = await api.orders(q === '' ? undefined : q)
@@ -108,7 +116,10 @@ export function LiveOrdersPage() {
   }, [load])
 
   useEffect(() => {
-    const poll = setInterval(() => void load(appliedRef.current), REFRESH_MS)
+    const poll = setInterval(() => {
+      if (actingRef.current) return
+      void load(appliedRef.current)
+    }, REFRESH_MS)
     // A second, faster timer for nothing but the relative times on screen. The
     // deadline countdown has to move every second; the data does not.
     const paint = setInterval(() => setTick((t) => t + 1), 1000)

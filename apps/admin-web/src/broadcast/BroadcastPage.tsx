@@ -59,6 +59,8 @@ export function BroadcastPage() {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [reach, setReach] = useState<number | null>(null)
+  const [reachError, setReachError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
   const [sent, setSent] = useState<BroadcastRow[] | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -80,21 +82,29 @@ export function BroadcastPage() {
   // The number is fetched per audience rather than counted once, because it is
   // the thing the confirmation is *about*: "send to 1,240 customers" has to be
   // 1,240 as of now, not as of when the page loaded.
+  //
+  // `attempt` exists so "Try again" can re-run this. Send stays disabled while
+  // the count is unknown — the confirmation is a sentence about that number —
+  // but a swallowed failure left the page reading "Counting…" for ever, with a
+  // dead Send button and nothing on screen admitting anything had gone wrong.
   useEffect(() => {
     let live = true
     setReach(null)
+    setReachError(null)
     api
       .broadcastReach(audience)
       .then((n) => {
         if (live) setReach(n)
       })
-      .catch(() => {
-        if (live) setReach(null)
+      .catch((e: unknown) => {
+        if (!live) return
+        setReach(null)
+        setReachError(e instanceof Error ? e.message : String(e))
       })
     return () => {
       live = false
     }
-  }, [audience])
+  }, [audience, attempt])
 
   async function send() {
     setBusy(true)
@@ -146,7 +156,11 @@ export function BroadcastPage() {
           />
           <p className="mt-2 text-sm text-ink-muted">
             {picked.who}{' '}
-            {reach === null ? (
+            {reachError !== null ? (
+              <span className="text-non-veg">
+                Counting them failed, so there is no number to send to.
+              </span>
+            ) : reach === null ? (
               'Counting…'
             ) : (
               <span className="font-semibold text-ink">
@@ -154,6 +168,19 @@ export function BroadcastPage() {
               </span>
             )}
           </p>
+
+          {reachError !== null && (
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setAttempt((n) => n + 1)}
+              >
+                Try again
+              </Button>
+              <span className="text-xs text-ink-muted">{reachError}</span>
+            </div>
+          )}
 
           <div className="mt-5 space-y-4">
             <Field

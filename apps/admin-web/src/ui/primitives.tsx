@@ -385,7 +385,12 @@ export function Modal({
 
     return () => {
       document.body.style.overflow = overflow
-      returnTo?.focus?.()
+      // Only hand focus back if nothing else has claimed it. When one dialog
+      // closes as another opens, the panel being torn down would otherwise
+      // throw the keyboard to the control behind *both* of them.
+      if (!document.activeElement?.closest('[role="dialog"]')) {
+        returnTo?.focus?.()
+      }
     }
   }, [])
 

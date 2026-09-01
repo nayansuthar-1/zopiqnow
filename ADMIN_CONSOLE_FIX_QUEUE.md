@@ -8,7 +8,7 @@ that is wrong at runtime, wrong on screen, or wrong in what it tells the person 
 
 Twenty-two findings. Worked one at a time, top to bottom. Tick the box when it lands.
 
-**Done so far:** A1, and all of B, C and D.
+**Done so far:** A1, and all of B, C, D and E.
 
 ---
 
@@ -325,55 +325,62 @@ A null guard in `worth()` would be a branch that cannot execute, so there is not
 ## E. States a screen cannot get out of
 
 ### E1 — If the reach count fails, Send is disabled forever and nothing says why
-- [ ] `src/broadcast/BroadcastPage.tsx:92`
+- [x] **Done** — `src/broadcast/BroadcastPage.tsx:62,86,159,172`
 
-```ts
-.catch(() => { if (live) setReach(null) })
-```
+The failure is held in `reachError` and shown where the number would have been —
+"Counting them failed, so there is no number to send to" — with a **Try again** beside it
+and the raw message next to that, small, for whoever has to say what went wrong. An
+`attempt` counter in the effect's dependencies is what the retry turns.
 
-`ready` requires `reach !== null && reach > 0`, so a failed count disables Send
-permanently. The line beside the audience picker reads "Counting…" and never stops. The
-error is swallowed, so the page looks like it is still working.
-
-**Fix:** hold the failure in state, show it, and offer a retry. Keep Send disabled — the
-confirmation is *about* that number — but say so.
+Send stays disabled, as the finding asked: the confirmation is a sentence *about* that
+number, and offering to send to an audience nobody has counted is worse than not offering.
+The difference is that the page now says which of the two it is instead of reading
+"Counting…" for ever behind a dead button.
 
 ### E2 — Two stacked modals fight over Escape and over Tab
-- [ ] `src/users/UsersPage.tsx:127,550`
+- [x] **Done** — `src/users/UsersPage.tsx:553`, `src/ui/primitives.tsx:391`
 
-"Block this person" is inside the open `UserSheet`, and `setConfirming` mounts
-`BlockDialog` on top without closing the sheet. Both are `<Modal>`, and `Modal` registers
-its key handler on `document` in the capture phase.
+Took the simpler of the two options: `UserSheet` closes as `BlockDialog` opens, so there is
+never a second `Modal` to argue with. Escape and Tab then have one owner by construction,
+which is a stronger guarantee than `stopImmediatePropagation` plus a mounted-instance
+counter would have been, and it costs nothing the page was not already doing —
+`applyBlock` closes the sheet on success anyway. The only behaviour that changes is where
+**Cancel** lands: the table rather than the sheet, which is refetched whenever it reopens.
 
-- **Escape** calls `e.stopPropagation()`, which does not stop sibling listeners on the
-  same node — that needs `stopImmediatePropagation`. So one Escape closes the confirmation
-  *and* the person sheet behind it.
-- **Tab** runs both focus traps. Each tries to wrap focus into its own panel, and whichever
-  runs second wins, so tabbing inside the confirmation lands unpredictably on the sheet.
+One thing the swap needed. `Modal`'s unmount effect hands focus back to whatever opened it,
+and one dialog closing in the same commit as another opens would have thrown the keyboard
+to the control behind *both*. The hand-back is now conditional on nothing else having
+claimed focus — `document.activeElement?.closest('[role="dialog"]')` — which makes the
+result the same whichever order React runs the two effects in, rather than correct by
+accident.
 
-**Fix:** the narrow version is `stopImmediatePropagation` plus having only the topmost
-`Modal` act — a small mounted-instance counter inside `primitives.tsx`. The simpler
-version is to close `UserSheet` when `BlockDialog` opens, since the sheet is refetched on
-reopen anyway.
+**Swept for other stacks and there are none.** Twelve files mount more than one dialog, but
+in every one of them the opener is a row or a toolbar — behind the backdrop, and
+unclickable — the moment any dialog is up. `UserSheet`'s footer button was the only opener
+that lived *inside* a dialog. The counter in `primitives.tsx` remains the answer if a
+second stack is ever wanted deliberately.
 
 ### E3 — The live board's confirmation dialog reads from a snapshot the poller has replaced
-- [ ] Low. `src/orders/LiveOrdersPage.tsx:113`
+- [x] **Done** — `src/orders/LiveOrdersPage.tsx:99,120`
 
-`acting` holds a captured `AdminOrderRow`. The 15-second poll calls `setRows` underneath
-it, so an open "Release rider" dialog can go on naming a rider who has since been changed
-— and the confirm still fires against the order id, which is right, but the sentence the
-admin read may not be.
+The 15-second poll skips a tick while a confirmation is open, through an `actingRef` read
+inside the interval — the same shape as the `appliedRef` already there, and for the same
+reason: the timer is not torn down and rebuilt. Chose this over re-deriving the row from
+`rows` by id, because an order that leaves the live board mid-dialog has no row to
+re-derive from and the dialog would have had to handle its own subject vanishing.
 
-**Fix:** pause the poll while `acting !== null`, or re-derive the row from `rows` by id on
-each render.
+The one-second repaint keeps running, so the header goes on counting honestly — "updated
+45s ago" is what it now says while a dialog is up, which is true. The action was never
+wrong: it fires against an order id. What was wrong was the sentence the admin read before
+agreeing to it.
 
 ### E4 — Deleting the last order on a page leaves an empty page with no way forward
-- [ ] Low. `src/orders/AllOrdersPage.tsx:197`
+- [x] **Done** — `src/orders/AllOrdersPage.tsx:210`
 
-`confirmDelete` reloads at the same `page`. If that page held one row, the reload returns
-nothing, `total` becomes 0, and the pager disappears — including the Previous button.
-
-**Fix:** after a delete that empties the page, step back one page when `page > 0`.
+`confirmDelete` steps back a page when the row it deleted was the only one on it and there
+is a page to step back to, and lets the filter effect do the reload rather than firing a
+second one. Deleting the last order on page 1 still leaves page 1 empty — with the pager
+gone, which is correct, because there is nothing to page through.
 
 ---
 
