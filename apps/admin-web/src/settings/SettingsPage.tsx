@@ -18,8 +18,14 @@ export function SettingsPage() {
   const [admins, setAdmins] = useState<AdminRow[] | null>(null)
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
+  const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /// What the database said happened. Not dismissed on its own timer: it names
+  /// the address that can now sign in, and on a fresh account it is the only
+  /// confirmation that the password went in — worth leaving on screen until it
+  /// is read.
+  const [note, setNote] = useState<string | null>(null)
   const [removing, setRemoving] = useState<AdminRow | null>(null)
 
   const load = useCallback(async () => {
@@ -37,6 +43,7 @@ export function SettingsPage() {
   async function run(action: () => Promise<unknown>) {
     setBusy(true)
     setError(null)
+    setNote(null)
     try {
       await action()
       await load()
@@ -58,7 +65,14 @@ export function SettingsPage() {
 
       <div className="max-w-2xl p-6">
         {error && (
-          <Banner tone="error" className="mb-4">{error}</Banner>
+          <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
+        )}
+        {note && (
+          <Banner tone="success" className="mb-4" onDismiss={() => setNote(null)}>
+            {note}
+          </Banner>
         )}
 
         <div className="rounded-[12px] border border-line bg-white p-6">
@@ -101,13 +115,19 @@ export function SettingsPage() {
           )}
 
           <form
-            className="mt-5 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+            className="mt-5 grid gap-3 sm:grid-cols-2"
             onSubmit={(e) => {
               e.preventDefault()
               void run(async () => {
-                await api.addAdmin(email, name)
+                const said = await api.addAdmin(email, name, password)
                 setEmail('')
                 setName('')
+                setPassword('')
+                // The database's own sentence, which says which of the two
+                // things happened — an account was created, or an existing one
+                // was granted access. Guessing here would mean the console
+                // claiming it made an account on the occasions it did not.
+                setNote(said)
               })
             }}
           >
@@ -124,13 +144,34 @@ export function SettingsPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="priya@siteonlab.com"
             />
-            <Button type="submit" variant="secondary" disabled={busy}>
-              Add admin
-            </Button>
+            <Field
+              className="sm:col-span-2"
+              label="Password"
+              // `text`, not `password`. Whoever types this has to read it back to
+              // the person it belongs to — it is not mailed and cannot be shown
+              // again — and a row of dots is how a handover password gets
+              // mistyped into a lockout.
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              // Off, all of it. This is somebody else's password being typed on
+              // an admin's machine; offering to save it into their own keychain
+              // is offering to store the wrong credential under the right site.
+              autoComplete="off"
+              placeholder="At least 10 characters"
+              hint="Leave blank if they already have a Zopiqnow account — they keep the password they have, and this screen cannot change it."
+            />
+            <div className="sm:col-span-2">
+              <Button type="submit" variant="secondary" disabled={busy}>
+                Add admin
+              </Button>
+            </div>
           </form>
           <p className="mt-3 text-sm text-ink-muted">
-            They sign in with a code sent to that address — there is no password to
-            set, and no account to create first.
+            An address that has never signed in to Zopiqnow needs a password here
+            — it creates the account, and you hand the password over in person.
+            One that has signed in before, as a customer or a restaurant, keeps
+            the password it already has.
           </p>
         </div>
 

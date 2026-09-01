@@ -340,8 +340,24 @@ export const api = {
 
   listAdmins: () => rpc<AdminRow[]>('admin_list_admins'),
 
-  addAdmin: (email: string, name: string) =>
-    rpc<void>('admin_add_admin', { p_email: email, p_name: name }),
+  /// Grants console access, and creates the account to use it with (0153).
+  ///
+  /// Until that migration this wrote one `platform_admins` row and nothing else,
+  /// which made somebody authorised without making them able to sign in — the
+  /// console's door is a password against `auth.users`, and there was no
+  /// `auth.users` row to check it against.
+  ///
+  /// `password` is required for an address that has never signed in to Zopiqnow
+  /// and **refused** for one that has: setting a password on an existing account
+  /// would be a way to take over any address on the platform. The database
+  /// decides which case this is and says so in the returned sentence, which is
+  /// written to be shown to the admin as-is.
+  addAdmin: (email: string, name: string, password: string | null) =>
+    rpc<string>('admin_add_admin', {
+      p_email: email,
+      p_name: name,
+      p_password: password === null || password === '' ? null : password,
+    }),
 
   removeAdmin: (email: string) => rpc<void>('admin_remove_admin', { p_email: email }),
 
