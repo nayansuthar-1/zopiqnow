@@ -61,8 +61,13 @@ const statusLabel: Record<RefundRow['status'], string> = {
 
 type Filter = 'open' | 'paid' | 'all'
 
+/// Open is four of the six statuses, and it is the question the header asks as
+/// well as the one the tabs ask — so it is one predicate rather than the same
+/// clause written out in both places.
+const isOpen = (r: RefundRow) => r.status !== 'paid' && r.status !== 'declined'
+
 export function RefundsPage() {
-  const [rows, setRows] = useState<RefundRow[] | null>(null)
+  const [all, setAll] = useState<RefundRow[] | null>(null)
   const [filter, setFilter] = useState<Filter>('open')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -84,22 +89,14 @@ export function RefundsPage() {
 
   const load = useCallback(async () => {
     try {
-      // One call and filtered here, unlike Payouts: "open" is four of the six
-      // statuses and the RPC takes exactly one.
-      const all = await api.listRefunds()
-      setRows(
-        filter === 'all'
-          ? all
-          : filter === 'paid'
-            ? all.filter((r) => r.status === 'paid' || r.status === 'declined')
-            : all.filter(
-                (r) => r.status !== 'paid' && r.status !== 'declined',
-              ),
-      )
+      // One call and filtered below, unlike Payouts: "open" is four of the six
+      // statuses and the RPC takes exactly one. The whole list is what is held,
+      // so that what is owed does not change when the tab does.
+      setAll(await api.listRefunds())
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
-  }, [filter])
+  }, [])
 
   useEffect(() => {
     void load()
@@ -119,9 +116,20 @@ export function RefundsPage() {
     }
   }
 
-  const owed = (rows ?? [])
-    .filter((r) => r.status !== 'paid' && r.status !== 'declined')
-    .reduce((sum, r) => sum + r.amount, 0)
+  const rows =
+    all === null
+      ? null
+      : filter === 'all'
+        ? all
+        : filter === 'paid'
+          ? all.filter((r) => !isOpen(r))
+          : all.filter(isOpen)
+
+  // From the unfiltered list. The header answers "how much is still to go out",
+  // and that is the same figure whichever tab is showing. Summing the visible
+  // rows had Closed stating that nothing was owed while Open, one click away,
+  // was full of money.
+  const owed = (all ?? []).filter(isOpen).reduce((sum, r) => sum + r.amount, 0)
 
   return (
     <>

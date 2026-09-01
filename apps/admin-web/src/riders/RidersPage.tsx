@@ -7,6 +7,7 @@ import type {
   RiderRow,
   Vehicle,
 } from '../lib/api'
+import { todayLocal } from '../lib/dates'
 import {
   signedRiderDocumentUrl,
   uploadRiderDocument,
@@ -625,7 +626,7 @@ function KycDialog({
     }
   }, [rider.email])
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayLocal()
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true)

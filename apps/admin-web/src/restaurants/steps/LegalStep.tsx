@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../../lib/api'
 import type { RestaurantDetail } from '../../lib/api'
+import { todayLocal } from '../../lib/dates'
 import { signedDocumentUrl, uploadDocument, UploadFailure } from '../../lib/uploads'
 import { Field } from '../../ui/primitives'
 import { StepFrame } from './StepFrame'
@@ -115,8 +116,7 @@ export function LegalStep({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const expired =
-    fssaiExpiry !== '' && fssaiExpiry < new Date().toISOString().slice(0, 10)
+  const expired = fssaiExpiry !== '' && fssaiExpiry < todayLocal()
 
   async function save() {
     setBusy(true)

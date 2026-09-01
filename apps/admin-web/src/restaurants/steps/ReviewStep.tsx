@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import type { MenuItemRow, RestaurantDetail } from '../../lib/api'
+import { todayLocal } from '../../lib/dates'
 import { Button, ConfirmDialog, Modal, TextArea } from '../../ui/primitives'
 
 /// Everything collected, in one place, with what is still missing said plainly.
@@ -17,7 +18,7 @@ function checksFor(d: RestaurantDetail, menu: MenuItemRow[]): Check[] {
   const r = d.restaurant
   const sellable = menu.filter((m) => m.is_available && m.category_available)
   const expiry = d.legal?.fssai_expiry
-  const expired = expiry ? expiry < new Date().toISOString().slice(0, 10) : false
+  const expired = expiry ? expiry < todayLocal() : false
 
   return [
     {

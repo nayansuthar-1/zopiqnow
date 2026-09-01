@@ -8,7 +8,7 @@ that is wrong at runtime, wrong on screen, or wrong in what it tells the person 
 
 Twenty-two findings. Worked one at a time, top to bottom. Tick the box when it lands.
 
-**Done so far:** A1, and all of B.
+**Done so far:** A1, all of B, and all of C.
 
 ---
 
@@ -194,45 +194,62 @@ survives in exactly one place, which is the modal backdrop's `bg-ink/40` — whe
 
 ## C. Wrong numbers and wrong dates
 
+A date input names a **calendar day**, in the timezone of the desk it was typed at.
+`Date` does not: ECMAScript parses a bare `"2026-09-30"` as UTC midnight, which is 05:30
+on the 30th here, and `toISOString().slice(0, 10)` is the same mistake read back. All
+three findings below were that slip, so all three now go through one small module —
+`src/lib/dates.ts`, holding `toDateInput`, `todayLocal` and `endOfDayLocal`, each built
+from `getFullYear`/`getMonth`/`getDate`, which are the parts of `Date` that read the local
+calendar.
+
+The two other date fields in the console were checked and left alone: `OrderAdsPage` and
+`HeroSlidesPage` use `datetime-local`, which ECMAScript parses as **local** time, so
+`new Date(value).toISOString()` there is already the instant the admin meant.
+
 ### C1 — A coupon's end date expires the coupon eighteen hours early
-- [ ] **High.** `src/coupons/CouponsPage.tsx:115`
+- [x] **Done** — `src/lib/dates.ts`, `src/coupons/CouponsPage.tsx:120,213,341`
 
-```ts
-valid_until: draft.valid_until ? new Date(draft.valid_until).toISOString() : null
-```
+`new Date(draft.valid_until).toISOString()` handed Postgres `2026-09-30T00:00:00Z` for a
+coupon set to run until the 30th — 05:30 IST that morning. Now
+`endOfDayLocal(draft.valid_until)`, which is that day's last second where it was picked:
+`2026-09-30T18:29:59Z`. The read back on edit is `toDateInput(new Date(c.valid_until))`
+rather than `slice(0, 10)`, because east of Greenwich an instant in the small hours is
+still the previous day in UTC and would reload a coupon as ending the day before the one
+it was given. The field's hint now says the code works all of that day, since that is a
+promise the form is making and nothing else on screen said it.
 
-`draft.valid_until` comes from `<input type="date">`, so it is `"2026-09-30"`. ECMAScript
-parses a bare date-only string as **UTC midnight**, not local midnight. `toISOString()`
-then hands Postgres `2026-09-30T00:00:00Z` — which is 05:30 IST on the 30th.
+Worth noting what the old code did to *today*: `admin_save_coupon` refuses
+`p_valid_until <= now()` (0074:171), so setting a coupon to run until today was not merely
+short — it was rejected outright, with a sentence about a date in the past on a date the
+admin had just picked from a calendar that offered it.
 
-A coupon an admin set to run until the 30th dies at half past five that morning. The
-round trip compounds it: `valid_until.slice(0, 10)` on edit reads the UTC date back, so a
-late-evening timestamp reloads as the previous day.
-
-**Fix:** build the instant in local time and take end-of-day —
-`new Date(`${draft.valid_until}T23:59:59`)` — and format the value back for the input from
-the local date parts rather than slicing the ISO string.
+**Verified** under `TZ=Asia/Kolkata`: the saved instant is `2026-09-30T18:29:59.000Z`, it
+reads back into the input as `2026-09-30`, and a cart at noon on the 30th sees the coupon
+live where the old value had already expired.
 
 ### C2 — Refunds says "₹0 still to send" whenever you are on the Closed tab
-- [ ] `src/payouts/RefundsPage.tsx:122,132`
+- [x] **Done** — `src/payouts/RefundsPage.tsx:67,70,90,119`
 
-`owed` sums `rows`, and `rows` is already narrowed by the active filter. On **Closed**,
-every row is `paid` or `declined`, the sum is zero, and the header states as fact that
-nothing is owed — while the Open tab, one click away, is full of money.
+`load` filtered before it stored, so `rows` — and therefore `owed` — held only the active
+tab. State now holds the whole list; `rows` and `owed` are both derived from it, so the
+header answers the same question on Closed as on Open. `load` no longer closes over
+`filter`, which also means switching tabs no longer re-fetches.
 
-**Fix:** keep the unfiltered list in state and derive both `rows` and `owed` from it, so
-the header answers the same question on every tab.
+The open-ness test that was written out twice is now one `isOpen` predicate beside the
+`Filter` type — it is the question the header asks as well as the one the tabs ask.
 
 ### C3 — `new Date().toISOString().slice(0, 10)` is yesterday until 05:30 IST
-- [ ] Low. `src/restaurants/steps/LegalStep.tsx:119`,
-      `src/restaurants/steps/ReviewStep.tsx:20`, `src/riders/RidersPage.tsx:628`
+- [x] **Done** — `src/restaurants/steps/LegalStep.tsx:119`,
+      `src/restaurants/steps/ReviewStep.tsx:21`, `src/riders/RidersPage.tsx:629`
 
-The same UTC-vs-local slip as C1, in the other direction. Between midnight and 05:30 IST
-this yields the previous day, so an FSSAI licence that expires today reads as still valid,
-and the KYC override's `min` date allows a date already past.
+All three now call `todayLocal()`. Between midnight and 05:30 the old expression returned
+the previous day, so an FSSAI licence expiring today read as still valid on both the Legal
+step and the Review checklist, and the KYC dialog's `min` accepted a licence or insurance
+expiry that had already passed.
 
-**Fix:** one shared `todayLocal()` helper built from `getFullYear/getMonth/getDate`, used
-in all three places.
+**Verified:** at 02:00 IST on 30 September, `todayLocal()` is `2026-09-30` where the old
+expression was `2026-09-29`. `tsc -b` is clean, `oxlint` still reports only the two
+pre-existing `only-export-components` warnings (F6), and `vite build` succeeds.
 
 ---
 

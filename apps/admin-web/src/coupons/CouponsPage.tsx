@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, couponStateOf } from '../lib/api'
 import type { CouponRow, CouponState } from '../lib/api'
+import { endOfDayLocal, toDateInput } from '../lib/dates'
 import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
@@ -111,8 +112,12 @@ export function CouponsPage() {
         flat_off: draft.kind === 'flat' ? Number(draft.flat_off || 0) : null,
         percent_off: draft.kind === 'percent' ? Number(draft.percent_off || 0) : null,
         max_off: draft.kind === 'percent' ? Number(draft.max_off || 0) : null,
+        // A date input hands back a bare "2026-09-30", which ECMAScript reads
+        // as UTC midnight — half past five on the morning of the 30th, here.
+        // The day an admin picks as the last day is a day the code still works
+        // on, so it is that day's last second in the timezone it was picked in.
         valid_until: draft.valid_until
-          ? new Date(draft.valid_until).toISOString()
+          ? endOfDayLocal(draft.valid_until).toISOString()
           : null,
         // Blank is a deliberate "no limit", not a zero — the RPC refuses 0 and
         // the column reads null as unbounded, so an empty field has to arrive
@@ -200,8 +205,12 @@ export function CouponsPage() {
                   flat_off: c.flat_off === null ? '' : String(c.flat_off),
                   percent_off: c.percent_off === null ? '' : String(c.percent_off),
                   max_off: c.max_off === null ? '' : String(c.max_off),
+                  // Read off the local calendar rather than sliced out of
+                  // the ISO string: an instant in the small hours here is still
+                  // the previous day in UTC, so slicing reloads a coupon as
+                  // ending the day before the one it was given.
                   valid_until: c.valid_until
-                    ? c.valid_until.slice(0, 10)
+                    ? toDateInput(new Date(c.valid_until))
                     : '',
                   // Null is "no limit" in the column and blank is how the form
                   // says it, so the two map onto each other directly. Editing a
@@ -329,7 +338,7 @@ export function CouponsPage() {
                 onChange={(e) =>
                   setDraft({ ...draft, valid_until: e.target.value })
                 }
-                hint="Leave empty for no end date."
+                hint="The code works all of that day. Leave empty for no end date."
               />
 
               {/* The caps (0075). Grouped and separated from the pricing above,
