@@ -3,7 +3,15 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api, statusOf } from '../lib/api'
 import type { RestaurantRow, Status } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
-import { Banner, Button, ConfirmDialog, EmptyState, Pill, TableSkeleton } from '../ui/primitives'
+import {
+  Banner,
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  Pill,
+  SegmentedControl,
+  TableSkeleton,
+} from '../ui/primitives'
 
 const statusLabels: Record<Status, string> = {
   live: 'Live',
@@ -11,6 +19,18 @@ const statusLabels: Record<Status, string> = {
   draft: 'Draft',
   delisted: 'Delisted',
 }
+
+/// The same five choices the hand-rolled pill row offered, in the shape the rest
+/// of the console's filters use. Written out rather than derived from
+/// `statusLabels` so that 'all' — which is not a `Status` and has no entry there
+/// — is not a special case threaded through a map.
+const filterOptions: { value: Status | 'all'; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'live', label: statusLabels.live },
+  { value: 'paused', label: statusLabels.paused },
+  { value: 'draft', label: statusLabels.draft },
+  { value: 'delisted', label: statusLabels.delisted },
+]
 
 const statusTones: Record<Status, 'live' | 'warn' | 'neutral' | 'danger'> = {
   live: 'live',
@@ -111,21 +131,12 @@ export function RestaurantsPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <div className="flex gap-1">
-            {(['all', 'live', 'paused', 'draft', 'delisted'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  filter === f
-                    ? 'bg-ink text-white'
-                    : 'bg-white text-ink-muted hover:text-ink'
-                }`}
-              >
-                {f === 'all' ? 'All' : statusLabels[f]}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl<Status | 'all'>
+            label="Filter restaurants"
+            value={filter}
+            onChange={setFilter}
+            options={filterOptions}
+          />
         </div>
 
         {error && (

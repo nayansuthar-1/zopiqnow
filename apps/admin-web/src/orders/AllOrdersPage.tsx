@@ -455,6 +455,13 @@ export function AllOrdersPage() {
 
       {photosFor && (
         <Modal
+          // `lg`, because this is the viewer rather than a glance. Three
+          // photographs in the default `md` land at about 120px square, and what
+          // support is usually doing here is reading a receipt taped to a bag.
+          // Support's own copy of these three stays small on purpose — there the
+          // photographs sit beside a complaint being read, and the full size is
+          // one click away in both.
+          size="lg"
           onClose={() => setPhotosFor(null)}
           title={`Photos — ${photosFor.order_id}`}
           footer={

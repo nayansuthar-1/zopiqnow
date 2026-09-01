@@ -8,7 +8,7 @@ that is wrong at runtime, wrong on screen, or wrong in what it tells the person 
 
 Twenty-two findings. Worked one at a time, top to bottom. Tick the box when it lands.
 
-**Done so far:** A1, B1, B2.
+**Done so far:** A1, and all of B.
 
 ---
 
@@ -163,27 +163,32 @@ That sweep is worth re-running after any future styling work — it is the only 
 catches this class of bug, because the build stays green either way.
 
 ### B3 — The evidence modal squeezes three photos into a 448px dialog
-- [ ] `src/orders/AllOrdersPage.tsx:459`
+- [x] **Done** — `src/orders/AllOrdersPage.tsx:456`
 
-The photos modal takes the default `size="md"` (`max-w-md`) and puts a
-`sm:grid-cols-3` grid inside it. Each photograph lands at roughly 120px square. Support
-opens this to look at a receipt taped to a bag.
+The photos modal took the default `size="md"` (`max-w-md`) and put a `sm:grid-cols-3` grid
+inside it, so each photograph landed at roughly 120px square. What support is usually doing
+here is reading a receipt taped to a bag.
 
-`SupportPage`'s own copy of the same three photos is a deliberate glance, and small is
-correct there. This one is the dedicated viewer.
-
-**Fix:** `size="lg"` on the modal.
+Now `size="lg"` (`max-w-2xl`). `SupportPage`'s own copy of the same three photographs stays
+small deliberately, and the code now says why: there they sit beside a complaint being
+read, and this is the dedicated viewer. Full size is one click away in both.
 
 ### B4 — The restaurant status filter is the only filter row in the console that is not a `SegmentedControl`
-- [ ] `src/restaurants/RestaurantsPage.tsx:112-127`
+- [x] **Done** — `src/restaurants/RestaurantsPage.tsx:134`
 
-Hand-rolled `<button>` pills, active state `bg-ink text-white` — dark navy chips, against
-the orange `bg-brand-soft text-brand-deep` that Orders, Support, Refunds, Alerts, Users,
-Settlements, Payouts and Gift orders all use. They also carry no `role="radio"`, no
-`aria-checked` and no `type`, so a screen reader reads five unrelated buttons and never
-says which one is on.
+Hand-rolled `<button>` pills with an active state of `bg-ink text-white` — dark navy chips,
+against the orange `bg-brand-soft text-brand-deep` that every other filter row uses. They
+also carried no `role="radio"`, no `aria-checked` and no `type`, so a screen reader read
+five unrelated buttons and never said which one was on.
 
-**Fix:** swap for `SegmentedControl<Status | 'all'>`.
+Replaced with `SegmentedControl<Status | 'all'>`, which is a real `radiogroup` and brings
+the focus ring with it. The five choices moved into a `filterOptions` constant beside
+`statusLabels`, written out rather than derived, so that `'all'` — which is not a `Status`
+and has no `statusLabels` entry — is not a special case threaded through a map.
+
+**Verified:** a sweep for the old pill styling (`rounded-full px-3 py-1.5`, `bg-ink
+text-white`) now returns nothing, and fourteen files import `SegmentedControl`. `bg-ink`
+survives in exactly one place, which is the modal backdrop's `bg-ink/40` — where it belongs.
 
 ---
 
