@@ -170,120 +170,122 @@ export function SupportPage() {
         }
       />
 
-      {error && <Banner tone="error" className="mb-4">{error}</Banner>}
-      {note && (
-        <Banner tone="success" className="mb-4" onDismiss={() => setNote(null)}>
-          {note}
-        </Banner>
-      )}
-
-      <div className="rounded-xl border border-line bg-surface">
-        {rows === null ? (
-          <TableSkeleton rows={6} />
-        ) : rows.length === 0 ? (
-          <EmptyState
-            title={filter === 'open' ? 'Nothing waiting' : 'Nothing here'}
-            body={
-              filter === 'open'
-                ? 'Every complaint has been answered.'
-                : 'No tickets match this filter.'
-            }
-          />
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
-                  <tr>
-                    <th className="px-5 py-3">Waiting</th>
-                    <th className="px-5 py-3">Problem</th>
-                    <th className="px-5 py-3">Order</th>
-                    <th className="px-5 py-3">Customer</th>
-                    <th className="px-5 py-3 text-right">Value</th>
-                    <th className="px-5 py-3 text-right" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {rows.map((tk) => (
-                    <tr key={tk.id}>
-                      <td className="px-5 py-4 align-top">
-                        <p className="font-semibold text-ink">
-                          {tk.status === 'open' ? waited(tk.created_at) : '—'}
-                        </p>
-                        <p className="text-xs text-ink-muted">
-                          {when(tk.created_at)}
-                        </p>
-                      </td>
-                      <td className="px-5 py-4 align-top">
-                        <Pill tone={tk.status === 'open' ? 'warn' : 'neutral'}>
-                          {ISSUE_LABEL[tk.category]}
-                        </Pill>
-                        {tk.body && (
-                          <p className="mt-1 max-w-md text-xs text-ink-muted">
-                            {tk.body}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-5 py-4 align-top">
-                        <p className="text-ink">
-                          {tk.order_id}
-                          {tk.kind === 'gift' && (
-                            // Said out loud rather than left to be inferred from
-                            // the id prefix. A gift complaint is answered
-                            // differently — no kitchen to call, no rider to ask.
-                            <span className="ml-2 align-middle">
-                              <Pill tone="neutral">Gift</Pill>
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-xs text-ink-muted">
-                          {tk.seller_name} · {orderStatusLabel(tk)}
-                        </p>
-                      </td>
-                      <td className="px-5 py-4 align-top text-ink">
-                        {tk.customer_phone}
-                      </td>
-                      <td className="px-5 py-4 text-right align-top font-semibold text-ink">
-                        ₹{tk.order_total}
-                      </td>
-                      <td className="px-5 py-4 text-right align-top">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => void open(tk)}
-                        >
-                          {tk.status === 'open' ? 'Answer' : 'View'}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {pages > 1 && (
-              <div className="mt-4 flex items-center justify-between px-5 pb-5">
-                <Button
-                  variant="secondary"
-                  disabled={page === 0}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-ink-muted">
-                  Page {page + 1} of {pages}
-                </span>
-                <Button
-                  variant="secondary"
-                  disabled={page + 1 >= pages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
-          </>
+      <div className="p-6">
+        {error && <Banner tone="error" className="mb-4">{error}</Banner>}
+        {note && (
+          <Banner tone="success" className="mb-4" onDismiss={() => setNote(null)}>
+            {note}
+          </Banner>
         )}
+
+        <div className="overflow-hidden rounded-[12px] border border-line bg-white">
+          {rows === null ? (
+            <TableSkeleton rows={6} />
+          ) : rows.length === 0 ? (
+            <EmptyState
+              title={filter === 'open' ? 'Nothing waiting' : 'Nothing here'}
+              body={
+                filter === 'open'
+                  ? 'Every complaint has been answered.'
+                  : 'No tickets match this filter.'
+              }
+            />
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
+                    <tr>
+                      <th className="px-5 py-3">Waiting</th>
+                      <th className="px-5 py-3">Problem</th>
+                      <th className="px-5 py-3">Order</th>
+                      <th className="px-5 py-3">Customer</th>
+                      <th className="px-5 py-3 text-right">Value</th>
+                      <th className="px-5 py-3 text-right" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {rows.map((tk) => (
+                      <tr key={tk.id}>
+                        <td className="px-5 py-4 align-top">
+                          <p className="font-semibold text-ink">
+                            {tk.status === 'open' ? waited(tk.created_at) : '—'}
+                          </p>
+                          <p className="text-xs text-ink-muted">
+                            {when(tk.created_at)}
+                          </p>
+                        </td>
+                        <td className="px-5 py-4 align-top">
+                          <Pill tone={tk.status === 'open' ? 'warn' : 'neutral'}>
+                            {ISSUE_LABEL[tk.category]}
+                          </Pill>
+                          {tk.body && (
+                            <p className="mt-1 max-w-md text-xs text-ink-muted">
+                              {tk.body}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-5 py-4 align-top">
+                          <p className="text-ink">
+                            {tk.order_id}
+                            {tk.kind === 'gift' && (
+                              // Said out loud rather than left to be inferred from
+                              // the id prefix. A gift complaint is answered
+                              // differently — no kitchen to call, no rider to ask.
+                              <span className="ml-2 align-middle">
+                                <Pill tone="neutral">Gift</Pill>
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-ink-muted">
+                            {tk.seller_name} · {orderStatusLabel(tk)}
+                          </p>
+                        </td>
+                        <td className="px-5 py-4 align-top text-ink">
+                          {tk.customer_phone}
+                        </td>
+                        <td className="px-5 py-4 text-right align-top font-semibold text-ink">
+                          ₹{tk.order_total}
+                        </td>
+                        <td className="px-5 py-4 text-right align-top">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void open(tk)}
+                          >
+                            {tk.status === 'open' ? 'Answer' : 'View'}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {pages > 1 && (
+                <div className="mt-4 flex items-center justify-between px-5 pb-5">
+                  <Button
+                    variant="secondary"
+                    disabled={page === 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-ink-muted">
+                    Page {page + 1} of {pages}
+                  </span>
+                  <Button
+                    variant="secondary"
+                    disabled={page + 1 >= pages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {answering && (
@@ -336,7 +338,7 @@ export function SupportPage() {
           </dl>
 
           {answering.body && (
-            <p className="mt-4 rounded-lg border border-line bg-surface-2 p-3 text-sm text-ink">
+            <p className="mt-4 rounded-[8px] border border-line bg-canvas p-3 text-sm text-ink">
               {answering.body}
             </p>
           )}

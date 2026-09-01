@@ -8,7 +8,7 @@ that is wrong at runtime, wrong on screen, or wrong in what it tells the person 
 
 Twenty-two findings. Worked one at a time, top to bottom. Tick the box when it lands.
 
-**Done so far:** A1.
+**Done so far:** A1, B1, B2.
 
 ---
 
@@ -123,38 +123,44 @@ is a decision rather than an omission.
 ## B. Layout that is visibly broken
 
 ### B1 — Three pages render with no page padding at all
-- [ ] **High.** `src/support/SupportPage.tsx:180`, `src/gifts/GiftOrdersPage.tsx:174`,
-      `src/content/OrderAdsPage.tsx:103`
+- [x] **Done** — `src/support/SupportPage.tsx`, `src/gifts/GiftOrdersPage.tsx`,
+      `src/content/OrderAdsPage.tsx`
 
-Every other screen wraps its content in `<div className="p-6">` under the `PageHeader`.
-These three do not. Their tables, banners and cards sit flush against the shell's left
-edge and the window's right edge, with the sticky header's own `px-6` above them — so the
-title is indented and the content under it is not.
+Every other screen wraps its body in `<div className="p-6">` under the `PageHeader`.
+These three did not, so their tables, banners and cards sat flush against the shell's left
+edge and the window's right edge — while the sticky header above them carried its own
+`px-6`, which is what made it read as broken rather than merely tight.
 
-**Fix:** wrap each page's body in `<div className="p-6">`, matching `AllOrdersPage`.
+All three now have the wrapper. The diff is large but almost entirely re-indentation of
+what the new wrapper contains; `git diff -w` shows the real change is one added line and
+one closing tag per page.
 
-### B2 — Four Tailwind classes name colours that do not exist
-- [ ] **High.** `src/support/SupportPage.tsx:180,339`, `src/gifts/GiftOrdersPage.tsx:174`,
-      `src/riders/RidersPage.tsx:1239,1274`
+### B2 — Five Tailwind classes name colours that do not exist
+- [x] **Done** — `src/support/SupportPage.tsx`, `src/gifts/GiftOrdersPage.tsx`,
+      `src/riders/RidersPage.tsx`
 
-`src/index.css` defines `--color-brand`, `-ink`, `-line`, `-canvas`, `-veg`, `-non-veg`,
-`-warn` and their soft variants. It defines no `surface` and no `hairline`. Tailwind v4
-generates nothing for an unknown token, so these classes are silently absent from the
-built CSS — confirmed: `grep -c bg-surface dist/assets/index-ByfIlsQy.css` → `0`.
+`src/index.css` defines thirteen colour tokens. `surface` and `hairline` are not among
+them, and Tailwind v4 emits nothing at all for an unknown token — no error, no fallback,
+just an absent rule. Confirmed before the fix: `grep -c bg-surface` against the built CSS
+returned `0`.
 
-What that costs on screen:
-
-| Where | Class | Result |
+| Where | Was | Now |
 |---|---|---|
-| Support ticket table | `bg-surface` | Table body is transparent — grey `--color-canvas` shows through instead of white |
-| Support complaint quote | `bg-surface-2` | Quote block has no fill, so it does not read as a quote |
-| Gift orders table | `bg-surface` | Same transparent table |
-| Rider engagement radio cards | `border-hairline` | **Unselected options have no border at all** — only the selected card is outlined |
-| Rider employer dropdown | `border-hairline bg-surface` | A `<select>` with no border and no background |
+| Support ticket table | `bg-surface` — transparent, grey canvas showing through | `bg-white` |
+| Support complaint quote | `bg-surface-2` — no fill, did not read as a quote | `bg-canvas` |
+| Gift orders table | `bg-surface` — same transparent table | `bg-white` |
+| Rider engagement radio cards | `border-hairline` — **unselected options had no border at all** | `border-line` |
+| Rider employer dropdown | `border-hairline bg-surface` — a `<select>` with neither | `border-line bg-white` |
 
-**Fix:** replace with `bg-white` and `border-line`, which is what every other screen uses.
-Do not add `surface`/`hairline` tokens — `packages/zopiq_ui` is the source of truth and
-does not have them.
+The stray `rounded-xl` on those elements went to the house `rounded-[12px]` / `rounded-[8px]`
+at the same time, since they were the only four uses of it on these surfaces.
+
+**Verified, not assumed.** A sweep of every colour utility in `src/**/*.tsx` against the
+`--color-*` names in `index.css` now comes back with an empty "used but not defined" list,
+and the rebuilt CSS carries real declarations for the replacements
+(`.bg-white{background-color:var(--color-white)}`, `.bg-canvas{…var(--color-canvas)}`).
+That sweep is worth re-running after any future styling work — it is the only thing that
+catches this class of bug, because the build stays green either way.
 
 ### B3 — The evidence modal squeezes three photos into a 448px dialog
 - [ ] `src/orders/AllOrdersPage.tsx:459`

@@ -100,100 +100,102 @@ export function OrderAdsPage() {
         action={<Button onClick={() => setAdding(true)}>New ad</Button>}
       />
 
-      {error && (
-        <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
-          {error}
-        </Banner>
-      )}
+      <div className="p-6">
+        {error && (
+          <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
+        )}
 
-      {live > 1 && (
-        <Banner tone="warn" className="mb-4">
-          {live} ads are live at once. The app shows only the first by order, so
-          the rest are invisible until it ends or is switched off.
-        </Banner>
-      )}
+        {live > 1 && (
+          <Banner tone="warn" className="mb-4">
+            {live} ads are live at once. The app shows only the first by order, so
+            the rest are invisible until it ends or is switched off.
+          </Banner>
+        )}
 
-      {ads !== null && ads.length === 0 ? (
-        <EmptyState
-          title="No map ads yet"
-          body="An ad needs a square logo for the round button on the map, and a tall image for the screen it opens."
-          action={<Button onClick={() => setAdding(true)}>New ad</Button>}
-        />
-      ) : (
-        <div className="space-y-3">
-          {(ads ?? []).map((ad) => {
-            const state = slideStateOf(ad)
-            return (
-              <div
-                key={ad.id}
-                className="flex flex-wrap items-center gap-4 rounded-[12px] border border-line bg-white p-4"
-              >
-                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-line bg-canvas">
-                  {ad.logo_url && (
-                    <img
-                      src={ad.logo_url}
-                      alt=""
-                      className="h-full w-full object-cover"
+        {ads !== null && ads.length === 0 ? (
+          <EmptyState
+            title="No map ads yet"
+            body="An ad needs a square logo for the round button on the map, and a tall image for the screen it opens."
+            action={<Button onClick={() => setAdding(true)}>New ad</Button>}
+          />
+        ) : (
+          <div className="space-y-3">
+            {(ads ?? []).map((ad) => {
+              const state = slideStateOf(ad)
+              return (
+                <div
+                  key={ad.id}
+                  className="flex flex-wrap items-center gap-4 rounded-[12px] border border-line bg-white p-4"
+                >
+                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-line bg-canvas">
+                    {ad.logo_url && (
+                      <img
+                        src={ad.logo_url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-2 text-sm font-bold text-ink">
+                      {ad.name}
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${stateStyles[state]}`}
+                      >
+                        {stateLabels[state]}
+                      </span>
+                    </p>
+                    <p className="mt-0.5 truncate text-sm text-ink-muted">
+                      {ad.cta_target
+                        ? `${ad.cta_label} → ${ad.cta_target}`
+                        : 'No button — the artwork is the whole ad'}
+                    </p>
+                  </div>
+
+                  {/* A view is one order that saw it; a click is every tap. Said
+                      here so nobody reads clicks > views as a broken counter. */}
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm tabular-nums text-ink">
+                      {ad.views.toLocaleString('en-IN')} views
+                    </p>
+                    <p className="text-sm tabular-nums text-ink-muted">
+                      {ad.clicks.toLocaleString('en-IN')} clicks
+                    </p>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-3">
+                    <Toggle
+                      label="Live"
+                      checked={ad.is_active}
+                      disabled={busy}
+                      onChange={(next) =>
+                        void run(() => api.setOrderAdActive(ad.id, next))
+                      }
                     />
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 text-sm font-bold text-ink">
-                    {ad.name}
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${stateStyles[state]}`}
+                    <button
+                      type="button"
+                      onClick={() => setEditing(ad)}
+                      className="text-sm font-semibold text-brand hover:text-brand-deep"
                     >
-                      {stateLabels[state]}
-                    </span>
-                  </p>
-                  <p className="mt-0.5 truncate text-sm text-ink-muted">
-                    {ad.cta_target
-                      ? `${ad.cta_label} → ${ad.cta_target}`
-                      : 'No button — the artwork is the whole ad'}
-                  </p>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleting(ad)}
+                      className="text-sm font-medium text-ink-muted hover:text-non-veg"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
-
-                {/* A view is one order that saw it; a click is every tap. Said
-                    here so nobody reads clicks > views as a broken counter. */}
-                <div className="shrink-0 text-right">
-                  <p className="text-sm tabular-nums text-ink">
-                    {ad.views.toLocaleString('en-IN')} views
-                  </p>
-                  <p className="text-sm tabular-nums text-ink-muted">
-                    {ad.clicks.toLocaleString('en-IN')} clicks
-                  </p>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-3">
-                  <Toggle
-                    label="Live"
-                    checked={ad.is_active}
-                    disabled={busy}
-                    onChange={(next) =>
-                      void run(() => api.setOrderAdActive(ad.id, next))
-                    }
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEditing(ad)}
-                    className="text-sm font-semibold text-brand hover:text-brand-deep"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeleting(ad)}
-                    className="text-sm font-medium text-ink-muted hover:text-non-veg"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {(adding || editing) && (
         <AdDialog

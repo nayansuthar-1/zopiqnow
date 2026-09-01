@@ -164,113 +164,115 @@ export function GiftOrdersPage() {
         }
       />
 
-      {error && <Banner tone="error" className="mb-4">{error}</Banner>}
-      {note && (
-        <Banner tone="success" className="mb-4" onDismiss={() => setNote(null)}>
-          {note}
-        </Banner>
-      )}
-
-      <div className="rounded-xl border border-line bg-surface">
-        {rows === null ? (
-          <TableSkeleton rows={6} />
-        ) : rows.length === 0 ? (
-          <EmptyState
-            title="Nothing to send"
-            body={
-              filter === 'placed'
-                ? 'Every gift order has been picked up.'
-                : 'No gift orders match this filter.'
-            }
-          />
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
-                  <tr>
-                    <th className="px-5 py-3">Waiting</th>
-                    <th className="px-5 py-3">Order</th>
-                    <th className="px-5 py-3">Shop</th>
-                    <th className="px-5 py-3">Sending to</th>
-                    <th className="px-5 py-3 text-right">Value</th>
-                    <th className="px-5 py-3 text-right" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {rows.map((g) => (
-                    <tr key={g.id}>
-                      <td className="px-5 py-4 align-top">
-                        <p className="font-semibold text-ink">
-                          {g.status === 'delivered' || g.status === 'cancelled'
-                            ? '—'
-                            : waited(g.created_at)}
-                        </p>
-                        <p className="text-xs text-ink-muted">{when(g.created_at)}</p>
-                      </td>
-                      <td className="px-5 py-4 align-top">
-                        <p className="text-ink">{g.id}</p>
-                        <Pill tone={tones[g.status]}>
-                          {GIFT_STATUS_LABEL[g.status]}
-                        </Pill>
-                        {g.courier_name && (
-                          <p className="mt-1 text-xs text-ink-muted">
-                            {g.courier_name}
-                            {g.tracking_ref ? ` · ${g.tracking_ref}` : ''}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-5 py-4 align-top">
-                        <p className="text-ink">{g.shop_name}</p>
-                        <p className="text-xs text-ink-muted">
-                          {g.item_count} item{g.item_count === 1 ? '' : 's'}
-                        </p>
-                      </td>
-                      <td className="px-5 py-4 align-top">
-                        <p className="text-ink">{g.customer_phone}</p>
-                        <p className="text-xs text-ink-muted">{g.delivery_to}</p>
-                      </td>
-                      <td className="px-5 py-4 text-right align-top font-semibold text-ink">
-                        ₹{g.total}
-                      </td>
-                      <td className="px-5 py-4 text-right align-top">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => void openOrder(g)}
-                        >
-                          {nextOf[g.status].length > 0 ? 'Work it' : 'View'}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {pages > 1 && (
-              <div className="mt-4 flex items-center justify-between px-5 pb-5">
-                <Button
-                  variant="secondary"
-                  disabled={page === 0}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-ink-muted">
-                  Page {page + 1} of {pages}
-                </span>
-                <Button
-                  variant="secondary"
-                  disabled={page + 1 >= pages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
-          </>
+      <div className="p-6">
+        {error && <Banner tone="error" className="mb-4">{error}</Banner>}
+        {note && (
+          <Banner tone="success" className="mb-4" onDismiss={() => setNote(null)}>
+            {note}
+          </Banner>
         )}
+
+        <div className="overflow-hidden rounded-[12px] border border-line bg-white">
+          {rows === null ? (
+            <TableSkeleton rows={6} />
+          ) : rows.length === 0 ? (
+            <EmptyState
+              title="Nothing to send"
+              body={
+                filter === 'placed'
+                  ? 'Every gift order has been picked up.'
+                  : 'No gift orders match this filter.'
+              }
+            />
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
+                    <tr>
+                      <th className="px-5 py-3">Waiting</th>
+                      <th className="px-5 py-3">Order</th>
+                      <th className="px-5 py-3">Shop</th>
+                      <th className="px-5 py-3">Sending to</th>
+                      <th className="px-5 py-3 text-right">Value</th>
+                      <th className="px-5 py-3 text-right" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {rows.map((g) => (
+                      <tr key={g.id}>
+                        <td className="px-5 py-4 align-top">
+                          <p className="font-semibold text-ink">
+                            {g.status === 'delivered' || g.status === 'cancelled'
+                              ? '—'
+                              : waited(g.created_at)}
+                          </p>
+                          <p className="text-xs text-ink-muted">{when(g.created_at)}</p>
+                        </td>
+                        <td className="px-5 py-4 align-top">
+                          <p className="text-ink">{g.id}</p>
+                          <Pill tone={tones[g.status]}>
+                            {GIFT_STATUS_LABEL[g.status]}
+                          </Pill>
+                          {g.courier_name && (
+                            <p className="mt-1 text-xs text-ink-muted">
+                              {g.courier_name}
+                              {g.tracking_ref ? ` · ${g.tracking_ref}` : ''}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-5 py-4 align-top">
+                          <p className="text-ink">{g.shop_name}</p>
+                          <p className="text-xs text-ink-muted">
+                            {g.item_count} item{g.item_count === 1 ? '' : 's'}
+                          </p>
+                        </td>
+                        <td className="px-5 py-4 align-top">
+                          <p className="text-ink">{g.customer_phone}</p>
+                          <p className="text-xs text-ink-muted">{g.delivery_to}</p>
+                        </td>
+                        <td className="px-5 py-4 text-right align-top font-semibold text-ink">
+                          ₹{g.total}
+                        </td>
+                        <td className="px-5 py-4 text-right align-top">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void openOrder(g)}
+                          >
+                            {nextOf[g.status].length > 0 ? 'Work it' : 'View'}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {pages > 1 && (
+                <div className="mt-4 flex items-center justify-between px-5 pb-5">
+                  <Button
+                    variant="secondary"
+                    disabled={page === 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-ink-muted">
+                    Page {page + 1} of {pages}
+                  </span>
+                  <Button
+                    variant="secondary"
+                    disabled={page + 1 >= pages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {open && (

@@ -1233,10 +1233,10 @@ function EngagementDialog({
           {engagements.map((o) => (
             <label
               key={o.value}
-              className={`flex cursor-pointer gap-3 rounded-xl border p-3 ${
+              className={`flex cursor-pointer gap-3 rounded-[8px] border p-3 ${
                 engagement === o.value
                   ? 'border-brand bg-brand-soft/40'
-                  : 'border-hairline hover:bg-canvas'
+                  : 'border-line hover:bg-canvas'
               }`}
             >
               <input
@@ -1271,7 +1271,7 @@ function EngagementDialog({
                 value={employer}
                 onChange={(e) => setEmployer(e.target.value)}
                 required
-                className="h-11 rounded-xl border border-hairline bg-surface px-3 text-sm text-ink"
+                className="h-11 rounded-[8px] border border-line bg-white px-3 text-sm text-ink"
               >
                 <option value="">Choose a restaurant…</option>
                 {restaurants.map((r) => (
