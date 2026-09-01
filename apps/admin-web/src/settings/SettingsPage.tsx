@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import type { AdminRow, RiderPayRates } from '../lib/api'
-import { useSession } from '../auth/session'
+import { useSession } from '../auth/context'
 import { PageHeader } from '../ui/AppShell'
 import { Banner, Button, ConfirmDialog, Field, Skeleton } from '../ui/primitives'
 
@@ -246,7 +246,9 @@ function RiderPayCard() {
       </p>
 
       {error && (
-        <Banner tone="error" className="mt-4">{error}</Banner>
+        <Banner tone="error" className="mt-4" onDismiss={() => setError(null)}>
+          {error}
+        </Banner>
       )}
 
       {rates === null ? (

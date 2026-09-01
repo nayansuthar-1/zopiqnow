@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { MAPS_KEY } from './mapsKey'
 import { Button, Modal } from './primitives'
 
 /// Drop a pin on the kitchen instead of typing two numbers.
@@ -45,19 +46,12 @@ declare global {
   }
 }
 
-const KEY = import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY as string | undefined
-
 /// Where the map opens when the restaurant has no coordinates yet.
 ///
 /// Sadri, which with Ranakpur and Falna is where Zopiqnow actually delivers
 /// today. A map that opens on the whole of India costs the admin four zoom
 /// gestures before they can see a street, every single time.
 const DEFAULT_CENTRE: LatLngLiteral = { lat: 25.1846, lng: 73.4419 }
-
-/// Whether the console has a browser key at all. The button is not offered
-/// without one — an "open the map" that opens a grey box with a Google error
-/// across it is worse than not offering it.
-export const mapPickerAvailable = Boolean(KEY)
 
 /// Loads the Maps script once and resolves when `window.google.maps` exists.
 ///
@@ -72,7 +66,7 @@ function loadMaps(): Promise<MapsApi> {
 
   loader = new Promise<MapsApi>((resolve, reject) => {
     const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${KEY}&v=weekly`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_KEY}&v=weekly`
     script.async = true
     script.onload = () => {
       const maps = window.google?.maps

@@ -32,6 +32,8 @@ const filterOptions: { value: Filter; label: string }[] = [
   { value: 'placed', label: 'New' },
   { value: 'accepted', label: 'Preparing' },
   { value: 'dispatched', label: 'With courier' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'cancelled', label: 'Cancelled' },
   { value: 'all', label: 'All' },
 ]
 
@@ -165,7 +167,11 @@ export function GiftOrdersPage() {
       />
 
       <div className="p-6">
-        {error && <Banner tone="error" className="mb-4">{error}</Banner>}
+        {error && (
+          <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
+        )}
         {note && (
           <Banner tone="success" className="mb-4" onDismiss={() => setNote(null)}>
             {note}

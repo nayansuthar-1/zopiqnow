@@ -224,7 +224,9 @@ export function RidersPage() {
 
       <div className="max-w-3xl p-6">
         {error && (
-          <Banner tone="error" className="mb-4">{error}</Banner>
+          <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
         )}
 
         <div className="rounded-[12px] border border-line bg-white p-6">

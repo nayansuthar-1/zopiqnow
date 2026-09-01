@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { useSession } from './auth/session'
+import { useSession } from './auth/context'
 import { NotAdminPage, SignInPage } from './auth/SignInPage'
 import { AppShell } from './ui/AppShell'
 import { RestaurantsPage } from './restaurants/RestaurantsPage'

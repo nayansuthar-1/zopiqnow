@@ -131,7 +131,11 @@ function UserSheet({
         </div>
       }
     >
-      {error && <Banner tone="error">{error}</Banner>}
+      {error && (
+        <Banner tone="error" onDismiss={() => setError(null)}>
+          {error}
+        </Banner>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Card>
@@ -442,7 +446,11 @@ export function UsersPage() {
       />
 
       <div className="p-6">
-        {error && <Banner tone="error">{error}</Banner>}
+        {error && (
+          <Banner tone="error" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
+        )}
         {notice && (
           <Banner tone="success" onDismiss={() => setNotice(null)}>
             {notice}

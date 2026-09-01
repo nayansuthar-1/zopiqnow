@@ -57,7 +57,9 @@ const rangeOptions: { value: Range; label: string }[] = [
 const statusOptions: { value: OrderStatus | 'any'; label: string }[] = [
   { value: 'any', label: 'Any status' },
   { value: 'placed', label: STATUS_LABEL.placed },
+  { value: 'accepted', label: STATUS_LABEL.accepted },
   { value: 'preparing', label: STATUS_LABEL.preparing },
+  { value: 'ready_for_pickup', label: STATUS_LABEL.ready_for_pickup },
   { value: 'out_for_delivery', label: STATUS_LABEL.out_for_delivery },
   { value: 'delivered', label: STATUS_LABEL.delivered },
   { value: 'cancelled', label: STATUS_LABEL.cancelled },

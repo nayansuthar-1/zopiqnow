@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, statusOf } from '../lib/api'
 import type { RestaurantRow, Status } from '../lib/api'
@@ -53,18 +53,23 @@ export function RestaurantsPage() {
   const [deleting, setDeleting] = useState<RestaurantRow | null>(null)
   const [busy, setBusy] = useState(false)
 
-  async function load() {
+  // A `useCallback` with the effect depending on it, like every other list in
+  // the console. It was a plain function with `[]` beside the effect, which is
+  // correct only for as long as `load` closes over nothing that changes — and
+  // `react/exhaustive-deps` does not check that shape, so nothing would have
+  // said otherwise the day it stopped being true.
+  const load = useCallback(async () => {
     setError(null)
     try {
       setRows(await api.listRestaurants())
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
-  }
+  }, [])
 
   useEffect(() => {
     void load()
-  }, [])
+  }, [load])
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -140,7 +145,9 @@ export function RestaurantsPage() {
         </div>
 
         {error && (
-          <Banner tone="error" className="mb-4">{error}</Banner>
+          <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
         )}
 
         {rows === null ? (

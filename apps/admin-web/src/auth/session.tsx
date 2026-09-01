@@ -1,28 +1,9 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-
-/// Being signed in and being an admin are two different facts, and the console
-/// needs both. Supabase issues a session to anyone whose email and password
-/// match — that is identity, not authority. Authority is `platform_admins`,
-/// which the server answers through `is_admin()` (migration 0026).
-///
-/// The check here is a *courtesy*: it decides what to render. It is not what
-/// keeps a non-admin out — every admin RPC re-asks the same question server-side,
-/// where the answer cannot be edited in a browser.
-type AdminSession = {
-  session: Session | null
-  email: string | null
-  isAdmin: boolean
-  /// True until the stored session has been restored and checked. Rendering the
-  /// sign-in screen before this settles would flash it at an admin who is
-  /// already signed in.
-  loading: boolean
-  signOut: () => Promise<void>
-}
-
-const SessionContext = createContext<AdminSession | null>(null)
+import { SessionContext } from './context'
+import type { AdminSession } from './context'
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
@@ -109,10 +90,4 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   )
 
   return <SessionContext value={value}>{children}</SessionContext>
-}
-
-export function useSession(): AdminSession {
-  const value = useContext(SessionContext)
-  if (!value) throw new Error('useSession must be used inside <SessionProvider>')
-  return value
 }

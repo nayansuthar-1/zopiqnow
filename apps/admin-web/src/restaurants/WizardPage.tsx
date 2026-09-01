@@ -88,45 +88,57 @@ export function WizardPage() {
 
   return (
     <>
-      <PageHeader
-        title={r ? r.name : 'Add restaurant'}
-        subtitle={
-          r
-            ? r.is_active
-              ? 'Live — changes take effect immediately'
-              : 'Draft — not visible to customers yet'
-            : 'Step 1 creates the draft. Nothing is public until you publish.'
-        }
-      />
+      {/* The header and the step bar are one thing and stick as one. Left to
+          itself the bar scrolled away on the Menu step — the only step long
+          enough to scroll — leaving a sticky header above a page whose eight
+          steps were no longer on screen. */}
+      <div className="sticky top-0 z-20">
+        <PageHeader
+          title={r ? r.name : 'Add restaurant'}
+          subtitle={
+            r
+              ? r.is_active
+                ? 'Live — changes take effect immediately'
+                : 'Draft — not visible to customers yet'
+              : 'Step 1 creates the draft. Nothing is public until you publish.'
+          }
+        />
 
-      <div className="border-b border-line bg-white px-6">
-        <div className="flex gap-1 overflow-x-auto">
-          {steps.map((s, i) => {
-            const reachable = Boolean(id) || i === 0
-            return (
-              <button
-                key={s.key}
-                disabled={!reachable}
-                onClick={() => setStep(i)}
-                className={`shrink-0 border-b-2 px-3 py-3 text-sm font-medium transition-colors ${
-                  step === i
-                    ? 'border-brand text-brand-deep'
-                    : reachable
-                      ? 'border-transparent text-ink-muted hover:text-ink'
-                      : 'border-transparent text-ink-muted/40'
-                }`}
-              >
-                <span className="mr-1.5 text-xs tabular-nums">{i + 1}</span>
-                {s.label}
-              </button>
-            )
-          })}
+        <div className="border-b border-line bg-white px-6">
+          <div className="flex gap-1 overflow-x-auto">
+            {steps.map((s, i) => {
+              const reachable = Boolean(id) || i === 0
+              return (
+                <button
+                  key={s.key}
+                  disabled={!reachable}
+                  onClick={() => setStep(i)}
+                  className={`shrink-0 border-b-2 px-3 py-3 text-sm font-medium transition-colors ${
+                    step === i
+                      ? 'border-brand text-brand-deep'
+                      : reachable
+                        ? 'border-transparent text-ink-muted hover:text-ink'
+                        : 'border-transparent text-ink-muted/40'
+                  }`}
+                >
+                  <span className="mr-1.5 text-xs tabular-nums">{i + 1}</span>
+                  {s.label}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
 
       <div className="p-6">
         {error && (
-          <Banner tone="error" className="mb-4 max-w-2xl">{error}</Banner>
+          <Banner
+            tone="error"
+            className="mb-4 max-w-2xl"
+            onDismiss={() => setError(null)}
+          >
+            {error}
+          </Banner>
         )}
 
         {/* The menu is a list of lists and needs the width; the forms read better

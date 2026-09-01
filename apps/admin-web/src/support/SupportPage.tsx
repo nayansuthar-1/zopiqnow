@@ -171,7 +171,11 @@ export function SupportPage() {
       />
 
       <div className="p-6">
-        {error && <Banner tone="error" className="mb-4">{error}</Banner>}
+        {error && (
+          <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
+        )}
         {note && (
           <Banner tone="success" className="mb-4" onDismiss={() => setNote(null)}>
             {note}

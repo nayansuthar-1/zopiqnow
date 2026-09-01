@@ -8,7 +8,8 @@ that is wrong at runtime, wrong on screen, or wrong in what it tells the person 
 
 Twenty-two findings. Worked one at a time, top to bottom. Tick the box when it lands.
 
-**Done so far:** A1, and all of B, C, D and E.
+**Done so far:** A1, and all of B, C, D, E and F. A2 and A3 are what is left — one
+fix and one decision.
 
 ---
 
@@ -387,46 +388,83 @@ gone, which is correct, because there is nothing to page through.
 ## F. Smaller gaps
 
 ### F1 — Two order statuses cannot be filtered on
-- [ ] `src/orders/AllOrdersPage.tsx:57-65`
+- [x] **Done** — `src/orders/AllOrdersPage.tsx:60,62`
 
-`statusOptions` omits `accepted` and `ready_for_pickup`, though both are valid
-`OrderStatus` values that `admin_all_orders` accepts. "Everything the kitchen has taken but
-not started" is not askable.
+`accepted` and `ready_for_pickup` are in `statusOptions`, in lifecycle order, labelled
+from `STATUS_LABEL` like the rest. `admin_all_orders` compares `p_status` to `o.status`
+with no allow-list of its own (0069:125), so both were always askable — the console just
+never asked.
 
 ### F2 — Gift orders cannot be filtered to delivered or cancelled
-- [ ] `src/gifts/GiftOrdersPage.tsx:31-36`
+- [x] **Done** — `src/gifts/GiftOrdersPage.tsx:35`
 
-Same shape: `placed`, `accepted`, `dispatched`, `all`. Finding one delivered gift means
-paging through All.
+Same shape, same fix: **Delivered** and **Cancelled** before **All**. `admin_gift_orders`
+also filters on a bare `p_status` (0096:545).
 
 ### F3 — Six pages leave an error banner with no dismiss
-- [ ] `src/restaurants/RestaurantsPage.tsx`, `src/users/UsersPage.tsx`,
-      `src/settings/SettingsPage.tsx`, `src/settlements/SettlementsPage.tsx`,
-      `src/payouts/CashPage.tsx`, `src/support/SupportPage.tsx`
+- [x] **Done** — eight banners in seven files. The list in the finding was not right.
 
-`Banner` takes `onDismiss` and most screens pass it. On these, an error sticks until the
-next action clears it.
+`SettlementsPage` and `CashPage` were named but both already pass `onDismiss`. What a
+sweep of every `<Banner` in `src/**/*.tsx` actually turns up is seventeen without one, of
+which eight are stuck errors:
+
+| File | Where |
+|---|---|
+| `src/gifts/GiftOrdersPage.tsx:171` | page error |
+| `src/restaurants/RestaurantsPage.tsx:148` | page error |
+| `src/restaurants/WizardPage.tsx:135` | wizard error |
+| `src/riders/RidersPage.tsx:227` | page error |
+| `src/settings/SettingsPage.tsx:249` | rider-pay card error |
+| `src/support/SupportPage.tsx:175` | page error |
+| `src/users/UsersPage.tsx:135` | inside the person sheet |
+| `src/users/UsersPage.tsx:450` | page error |
+
+The other nine were left alone deliberately, and are not the same thing: they are `warn`
+and `success` banners that *are* the content — the invoice warning in the delete dialog,
+the KYC state on a rider, the "no photographs" line in the evidence viewer. A dismiss on
+those would offer to hide the answer to the question the screen was asked.
+`ImportDialog`'s `headerProblem` is the third kind: a verdict on the file just chosen,
+cleared by choosing another.
 
 ### F4 — `exhaustive-deps` is not enforced, and one effect already relies on that
-- [ ] `.oxlintrc.json`, `src/restaurants/RestaurantsPage.tsx:44`
+- [x] **Done** — `.oxlintrc.json`, `src/restaurants/RestaurantsPage.tsx:61`.
+      The second half of the finding does not hold.
 
-`load` there is a plain function, not a `useCallback`, and its effect has `[]` for
-dependencies. Harmless today because `load` closes over nothing that changes — but the
-rule that would have caught it is off, and this is the class of bug that arrives silently
-during a refactor.
+`"react/exhaustive-deps": "error"` is on, and the whole of `src/` passes it today — no
+suppressions, nothing to clean up first. Verified it is actually running rather than
+silently unmatched, by putting a deliberate violation in a scratch file: it was reported,
+`react-hooks(exhaustive-deps)`, from the config alone with no CLI flag.
+
+**But the effect the finding names would not have been caught by it.** `load` there was a
+plain function declared in the component body and called from an effect with `[]` — and
+oxlint's implementation does not flag that shape. Checked directly, with exactly that
+shape in a scratch file: nothing. So the rule was never what was holding that line up.
+
+What was holding it up is that `load` closed over nothing that changes. `load` is now a
+`useCallback`, with the effect depending on it, like every other list in the console —
+which is the shape the rule *does* check, so a future dependency added to it has something
+watching.
 
 ### F5 — Wizard step tabs scroll away under the sticky header
-- [ ] Low. `src/restaurants/WizardPage.tsx:103`
+- [x] **Done** — `src/restaurants/WizardPage.tsx:95`
 
-`PageHeader` is `sticky top-0`. The step bar immediately below it is not, so on the Menu
-step — the one long enough to scroll — the eight steps leave the screen and the header
-stays.
+The header and the step bar are wrapped in one `sticky top-0 z-20` and stick together. No
+hard-coded offset: `PageHeader`'s height depends on whether it has a subtitle, and a
+`top-[73px]` on the bar would have been a number that goes wrong the first time the copy
+above it wraps to two lines.
 
 ### F6 — `only-export-components` warnings
-- [ ] Low. `src/auth/session.tsx:114`, `src/ui/MapPicker.tsx:60`
+- [x] **Done** — `src/auth/context.ts` and `src/ui/mapsKey.ts` are new;
+      `src/auth/session.tsx`, `src/ui/MapPicker.tsx`, `src/App.tsx`, `src/ui/AppShell.tsx`,
+      `src/settings/SettingsPage.tsx`, `src/restaurants/steps/AddressStep.tsx` follow.
 
-The two lint warnings. Cosmetic (they cost a full reload instead of a hot update in dev),
-but they are the only two and clearing them makes a clean lint run mean something.
+Both warnings were a component file exporting one other thing. `session.tsx` kept
+`SessionProvider` and gave up `AdminSession`, `SessionContext` and `useSession` to
+`auth/context.ts`; `MapPicker.tsx` kept its component and gave up the browser key and
+`mapPickerAvailable` to `ui/mapsKey.ts`. Three import lines moved with them.
+
+**`oxlint` now exits 0 with no output at all**, which is the point of clearing the last two:
+a lint run that always prints something is a lint run nobody reads.
 
 ---
 

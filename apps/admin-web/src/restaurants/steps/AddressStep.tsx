@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { api } from '../../lib/api'
 import type { RestaurantDetail } from '../../lib/api'
 import { Button, Field } from '../../ui/primitives'
-import { MapPicker, mapPickerAvailable } from '../../ui/MapPicker'
+import { MapPicker } from '../../ui/MapPicker'
+import { mapPickerAvailable } from '../../ui/mapsKey'
 import { StepFrame } from './StepFrame'
 
 /// Where the kitchen is and who to call about it. None of this reaches the

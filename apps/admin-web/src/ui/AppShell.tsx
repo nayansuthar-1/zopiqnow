@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { useSession } from '../auth/session'
+import { useSession } from '../auth/context'
 
 /// The frame every signed-in screen sits in. A fixed sidebar on desktop, a row
 /// of tabs under the header on narrow windows — this is an ops tool used at a
