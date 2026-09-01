@@ -24,7 +24,8 @@ import { BroadcastPage } from './broadcast/BroadcastPage'
 import { SettlementsPage } from './settlements/SettlementsPage'
 
 export default function App() {
-  const { loading, session, isAdmin, email, signOut } = useSession()
+  const { loading, session, isAdmin, email, signOut, checkFailed, recheck } =
+    useSession()
 
   if (loading) {
     return (
@@ -35,7 +36,16 @@ export default function App() {
   }
 
   if (!session) return <SignInPage />
-  if (!isAdmin) return <NotAdminPage email={email} onSignOut={() => void signOut()} />
+  if (!isAdmin) {
+    return (
+      <NotAdminPage
+        email={email}
+        onSignOut={() => void signOut()}
+        checkFailed={checkFailed}
+        onRetry={recheck}
+      />
+    )
+  }
 
   return (
     <BrowserRouter>

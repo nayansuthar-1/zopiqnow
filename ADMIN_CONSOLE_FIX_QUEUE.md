@@ -8,8 +8,7 @@ that is wrong at runtime, wrong on screen, or wrong in what it tells the person 
 
 Twenty-two findings. Worked one at a time, top to bottom. Tick the box when it lands.
 
-**Done so far:** A1, and all of B, C, D, E and F. A2 and A3 are what is left — one
-fix and one decision.
+**Done so far:** everything but A3, which is a decision rather than a fix.
 
 ---
 
@@ -93,20 +92,33 @@ Supabase's `updateUser({ password })` would do it for the signed-in user; there 
 for it yet. That is the natural follow-up, and it is what A3 should be resolved against.
 
 ### A2 — A network blip at load locks a real admin out of the console
-- [ ] `src/auth/session.tsx:60`
+- [x] **Done** — `src/auth/context.ts:24`, `src/auth/session.tsx:12,48,101`,
+      `src/auth/SignInPage.tsx:99`, `src/App.tsx:27,40`
 
-`resolve()` treats an `is_admin()` RPC **error** and an `is_admin()` answer of **false**
-as the same outcome: `setIsAdmin(false)`. Failing closed is right. Rendering the same
-screen for both is not.
+`resolve()` treated an `is_admin()` **error** and an answer of **false** as one outcome.
+Failing closed is right and has not changed; what has changed is that the two are no longer
+the same screen. "You are not staff" is a sentence about the person and a dead end on
+purpose. "We could not ask" is a sentence about the connection, and it now has a way out.
 
-An admin whose first `is_admin()` call fails on a flaky connection lands on
-`NotAdminPage` — "This console is for Zopiqnow staff" — whose only control is Sign out.
-Nothing there suggests retrying, and nothing retries on its own until an auth state
-change happens to fire.
+`AdminSession` carries two more things: `checkFailed`, true when the last call did not come
+back, and `recheck()`. `NotAdminPage` reads the first and offers **Try again** — which is
+the primary button there, with Sign out demoted beneath it — and the copy says plainly that
+the console stayed shut because the server did not answer, not because it refused.
 
-**Fix:** keep failing closed, but carry the error out of `resolve()` and give
-`NotAdminPage` a "Try again" that re-runs the check when the cause was a network failure
-rather than a denial.
+Two mechanical notes on the provider:
+
+- `resolve` is a `useCallback` now, so the retry can call it from outside the effect
+  without tearing down and re-establishing the `onAuthStateChange` subscription.
+- `checkedFor` moved from a variable inside the effect to a ref, for the same reason. It
+  stays null after a failure, which is what lets the next ask actually reach the server
+  rather than being answered from the last one. As a side effect the dev double-mount that
+  `StrictMode` performs now costs one `is_admin()` call instead of two, since the ref
+  survives the remount and the effect-local variable did not.
+
+The retry loop end to end: the call fails, `checkFailed` goes true and `checkedFor` stays
+null, the screen offers Try again, the button spins on its own state, `recheck()` re-runs
+the same `resolve` against the session already in state, and a success flips `isAdmin` and
+renders the console. A second failure leaves the same screen with the button back to rest.
 
 ### A3 — No way back in from a forgotten password
 - [ ] Decision needed. `src/auth/SignInPage.tsx`

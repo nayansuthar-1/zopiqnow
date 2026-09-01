@@ -96,18 +96,70 @@ export function SignInPage() {
 
 /// Signed in, but not an admin. Deliberately a dead end with one way out — the
 /// console does not explain what `platform_admins` is to someone who is not in it.
-export function NotAdminPage({ email, onSignOut }: { email: string | null; onSignOut: () => void }) {
+export function NotAdminPage({
+  email,
+  onSignOut,
+  /// The check did not come back, rather than coming back "no". The console
+  /// still shows nothing — it fails closed — but this is not a dead end, and a
+  /// screen whose only control is Sign out reads as one.
+  checkFailed,
+  onRetry,
+}: {
+  email: string | null
+  onSignOut: () => void
+  checkFailed: boolean
+  onRetry: () => Promise<void>
+}) {
+  const [busy, setBusy] = useState(false)
+
   return (
     <div className="flex min-h-full items-center justify-center p-6">
       <Card className="w-full max-w-md text-center">
-        <h1 className="text-xl font-bold text-ink">This console is for Zopiqnow staff</h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          {email ?? 'This account'} doesn&apos;t have access. If you run a restaurant on
-          Zopiqnow, use the Zopiqnow Partner app instead.
-        </p>
-        <Button variant="secondary" className="mt-6 w-full" onClick={onSignOut}>
-          Sign out
-        </Button>
+        {checkFailed ? (
+          <>
+            <h1 className="text-xl font-bold text-ink">
+              Could not check your access
+            </h1>
+            <p className="mt-2 text-sm text-ink-muted">
+              The server did not answer, so the console stayed shut. That is a
+              connection problem rather than a refusal — try again.
+            </p>
+            <Button
+              className="mt-6 w-full"
+              loading={busy}
+              onClick={() => {
+                setBusy(true)
+                void onRetry().finally(() => setBusy(false))
+              }}
+            >
+              Try again
+            </Button>
+            <Button
+              variant="secondary"
+              className="mt-2 w-full"
+              onClick={onSignOut}
+            >
+              Sign out
+            </Button>
+          </>
+        ) : (
+          <>
+            <h1 className="text-xl font-bold text-ink">
+              This console is for Zopiqnow staff
+            </h1>
+            <p className="mt-2 text-sm text-ink-muted">
+              {email ?? 'This account'} doesn&apos;t have access. If you run a
+              restaurant on Zopiqnow, use the Zopiqnow Partner app instead.
+            </p>
+            <Button
+              variant="secondary"
+              className="mt-6 w-full"
+              onClick={onSignOut}
+            >
+              Sign out
+            </Button>
+          </>
+        )}
       </Card>
     </div>
   )

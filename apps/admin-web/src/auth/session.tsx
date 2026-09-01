@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
@@ -9,38 +9,53 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [checkFailed, setCheckFailed] = useState(false)
+
+  // Whose authority we last asked the server about. `onAuthStateChange` fires
+  // on far more than a sign-in — see below — and re-asking on every one of
+  // those is a network round trip that can only ever return the same answer.
+  //
+  // A ref rather than a variable inside the effect, because `resolve` is now
+  // reachable from outside it: the retry has to be able to ask again without
+  // tearing down and re-establishing the auth subscription.
+  const checkedFor = useRef<string | null>(null)
+  const alive = useRef(true)
+
+  const resolve = useCallback(async (next: Session | null) => {
+    if (!alive.current) return
+    setSession(next)
+
+    if (!next) {
+      checkedFor.current = null
+      setIsAdmin(false)
+      setCheckFailed(false)
+      setLoading(false)
+      return
+    }
+
+    if (checkedFor.current === next.user.id) {
+      setLoading(false)
+      return
+    }
+
+    const { data, error } = await supabase.rpc('is_admin')
+    if (!alive.current) return
+    // An error here is a network failure, not a denial. Either way the console
+    // stays shut: fail closed, never open.
+    //
+    // But they are not the same screen. "You are not staff" is a sentence about
+    // the person and a dead end on purpose; "we could not ask" is a sentence
+    // about the connection and has a way out. `checkFailed` is the difference,
+    // and `checkedFor` staying null after a failure is what lets the next ask
+    // actually reach the server.
+    checkedFor.current = error ? null : next.user.id
+    setIsAdmin(error ? false : data === true)
+    setCheckFailed(Boolean(error))
+    setLoading(false)
+  }, [])
 
   useEffect(() => {
-    let active = true
-    // Whose authority we last asked the server about. `onAuthStateChange` fires
-    // on far more than a sign-in — see below — and re-asking on every one of
-    // those is a network round trip that can only ever return the same answer.
-    let checkedFor: string | null = null
-
-    async function resolve(next: Session | null) {
-      if (!active) return
-      setSession(next)
-
-      if (!next) {
-        checkedFor = null
-        setIsAdmin(false)
-        setLoading(false)
-        return
-      }
-
-      if (checkedFor === next.user.id) {
-        setLoading(false)
-        return
-      }
-
-      const { data, error } = await supabase.rpc('is_admin')
-      if (!active) return
-      // An error here is a network failure, not a denial. Either way the console
-      // stays shut: fail closed, never open.
-      checkedFor = error ? null : next.user.id
-      setIsAdmin(error ? false : data === true)
-      setLoading(false)
-    }
+    alive.current = true
 
     void supabase.auth.getSession().then(({ data }) => resolve(data.session))
 
@@ -71,10 +86,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     })
 
     return () => {
-      active = false
+      alive.current = false
       sub.subscription.unsubscribe()
     }
-  }, [])
+  }, [resolve])
 
   const value = useMemo<AdminSession>(
     () => ({
@@ -82,11 +97,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       email: session?.user.email ?? null,
       isAdmin,
       loading,
+      checkFailed,
+      recheck: () => resolve(session),
       signOut: async () => {
         await supabase.auth.signOut()
       },
     }),
-    [session, isAdmin, loading],
+    [session, isAdmin, loading, checkFailed, resolve],
   )
 
   return <SessionContext value={value}>{children}</SessionContext>

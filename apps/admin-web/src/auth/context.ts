@@ -17,6 +17,14 @@ export type AdminSession = {
   /// sign-in screen before this settles would flash it at an admin who is
   /// already signed in.
   loading: boolean
+  /// The last `is_admin()` call did not come back — a network failure rather
+  /// than a denial. `isAdmin` is false either way, because this fails closed;
+  /// this is how the screen tells the two apart, since only one of them is
+  /// worth retrying.
+  checkFailed: boolean
+  /// Ask again. What the retry on `NotAdminPage` calls, and a no-op with
+  /// nobody signed in.
+  recheck: () => Promise<void>
   signOut: () => Promise<void>
 }
 
