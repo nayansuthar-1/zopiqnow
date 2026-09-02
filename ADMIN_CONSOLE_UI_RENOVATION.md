@@ -542,15 +542,19 @@ drew a bordered card *around* a `TableSkeleton`, an `EmptyState` and a table —
 which draw their own border. That was a double border before this work and would have been
 a triple after it. Both wrappers are gone.
 
-**Still open, and named rather than quietly dropped:**
+**Closed** (`40673af`). All ten selects are on `Select`; every `<th>` in the console has
+`scope`; there are no hand-rolled pills left.
 
-- Eight `<select>` call sites still to move onto `Select` (Gift item, Item, Team, Riders).
-  The primitive exists and All orders uses it; these eight are each wrapped in their own
-  label markup and need reading, not a codemod.
-- Eight bare `Loading…` strings still to become skeletons, and three screens still missing
-  an `EmptyState` (Riders, Cash, Platform).
-- `StepFrame` still hand-rolls its error banner instead of using `Banner` — no
-  `role="alert"`, no dismiss, and it sits at the *bottom* of the form.
+**Five of the ten `Loading…` strings stay, on purpose.** `App.tsx` boots before the shell
+exists, so there is no layout to hold open and a skeleton of a screen nobody has chosen yet
+is a lie. Hero slides, Map ads and Riders put the word in a `PageHeader` *subtitle*, which
+is a sentence about the page rather than a stand-in for its content. The other five — the
+two that held a whole page open, and three inside a panel or dialog — are skeletons now.
+
+**`StepFrame` moved its error above the fields**, as well as making it a `Banner`. It had
+been a bare `<p>` below the last field and over the save button, so a refusal about the
+*first* field announced itself six hundred pixels below it, and — being a `<p>` — announced
+itself to a screen reader not at all.
 
 
 *Goal: the 27 hand-rolled cards, 16 field copies, 7 pills and 12 tables are gone.*
@@ -650,20 +654,20 @@ Tick as they land.
 
 **Part 1 — measurably wrong**
 - [x] A1 — brand contrast *(decided: keep the orange, darken the label — 21/21 pairs pass)*
-- [~] A2 — `<select>` focus *(`Select` exists; 2 of 10 call sites moved over)*
+- [x] A2 — `<select>` focus *(all 10 call sites)*
 - [x] A3 — table hover + sticky header *(all 10 page-level tables)*
 - [x] A4 — `scope="col"` *(every `<th>` in the console has it)*
-- [x] A5 — money *(45 sites through `inr`/`inrSigned`)*; dates still owed
+- [x] A5 — money *(49 sites through `inr`/`inrSigned`)*; the 3 Alerts dates still owed
 - [ ] A6 — favicon and the dead sprite
 - [x] A7 — the toggle's two states *(2.55 → 4.88 on, 1.21 → 3.24 off)*
 
 **Part 2 — inconsistent**
 - [x] B1 — twelve tables → one *(10 converted, 2 sub-tables deliberately not)*
 - [x] B2 — 27 hand-rolled cards *(12 more on `Card`; 4 changed padding to p-6)*
-- [~] B3 — 16 field copies *(search boxes done; 8 selects left)*
+- [x] B3 — 16 field copies
 - [x] B4 — seven hand-rolled pills
 - [x] B5 — three pagers → one
-- [ ] B6 — `Loading…`, skeletons, empty states *(untouched)*
+- [x] B6 — `Loading…`, skeletons, empty states *(5 of 10 kept, with reasons)*
 - [x] B7 — two stat tiles → one
 - [x] B8 — page padding and content width *(`PageBody` on 16 pages)*
 
