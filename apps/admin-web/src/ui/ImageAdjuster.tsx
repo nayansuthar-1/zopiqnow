@@ -171,7 +171,7 @@ export function ImageAdjuster({
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
-            className="relative w-full cursor-grab select-none overflow-hidden rounded-[8px] border border-line bg-canvas active:cursor-grabbing"
+            className="relative w-full cursor-grab select-none overflow-hidden rounded-field border border-line bg-canvas active:cursor-grabbing"
             style={{ aspectRatio: String(aspect) }}
           >
             {natural ? (

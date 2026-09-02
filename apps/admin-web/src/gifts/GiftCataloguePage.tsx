@@ -241,7 +241,7 @@ export function GiftCataloguePage() {
                       onClick={() => setShopId(s.id)}
                       className="flex min-w-0 flex-1 items-center gap-3 text-left"
                     >
-                      <span className="h-10 w-10 shrink-0 overflow-hidden rounded-[8px] bg-canvas">
+                      <span className="h-10 w-10 shrink-0 overflow-hidden rounded-field bg-canvas">
                         {s.image_url && (
                           <img src={s.image_url} alt="" className="h-full w-full object-cover" />
                         )}
@@ -327,7 +327,7 @@ export function GiftCataloguePage() {
                 ) : (
                   <div className="space-y-5 p-6">
                     {shelves.map((shelf, si) => (
-                      <div key={shelf.name} className="rounded-[8px] border border-line">
+                      <div key={shelf.name} className="rounded-field border border-line">
                         <div className="flex flex-wrap items-center gap-2 border-b border-line bg-canvas px-4 py-2.5">
                           {renaming?.from === shelf.name ? (
                             <form
@@ -347,7 +347,7 @@ export function GiftCataloguePage() {
                                 onChange={(e) =>
                                   setRenaming({ ...renaming, to: e.target.value })
                                 }
-                                className="h-9 flex-1 rounded-[8px] border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
+                                className="h-9 flex-1 rounded-field border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
                               />
                               <Button type="submit" className="h-9 px-3" loading={busy}>
                                 Rename
@@ -426,7 +426,7 @@ export function GiftCataloguePage() {
                               <span className="select-none text-ink-muted" aria-hidden>
                                 ⠿
                               </span>
-                              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-[4px] bg-canvas">
+                              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xs bg-canvas">
                                 {item.image_url && (
                                   <img
                                     src={item.image_url}

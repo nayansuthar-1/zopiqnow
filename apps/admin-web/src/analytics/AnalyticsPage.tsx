@@ -83,7 +83,7 @@ export function AnalyticsPage() {
         {stats === null ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 8 }, (_, i) => (
-              <div key={i} className="rounded-[12px] border border-line bg-white p-5">
+              <div key={i} className="rounded-card border border-line bg-white p-5">
                 <Skeleton className="h-3 w-20" />
                 <Skeleton className="mt-3 h-7 w-28" />
                 <Skeleton className="mt-2 h-3 w-32" />
@@ -156,7 +156,7 @@ export function AnalyticsPage() {
                   Nothing delivered in this window.
                 </p>
               ) : (
-                <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
+                <div className="overflow-x-auto rounded-card border border-line bg-white">
                   <table className="w-full min-w-[560px] text-sm">
                     <thead className="border-b border-line text-left text-ink-muted">
                       <tr>
@@ -212,7 +212,7 @@ function Tile({
   sub: string
 }) {
   return (
-    <div className="rounded-[12px] border border-line bg-white p-5">
+    <div className="rounded-card border border-line bg-white p-5">
       <p className="text-xs font-medium tracking-wide text-ink-muted uppercase">
         {label}
       </p>
@@ -250,7 +250,7 @@ function Chart({ series }: { series: DailyOrders[] }) {
       <p className="mt-0.5 mb-3 text-sm text-ink-muted">
         Placed in the tint, delivered on the line. Peak {peak} in a day.
       </p>
-      <div className="rounded-[12px] border border-line bg-white p-5">
+      <div className="rounded-card border border-line bg-white p-5">
         <svg
           viewBox={`0 0 ${W} ${H}`}
           className="h-44 w-full"

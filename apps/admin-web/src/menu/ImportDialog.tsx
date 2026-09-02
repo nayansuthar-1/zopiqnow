@@ -59,7 +59,7 @@ export function ImportDialog({
         </p>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <label className="inline-flex h-10 cursor-pointer items-center rounded-[8px] border border-line px-4 text-sm font-semibold text-ink hover:bg-canvas">
+          <label className="inline-flex h-10 cursor-pointer items-center rounded-field border border-line px-4 text-sm font-semibold text-ink hover:bg-canvas">
             Choose CSV file
             <input
               type="file"
@@ -98,7 +98,7 @@ export function ImportDialog({
             </p>
 
             {bad.length > 0 && (
-              <ul className="mt-3 max-h-32 overflow-y-auto rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg-ink">
+              <ul className="mt-3 max-h-32 overflow-y-auto rounded-field bg-non-veg-soft px-4 py-3 text-sm text-non-veg-ink">
                 {bad.map((r) => (
                   <li key={r.line}>
                     Line {r.line}: {r.problem}
@@ -107,7 +107,7 @@ export function ImportDialog({
               </ul>
             )}
 
-            <div className="mt-3 max-h-64 overflow-auto rounded-[8px] border border-line">
+            <div className="mt-3 max-h-64 overflow-auto rounded-field border border-line">
               <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className="border-b border-line text-xs uppercase text-ink-muted">
                   <tr>

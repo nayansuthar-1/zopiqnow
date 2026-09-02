@@ -112,7 +112,7 @@ function SlidePreview({
   return (
     <div>
       <div
-        className="relative overflow-hidden rounded-[12px] bg-canvas"
+        className="relative overflow-hidden rounded-card bg-canvas"
         style={{ width: `${PREVIEW_WIDTH}px`, height: px(HERO_HEIGHT) }}
       >
         {imageUrl ? (
@@ -377,7 +377,7 @@ function SlideForm({
 
   return (
     <form
-      className="mt-5 rounded-[8px] border border-line p-4"
+      className="mt-5 rounded-field border border-line p-4"
       onSubmit={(e) => {
         e.preventDefault()
         onSubmit({
@@ -403,7 +403,7 @@ function SlideForm({
               box is ambiguous — it reads as something not filled in yet, and an
               admin who wanted no headline could never be sure they had got what
               they asked for. A switch that is off is a decision. */}
-          <div className="space-y-4 rounded-[8px] bg-canvas p-4">
+          <div className="space-y-4 rounded-field bg-canvas p-4">
             <Toggle
               label="Headline"
               checked={hasTitle}
@@ -430,7 +430,7 @@ function SlideForm({
             )}
           </div>
 
-          <div className="space-y-4 rounded-[8px] bg-canvas p-4">
+          <div className="space-y-4 rounded-field bg-canvas p-4">
             <Toggle
               label="Button"
               checked={hasCta}
@@ -487,7 +487,7 @@ function SlideForm({
             <span className="mb-1.5 block text-sm font-medium text-ink">
               Artwork
             </span>
-            <label className="inline-flex h-10 cursor-pointer items-center rounded-[8px] border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas">
+            <label className="inline-flex h-10 cursor-pointer items-center rounded-field border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas">
               {uploading ? 'Uploading…' : imageUrl ? 'Replace image' : 'Upload image'}
               <input
                 type="file"
@@ -535,7 +535,7 @@ function SlideForm({
               Motion loop (optional)
             </span>
             <div className="flex flex-wrap items-center gap-2">
-              <label className="inline-flex h-10 cursor-pointer items-center rounded-[8px] border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas">
+              <label className="inline-flex h-10 cursor-pointer items-center rounded-field border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas">
                 {motionBusy
                   ? 'Transcoding…'
                   : motionUrl
@@ -709,7 +709,7 @@ export function HeroSlidesPage() {
           </Banner>
         )}
 
-        <div className="rounded-[12px] border border-line bg-white p-6">
+        <div className="rounded-card border border-line bg-white p-6">
           <h2 className="text-base font-bold text-ink">Campaign slides</h2>
           <p className="mt-1 text-sm text-ink-muted">
             {slides === null
@@ -756,7 +756,7 @@ export function HeroSlidesPage() {
           )}
 
           {slides !== null && slides.length > 0 && (
-            <div className="mt-5 divide-y divide-line rounded-[8px] border border-line">
+            <div className="mt-5 divide-y divide-line rounded-field border border-line">
               {slides.map((s) => {
                 const state = slideStateOf(s)
                 return (

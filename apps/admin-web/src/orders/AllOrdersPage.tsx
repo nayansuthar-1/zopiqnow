@@ -268,7 +268,7 @@ export function AllOrdersPage() {
             }}
           >
             <input
-              className="h-11 flex-1 rounded-[8px] border border-field bg-white px-3 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink"
+              className="h-11 flex-1 rounded-field border border-field bg-white px-3 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Order id or phone number"
@@ -299,7 +299,7 @@ export function AllOrdersPage() {
               }}
             />
             <select
-              className="h-9 rounded-[8px] border border-field bg-white px-2 text-sm text-ink outline-none focus:border-brand-ink"
+              className="h-9 rounded-field border border-field bg-white px-2 text-sm text-ink outline-none focus:border-brand-ink"
               value={restaurantId}
               aria-label="Restaurant"
               onChange={(e) => {
@@ -342,7 +342,7 @@ export function AllOrdersPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
+            <div className="overflow-x-auto rounded-card border border-line bg-white">
               <table className="w-full min-w-[900px] text-sm">
                 <thead>
                   <tr className="border-b border-line text-left text-xs font-medium tracking-wide text-ink-muted uppercase">
@@ -595,11 +595,11 @@ function PhotoPane({ label, url }: { label: string; url: string | null }) {
             src={url}
             alt={`${label} photo`}
             loading="lazy"
-            className="aspect-square w-full rounded-lg border border-line object-cover"
+            className="aspect-square w-full rounded-field border border-line object-cover"
           />
         </a>
       ) : (
-        <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-line">
+        <div className="flex aspect-square w-full items-center justify-center rounded-field border border-dashed border-line">
           <span className="text-xs text-ink-muted">Not taken</span>
         </div>
       )}

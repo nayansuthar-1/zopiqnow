@@ -94,7 +94,7 @@ export function GiftShopDialog({
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-[8px] border border-field bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink"
+              className="w-full rounded-field border border-field bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink"
             />
           </label>
 

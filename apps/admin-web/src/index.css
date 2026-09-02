@@ -1,5 +1,26 @@
 @import 'tailwindcss';
 
+/* The brand face, the same file the three Flutter apps bundle
+   (packages/zopiq_ui/assets/fonts/Figtree-Variable.ttf, SIL OFL — the licence
+   is beside it in src/fonts/). Until now the console was the one surface in
+   the product set in system-ui, which is why it read as somebody else's tool.
+
+   One variable file with a wght axis of 300–900, so every weight Tailwind can
+   ask for is a real cut and none of them is synthesised. Shipped as .ttf and
+   not .woff2 because .ttf is what the repository has; woff2 would be roughly
+   40% smaller and is worth doing the day there is a converter in the toolchain.
+
+   `swap`, deliberately: this is an ops console behind a login, and text that
+   is invisible for 100ms so it can arrive in the right face is a worse trade
+   than text that reflows. */
+@font-face {
+  font-family: 'Figtree';
+  src: url('./fonts/Figtree-Variable.ttf') format('truetype-variations');
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* The design tokens, mirrored from packages/zopiq_ui/lib/src/tokens/.
    That package is the source of truth; these are its hex values restated for
    the web. Change them there first. Feature code uses the token names below
@@ -63,9 +84,54 @@
   --color-warn: #a05f18;
   --color-warn-soft: #fdf1e3;
 
-  --radius-card: 12px;
-  --radius-field: 8px;
+  /* The type scale, mirrored from ZopiqTypography.textTheme. Set on the six
+     names the console already writes rather than under new ones, so every
+     existing `text-sm` inherits the product's line-height and letter-spacing
+     without a single page changing. Headings tighten as they grow and body
+     text opens up — that contrast is most of what separates this from four
+     sizes and a default leading.
+
+     Steps the console has no use for (displayLarge/Medium at 32 and 28) are
+     left out rather than mirrored into tokens nobody calls. */
+  --text-xs: 12px; /* bodySmall */
+  --text-xs--line-height: 1.4;
+  --text-xs--letter-spacing: 0.1px;
+  --text-sm: 14px; /* bodyMedium — the console's workhorse, 308 uses */
+  --text-sm--line-height: 1.45;
+  --text-sm--letter-spacing: 0;
+  --text-base: 16px; /* bodyLarge */
+  --text-base--line-height: 1.45;
+  --text-base--letter-spacing: 0;
+  --text-lg: 18px; /* titleLarge — the page heading */
+  --text-lg--line-height: 1.3;
+  --text-lg--letter-spacing: -0.1px;
+  --text-xl: 20px; /* headlineMedium */
+  --text-xl--line-height: 1.3;
+  --text-xl--letter-spacing: -0.2px;
+  --text-2xl: 24px; /* headlineLarge — the stat tiles */
+  --text-2xl--line-height: 1.25;
+  --text-2xl--letter-spacing: -0.3px;
+
+  /* Radii, mirrored from ZopiqRadii. Two of these were declared before and
+     never once used — every corner in the console was a literal. */
+  --radius-xs: 4px;
+  --radius-field: 8px; /* ZopiqRadii.sm — controls */
+  --radius-card: 12px; /* ZopiqRadii.md — cards, dialogs, tables */
+
+  /* Elevation, mirrored from ZopiqElevation. The console is a flat surface on
+     purpose and spends exactly one of these today — the modal, whose value is
+     its own rather than the package's because a dialog over a whole page is
+     not the same object as a card. `card` is what the sticky headers will
+     take in Phase 4. */
+  --shadow-card: 0 4px 12px rgb(0 0 0 / 0.08);
+  --shadow-floating: 0 6px 16px rgb(0 0 0 / 0.12);
+  --shadow-modal: 0 16px 48px rgb(40 44 63 / 0.18);
 }
+
+/* Spacing is Tailwind's 4-pt scale, which is ZopiqSpacing's 8-pt grid with the
+   half-steps kept: 4, 8, 12, 16, 24, 32, 48 are p-1, p-2, p-3, p-4, p-6, p-8,
+   p-12. Use those. `p-5` (20) and `py-2.5` (10) are off the grid and are most
+   of the reason two adjacent cards in this console never quite line up. */
 
 html,
 body,
@@ -77,7 +143,7 @@ body {
   margin: 0;
   background-color: var(--color-canvas);
   color: var(--color-ink);
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Figtree', system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   /* Long restaurant names and pasted UTRs are the two strings that overflow a
      cell in this console. Neither has spaces to break at, so without this the

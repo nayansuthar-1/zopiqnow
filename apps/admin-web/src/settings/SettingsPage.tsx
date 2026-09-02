@@ -75,7 +75,7 @@ export function SettingsPage() {
           </Banner>
         )}
 
-        <div className="rounded-[12px] border border-line bg-white p-6">
+        <div className="rounded-card border border-line bg-white p-6">
           <h2 className="text-base font-bold text-ink">Platform admins</h2>
           <p className="mt-1 text-sm text-ink-muted">
             Everyone here can create and publish restaurants, and can see every
@@ -85,7 +85,7 @@ export function SettingsPage() {
           {admins === null ? (
             <div className="mt-5 space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
           ) : (
-            <div className="mt-5 divide-y divide-line rounded-[8px] border border-line">
+            <div className="mt-5 divide-y divide-line rounded-field border border-line">
               {admins.map((a) => {
                 const isMe = a.email === mine
                 return (
@@ -237,7 +237,7 @@ function RiderPayCard() {
     (base !== String(rates.base_fee) || perKm !== String(rates.per_km_fee))
 
   return (
-    <div className="mt-6 rounded-[12px] border border-line bg-white p-6">
+    <div className="mt-6 rounded-card border border-line bg-white p-6">
       <h2 className="text-base font-bold text-ink">Rider pay</h2>
       <p className="mt-1 text-sm text-ink-muted">
         What one delivery pays. The distance is measured in a straight line from

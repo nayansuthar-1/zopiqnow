@@ -195,7 +195,7 @@ export function SettlementsPage() {
             }
           />
         ) : (
-          <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
+          <div className="overflow-x-auto rounded-card border border-line bg-white">
             <table className="w-full min-w-[980px] text-sm">
               <thead className="border-b border-line text-left text-ink-muted">
                 <tr>
@@ -347,7 +347,7 @@ export function SettlementsPage() {
             rather than for us.
           </p>
 
-          <div className="mt-4 rounded-[8px] bg-canvas px-4 py-3 text-sm">
+          <div className="mt-4 rounded-field bg-canvas px-4 py-3 text-sm">
             <p className="text-ink-muted">
               Currently payable{' '}
               <span className="font-medium tabular-nums text-ink">
@@ -388,7 +388,7 @@ export function SettlementsPage() {
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
                 Already adjusted
               </p>
-              <ul className="divide-y divide-line rounded-[8px] border border-line">
+              <ul className="divide-y divide-line rounded-field border border-line">
                 {history.map((a) => (
                   <li key={a.id} className="px-4 py-2 text-sm">
                     <div className="flex justify-between gap-3">
@@ -443,7 +443,7 @@ export function SettlementsPage() {
             first, then put the bank&rsquo;s reference here.
           </p>
 
-          <div className="mt-4 rounded-[8px] bg-canvas px-4 py-3 text-sm">
+          <div className="mt-4 rounded-field bg-canvas px-4 py-3 text-sm">
             {bank === null ? (
               <p className="text-ink-muted">Fetching account details…</p>
             ) : (

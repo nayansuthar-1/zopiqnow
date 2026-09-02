@@ -160,7 +160,7 @@ export function CashPage() {
               </Button>
             </div>
 
-            <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
+            <div className="overflow-x-auto rounded-card border border-line bg-white">
               <table className="w-full min-w-[900px] text-sm">
                 <thead className="border-b border-line text-left text-ink-muted">
                   <tr>

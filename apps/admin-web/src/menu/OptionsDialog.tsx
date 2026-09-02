@@ -195,7 +195,7 @@ export function OptionsDialog({
       )}
 
       {loadError ? (
-        <div className="mt-6 rounded-[8px] border border-line p-6 text-center">
+        <div className="mt-6 rounded-field border border-line p-6 text-center">
           <p className="text-sm text-ink">We couldn’t read this dish’s options.</p>
           <p className="mt-1 text-sm text-ink-muted">
             Nothing has been changed. {loadError}
@@ -215,20 +215,20 @@ export function OptionsDialog({
       ) : (
         <div className="mt-5 space-y-4">
           {groups.length === 0 && (
-            <p className="rounded-[8px] border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted">
+            <p className="rounded-field border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted">
               This dish asks nothing before it is ordered. Add a group to give it
               sizes or add-ons.
             </p>
           )}
 
           {groups.map((g, i) => (
-            <div key={g.key} className="rounded-[8px] border border-line p-4">
+            <div key={g.key} className="rounded-field border border-line p-4">
               <div className="flex items-center gap-2">
                 <input
                   value={g.name}
                   placeholder="Choose a size"
                   onChange={(e) => patch(i, { name: e.target.value })}
-                  className="h-10 flex-1 rounded-[8px] border border-field bg-white px-3 text-sm font-medium text-ink outline-none focus:border-brand-ink"
+                  className="h-10 flex-1 rounded-field border border-field bg-white px-3 text-sm font-medium text-ink outline-none focus:border-brand-ink"
                   aria-label="Group name"
                 />
                 <button
@@ -260,7 +260,7 @@ export function OptionsDialog({
                     value={g.min}
                     inputMode="numeric"
                     onChange={(e) => patch(i, { min: e.target.value })}
-                    className="h-9 w-16 rounded-[8px] border border-field bg-white px-2 text-center text-sm text-ink outline-none focus:border-brand-ink"
+                    className="h-9 w-16 rounded-field border border-field bg-white px-2 text-center text-sm text-ink outline-none focus:border-brand-ink"
                     aria-label="Minimum picks"
                   />
                   <span>and up to</span>
@@ -268,7 +268,7 @@ export function OptionsDialog({
                     value={g.max}
                     inputMode="numeric"
                     onChange={(e) => patch(i, { max: e.target.value })}
-                    className="h-9 w-16 rounded-[8px] border border-field bg-white px-2 text-center text-sm text-ink outline-none focus:border-brand-ink"
+                    className="h-9 w-16 rounded-field border border-field bg-white px-2 text-center text-sm text-ink outline-none focus:border-brand-ink"
                     aria-label="Maximum picks"
                   />
                 </div>
@@ -281,7 +281,7 @@ export function OptionsDialog({
                       value={o.name}
                       placeholder="500 g"
                       onChange={(e) => patchOption(i, j, { name: e.target.value })}
-                      className="h-10 flex-1 rounded-[8px] border border-field bg-white px-3 text-sm text-ink outline-none focus:border-brand-ink"
+                      className="h-10 flex-1 rounded-field border border-field bg-white px-3 text-sm text-ink outline-none focus:border-brand-ink"
                       aria-label="Option name"
                     />
                     <span className="text-sm text-ink-muted">+₹</span>
@@ -289,7 +289,7 @@ export function OptionsDialog({
                       value={o.delta}
                       inputMode="numeric"
                       onChange={(e) => patchOption(i, j, { delta: e.target.value })}
-                      className="h-10 w-24 rounded-[8px] border border-field bg-white px-3 text-sm tabular-nums text-ink outline-none focus:border-brand-ink"
+                      className="h-10 w-24 rounded-field border border-field bg-white px-3 text-sm tabular-nums text-ink outline-none focus:border-brand-ink"
                       aria-label="Adds to the price"
                     />
                     <span className="w-20 shrink-0 text-right text-sm tabular-nums text-ink-muted">

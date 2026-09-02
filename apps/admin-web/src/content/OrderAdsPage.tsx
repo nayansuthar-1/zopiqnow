@@ -127,7 +127,7 @@ export function OrderAdsPage() {
               return (
                 <div
                   key={ad.id}
-                  className="flex flex-wrap items-center gap-4 rounded-[12px] border border-line bg-white p-4"
+                  className="flex flex-wrap items-center gap-4 rounded-card border border-line bg-white p-4"
                 >
                   <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-line bg-canvas">
                     {ad.logo_url && (

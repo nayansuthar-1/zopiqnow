@@ -114,14 +114,14 @@ export function HoursStep({
                   type="time"
                   value={day.opens}
                   onChange={(e) => update(i, { opens: e.target.value })}
-                  className="h-9 rounded-[8px] border border-field bg-white px-2 text-sm outline-none focus:border-brand-ink"
+                  className="h-9 rounded-field border border-field bg-white px-2 text-sm outline-none focus:border-brand-ink"
                 />
                 <span className="text-ink-muted">–</span>
                 <input
                   type="time"
                   value={day.closes}
                   onChange={(e) => update(i, { closes: e.target.value })}
-                  className="h-9 rounded-[8px] border border-field bg-white px-2 text-sm outline-none focus:border-brand-ink"
+                  className="h-9 rounded-field border border-field bg-white px-2 text-sm outline-none focus:border-brand-ink"
                 />
                 {day.closes < day.opens && (
                   <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-ink">
@@ -144,7 +144,7 @@ export function HoursStep({
       </div>
 
       {allShut && (
-        <p className="rounded-[8px] bg-canvas px-4 py-3 text-sm text-ink-muted">
+        <p className="rounded-field bg-canvas px-4 py-3 text-sm text-ink-muted">
           With no days set, the kitchen counts as always open — and publishing is
           blocked until at least one day has hours.
         </p>

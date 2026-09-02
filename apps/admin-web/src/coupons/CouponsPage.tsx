@@ -472,7 +472,7 @@ function Table({
       {rows.length === 0 ? (
         <EmptyState title={empty.title} body={empty.body} />
       ) : (
-        <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
+        <div className="overflow-x-auto rounded-card border border-line bg-white">
           <table className="w-full min-w-[820px] text-sm">
             <thead className="border-b border-line text-left text-ink-muted">
               <tr>

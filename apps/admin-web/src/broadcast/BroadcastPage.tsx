@@ -135,7 +135,7 @@ export function BroadcastPage() {
       />
 
       <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-        <div className="rounded-[12px] border border-line bg-white p-6">
+        <div className="rounded-card border border-line bg-white p-6">
           {error && (
             <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
               {error}
@@ -231,7 +231,7 @@ export function BroadcastPage() {
               {sent.map((b) => (
                 <div
                   key={b.id}
-                  className="rounded-[12px] border border-line bg-white p-4"
+                  className="rounded-card border border-line bg-white p-4"
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <p className="font-semibold text-ink">{b.title}</p>
@@ -282,7 +282,7 @@ export function BroadcastPage() {
               different shape from the one you typed it in is how a typo gets
               caught — the same reason a proof is set, not re-read in the
               manuscript. */}
-          <div className="mt-4 rounded-[8px] bg-canvas px-4 py-3">
+          <div className="mt-4 rounded-field bg-canvas px-4 py-3">
             <p className="font-semibold text-ink">{title}</p>
             {body && <p className="mt-0.5 text-sm text-ink-muted">{body}</p>}
           </div>

@@ -73,7 +73,7 @@ export function Button({
   size?: 'md' | 'sm'
   loading?: boolean
 }) {
-  const base = `inline-flex shrink-0 items-center justify-center gap-2 rounded-[8px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${RING}`
+  const base = `inline-flex shrink-0 items-center justify-center gap-2 rounded-field font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${RING}`
   const sizes = { md: 'h-11 px-4 text-sm', sm: 'h-9 px-3 text-sm' }[size]
   const styles = {
     primary: 'bg-brand text-ink hover:bg-brand-hover',
@@ -136,7 +136,7 @@ export function Field({
         // A read-only field that looks editable is one somebody types into and
         // wonders why nothing happens. Still focusable and still selectable —
         // the value is usually there to be copied.
-        className={`h-11 w-full rounded-[8px] border bg-white px-3 text-sm text-ink outline-none read-only:bg-canvas read-only:text-ink-muted placeholder:text-ink-muted focus:border-brand-ink ${RING} ${
+        className={`h-11 w-full rounded-field border bg-white px-3 text-sm text-ink outline-none read-only:bg-canvas read-only:text-ink-muted placeholder:text-ink-muted focus:border-brand-ink ${RING} ${
           error ? 'border-non-veg' : 'border-field'
         }`}
         {...rest}
@@ -179,7 +179,7 @@ export function TextArea({
       <textarea
         id={inputId}
         aria-describedby={hint ? noteId : undefined}
-        className={`min-h-24 w-full rounded-[8px] border border-field bg-white px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink ${RING}`}
+        className={`min-h-24 w-full rounded-field border border-field bg-white px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink ${RING}`}
         {...rest}
       />
       {hint && (
@@ -276,7 +276,7 @@ export function ChipsInput({
     <div>
       <span className="mb-1.5 block text-sm font-medium text-ink">{label}</span>
       <div
-        className={`flex min-h-11 flex-wrap items-center gap-1.5 rounded-[8px] border border-field bg-white px-2 py-1.5 focus-within:border-brand-ink focus-within:ring-2 focus-within:ring-brand focus-within:ring-offset-2 focus-within:ring-offset-white`}
+        className={`flex min-h-11 flex-wrap items-center gap-1.5 rounded-field border border-field bg-white px-2 py-1.5 focus-within:border-brand-ink focus-within:ring-2 focus-within:ring-brand focus-within:ring-offset-2 focus-within:ring-offset-white`}
       >
         {values.map((v) => (
           <span
@@ -445,7 +445,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`my-auto w-full ${width} rounded-[12px] bg-white shadow-[0_16px_48px_rgba(40,44,63,0.18)] outline-none`}
+        className={`my-auto w-full ${width} rounded-card bg-white shadow-modal outline-none`}
       >
         <div className="px-6 pt-6">
           <h2 id={titleId} className="text-base font-bold text-ink">
@@ -538,7 +538,7 @@ export function Banner({
   return (
     <div
       role={tone === 'error' ? 'alert' : 'status'}
-      className={`flex items-start justify-between gap-4 rounded-[8px] px-4 py-3 text-sm ${styles} ${className}`}
+      className={`flex items-start justify-between gap-4 rounded-field px-4 py-3 text-sm ${styles} ${className}`}
     >
       <p className="min-w-0">{children}</p>
       {onDismiss && (
@@ -546,7 +546,7 @@ export function Banner({
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss"
-          className={`shrink-0 rounded-[4px] font-semibold opacity-70 hover:opacity-100 ${RING}`}
+          className={`shrink-0 rounded-xs font-semibold opacity-70 hover:opacity-100 ${RING}`}
         >
           ×
         </button>
@@ -568,7 +568,7 @@ export function EmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="rounded-[12px] border border-dashed border-line bg-white px-6 py-12 text-center">
+    <div className="rounded-card border border-dashed border-line bg-white px-6 py-12 text-center">
       <p className="text-sm font-semibold text-ink">{title}</p>
       <p className="mx-auto mt-1 max-w-md text-sm text-ink-muted">{body}</p>
       {action && <div className="mt-4 flex justify-center">{action}</div>}
@@ -594,7 +594,7 @@ export function Skeleton({ className = '' }: { className?: string }) {
 export function TableSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div
-      className="overflow-hidden rounded-[12px] border border-line bg-white"
+      className="overflow-hidden rounded-card border border-line bg-white"
       role="status"
       aria-label="Loading"
     >
@@ -616,7 +616,7 @@ export function CardSkeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="space-y-3" role="status" aria-label="Loading">
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="rounded-[12px] border border-line bg-white p-5">
+        <div key={i} className="rounded-card border border-line bg-white p-5">
           <Skeleton className="h-4 w-48" />
           <Skeleton className="mt-3 h-3 w-72" />
           <Skeleton className="mt-4 h-3 w-full max-w-xl" />
@@ -674,7 +674,7 @@ export function SegmentedControl<T extends string>({
           role="radio"
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
-          className={`rounded-[8px] px-3 py-1.5 text-sm font-medium transition-colors ${RING} ${
+          className={`rounded-field px-3 py-1.5 text-sm font-medium transition-colors ${RING} ${
             value === o.value
               ? 'bg-brand-soft text-brand-ink'
               : 'text-ink-muted hover:bg-canvas hover:text-ink'
@@ -696,7 +696,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-[12px] border border-line bg-white p-6 ${className}`}
+      className={`rounded-card border border-line bg-white p-6 ${className}`}
     >
       {children}
     </div>

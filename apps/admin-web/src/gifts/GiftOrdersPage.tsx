@@ -178,7 +178,7 @@ export function GiftOrdersPage() {
           </Banner>
         )}
 
-        <div className="overflow-hidden rounded-[12px] border border-line bg-white">
+        <div className="overflow-hidden rounded-card border border-line bg-white">
           {rows === null ? (
             <TableSkeleton rows={6} />
           ) : rows.length === 0 ? (

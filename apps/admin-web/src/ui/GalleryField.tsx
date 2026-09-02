@@ -95,7 +95,7 @@ export function GalleryField({
             // either way — there is no expensive subtree here to preserve.
             <li
               key={`${url}-${i}`}
-              className="overflow-hidden rounded-[8px] border border-line"
+              className="overflow-hidden rounded-field border border-line"
             >
               <div className="relative aspect-square bg-canvas">
                 <img src={url} alt="" className="h-full w-full object-cover" />
@@ -155,7 +155,7 @@ export function GalleryField({
 
       <div className="flex flex-wrap items-center gap-2">
         <label
-          className={`inline-flex h-10 items-center rounded-[8px] border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas ${
+          className={`inline-flex h-10 items-center rounded-field border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas ${
             busy ? 'pointer-events-none opacity-60' : 'cursor-pointer'
           }`}
         >

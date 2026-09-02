@@ -58,7 +58,7 @@ export function TeamStep({
       onSave={onNext}
     >
       {staff.length > 0 ? (
-        <div className="divide-y divide-line rounded-[8px] border border-line">
+        <div className="divide-y divide-line rounded-field border border-line">
           {staff.map((s) => (
             <div key={s.email} className="flex flex-wrap items-center gap-3 px-4 py-3">
               <span className="flex-1 text-sm text-ink">{s.email}</span>
@@ -70,7 +70,7 @@ export function TeamStep({
                     api.setStaffRole(id, s.email, e.target.value as 'owner' | 'staff'),
                   )
                 }
-                className="h-9 rounded-[8px] border border-field bg-white px-2 text-sm outline-none focus:border-brand-ink"
+                className="h-9 rounded-field border border-field bg-white px-2 text-sm outline-none focus:border-brand-ink"
               >
                 <option value="owner">Owner</option>
                 <option value="staff">Staff</option>
@@ -87,12 +87,12 @@ export function TeamStep({
           ))}
         </div>
       ) : (
-        <p className="rounded-[8px] bg-canvas px-4 py-3 text-sm text-ink-muted">
+        <p className="rounded-field bg-canvas px-4 py-3 text-sm text-ink-muted">
           Nobody can run this kitchen yet. Add the owner&apos;s email below.
         </p>
       )}
 
-      <div className="rounded-[8px] border border-line p-4">
+      <div className="rounded-field border border-line p-4">
         <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
           <Field
             label="Email address"
@@ -106,7 +106,7 @@ export function TeamStep({
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as 'owner' | 'staff')}
-              className="h-11 rounded-[8px] border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
+              className="h-11 rounded-field border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
             >
               <option value="owner">Owner</option>
               <option value="staff">Staff</option>
@@ -133,7 +133,7 @@ export function TeamStep({
       </div>
 
       {!hasOwner && (
-        <p className="rounded-[8px] bg-warn-soft px-4 py-3 text-sm text-warn">
+        <p className="rounded-field bg-warn-soft px-4 py-3 text-sm text-warn">
           Publishing is blocked until there is at least one owner.
         </p>
       )}

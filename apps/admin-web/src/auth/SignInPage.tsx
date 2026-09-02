@@ -197,7 +197,7 @@ export function SignInPage() {
           >
             {/* Says nothing about whether that address is an admin, because the
                 function it just called said nothing either. */}
-            <p className="rounded-[8px] border border-line bg-canvas p-3 text-sm text-ink-muted">
+            <p className="rounded-field border border-line bg-canvas p-3 text-sm text-ink-muted">
               If <span className="text-ink">{address}</span> can open this
               console, a six-digit code is on its way. It can take a minute, and
               asking again straight away will not make it faster.

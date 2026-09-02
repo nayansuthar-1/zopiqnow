@@ -194,7 +194,7 @@ export function LiveOrdersPage() {
           }}
         >
           <input
-            className="h-11 flex-1 rounded-[8px] border border-field bg-white px-3 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink"
+            className="h-11 flex-1 rounded-field border border-field bg-white px-3 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Order id or phone number"
@@ -339,7 +339,7 @@ function OrderCard({
   )
 
   return (
-    <div className="rounded-[12px] border border-line bg-white p-5">
+    <div className="rounded-card border border-line bg-white p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">

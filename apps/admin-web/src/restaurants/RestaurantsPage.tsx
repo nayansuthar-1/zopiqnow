@@ -131,7 +131,7 @@ export function RestaurantsPage() {
       <div className="p-6">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <input
-            className="h-10 w-full max-w-xs rounded-[8px] border border-field bg-white px-3 text-sm outline-none placeholder:text-ink-muted focus:border-brand-ink"
+            className="h-10 w-full max-w-xs rounded-field border border-field bg-white px-3 text-sm outline-none placeholder:text-ink-muted focus:border-brand-ink"
             placeholder="Search name, city, or owner"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -170,7 +170,7 @@ export function RestaurantsPage() {
             />
           )
         ) : (
-          <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
+          <div className="overflow-x-auto rounded-card border border-line bg-white">
             <table className="w-full min-w-[820px] text-left text-sm">
               <thead className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
                 <tr>

@@ -55,7 +55,7 @@ function DocumentField({
     <div>
       <span className="mb-1.5 block text-sm font-medium text-ink">{label}</span>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="inline-flex h-10 cursor-pointer items-center rounded-[8px] border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas">
+        <label className="inline-flex h-10 cursor-pointer items-center rounded-field border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas">
           {busy ? 'Uploading…' : path ? 'Replace file' : 'Upload file'}
           <input
             type="file"

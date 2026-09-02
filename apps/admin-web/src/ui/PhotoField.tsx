@@ -76,7 +76,7 @@ export function PhotoField({
 
       <div className="flex items-start gap-4">
         <div
-          className={`${previewClassName} shrink-0 overflow-hidden rounded-[8px] border border-line bg-canvas`}
+          className={`${previewClassName} shrink-0 overflow-hidden rounded-field border border-line bg-canvas`}
         >
           {value ? (
             <img src={value} alt="" className="h-full w-full object-cover" />
@@ -90,7 +90,7 @@ export function PhotoField({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <label
-              className={`inline-flex h-10 items-center rounded-[8px] border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas ${
+              className={`inline-flex h-10 items-center rounded-field border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas ${
                 busy ? 'pointer-events-none opacity-60' : 'cursor-pointer'
               }`}
             >

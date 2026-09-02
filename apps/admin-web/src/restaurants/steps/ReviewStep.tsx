@@ -155,7 +155,7 @@ export function ReviewStep({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-[12px] border border-line bg-white p-6">
+      <div className="rounded-card border border-line bg-white p-6">
         <h2 className="text-base font-bold text-ink">Before it goes live</h2>
         <p className="mt-1 text-sm text-ink-muted">
           {outstanding.length === 0
@@ -196,7 +196,7 @@ export function ReviewStep({
         </ul>
       </div>
 
-      <div className="rounded-[12px] border border-line bg-white p-6">
+      <div className="rounded-card border border-line bg-white p-6">
         <h2 className="text-base font-bold text-ink">Storefront</h2>
         <dl className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
           {[
@@ -221,7 +221,7 @@ export function ReviewStep({
       </div>
 
       {published || r.is_active ? (
-        <div className="rounded-[12px] border border-veg bg-veg-soft p-6">
+        <div className="rounded-card border border-veg bg-veg-soft p-6">
           <h2 className="text-base font-bold text-veg">This restaurant is live</h2>
           <p className="mt-1 text-sm text-ink">
             Customers can see and order from it in the app now. Edits from here take
@@ -237,7 +237,7 @@ export function ReviewStep({
           </Button>
         </div>
       ) : (
-        <div className="rounded-[12px] border border-line bg-white p-6">
+        <div className="rounded-card border border-line bg-white p-6">
           <h2 className="text-base font-bold text-ink">Publish</h2>
           <p className="mt-1 text-sm text-ink-muted">
             This puts the restaurant in front of every customer on Zopiqnow.
@@ -269,7 +269,7 @@ export function ReviewStep({
       )}
 
       {error && (
-        <p className="rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg-ink">
+        <p className="rounded-field bg-non-veg-soft px-4 py-3 text-sm text-non-veg-ink">
           {error}
         </p>
       )}
@@ -319,14 +319,14 @@ export function ReviewStep({
             {/* Named rather than left to the general warning, because these two
                 are the ones with a consequence outside the console. */}
             {!checks.find((c) => c.label.startsWith('At least one dish'))?.done && (
-              <p className="rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg-ink">
+              <p className="rounded-field bg-non-veg-soft px-4 py-3 text-sm text-non-veg-ink">
                 With no orderable dish, a customer who opens this restaurant sees an
                 empty menu — which reads as a broken app rather than as a kitchen
                 that has not finished onboarding.
               </p>
             )}
             {!checks.find((c) => c.label === 'FSSAI licence')?.done && (
-              <p className="rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg-ink">
+              <p className="rounded-field bg-non-veg-soft px-4 py-3 text-sm text-non-veg-ink">
                 Listing a kitchen with no valid FSSAI licence on file is a legal
                 exposure for the platform, not just an incomplete record.
               </p>

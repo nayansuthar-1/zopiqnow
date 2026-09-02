@@ -182,7 +182,7 @@ export function SupportPage() {
           </Banner>
         )}
 
-        <div className="overflow-hidden rounded-[12px] border border-line bg-white">
+        <div className="overflow-hidden rounded-card border border-line bg-white">
           {rows === null ? (
             <TableSkeleton rows={6} />
           ) : rows.length === 0 ? (
@@ -347,7 +347,7 @@ export function SupportPage() {
           </dl>
 
           {answering.body && (
-            <p className="mt-4 rounded-[8px] border border-line bg-canvas p-3 text-sm text-ink">
+            <p className="mt-4 rounded-field border border-line bg-canvas p-3 text-sm text-ink">
               {answering.body}
             </p>
           )}
@@ -407,11 +407,11 @@ function Shot({ label, url }: { label: string; url: string | null }) {
             src={url}
             alt={`${label} photo`}
             loading="lazy"
-            className="aspect-square w-full rounded-lg border border-line object-cover"
+            className="aspect-square w-full rounded-field border border-line object-cover"
           />
         </a>
       ) : (
-        <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-line">
+        <div className="flex aspect-square w-full items-center justify-center rounded-field border border-dashed border-line">
           <span className="text-xs text-ink-muted">None</span>
         </div>
       )}

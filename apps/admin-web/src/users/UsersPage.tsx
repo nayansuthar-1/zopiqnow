@@ -476,7 +476,7 @@ export function UsersPage() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search name, email or phone"
             aria-label="Search people"
-            className="min-w-[220px] flex-1 rounded-[8px] border border-line px-3 py-1.5 text-sm"
+            className="min-w-[220px] flex-1 rounded-field border border-line px-3 py-1.5 text-sm"
           />
         </div>
 
@@ -492,7 +492,7 @@ export function UsersPage() {
             }
           />
         ) : (
-          <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
+          <div className="overflow-x-auto rounded-card border border-line bg-white">
             <table className="w-full min-w-[900px] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs font-medium tracking-wide text-ink-muted uppercase">

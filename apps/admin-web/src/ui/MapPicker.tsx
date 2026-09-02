@@ -189,7 +189,7 @@ export function MapPicker({
         <div className="space-y-3">
           <div
             ref={host}
-            className="h-[420px] w-full overflow-hidden rounded-[8px] border border-line bg-canvas"
+            className="h-[420px] w-full overflow-hidden rounded-field border border-line bg-canvas"
           />
           <p className="text-sm text-ink-muted">
             {pin

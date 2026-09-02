@@ -96,7 +96,7 @@ function RiderForm({
 
   return (
     <form
-      className="mt-5 rounded-[8px] border border-line p-4"
+      className="mt-5 rounded-field border border-line p-4"
       onSubmit={(e) => {
         e.preventDefault()
         onSubmit({ email, name, phone, vehicle })
@@ -119,7 +119,7 @@ function RiderForm({
         {editing ? (
           <div>
             <span className="mb-1.5 block text-sm font-medium text-ink">Email</span>
-            <p className="flex h-11 items-center rounded-[8px] border border-field bg-canvas px-3 text-sm text-ink-muted">
+            <p className="flex h-11 items-center rounded-field border border-field bg-canvas px-3 text-sm text-ink-muted">
               {editing.email}
             </p>
             <span className="mt-1.5 block text-sm text-ink-muted">
@@ -140,7 +140,7 @@ function RiderForm({
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-ink">Vehicle</span>
           <select
-            className="h-11 w-full rounded-[8px] border border-field bg-white px-3 text-sm text-ink outline-none focus:border-brand-ink"
+            className="h-11 w-full rounded-field border border-field bg-white px-3 text-sm text-ink outline-none focus:border-brand-ink"
             value={vehicle}
             onChange={(e) => setVehicle(e.target.value as Vehicle)}
           >
@@ -229,7 +229,7 @@ export function RidersPage() {
           </Banner>
         )}
 
-        <div className="rounded-[12px] border border-line bg-white p-6">
+        <div className="rounded-card border border-line bg-white p-6">
           <h2 className="text-base font-bold text-ink">Delivery partners</h2>
           <p className="mt-1 text-sm text-ink-muted">
             {riders === null
@@ -289,7 +289,7 @@ export function RidersPage() {
           )}
 
           {riders !== null && riders.length > 0 && (
-            <div className="mt-5 divide-y divide-line rounded-[8px] border border-line">
+            <div className="mt-5 divide-y divide-line rounded-field border border-line">
               {riders.map((r) => (
                 <div key={r.email} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
@@ -514,7 +514,7 @@ function RiderDocField({
     <div>
       <span className="mb-1.5 block text-sm font-medium text-ink">{label}</span>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="inline-flex h-10 cursor-pointer items-center rounded-[8px] border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas">
+        <label className="inline-flex h-10 cursor-pointer items-center rounded-field border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-canvas">
           {busy ? 'Uploading…' : path ? 'Replace file' : 'Upload file'}
           <input
             type="file"
@@ -794,7 +794,7 @@ function KycDialog({
                   ID proof
                 </span>
                 <select
-                  className="h-11 w-full rounded-[8px] border border-field bg-white px-3 text-sm text-ink outline-none focus:border-brand-ink"
+                  className="h-11 w-full rounded-field border border-field bg-white px-3 text-sm text-ink outline-none focus:border-brand-ink"
                   value={idKind}
                   onChange={(e) => setIdKind(e.target.value as 'aadhaar' | 'pan')}
                 >
@@ -1236,7 +1236,7 @@ function EngagementDialog({
           {engagements.map((o) => (
             <label
               key={o.value}
-              className={`flex cursor-pointer gap-3 rounded-[8px] border p-3 ${
+              className={`flex cursor-pointer gap-3 rounded-field border p-3 ${
                 engagement === o.value
                   ? 'border-brand-ink bg-brand-soft/40'
                   : 'border-line hover:bg-canvas'
@@ -1274,7 +1274,7 @@ function EngagementDialog({
                 value={employer}
                 onChange={(e) => setEmployer(e.target.value)}
                 required
-                className="h-11 rounded-[8px] border border-field bg-white px-3 text-sm text-ink"
+                className="h-11 rounded-field border border-field bg-white px-3 text-sm text-ink"
               >
                 <option value="">Choose a restaurant…</option>
                 {restaurants.map((r) => (

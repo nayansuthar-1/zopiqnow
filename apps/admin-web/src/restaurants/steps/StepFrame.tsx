@@ -27,7 +27,7 @@ export function StepFrame({
 }) {
   return (
     <form
-      className="rounded-[12px] border border-line bg-white p-6"
+      className="rounded-card border border-line bg-white p-6"
       onSubmit={(e) => {
         e.preventDefault()
         onSave()
@@ -39,7 +39,7 @@ export function StepFrame({
       <div className="mt-6 space-y-5">{children}</div>
 
       {error && (
-        <p className="mt-5 rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg-ink">
+        <p className="mt-5 rounded-field bg-non-veg-soft px-4 py-3 text-sm text-non-veg-ink">
           {error}
         </p>
       )}

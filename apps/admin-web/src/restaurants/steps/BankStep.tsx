@@ -115,7 +115,7 @@ export function BankStep({
       />
 
       {existingLast4 && !changingAccount ? (
-        <div className="rounded-[8px] bg-canvas px-4 py-3">
+        <div className="rounded-field bg-canvas px-4 py-3">
           <p className="text-sm text-ink">
             Account on file ends in{' '}
             <span className="font-semibold tabular-nums">{existingLast4}</span>

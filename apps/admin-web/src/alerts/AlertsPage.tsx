@@ -209,7 +209,7 @@ export function AlertsPage() {
             <p className="mt-3 whitespace-pre-line text-sm text-ink">{row.body}</p>
 
             {openDetail === row.subject && (
-              <div className="mt-4 rounded-[8px] bg-canvas p-4">
+              <div className="mt-4 rounded-field bg-canvas p-4">
                 {incidents === null ? (
                   <p className="text-sm text-ink-muted">Loading…</p>
                 ) : (
