@@ -527,6 +527,32 @@ diff is a deletion. `tsc -b` / `vite build` / `oxlint` clean at every step.
 
 ### Phase 3 — Convert the pages
 
+**Mostly done** (`bc38bc1`, `6b95e38`). Every page-level table, every page wrapper, every
+hand-rolled card and every hand-rolled pill is on a primitive. What is left is listed under
+**Still open** below.
+
+**Two tables stay hand-rolled on purpose:** the cash ledger inside a card and the CSV
+preview inside the import dialog. Both are sub-tables at their own density (`py-2 pr-4`,
+`px-3 py-2`); wrapping either in `DataTable` would give it a border, a radius and a
+viewport-height cap it has no business having. Both got `scope="col"`, which was the part
+of A4 that actually applied to them.
+
+**One thing the conversion found that the survey missed:** Gift orders and Support each
+drew a bordered card *around* a `TableSkeleton`, an `EmptyState` and a table — all three of
+which draw their own border. That was a double border before this work and would have been
+a triple after it. Both wrappers are gone.
+
+**Still open, and named rather than quietly dropped:**
+
+- Eight `<select>` call sites still to move onto `Select` (Gift item, Item, Team, Riders).
+  The primitive exists and All orders uses it; these eight are each wrapped in their own
+  label markup and need reading, not a codemod.
+- Eight bare `Loading…` strings still to become skeletons, and three screens still missing
+  an `EmptyState` (Riders, Cash, Platform).
+- `StepFrame` still hand-rolls its error banner instead of using `Banner` — no
+  `role="alert"`, no dismiss, and it sits at the *bottom* of the form.
+
+
 *Goal: the 27 hand-rolled cards, 16 field copies, 7 pills and 12 tables are gone.*
 
 Screen by screen, in this order — busiest first, so the value lands early and the risky
@@ -624,22 +650,22 @@ Tick as they land.
 
 **Part 1 — measurably wrong**
 - [x] A1 — brand contrast *(decided: keep the orange, darken the label — 21/21 pairs pass)*
-- [x] A2 — `<select>` focus *(`Select` exists; 1 of 10 call sites moved over)*
-- [x] A3 — table hover + sticky header *(in `DataTable`; 3 of 12 pages moved over)*
-- [x] A4 — `scope="col"` *(in `Th`; 3 of 12 pages moved over)*
-- [ ] A5 — money and date formatting
+- [~] A2 — `<select>` focus *(`Select` exists; 2 of 10 call sites moved over)*
+- [x] A3 — table hover + sticky header *(all 10 page-level tables)*
+- [x] A4 — `scope="col"` *(every `<th>` in the console has it)*
+- [x] A5 — money *(45 sites through `inr`/`inrSigned`)*; dates still owed
 - [ ] A6 — favicon and the dead sprite
 - [x] A7 — the toggle's two states *(2.55 → 4.88 on, 1.21 → 3.24 off)*
 
 **Part 2 — inconsistent**
-- [ ] B1 — twelve tables → one
-- [ ] B2 — 27 hand-rolled cards
-- [ ] B3 — 16 field copies
-- [ ] B4 — seven hand-rolled pills
-- [ ] B5 — three pagers → one
-- [ ] B6 — `Loading…`, skeletons, empty states
-- [ ] B7 — two stat tiles → one
-- [ ] B8 — page padding and content width
+- [x] B1 — twelve tables → one *(10 converted, 2 sub-tables deliberately not)*
+- [x] B2 — 27 hand-rolled cards *(12 more on `Card`; 4 changed padding to p-6)*
+- [~] B3 — 16 field copies *(search boxes done; 8 selects left)*
+- [x] B4 — seven hand-rolled pills
+- [x] B5 — three pagers → one
+- [ ] B6 — `Loading…`, skeletons, empty states *(untouched)*
+- [x] B7 — two stat tiles → one
+- [x] B8 — page padding and content width *(`PageBody` on 16 pages)*
 
 **Part 3 — missing**
 - [ ] C1 — icons *(blocked: the font route costs 376 kB gzipped — needs glyph extraction)*
