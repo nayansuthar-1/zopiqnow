@@ -15,6 +15,7 @@ import {
   SegmentedControl,
   Skeleton,
 } from '../ui/primitives'
+import { useToast } from '../ui/toast'
 
 /// What the platform noticed while nobody was looking.
 ///
@@ -51,10 +52,10 @@ const RIDER_NO_SHOWS = 'rider_no_shows'
 const REFUNDS_STALLED = 'refunds_stalled'
 
 export function AlertsPage() {
+  const toast = useToast()
   const navigate = useNavigate()
   const [rows, setRows] = useState<AdminAlertRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [note, setNote] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('open')
   const [busy, setBusy] = useState(false)
 
@@ -95,7 +96,7 @@ export function AlertsPage() {
     setBusy(true)
     try {
       await api.resolveAlert(row.id)
-      setNote('Alert cleared.')
+      toast('Alert cleared.')
       await load(filter)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -113,7 +114,7 @@ export function AlertsPage() {
       // and it has now been answered, so leaving it open would put it back in
       // front of the next admin who has nothing left to decide.
       await api.resolveAlert(suspending.id)
-      setNote(`${suspending.rider_name ?? suspending.subject} is suspended.`)
+      toast(`${suspending.rider_name ?? suspending.subject} is suspended.`)
       setSuspending(null)
       await load(filter)
     } catch (e) {
@@ -156,11 +157,6 @@ export function AlertsPage() {
         {error && (
           <Banner tone="error" onDismiss={() => setError(null)}>
             {error}
-          </Banner>
-        )}
-        {note && (
-          <Banner tone="success" onDismiss={() => setNote(null)}>
-            {note}
           </Banner>
         )}
 

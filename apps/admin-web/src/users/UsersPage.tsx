@@ -22,6 +22,7 @@ import {
   Td,
   Th,
 } from '../ui/primitives'
+import { useToast } from '../ui/toast'
 import { inr } from '../lib/money'
 
 /// Everybody on the platform, and the power to shut one of them out.
@@ -372,9 +373,9 @@ function BlockDialog({
 }
 
 export function UsersPage() {
+  const toast = useToast()
   const [users, setUsers] = useState<UserRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<UserRow | null>(null)
@@ -415,7 +416,7 @@ export function UsersPage() {
     setError(null)
     try {
       await api.setUserBlocked(target.user_id, !target.is_blocked, reason)
-      setNotice(
+      toast(
         target.is_blocked
           ? `${target.email ?? 'They'} can sign in again.`
           : `${target.email ?? 'They'} are blocked and signed out.`,
@@ -454,11 +455,6 @@ export function UsersPage() {
         {error && (
           <Banner tone="error" onDismiss={() => setError(null)}>
             {error}
-          </Banner>
-        )}
-        {notice && (
-          <Banner tone="success" onDismiss={() => setNotice(null)}>
-            {notice}
           </Banner>
         )}
 

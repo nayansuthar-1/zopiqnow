@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useSession } from './auth/context'
 import { NotAdminPage, SignInPage } from './auth/SignInPage'
 import { AppShell } from './ui/AppShell'
+import { ToastHost } from './ui/ToastHost'
 import { RestaurantsPage } from './restaurants/RestaurantsPage'
 import { WizardPage } from './restaurants/WizardPage'
 import { RidersPage } from './riders/RidersPage'
@@ -49,39 +50,43 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <AppShell>
-        <Routes>
-          {/* The floor, not the filing cabinet. Onboarding a restaurant is a
-              thing somebody does once; an order going wrong is happening now,
-              so B7 moved the landing screen to the live board and left
-              Restaurants where it was, one click away. */}
-          <Route path="/" element={<LiveOrdersPage />} />
-          <Route path="/orders" element={<AllOrdersPage />} />
-          <Route path="/restaurants" element={<RestaurantsPage />} />
-          {/* Keyed so switching from an existing restaurant to /new remounts the
-              wizard — otherwise React keeps the old form state and the new draft
-              starts life pre-filled with someone else's restaurant. */}
-          <Route path="/restaurants/new" element={<WizardPage key="new" />} />
-          <Route path="/restaurants/:id" element={<WizardPage key="edit" />} />
-          <Route path="/riders" element={<RidersPage />} />
-          <Route path="/users" element={<UsersPage />} />
-          <Route path="/hero" element={<HeroSlidesPage />} />
-          <Route path="/map-ads" element={<OrderAdsPage />} />
-          <Route path="/coupons" element={<CouponsPage />} />
-          <Route path="/broadcast" element={<BroadcastPage />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/settlements" element={<SettlementsPage />} />
-          <Route path="/payouts" element={<PayoutsPage />} />
-          <Route path="/cash" element={<CashPage />} />
-          <Route path="/refunds" element={<RefundsPage />} />
-          <Route path="/support" element={<SupportPage />} />
-          <Route path="/alerts" element={<AlertsPage />} />
-          <Route path="/gift-orders" element={<GiftOrdersPage />} />
-          <Route path="/gifts" element={<GiftCataloguePage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AppShell>
+      {/* Outside AppShell, so a confirmation survives the screen that raised it
+          unmounting — the usual shape here is "act, then navigate away". */}
+      <ToastHost>
+        <AppShell>
+          <Routes>
+            {/* The floor, not the filing cabinet. Onboarding a restaurant is a
+                thing somebody does once; an order going wrong is happening now,
+                so B7 moved the landing screen to the live board and left
+                Restaurants where it was, one click away. */}
+            <Route path="/" element={<LiveOrdersPage />} />
+            <Route path="/orders" element={<AllOrdersPage />} />
+            <Route path="/restaurants" element={<RestaurantsPage />} />
+            {/* Keyed so switching from an existing restaurant to /new remounts the
+                wizard — otherwise React keeps the old form state and the new draft
+                starts life pre-filled with someone else's restaurant. */}
+            <Route path="/restaurants/new" element={<WizardPage key="new" />} />
+            <Route path="/restaurants/:id" element={<WizardPage key="edit" />} />
+            <Route path="/riders" element={<RidersPage />} />
+            <Route path="/users" element={<UsersPage />} />
+            <Route path="/hero" element={<HeroSlidesPage />} />
+            <Route path="/map-ads" element={<OrderAdsPage />} />
+            <Route path="/coupons" element={<CouponsPage />} />
+            <Route path="/broadcast" element={<BroadcastPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/settlements" element={<SettlementsPage />} />
+            <Route path="/payouts" element={<PayoutsPage />} />
+            <Route path="/cash" element={<CashPage />} />
+            <Route path="/refunds" element={<RefundsPage />} />
+            <Route path="/support" element={<SupportPage />} />
+            <Route path="/alerts" element={<AlertsPage />} />
+            <Route path="/gift-orders" element={<GiftOrdersPage />} />
+            <Route path="/gifts" element={<GiftCataloguePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </AppShell>
+      </ToastHost>
     </BrowserRouter>
   )
 }

@@ -13,6 +13,7 @@ import {
   SegmentedControl,
   TextArea,
 } from '../ui/primitives'
+import { useToast } from '../ui/toast'
 
 /// One message to everybody in an audience.
 ///
@@ -56,6 +57,7 @@ function when(iso: string) {
 }
 
 export function BroadcastPage() {
+  const toast = useToast()
   const [audience, setAudience] = useState<Audience>('customer')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -66,7 +68,6 @@ export function BroadcastPage() {
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [note, setNote] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -112,7 +113,7 @@ export function BroadcastPage() {
     setError(null)
     try {
       const n = await api.sendBroadcast(audience, title, body)
-      setNote(`Sent to ${n} ${audience === 'restaurant' ? 'restaurants' : `${audience}s`}.`)
+      toast(`Sent to ${n} ${audience === 'restaurant' ? 'restaurants' : `${audience}s`}.`)
       setTitle('')
       setBody('')
       setConfirming(false)
@@ -140,11 +141,6 @@ export function BroadcastPage() {
           {error && (
             <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
               {error}
-            </Banner>
-          )}
-          {note && (
-            <Banner tone="success" className="mb-4" onDismiss={() => setNote(null)}>
-              {note}
             </Banner>
           )}
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useSession } from '../auth/context'
@@ -76,20 +76,28 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
       : 'text-ink-muted hover:bg-canvas hover:text-ink'
   }`
 
+/// Which link the current path belongs to. The longest matching prefix wins,
+/// so /restaurants/new does not read as /restaurants.
+function currentLink(pathname: string) {
+  return groups
+    .flatMap((g) => g.links)
+    .filter((l) => (l.end ? pathname === l.to : pathname.startsWith(l.to)))
+    .sort((a, b) => b.to.length - a.to.length)[0]
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { email, signOut } = useSession()
   const { pathname } = useLocation()
+  // Closed on every navigation: below md this is a menu over the page, and a
+  // menu that stays open after you have chosen from it is in the way.
+  const [navOpen, setNavOpen] = useState(false)
 
   // The browser tab says which screen this is. With eleven of them and no tab
   // title, three console windows open side by side are three identical tabs.
   useEffect(() => {
-    const here = groups
-      .flatMap((g) => g.links)
-      .filter((l) => (l.end ? pathname === l.to : pathname.startsWith(l.to)))
-      // The longest matching prefix wins, so /restaurants/new does not read as
-      // /restaurants.
-      .sort((a, b) => b.to.length - a.to.length)[0]
+    const here = currentLink(pathname)
     document.title = here ? `${here.label} · Zopiqnow Console` : 'Zopiqnow Console'
+    setNavOpen(false)
   }, [pathname])
 
   return (
@@ -123,13 +131,33 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
 
+        {/* Below md the nav was one horizontal strip of twenty links with the
+            group headings hidden, so finding "Rider cash" meant scrubbing a
+            scroller with no landmarks in it. As a disclosure the headings come
+            back and the page starts where the page starts. */}
+        <button
+          type="button"
+          aria-expanded={navOpen}
+          aria-controls="console-nav"
+          onClick={() => setNavOpen((o) => !o)}
+          className="mx-3 mb-3 flex items-center justify-between rounded-field border border-line px-3 py-2 text-sm font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink md:hidden"
+        >
+          <span>{currentLink(pathname)?.label ?? 'Menu'}</span>
+          <span aria-hidden="true" className="text-ink-muted">
+            {navOpen ? '▲' : '▼'}
+          </span>
+        </button>
+
         <nav
+          id="console-nav"
           aria-label="Console sections"
-          className="flex gap-1 overflow-x-auto px-3 pb-3 md:min-h-0 md:flex-1 md:flex-col md:gap-0 md:overflow-y-auto md:pb-4"
+          className={`flex-col gap-0 px-3 pb-3 md:flex md:min-h-0 md:flex-1 md:overflow-y-auto md:pb-4 ${
+            navOpen ? 'flex' : 'hidden'
+          }`}
         >
           {groups.map((g) => (
-            <div key={g.heading} className="contents md:mt-3 md:block md:first:mt-0">
-              <p className="hidden px-3 pt-2 pb-1 text-xs font-semibold tracking-wide text-ink-muted uppercase md:block">
+            <div key={g.heading} className="mt-3 first:mt-0">
+              <p className="px-3 pt-2 pb-1 text-xs font-semibold tracking-wide text-ink-muted uppercase">
                 {g.heading}
               </p>
               {g.links.map((l) => (
@@ -171,6 +199,7 @@ export function PageHeader({
   action?: ReactNode
 }) {
   const box = useRef<HTMLDivElement>(null)
+  const [lifted, setLifted] = useState(false)
 
   // How tall this header is, published to the document so anything sticking
   // underneath it knows where the window really begins. `DataTable` needs it to
@@ -197,12 +226,25 @@ export function PageHeader({
     }
   }, [])
 
+  // A 1px border was the only thing between this header and the page, so
+  // content slid under it with nothing to say it had. The shadow appears the
+  // moment anything has scrolled past, and only then — a page that fits its
+  // window keeps the console flat, which is the look this app is held to.
+  useEffect(() => {
+    const onScroll = () => setLifted(window.scrollY > 2)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   return (
     // Sticky, because every list in this console is longer than the window and
     // the actions that belong to the page were scrolling away from it.
     <div
       ref={box}
-      className="sticky top-0 z-20 flex flex-wrap items-start justify-between gap-4 border-b border-line bg-white px-6 py-5"
+      className={`sticky top-0 z-20 flex flex-wrap items-start justify-between gap-4 border-b border-line bg-white px-6 py-5 transition-shadow ${
+        lifted ? 'shadow-card' : ''
+      }`}
     >
       <div className="min-w-0">
         <h1 className="text-lg font-bold text-ink">{title}</h1>

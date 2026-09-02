@@ -25,6 +25,7 @@ import {
   Td,
   Th,
 } from '../ui/primitives'
+import { useToast } from '../ui/toast'
 import { inr } from '../lib/money'
 
 /// The whole order book — every order ever placed, not just the open ones.
@@ -97,10 +98,10 @@ function when(iso: string) {
 }
 
 export function AllOrdersPage() {
+  const toast = useToast()
   const [rows, setRows] = useState<AllOrderRow[] | null>(null)
   const [restaurants, setRestaurants] = useState<RestaurantRow[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [note, setNote] = useState<string | null>(null)
 
   // Filters. `query` is what is being typed; it only reaches the database when
   // the form is submitted, so a half-typed order id does not run four searches.
@@ -211,7 +212,7 @@ export function AllOrdersPage() {
     setError(null)
     try {
       const said = await api.deleteOrder(deleting.order_id, reason)
-      setNote(said)
+      toast(said)
       setDeleting(null)
       setReason('')
       setConfirmId('')
@@ -255,15 +256,6 @@ export function AllOrdersPage() {
             onDismiss={() => setError(null)}
           >
             {error}
-          </Banner>
-        )}
-        {note && (
-          <Banner
-            tone="success"
-            className="mb-4 max-w-3xl"
-            onDismiss={() => setNote(null)}
-          >
-            {note}
           </Banner>
         )}
 

@@ -124,7 +124,13 @@ export function WizardPage() {
                       ? 'border-brand-ink text-brand-ink'
                       : reachable
                         ? 'border-transparent text-ink-muted hover:text-ink'
-                        : 'border-transparent text-ink-muted/40'
+                        : // 3.08:1, up from 1.80. A step you cannot reach yet
+                          // still has to be readable — it is how you find out
+                          // what the wizard is going to ask for. WCAG exempts
+                          // an inactive control from the text minimum, which is
+                          // an argument for not colouring it like an error, not
+                          // an argument for making it invisible.
+                          'cursor-not-allowed border-transparent text-ink-muted/70'
                   }`}
                 >
                   <span className="mr-1.5 text-xs tabular-nums">{i + 1}</span>

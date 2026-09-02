@@ -14,6 +14,7 @@ import {
   PageBody,
   Pill,
 } from '../ui/primitives'
+import { useToast } from '../ui/toast'
 import { inr } from '../lib/money'
 
 /// The running floor. Every order that has not ended, oldest first, because the
@@ -72,6 +73,7 @@ function whereItIs(o: AdminOrderRow): string {
 }
 
 export function LiveOrdersPage() {
+  const toast = useToast()
   const [rows, setRows] = useState<AdminOrderRow[] | null>(null)
   const [query, setQuery] = useState('')
   // The query the rows on screen actually answer, which is not the one being
@@ -87,7 +89,6 @@ export function LiveOrdersPage() {
   } | null>(null)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
-  const [note, setNote] = useState<string | null>(null)
 
   // Read inside the interval so the timer does not have to be torn down and
   // rebuilt every time the search box changes.
@@ -139,12 +140,12 @@ export function LiveOrdersPage() {
     try {
       if (acting.kind === 'release') {
         const who = await api.releaseDelivery(acting.order.order_id, reason)
-        setNote(
+        toast(
           `${acting.order.order_id} is back on the shelf — released from ${who}. The dispatcher will offer it again within 20 seconds.`,
         )
       } else {
         await api.cancelOrder(acting.order.order_id, reason)
-        setNote(`${acting.order.order_id} is cancelled. The customer has been told.`)
+        toast(`${acting.order.order_id} is cancelled. The customer has been told.`)
       }
       setActing(null)
       setReason('')
@@ -181,11 +182,6 @@ export function LiveOrdersPage() {
         {error && (
           <Banner tone="error" className="mb-4 max-w-2xl" onDismiss={() => setError(null)}>
             {error}
-          </Banner>
-        )}
-        {note && (
-          <Banner tone="success" className="mb-4 max-w-3xl" onDismiss={() => setNote(null)}>
-            {note}
           </Banner>
         )}
 

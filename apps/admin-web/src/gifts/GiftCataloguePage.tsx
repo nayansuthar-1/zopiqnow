@@ -13,6 +13,7 @@ import {
   PageBody,
   Pill,
 } from '../ui/primitives'
+import { useToast } from '../ui/toast'
 import { inr } from '../lib/money'
 import { GiftItemDialog } from './GiftItemDialog'
 import { GiftShopDialog } from './GiftShopDialog'
@@ -67,6 +68,7 @@ function orderPayload(shelves: Shelf[]) {
 }
 
 export function GiftCataloguePage() {
+  const toast = useToast()
   const [shops, setShops] = useState<GiftShopRow[] | null>(null)
   const [shopId, setShopId] = useState<string | null>(null)
   const [items, setItems] = useState<GiftItemRow[] | null>(null)
@@ -74,7 +76,6 @@ export function GiftCataloguePage() {
   const [feeDraft, setFeeDraft] = useState('')
 
   const [error, setError] = useState<string | null>(null)
-  const [note, setNote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const [addingShop, setAddingShop] = useState(false)
@@ -133,11 +134,10 @@ export function GiftCataloguePage() {
   async function run(action: () => Promise<unknown>, said?: string) {
     setBusy(true)
     setError(null)
-    setNote(null)
-    try {
+        try {
       await action()
       await Promise.all([loadShops(), loadItems()])
-      if (said) setNote(said)
+      if (said) toast(said)
       return true
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -209,11 +209,6 @@ export function GiftCataloguePage() {
         {error && (
           <Banner tone="error" onDismiss={() => setError(null)}>
             {error}
-          </Banner>
-        )}
-        {note && (
-          <Banner tone="success" onDismiss={() => setNote(null)}>
-            {note}
           </Banner>
         )}
 

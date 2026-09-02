@@ -12,6 +12,7 @@ import {
   PageBody,
   Skeleton,
 } from '../ui/primitives'
+import { useToast } from '../ui/toast'
 import { inr } from '../lib/money'
 
 /// Who else can run the platform.
@@ -23,6 +24,7 @@ import { inr } from '../lib/money'
 /// them is a distinction that sounds useful and protects nothing.
 
 export function SettingsPage() {
+  const toast = useToast()
   const { email: mine } = useSession()
   const [admins, setAdmins] = useState<AdminRow[] | null>(null)
   const [email, setEmail] = useState('')
@@ -34,7 +36,6 @@ export function SettingsPage() {
   /// the address that can now sign in, and on a fresh account it is the only
   /// confirmation that the password went in — worth leaving on screen until it
   /// is read.
-  const [note, setNote] = useState<string | null>(null)
   const [removing, setRemoving] = useState<AdminRow | null>(null)
 
   const load = useCallback(async () => {
@@ -52,8 +53,7 @@ export function SettingsPage() {
   async function run(action: () => Promise<unknown>) {
     setBusy(true)
     setError(null)
-    setNote(null)
-    try {
+        try {
       await action()
       await load()
       return true
@@ -76,11 +76,6 @@ export function SettingsPage() {
         {error && (
           <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
             {error}
-          </Banner>
-        )}
-        {note && (
-          <Banner tone="success" className="mb-4" onDismiss={() => setNote(null)}>
-            {note}
           </Banner>
         )}
 
@@ -136,7 +131,7 @@ export function SettingsPage() {
                 // things happened — an account was created, or an existing one
                 // was granted access. Guessing here would mean the console
                 // claiming it made an account on the occasions it did not.
-                setNote(said)
+                toast(said)
               })
             }}
           >

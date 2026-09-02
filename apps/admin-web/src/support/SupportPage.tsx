@@ -22,6 +22,7 @@ import {
   Td,
   Th,
 } from '../ui/primitives'
+import { useToast } from '../ui/toast'
 import { inr } from '../lib/money'
 
 /// The complaint queue (migration 0095).
@@ -79,9 +80,9 @@ function orderStatusLabel(tk: SupportTicketRow) {
 }
 
 export function SupportPage() {
+  const toast = useToast()
   const [rows, setRows] = useState<SupportTicketRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [note, setNote] = useState<string | null>(null)
 
   const [filter, setFilter] = useState<Filter>('open')
   const [page, setPage] = useState(0)
@@ -147,7 +148,7 @@ export function SupportPage() {
     setError(null)
     try {
       const said = await api.resolveTicket(answering.id, reply)
-      setNote(said)
+      toast(said)
       setAnswering(null)
       setReply('')
       await load({ filter, page })
@@ -180,11 +181,6 @@ export function SupportPage() {
         {error && (
           <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
             {error}
-          </Banner>
-        )}
-        {note && (
-          <Banner tone="success" className="mb-4" onDismiss={() => setNote(null)}>
-            {note}
           </Banner>
         )}
 

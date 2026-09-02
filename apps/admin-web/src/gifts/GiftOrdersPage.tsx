@@ -18,6 +18,7 @@ import {
   Td,
   Th,
 } from '../ui/primitives'
+import { useToast } from '../ui/toast'
 import { inr } from '../lib/money'
 
 /// The gift fulfilment queue (migration 0096).
@@ -80,9 +81,9 @@ const nextOf: Record<GiftOrderStatus, GiftOrderStatus[]> = {
 }
 
 export function GiftOrdersPage() {
+  const toast = useToast()
   const [rows, setRows] = useState<GiftOrderRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [note, setNote] = useState<string | null>(null)
 
   const [filter, setFilter] = useState<Filter>('placed')
   const [page, setPage] = useState(0)
@@ -145,7 +146,7 @@ export function GiftOrdersPage() {
         tracking: tracking.trim() || undefined,
         reason: reason.trim() || undefined,
       })
-      setNote(`${open.id} is now ${GIFT_STATUS_LABEL[to].toLowerCase()}.`)
+      toast(`${open.id} is now ${GIFT_STATUS_LABEL[to].toLowerCase()}.`)
       setOpen(null)
       await load({ filter, page })
     } catch (e) {
@@ -177,11 +178,6 @@ export function GiftOrdersPage() {
         {error && (
           <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
             {error}
-          </Banner>
-        )}
-        {note && (
-          <Banner tone="success" className="mb-4" onDismiss={() => setNote(null)}>
-            {note}
           </Banner>
         )}
 
