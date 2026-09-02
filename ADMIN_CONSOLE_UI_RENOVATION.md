@@ -476,6 +476,25 @@ exception with a reason); `grep -c 'text-sm'` unchanged (Phase 1 changes no page
 
 ### Phase 2 — The missing primitives
 
+**Done** (`e459c7d`), with one deferral. Seven of the eight landed and three pages moved
+onto them — All orders, Platform and Settlements — for 174 insertions against 224 deletions.
+
+**`Icon` did not ship, and the reason is a number.** Phosphor as a web font is 488 kB +
+449 kB raw, **376 kB gzipped for 54 glyphs** — twice the console's entire JS bundle. The
+Flutter apps get away with bundling it because Flutter's tree-shaker subsets the font to
+the codepoints it can prove are reachable; the web has no equivalent. The route that works
+is extracting the 54 glyph outlines from the TTF into SVG paths at authoring time, which
+is its own piece of work rather than a line in a commit. C1 stays open.
+
+**Two things the build taught, worth keeping:** a sticky `<thead>` cannot live inside
+`overflow-x: auto` — CSS computes the other axis to `auto` as well, so the header sticks
+to a box that never scrolls vertically and never moves. And `border-collapse` loses a
+sticky cell's border, because a collapsed border belongs to the table rather than the cell.
+`DataTable` is its own scroller, capped against a `--page-header-h` that `PageHeader`
+publishes through a `ResizeObserver` — its height is not a constant, being 87px with a
+subtitle and 64px without.
+
+
 *Goal: nothing in `src/` outside `primitives.tsx` writes a card, a select, a pill, a table
 or a pager by hand.*
 
@@ -605,12 +624,12 @@ Tick as they land.
 
 **Part 1 — measurably wrong**
 - [x] A1 — brand contrast *(decided: keep the orange, darken the label — 21/21 pairs pass)*
-- [ ] A2 — `<select>` focus
-- [ ] A3 — table hover + sticky header
-- [ ] A4 — `scope="col"`
+- [x] A2 — `<select>` focus *(`Select` exists; 1 of 10 call sites moved over)*
+- [x] A3 — table hover + sticky header *(in `DataTable`; 3 of 12 pages moved over)*
+- [x] A4 — `scope="col"` *(in `Th`; 3 of 12 pages moved over)*
 - [ ] A5 — money and date formatting
 - [ ] A6 — favicon and the dead sprite
-- [ ] A7 — the toggle's two states *(new, found during A1)*
+- [x] A7 — the toggle's two states *(2.55 → 4.88 on, 1.21 → 3.24 off)*
 
 **Part 2 — inconsistent**
 - [ ] B1 — twelve tables → one
@@ -623,7 +642,7 @@ Tick as they land.
 - [ ] B8 — page padding and content width
 
 **Part 3 — missing**
-- [ ] C1 — icons
+- [ ] C1 — icons *(blocked: the font route costs 376 kB gzipped — needs glyph extraction)*
 - [x] C2 — Figtree
 - [x] C3 — type scale
 - [~] C4 — elevation *(scale mirrored; sticky-header shadow is Phase 4)*
