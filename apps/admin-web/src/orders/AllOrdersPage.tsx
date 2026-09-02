@@ -10,13 +10,21 @@ import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
   Button,
+  DataTable,
   EmptyState,
   Field,
   Modal,
+  PageBody,
+  Pager,
   Pill,
+  SearchField,
   SegmentedControl,
+  Select,
   TableSkeleton,
+  Td,
+  Th,
 } from '../ui/primitives'
+import { inr } from '../lib/money'
 
 /// The whole order book — every order ever placed, not just the open ones.
 ///
@@ -238,7 +246,7 @@ export function AllOrdersPage() {
         }
       />
 
-      <div className="p-6">
+      <PageBody>
         {error && (
           <Banner
             tone="error"
@@ -259,25 +267,16 @@ export function AllOrdersPage() {
         )}
 
         <div className="mb-5 space-y-3">
-          <form
-            className="flex max-w-xl gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
+          <SearchField
+            label="Find an order"
+            placeholder="Order id or phone number"
+            value={query}
+            onChange={setQuery}
+            onSubmit={() => {
               setPage(0)
               setApplied(query.trim())
             }}
-          >
-            <input
-              className="h-11 flex-1 rounded-field border border-field bg-white px-3 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Order id or phone number"
-              aria-label="Find an order"
-            />
-            <Button type="submit" variant="secondary">
-              Find
-            </Button>
-          </form>
+          />
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <SegmentedControl
@@ -298,10 +297,11 @@ export function AllOrdersPage() {
                 setRange(next)
               }}
             />
-            <select
-              className="h-9 rounded-field border border-field bg-white px-2 text-sm text-ink outline-none focus:border-brand-ink"
+            <Select
+              label="Restaurant"
+              hideLabel
+              size="sm"
               value={restaurantId}
-              aria-label="Restaurant"
               onChange={(e) => {
                 setPage(0)
                 setRestaurantId(e.target.value)
@@ -313,7 +313,7 @@ export function AllOrdersPage() {
                   {r.name}
                 </option>
               ))}
-            </select>
+            </Select>
             {filtered && (
               <Button variant="ghost" onClick={resetFilters}>
                 Clear filters
@@ -342,22 +342,23 @@ export function AllOrdersPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto rounded-card border border-line bg-white">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead>
-                  <tr className="border-b border-line text-left text-xs font-medium tracking-wide text-ink-muted uppercase">
-                    <th className="px-5 py-3">Order</th>
-                    <th className="px-5 py-3">Restaurant</th>
-                    <th className="px-5 py-3">Customer</th>
-                    <th className="px-5 py-3">Rider</th>
-                    <th className="px-5 py-3 text-right">Total</th>
-                    <th className="px-5 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((o) => (
-                    <tr key={o.order_id} className="border-b border-line last:border-b-0">
-                      <td className="px-5 py-4 align-top">
+            <DataTable label="All orders" minWidth={900}>
+              <thead>
+                <tr>
+                  <Th>Order</Th>
+                  <Th>Restaurant</Th>
+                  <Th>Customer</Th>
+                  <Th>Rider</Th>
+                  <Th align="right">Total</Th>
+                  <Th align="right" hideLabel>
+                    Actions
+                  </Th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((o) => (
+                  <tr key={o.order_id}>
+                    <Td>
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-ink">
                             {o.order_id}
@@ -383,16 +384,14 @@ export function AllOrdersPage() {
                             {o.status_reason}
                           </p>
                         )}
-                      </td>
-                      <td className="px-5 py-4 align-top text-ink">
-                        {o.restaurant_name}
-                      </td>
-                      <td className="px-5 py-4 align-top">
-                        <p className="text-ink">{o.customer_phone}</p>
-                        <p className="text-xs text-ink-muted">{o.delivery_to}</p>
-                      </td>
-                      <td className="px-5 py-4 align-top">
-                        {o.rider_name ? (
+                    </Td>
+                    <Td className="text-ink">{o.restaurant_name}</Td>
+                    <Td>
+                      <p className="text-ink">{o.customer_phone}</p>
+                      <p className="text-xs text-ink-muted">{o.delivery_to}</p>
+                    </Td>
+                    <Td>
+                      {o.rider_name ? (
                           <>
                             <p className="text-ink">{o.rider_name}</p>
                             <p className="text-xs text-ink-muted">
@@ -402,21 +401,21 @@ export function AllOrdersPage() {
                             </p>
                           </>
                         ) : (
-                          <span className="text-ink-muted">—</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4 text-right align-top">
-                        <p className="font-semibold text-ink">₹{o.total}</p>
+                        <span className="text-ink-muted">—</span>
+                      )}
+                    </Td>
+                    <Td align="right">
+                      <p className="font-semibold text-ink">{inr(o.total)}</p>
                         <p className="text-xs text-ink-muted">
-                          {o.payment_method === 'upi' ? 'prepaid' : 'cash'}
-                        </p>
-                      </td>
-                      <td className="px-5 py-4 text-right align-top">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => void openPhotos(o)}
-                        >
+                        {o.payment_method === 'upi' ? 'prepaid' : 'cash'}
+                      </p>
+                    </Td>
+                    <Td align="right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void openPhotos(o)}
+                      >
                           Photos
                         </Button>
                         <Button
@@ -428,39 +427,18 @@ export function AllOrdersPage() {
                             setConfirmId('')
                           }}
                         >
-                          Delete
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        Delete
+                      </Button>
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </DataTable>
 
-            {pages > 1 && (
-              <div className="mt-4 flex items-center justify-between">
-                <Button
-                  variant="secondary"
-                  disabled={page === 0}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-ink-muted">
-                  Page {page + 1} of {pages}
-                </span>
-                <Button
-                  variant="secondary"
-                  disabled={page + 1 >= pages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
+            <Pager page={page} pages={pages} onChange={setPage} />
           </>
         )}
-      </div>
+      </PageBody>
 
       {photosFor && (
         <Modal

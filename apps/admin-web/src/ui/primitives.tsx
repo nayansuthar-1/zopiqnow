@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
+  SelectHTMLAttributes,
   ReactNode,
   TextareaHTMLAttributes,
 } from 'react'
@@ -214,7 +215,7 @@ export function Toggle({
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={`mt-0.5 h-6 w-11 shrink-0 rounded-full p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${RING} ${
-          checked ? 'bg-brand' : 'bg-line'
+          checked ? 'bg-brand-ink' : 'bg-field'
         }`}
       >
         <span
@@ -701,4 +702,341 @@ export function Card({
       {children}
     </div>
   )
+}
+
+// ---------------------------------------------------------------------------
+// Tables
+// ---------------------------------------------------------------------------
+
+/// The one table in the console, and the reason there is only one.
+///
+/// Before this there were twelve, hand-rolled, with four header styles, three
+/// ways of drawing a row divider and two row heights between them. None of the
+/// twelve highlighted the row under the cursor, none kept its header visible
+/// while the body scrolled, none put `scope` on a heading, and none gave any
+/// sign that it continued off the right of the window.
+///
+/// That reads as untidiness and is not. `SettlementsPage` is nine columns wide
+/// and the ninth is **Payable**, with a "Mark paid" button beside it: tracking a
+/// restaurant's name from column one to a money button in column nine, on a row
+/// that looks exactly like the fourteen around it, with the header gone off the
+/// top, is the console's highest-consequence interaction and it had the least
+/// support of any screen in the app.
+///
+/// **The body scrolls, not the page.** A sticky `<thead>` cannot work inside an
+/// `overflow-x: auto` box — CSS computes the other axis to `auto` as well, so
+/// the header sticks to a container that never scrolls vertically and therefore
+/// never moves. The table is its own scroller instead, capped against the
+/// viewport using the height `PageHeader` publishes. Short tables never reach
+/// the cap and behave exactly as they did.
+///
+/// `border-separate`, not `collapse`: a collapsed border is painted by the table
+/// rather than by the cell, and a sticky cell leaves it behind when it moves.
+/// The row dividers sit on the cells for the same reason.
+export function DataTable({
+  label,
+  minWidth,
+  children,
+  className = '',
+}: {
+  /// Named for a screen reader, which otherwise announces "table" and a column
+  /// count. Every one of these is one of several nouns in this console.
+  label: string
+  /// The width below which the columns stop being readable and the table should
+  /// scroll rather than crush. Two of the twelve had no floor at all and
+  /// squeezed nine columns onto a phone.
+  minWidth?: number
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      className={`scroll-shadow-x max-h-[calc(100vh-var(--page-header-h,4.5rem)-7rem)] overflow-auto rounded-card border border-line ${className}`}
+    >
+      <table
+        aria-label={label}
+        style={minWidth ? { minWidth } : undefined}
+        className="w-full border-separate border-spacing-0 text-left text-sm [&_tbody_td]:border-b [&_tbody_td]:border-line [&_tbody_td]:align-top [&_tbody_tr:hover]:bg-canvas [&_tbody_tr:last-child_td]:border-b-0"
+      >
+        {children}
+      </table>
+    </div>
+  )
+}
+
+export function Th({
+  align = 'left',
+  /// For the column holding a row's actions. It still needs a name — an
+  /// unlabelled column is one a screen reader reads as nothing at all — but the
+  /// name is for them and not for the page.
+  hideLabel = false,
+  children,
+  className = '',
+}: {
+  align?: 'left' | 'right'
+  hideLabel?: boolean
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <th
+      scope="col"
+      className={`sticky top-0 z-10 border-b border-line bg-white px-5 py-3 text-xs font-semibold tracking-wide text-ink-muted uppercase ${
+        align === 'right' ? 'text-right' : ''
+      } ${className}`}
+    >
+      {hideLabel ? <span className="sr-only">{children}</span> : children}
+    </th>
+  )
+}
+
+export function Td({
+  align = 'left',
+  children,
+  className = '',
+}: {
+  align?: 'left' | 'right'
+  children: ReactNode
+  className?: string
+}) {
+  // A right-aligned column in this console is money or a count, and tabular
+  // figures there are not optional — being scannable down the column is the
+  // whole reason it is right aligned. Applied here rather than remembered at
+  // thirty call sites, three of which had already forgotten.
+  return (
+    <td
+      className={`px-5 py-3 ${align === 'right' ? 'text-right tabular-nums' : ''} ${className}`}
+    >
+      {children}
+    </td>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// The controls the console kept writing out by hand
+// ---------------------------------------------------------------------------
+
+/// A `<select>` that can be seen when it has focus.
+///
+/// All ten native selects in the console carried `outline-none
+/// focus:border-brand` — which removes the browser's own ring and puts a 1px
+/// border colour change in its place — and one carried no focus style at all.
+/// There was no `Select` for `RING` to live in, so it lived in none of them.
+export function Select({
+  label,
+  hint,
+  error,
+  size = 'md',
+  /// For a filter in a toolbar, where the surrounding controls say what it
+  /// filters and a printed label would be a third piece of chrome. The label is
+  /// still rendered — a screen reader gets it, the layout does not.
+  hideLabel = false,
+  className = '',
+  id,
+  children,
+  ...rest
+  // `size` is omitted rather than merged: HTML gives <select> a numeric size
+  // attribute (how many options to show unrolled), which nothing here wants and
+  // which collides with the two shapes this component actually has.
+}: Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> & {
+  label: string
+  hint?: string
+  error?: string
+  size?: 'md' | 'sm'
+  hideLabel?: boolean
+}) {
+  const auto = useId()
+  const selectId = id ?? auto
+  const noteId = `${selectId}-note`
+
+  return (
+    <div className={className}>
+      <label
+        htmlFor={selectId}
+        className={
+          hideLabel ? 'sr-only' : 'mb-1.5 block text-sm font-medium text-ink'
+        }
+      >
+        {label}
+      </label>
+      <select
+        id={selectId}
+        aria-describedby={error || hint ? noteId : undefined}
+        aria-invalid={error ? true : undefined}
+        className={`select-chevron appearance-none rounded-field border bg-white py-0 text-sm text-ink outline-none focus:border-brand-ink ${RING} ${
+          size === 'sm' ? 'h-9 pr-8 pl-2.5' : 'h-11 w-full pr-9 pl-3'
+        } ${error ? 'border-non-veg' : 'border-field'}`}
+        {...rest}
+      >
+        {children}
+      </select>
+      {error ? (
+        <p id={noteId} className="mt-1.5 text-sm text-non-veg-ink">
+          {error}
+        </p>
+      ) : hint ? (
+        <p id={noteId} className="mt-1.5 text-sm text-ink-muted">
+          {hint}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+/// The find-an-order box, which two screens had written out character for
+/// character. A `<form>` rather than an input with a click handler, so Enter
+/// submits it the way Enter submits everything else in the console.
+export function SearchField({
+  label,
+  placeholder,
+  value,
+  onChange,
+  onSubmit,
+  onClear,
+  clearLabel = 'Clear',
+  submitLabel = 'Find',
+  className = '',
+}: {
+  label: string
+  placeholder: string
+  value: string
+  onChange: (next: string) => void
+  onSubmit: () => void
+  /// Passed only while a search is actually applied — the way back is not an
+  /// action until there is something to come back from.
+  onClear?: () => void
+  clearLabel?: string
+  submitLabel?: string
+  className?: string
+}) {
+  const id = useId()
+
+  return (
+    <form
+      className={`flex max-w-xl gap-2 ${className}`}
+      onSubmit={(e) => {
+        e.preventDefault()
+        onSubmit()
+      }}
+    >
+      <input
+        id={id}
+        type="search"
+        className={`h-11 min-w-0 flex-1 rounded-field border border-field bg-white px-3 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink ${RING}`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={label}
+      />
+      <Button type="submit" variant="secondary">
+        {submitLabel}
+      </Button>
+      {onClear && (
+        <Button type="button" variant="ghost" onClick={onClear}>
+          {clearLabel}
+        </Button>
+      )}
+    </form>
+  )
+}
+
+/// Previous, where you are, Next — which three screens repeated verbatim.
+export function Pager({
+  page,
+  pages,
+  onChange,
+}: {
+  /// Zero-based, the way all three callers already count.
+  page: number
+  pages: number
+  onChange: (next: number) => void
+}) {
+  if (pages <= 1) return null
+
+  return (
+    <nav
+      aria-label="Pages"
+      className="mt-4 flex items-center justify-center gap-3"
+    >
+      <Button
+        variant="secondary"
+        disabled={page === 0}
+        onClick={() => onChange(page - 1)}
+      >
+        Previous
+      </Button>
+      {/* Announced when it changes, because the thing that moved is the list
+          above it and a screen reader has no way to notice that by itself. */}
+      <span aria-live="polite" className="text-sm text-ink-muted">
+        Page {page + 1} of {pages}
+      </span>
+      <Button
+        variant="secondary"
+        disabled={page + 1 >= pages}
+        onClick={() => onChange(page + 1)}
+      >
+        Next
+      </Button>
+    </nav>
+  )
+}
+
+/// One number, said once. Analytics and People each had their own, differing in
+/// weight, in label weight, in both margins, and in whether the figure was set
+/// in tabular figures at all.
+export function StatTile({
+  label,
+  value,
+  sub,
+}: {
+  label: string
+  value: string
+  sub?: string
+}) {
+  return (
+    <div className="rounded-card border border-line bg-white p-6">
+      <p className="text-xs font-medium tracking-wide text-ink-muted uppercase">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-bold tabular-nums text-ink">{value}</p>
+      {sub && <p className="mt-1 text-sm text-ink-muted">{sub}</p>}
+    </div>
+  )
+}
+
+/// What every screen puts under its `PageHeader`.
+///
+/// Eighteen pages wrote `p-6`, one wrote `px-6 py-6` — the same thing, spelled
+/// differently — and one wrote `px-6 py-5`, which is off the grid. Width was
+/// worse: `RidersPage` capped at `3xl` and `SettingsPage` at `2xl` while
+/// `UsersPage`, the same kind of roster screen, ran full bleed to whatever
+/// monitor it happened to be on.
+///
+/// Three widths, because there are three kinds of screen here, and a rule you
+/// can state is a rule a new screen can be right about.
+export function PageBody({
+  width = 'list',
+  children,
+  className = '',
+}: {
+  /// `list` — a table or a board. Takes the room, but stops at 1600px: a
+  /// nine-column settlement table stretched across a 27-inch monitor puts a
+  /// restaurant's name and its payable figure two feet apart.
+  ///
+  /// `form` — fields being filled in. A long measure is hard to read and a text
+  /// input the width of a monitor is hard to aim at.
+  ///
+  /// `wide` — the two screens that are a list of lists: the wizard's menu step
+  /// and the home hero.
+  width?: 'list' | 'form' | 'wide'
+  children: ReactNode
+  className?: string
+}) {
+  const max = {
+    list: 'max-w-[1600px]',
+    form: 'max-w-2xl',
+    wide: 'max-w-4xl',
+  }[width]
+
+  return <div className={`p-6 ${max} ${className}`}>{children}</div>
 }

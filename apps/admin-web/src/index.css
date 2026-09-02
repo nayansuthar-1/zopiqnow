@@ -169,6 +169,42 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Horizontal scroll, made visible. A table wider than its window gave no sign
+   it continued to the right, so ten of the console's twelve scrolled sideways
+   in silence. The two `local` layers are the surface's own white, pinned to the
+   content; the two `scroll` layers are the shadow, pinned to the scroller — so
+   a shadow appears on exactly the side that has more table on it, and goes when
+   you reach the end. No scroll listener, nothing to keep in sync.
+
+   The literal #fff is deliberate: this is the token file, and the value is the
+   card surface these tables sit on. */
+.scroll-shadow-x {
+  background:
+    linear-gradient(to right, #fff 30%, rgb(255 255 255 / 0)) 0 0 / 2.5rem 100%
+      no-repeat local,
+    linear-gradient(to left, #fff 30%, rgb(255 255 255 / 0)) 100% 0 / 2.5rem 100%
+      no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgb(40 44 63 / 0.13), rgb(40 44 63 / 0))
+      0 0 / 0.9rem 100% no-repeat scroll,
+    radial-gradient(
+        farthest-side at 100% 50%,
+        rgb(40 44 63 / 0.13),
+        rgb(40 44 63 / 0)
+      )
+      100% 0 / 0.9rem 100% no-repeat scroll;
+  background-color: #fff;
+}
+
+/* The arrow on a <select>. Native arrows are three different shapes across
+   three browsers and none of them is --color-ink-muted, so the control is
+   `appearance-none` and draws its own. Encoded rather than imported: one
+   12x8 chevron is smaller as a data URI than as a request. */
+.select-chevron {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.75 6 6.25l5-4.5' stroke='%235f6470' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.875rem center;
+}
+
 ::selection {
   background: var(--color-brand-soft);
   color: var(--color-brand-ink);

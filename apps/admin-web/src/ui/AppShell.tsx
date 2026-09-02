@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useSession } from '../auth/context'
@@ -170,10 +170,40 @@ export function PageHeader({
   subtitle?: string
   action?: ReactNode
 }) {
+  const box = useRef<HTMLDivElement>(null)
+
+  // How tall this header is, published to the document so anything sticking
+  // underneath it knows where the window really begins. `DataTable` needs it to
+  // cap its own height, and its height is not a constant: a header with a
+  // subtitle is 87px and one without is 64px, and the subtitle on the live
+  // board rewrites itself every fifteen seconds.
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    const publish = () =>
+      document.documentElement.style.setProperty(
+        '--page-header-h',
+        `${el.offsetHeight}px`,
+      )
+    publish()
+    const ro = new ResizeObserver(publish)
+    ro.observe(el)
+    // Cleared on unmount rather than left behind, so a screen with no
+    // PageHeader at all falls back to the default in the calc() rather than
+    // inheriting the last screen's number.
+    return () => {
+      ro.disconnect()
+      document.documentElement.style.removeProperty('--page-header-h')
+    }
+  }, [])
+
   return (
     // Sticky, because every list in this console is longer than the window and
     // the actions that belong to the page were scrolling away from it.
-    <div className="sticky top-0 z-20 flex flex-wrap items-start justify-between gap-4 border-b border-line bg-white px-6 py-5">
+    <div
+      ref={box}
+      className="sticky top-0 z-20 flex flex-wrap items-start justify-between gap-4 border-b border-line bg-white px-6 py-5"
+    >
       <div className="min-w-0">
         <h1 className="text-lg font-bold text-ink">{title}</h1>
         {subtitle && <p className="mt-0.5 text-sm text-ink-muted">{subtitle}</p>}

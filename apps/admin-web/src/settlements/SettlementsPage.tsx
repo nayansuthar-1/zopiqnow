@@ -9,12 +9,16 @@ import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
   Button,
+  DataTable,
   EmptyState,
   Field,
   Modal,
   SegmentedControl,
   TableSkeleton,
+  Td,
+  Th,
 } from '../ui/primitives'
+import { inr, inrSigned } from '../lib/money'
 
 /// What the platform owes its restaurants, and the record that it paid.
 ///
@@ -51,9 +55,7 @@ function day(iso: string) {
 
 /// Signed, and rendered as such: an adjustment is the one figure on this page
 /// that reads in both directions, so the sign carries the meaning.
-function signed(n: number) {
-  return `${n < 0 ? '−' : '+'}₹${Math.abs(n).toLocaleString('en-IN')}`
-}
+
 
 export function SettlementsPage() {
   const [rows, setRows] = useState<SettlementRow[] | null>(null)
@@ -195,69 +197,64 @@ export function SettlementsPage() {
             }
           />
         ) : (
-          <div className="overflow-x-auto rounded-card border border-line bg-white">
-            <table className="w-full min-w-[980px] text-sm">
-              <thead className="border-b border-line text-left text-ink-muted">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Restaurant</th>
-                  <th className="px-5 py-3 font-medium">Week</th>
-                  <th className="px-5 py-3 text-right font-medium">Orders</th>
-                  <th className="px-5 py-3 text-right font-medium">Sales</th>
-                  <th className="px-5 py-3 text-right font-medium">Own offers</th>
-                  <th className="px-5 py-3 text-right font-medium">Commission</th>
-                  <th className="px-5 py-3 text-right font-medium">Refunds</th>
-                  <th className="px-5 py-3 text-right font-medium">Adjustments</th>
-                  <th className="px-5 py-3 text-right font-medium">Payable</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
+          <DataTable label="Restaurant settlements" minWidth={980}>
+            <thead>
+              <tr>
+                <Th>Restaurant</Th>
+                <Th>Week</Th>
+                <Th align="right">Orders</Th>
+                <Th align="right">Sales</Th>
+                <Th align="right">Own offers</Th>
+                <Th align="right">Commission</Th>
+                <Th align="right">Refunds</Th>
+                <Th align="right">Adjustments</Th>
+                <Th align="right">Payable</Th>
+                <Th>Status</Th>
+                <Th hideLabel>Actions</Th>
+              </tr>
+            </thead>
+            <tbody>
                 {rows.map((s) => (
                   <tr key={s.id}>
-                    <td className="px-5 py-3 font-medium text-ink">
-                      {s.restaurant_name}
-                    </td>
-                    <td className="px-5 py-3 text-ink-muted">
-                      {period(s.period_start, s.period_end)}
-                    </td>
-                    <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
-                      {s.order_count}
-                    </td>
-                    <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
-                      ₹{s.gross_sales.toLocaleString('en-IN')}
-                    </td>
+                  <Td className="font-medium text-ink">{s.restaurant_name}</Td>
+                  <Td className="text-ink-muted">
+                    {period(s.period_start, s.period_end)}
+                  </Td>
+                  <Td align="right" className="text-ink-muted">
+                    {s.order_count}
+                  </Td>
+                  <Td align="right" className="text-ink-muted">
+                    {inr(s.gross_sales)}
+                  </Td>
                     {/* A dash, not a zero. Most weeks have no restaurant-funded
                         offers, and a column of ₹0 is noise the eye has to skip
                         past to find the week that does. */}
-                    <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
-                      {s.vendor_funded_discount > 0
-                        ? `−₹${s.vendor_funded_discount.toLocaleString('en-IN')}`
-                        : '—'}
-                    </td>
-                    <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
-                      −₹{s.commission.toLocaleString('en-IN')}
-                    </td>
+                  <Td align="right" className="text-ink-muted">
+                    {s.vendor_funded_discount > 0
+                      ? `−${inr(s.vendor_funded_discount)}`
+                      : '—'}
+                  </Td>
+                  <Td align="right" className="text-ink-muted">
+                    −{inr(s.commission)}
+                  </Td>
                     {/* Same dash rule, and the same reason (0077). Unlike the
                         other columns this one is not week-scoped: a refund
                         raised this week for a month-old order is charged here,
                         because the week it belongs to has already been paid. */}
-                    <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
-                      {s.refunds > 0
-                        ? `−₹${s.refunds.toLocaleString('en-IN')}`
-                        : '—'}
-                    </td>
+                  <Td align="right" className="text-ink-muted">
+                    {s.refunds > 0 ? `−${inr(s.refunds)}` : '—'}
+                  </Td>
                     {/* Signed, and the same dash rule as the two columns above
                         it. Most statements are never adjusted, and the ones
                         that are should stand out of the page rather than sit in
                         a column of zeroes. */}
-                    <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
-                      {s.adjustments !== 0 ? signed(s.adjustments) : '—'}
-                    </td>
-                    <td className="px-5 py-3 text-right font-semibold tabular-nums text-ink">
-                      ₹{s.net_payable.toLocaleString('en-IN')}
-                    </td>
-                    <td className="px-5 py-3">
+                  <Td align="right" className="text-ink-muted">
+                    {s.adjustments !== 0 ? inrSigned(s.adjustments) : '—'}
+                  </Td>
+                  <Td align="right" className="font-semibold text-ink">
+                    {inr(s.net_payable)}
+                  </Td>
+                  <Td>
                       {s.status === 'paid' ? (
                         <span className="text-veg">Paid · {s.reference}</span>
                       ) : s.on_hold ? (
@@ -273,8 +270,8 @@ export function SettlementsPage() {
                         // somebody clicks and finds out.
                         <span className="text-warn">No bank details</span>
                       )}
-                    </td>
-                    <td className="px-5 py-3">
+                  </Td>
+                  <Td>
                       <div className="flex justify-end gap-2">
                         {s.status === 'pending' && (
                           <>
@@ -303,12 +300,11 @@ export function SettlementsPage() {
                           </>
                         )}
                       </div>
-                    </td>
+                  </Td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+            </tbody>
+          </DataTable>
         )}
       </div>
 
@@ -394,7 +390,7 @@ export function SettlementsPage() {
                     <div className="flex justify-between gap-3">
                       <span className="text-ink">{a.reason}</span>
                       <span className="shrink-0 tabular-nums text-ink">
-                        {signed(a.amount)}
+                        {inrSigned(a.amount)}
                       </span>
                     </div>
                     <p className="text-xs text-ink-muted">

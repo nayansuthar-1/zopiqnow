@@ -2,7 +2,17 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import type { DailyOrders, PlatformStats, TopRestaurant } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
-import { Banner, SegmentedControl, Skeleton } from '../ui/primitives'
+import {
+  Banner,
+  DataTable,
+  PageBody,
+  SegmentedControl,
+  Skeleton,
+  StatTile,
+  Td,
+  Th,
+} from '../ui/primitives'
+import { inr } from '../lib/money'
 
 /// The platform's own numbers. The vendor app has had a restaurant's since
 /// migration 0017; nobody has ever been able to ask how the whole thing is
@@ -20,10 +30,6 @@ import { Banner, SegmentedControl, Skeleton } from '../ui/primitives'
 /// makes that an explicit request, not a convenience.
 
 const RANGES = [7, 30, 90] as const
-
-function inr(n: number) {
-  return `₹${n.toLocaleString('en-IN')}`
-}
 
 export function AnalyticsPage() {
   const [days, setDays] = useState<number>(30)
@@ -63,7 +69,7 @@ export function AnalyticsPage() {
         }
       />
 
-      <div className="space-y-6 p-6">
+      <PageBody className="space-y-6">
         {error && (
           <Banner tone="error" className="max-w-2xl" onDismiss={() => setError(null)}>
             {error}
@@ -83,7 +89,7 @@ export function AnalyticsPage() {
         {stats === null ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 8 }, (_, i) => (
-              <div key={i} className="rounded-card border border-line bg-white p-5">
+              <div key={i} className="rounded-card border border-line bg-white p-6">
                 <Skeleton className="h-3 w-20" />
                 <Skeleton className="mt-3 h-7 w-28" />
                 <Skeleton className="mt-2 h-3 w-32" />
@@ -93,22 +99,22 @@ export function AnalyticsPage() {
         ) : (
           <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Tile
+              <StatTile
                 label="Delivered"
                 value={String(stats.orders_delivered)}
                 sub={`of ${stats.orders_placed} placed`}
               />
-              <Tile
+              <StatTile
                 label="GMV"
                 value={inr(stats.gmv)}
                 sub="delivered orders only"
               />
-              <Tile
+              <StatTile
                 label="Commission"
                 value={inr(stats.commission)}
                 sub="on subtotal, never on tax or delivery"
               />
-              <Tile
+              <StatTile
                 label="Average order"
                 value={inr(stats.avg_order)}
                 sub={`${stats.customers_ordering} customer${stats.customers_ordering === 1 ? '' : 's'} ordered`}
@@ -116,7 +122,7 @@ export function AnalyticsPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Tile
+              <StatTile
                 label="Cancelled"
                 value={String(stats.orders_cancelled)}
                 sub={
@@ -125,17 +131,17 @@ export function AnalyticsPage() {
                     : 'nothing placed'
                 }
               />
-              <Tile
+              <StatTile
                 label="Rejected by kitchens"
                 value={String(stats.orders_rejected)}
                 sub="includes the 5-minute auto-timeout"
               />
-              <Tile
+              <StatTile
                 label="Discount given"
                 value={inr(stats.discount_given)}
                 sub="coupons, on delivered orders"
               />
-              <Tile
+              <StatTile
                 label="Taking orders"
                 value={`${stats.restaurants_live} kitchens`}
                 sub={`${stats.riders_active} rider${stats.riders_active === 1 ? '' : 's'} on the roster`}
@@ -156,69 +162,39 @@ export function AnalyticsPage() {
                   Nothing delivered in this window.
                 </p>
               ) : (
-                <div className="overflow-x-auto rounded-card border border-line bg-white">
-                  <table className="w-full min-w-[560px] text-sm">
-                    <thead className="border-b border-line text-left text-ink-muted">
-                      <tr>
-                        <th className="px-5 py-3 font-medium">Restaurant</th>
-                        <th className="px-5 py-3 text-right font-medium">
-                          Orders
-                        </th>
-                        <th className="px-5 py-3 text-right font-medium">
-                          Delivered value
-                        </th>
-                        <th className="px-5 py-3 text-right font-medium">
-                          Rating
-                        </th>
+                <DataTable label="Orders by restaurant" minWidth={560}>
+                  <thead>
+                    <tr>
+                      <Th>Restaurant</Th>
+                      <Th align="right">Orders</Th>
+                      <Th align="right">Delivered value</Th>
+                      <Th align="right">Rating</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {top.map((r) => (
+                      <tr key={r.restaurant_id}>
+                        <Td className="font-medium text-ink">{r.name}</Td>
+                        <Td align="right" className="text-ink-muted">
+                          {r.orders}
+                        </Td>
+                        <Td align="right" className="font-semibold text-ink">
+                          {inr(r.gmv)}
+                        </Td>
+                        <Td align="right" className="text-ink-muted">
+                          {r.rating.toFixed(1)} ★
+                          <span className="ml-1">({r.rating_count})</span>
+                        </Td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-line">
-                      {top.map((r) => (
-                        <tr key={r.restaurant_id}>
-                          <td className="px-5 py-3 font-medium text-ink">
-                            {r.name}
-                          </td>
-                          <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
-                            {r.orders}
-                          </td>
-                          <td className="px-5 py-3 text-right font-semibold tabular-nums text-ink">
-                            {inr(r.gmv)}
-                          </td>
-                          <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
-                            {r.rating.toFixed(1)} ★
-                            <span className="ml-1">({r.rating_count})</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </DataTable>
               )}
             </section>
           </>
         )}
-      </div>
+      </PageBody>
     </>
-  )
-}
-
-function Tile({
-  label,
-  value,
-  sub,
-}: {
-  label: string
-  value: string
-  sub: string
-}) {
-  return (
-    <div className="rounded-card border border-line bg-white p-5">
-      <p className="text-xs font-medium tracking-wide text-ink-muted uppercase">
-        {label}
-      </p>
-      <p className="mt-1.5 text-2xl font-bold tabular-nums text-ink">{value}</p>
-      <p className="mt-0.5 text-sm text-ink-muted">{sub}</p>
-    </div>
   )
 }
 
