@@ -584,6 +584,28 @@ lint clean per screen.
 
 ### Phase 4 — Layout and rhythm
 
+**Done bar one item** (`e638afa`). The content-width rule shipped early, as `PageBody`'s
+`width` prop in Phase 3.
+
+**Toasts:** nine screens kept a `note` in state and rendered it as a success banner at the
+top of the page body. A success clears itself after six seconds; **a failure never does**,
+because a failure nobody read is indistinguishable from a success. The host sits outside
+`AppShell`, so a confirmation survives the screen that raised it unmounting — the usual
+shape here is act, then navigate away.
+
+**Error banners stay inline, deliberately.** They already carry `role="alert"`, and an
+error usually belongs beside the form that produced it rather than in a corner. So do the
+banners that *are* content — Riders' two KYC warnings and Cash's limit note describe a
+state rather than report an event, which is why they never had an `onDismiss`.
+
+**Still open: the tick on saved wizard steps.** The unreachable-step contrast is fixed
+(1.80:1 → 3.08:1), but the tick is not, and the reason is worth keeping. A truthful one has
+to come from `checksFor` in `ReviewStep`, which needs the menu the wizard does not load;
+inventing a second completeness rule in the step bar is exactly the divergence that file's
+own header warns about — *"if the two ever disagree the database wins"*. It needs the
+checklist lifted somewhere both can read it, not a guess in the tab strip.
+
+
 *Goal: two screens of the same kind look the same, at any window width.*
 
 1. **One content-width rule** (B8). Proposal: list and table screens run full-bleed with a
@@ -675,11 +697,12 @@ Tick as they land.
 - [ ] C1 — icons *(blocked: the font route costs 376 kB gzipped — needs glyph extraction)*
 - [x] C2 — Figtree
 - [x] C3 — type scale
-- [~] C4 — elevation *(scale mirrored; sticky-header shadow is Phase 4)*
-- [ ] C5 — toasts
+- [x] C4 — elevation *(scale mirrored; `PageHeader` lifts on scroll)*
+- [x] C5 — toasts *(9 screens; errors stay inline on purpose)*
 - [x] C6 — spacing grid *(stated; per-screen corrections in Phase 3)*
 - [x] C7 — radii
 - [x] C8 — dark mode *(decided: no)*
 
 **Part 4 — per screen**
-- [ ] D — sign-in, sidebar, riders, wizard, step frame, chart, bundle
+- [~] D — sidebar (mobile disclosure), step frame and the wizard’s step contrast done;
+      sign-in, the Riders table shape, the chart and the bundle still open
