@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api'
 import type { MenuItemRow } from '../lib/api'
-import { Banner, Button, ConfirmDialog } from '../ui/primitives'
+import { Banner, Button, Card, ConfirmDialog, Pill } from '../ui/primitives'
 import { inr } from '../lib/money'
 import { ItemDialog } from './ItemDialog'
 import { ImportDialog } from './ImportDialog'
@@ -149,7 +149,7 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
   const noPhoto = (items ?? []).filter((i) => !i.image_url).length
 
   return (
-    <div className="rounded-card border border-line bg-white p-6">
+    <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-ink">Menu</h2>
@@ -222,9 +222,9 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
                       {section.items.length}
                     </span>
                     {!section.available && (
-                      <span className="ml-2 rounded-full bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn">
+                      <span className="ml-2 inline-block align-middle"><Pill tone="warn">
                         hidden
-                      </span>
+                      </Pill></span>
                     )}
                   </span>
                   <button
@@ -462,6 +462,6 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
           }
         />
       )}
-    </div>
+    </Card>
   )
 }

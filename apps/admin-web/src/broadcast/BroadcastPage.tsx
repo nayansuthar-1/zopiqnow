@@ -5,6 +5,7 @@ import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
   Button,
+  Card,
   CardSkeleton,
   EmptyState,
   Field,
@@ -135,7 +136,7 @@ export function BroadcastPage() {
       />
 
       <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-        <div className="rounded-card border border-line bg-white p-6">
+        <Card>
           {error && (
             <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
               {error}
@@ -211,7 +212,7 @@ export function BroadcastPage() {
               {reach === 0 ? 'Nobody to send to' : 'Send'}
             </Button>
           </div>
-        </div>
+        </Card>
 
         <div>
           <h2 className="text-base font-bold text-ink">Already sent</h2>

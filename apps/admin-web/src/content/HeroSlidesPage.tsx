@@ -12,9 +12,11 @@ import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
   Button,
+  Card,
   ConfirmDialog,
   EmptyState,
   Field,
+  PageBody,
   Pill,
   Toggle,
 } from '../ui/primitives'
@@ -38,12 +40,13 @@ const stateLabels: Record<SlideState, string> = {
   expired: 'Expired',
 }
 
-const stateStyles: Record<SlideState, string> = {
-  live: 'bg-veg-soft text-veg',
-  off: 'bg-canvas text-ink-muted',
-  scheduled: 'bg-warn-soft text-warn',
-  expired: 'bg-non-veg-soft text-non-veg-ink',
-}
+const stateTones: Record<SlideState, 'live' | 'neutral' | 'warn' | 'danger'> =
+  {
+    live: 'live',
+    off: 'neutral',
+    scheduled: 'warn',
+    expired: 'danger',
+  }
 
 // ---------------------------------------------------------------------------
 // The phone's real metrics, read off `home_app_bar.dart`.
@@ -72,11 +75,7 @@ const px = (dp: number) => `${dp * SCALE}px`
 
 function StatePill({ state }: { state: SlideState }) {
   return (
-    <span
-      className={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${stateStyles[state]}`}
-    >
-      {stateLabels[state]}
-    </span>
+    <Pill tone={stateTones[state]}>{stateLabels[state]}</Pill>
   )
 }
 
@@ -702,14 +701,14 @@ export function HeroSlidesPage() {
         }
       />
 
-      <div className="max-w-5xl p-6">
+      <PageBody width="wide">
         {error && (
           <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
             {error}
           </Banner>
         )}
 
-        <div className="rounded-card border border-line bg-white p-6">
+        <Card>
           <h2 className="text-base font-bold text-ink">Campaign slides</h2>
           <p className="mt-1 text-sm text-ink-muted">
             {slides === null
@@ -840,8 +839,8 @@ export function HeroSlidesPage() {
               })}
             </div>
           )}
-        </div>
-      </div>
+        </Card>
+      </PageBody>
 
       {deleting && (
         <ConfirmDialog

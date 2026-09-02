@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import type { MenuItemRow, RestaurantDetail } from '../../lib/api'
 import { todayLocal } from '../../lib/dates'
-import { Button, ConfirmDialog, Modal, TextArea } from '../../ui/primitives'
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  Modal,
+  TextArea,
+} from '../../ui/primitives'
 
 /// Everything collected, in one place, with what is still missing said plainly.
 ///
@@ -155,7 +161,7 @@ export function ReviewStep({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-card border border-line bg-white p-6">
+      <Card>
         <h2 className="text-base font-bold text-ink">Before it goes live</h2>
         <p className="mt-1 text-sm text-ink-muted">
           {outstanding.length === 0
@@ -194,9 +200,9 @@ export function ReviewStep({
             </li>
           ))}
         </ul>
-      </div>
+      </Card>
 
-      <div className="rounded-card border border-line bg-white p-6">
+      <Card>
         <h2 className="text-base font-bold text-ink">Storefront</h2>
         <dl className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
           {[
@@ -218,7 +224,7 @@ export function ReviewStep({
             </div>
           ))}
         </dl>
-      </div>
+      </Card>
 
       {published || r.is_active ? (
         <div className="rounded-card border border-veg bg-veg-soft p-6">
@@ -237,7 +243,7 @@ export function ReviewStep({
           </Button>
         </div>
       ) : (
-        <div className="rounded-card border border-line bg-white p-6">
+        <Card>
           <h2 className="text-base font-bold text-ink">Publish</h2>
           <p className="mt-1 text-sm text-ink-muted">
             This puts the restaurant in front of every customer on Zopiqnow.
@@ -265,7 +271,7 @@ export function ReviewStep({
               with what was missing.
             </p>
           )}
-        </div>
+        </Card>
       )}
 
       {error && (

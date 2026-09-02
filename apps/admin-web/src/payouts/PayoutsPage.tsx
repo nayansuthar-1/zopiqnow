@@ -9,6 +9,7 @@ import {
   EmptyState,
   Field,
   Modal,
+  PageBody,
   SegmentedControl,
   TableSkeleton,
   Td,
@@ -87,7 +88,7 @@ export function PayoutsPage() {
         }
       />
 
-      <div className="p-6">
+      <PageBody>
         {error && (
           <Banner
             tone="error"
@@ -196,7 +197,7 @@ export function PayoutsPage() {
             </tbody>
           </DataTable>
         )}
-      </div>
+      </PageBody>
 
       {paying && (
         <Modal

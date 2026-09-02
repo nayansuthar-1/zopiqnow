@@ -11,6 +11,7 @@ import {
   EmptyState,
   Field,
   Modal,
+  PageBody,
   Pill,
   SegmentedControl,
   TableSkeleton,
@@ -197,7 +198,7 @@ export function CouponsPage() {
         action={<Button onClick={() => setDraft(blank)}>New coupon</Button>}
       />
 
-      <div className="space-y-8 p-6">
+      <PageBody className="space-y-8">
         {error && (
           <Banner tone="error" className="max-w-2xl" onDismiss={() => setError(null)}>
             {error}
@@ -261,7 +262,7 @@ export function CouponsPage() {
             />
           </>
         )}
-      </div>
+      </PageBody>
 
       {draft && (
         <Modal

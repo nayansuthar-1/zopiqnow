@@ -10,6 +10,7 @@ import {
   ConfirmDialog,
   EmptyState,
   Field,
+  PageBody,
   Pill,
 } from '../ui/primitives'
 import { inr } from '../lib/money'
@@ -204,7 +205,7 @@ export function GiftCataloguePage() {
         }
       />
 
-      <div className="space-y-5 px-6 py-5">
+      <PageBody className="space-y-6">
         {error && (
           <Banner tone="error" onDismiss={() => setError(null)}>
             {error}
@@ -533,7 +534,7 @@ export function GiftCataloguePage() {
             </Card>
           </>
         )}
-      </div>
+      </PageBody>
 
       {(addingShop || editingShop) && (
         <GiftShopDialog

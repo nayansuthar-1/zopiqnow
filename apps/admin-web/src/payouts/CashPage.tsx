@@ -8,6 +8,7 @@ import {
   DataTable,
   Field,
   Modal,
+  PageBody,
   TableSkeleton,
   Td,
   TextArea,
@@ -132,7 +133,7 @@ export function CashPage() {
         }
       />
 
-      <div className="p-6">
+      <PageBody>
         {error && (
           <Banner
             tone="error"
@@ -264,7 +265,7 @@ export function CashPage() {
             </DataTable>
           </>
         )}
-      </div>
+      </PageBody>
 
       {depositing && (
         <Modal
@@ -431,10 +432,10 @@ export function CashPage() {
               <table className="w-full min-w-[560px] text-sm">
                 <thead className="border-b border-line text-left text-ink-muted">
                   <tr>
-                    <th className="py-2 pr-4 font-medium">When</th>
-                    <th className="py-2 pr-4 font-medium">What</th>
-                    <th className="py-2 pr-4 text-right font-medium">Amount</th>
-                    <th className="py-2 font-medium">Against</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">When</th>
+                    <th scope="col" className="py-2 pr-4 font-medium">What</th>
+                    <th scope="col" className="py-2 pr-4 text-right font-medium">Amount</th>
+                    <th scope="col" className="py-2 font-medium">Against</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">

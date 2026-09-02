@@ -13,6 +13,7 @@ import {
   EmptyState,
   Field,
   Modal,
+  PageBody,
   SegmentedControl,
   TableSkeleton,
   Td,
@@ -161,7 +162,7 @@ export function SettlementsPage() {
         }
       />
 
-      <div className="p-6">
+      <PageBody>
         {error && (
           <Banner
             tone="error"
@@ -306,7 +307,7 @@ export function SettlementsPage() {
             </tbody>
           </DataTable>
         )}
-      </div>
+      </PageBody>
 
       {adjusting && (
         <Modal

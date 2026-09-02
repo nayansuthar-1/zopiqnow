@@ -9,6 +9,7 @@ import {
   EmptyState,
   Field,
   Modal,
+  PageBody,
   Pager,
   Pill,
   SegmentedControl,
@@ -171,7 +172,7 @@ export function GiftOrdersPage() {
         }
       />
 
-      <div className="p-6">
+      <PageBody>
         {error && (
           <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
             {error}
@@ -183,7 +184,7 @@ export function GiftOrdersPage() {
           </Banner>
         )}
 
-        <div className="overflow-hidden rounded-card border border-line bg-white">
+        
           {rows === null ? (
             <TableSkeleton rows={6} />
           ) : rows.length === 0 ? (
@@ -261,8 +262,8 @@ export function GiftOrdersPage() {
               <Pager page={page} pages={pages} onChange={setPage} />
             </>
           )}
-        </div>
-      </div>
+        
+      </PageBody>
 
       {open && (
         <Modal

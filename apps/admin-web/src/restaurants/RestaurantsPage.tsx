@@ -9,6 +9,7 @@ import {
   ConfirmDialog,
   DataTable,
   EmptyState,
+  PageBody,
   Pill,
   SegmentedControl,
   TableSkeleton,
@@ -131,7 +132,7 @@ export function RestaurantsPage() {
         }
       />
 
-      <div className="p-6">
+      <PageBody>
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <input
             className="h-10 w-full max-w-xs rounded-field border border-field bg-white px-3 text-sm outline-none placeholder:text-ink-muted focus:border-brand-ink"
@@ -252,7 +253,7 @@ export function RestaurantsPage() {
             </tbody>
           </DataTable>
         )}
-      </div>
+      </PageBody>
 
       {confirming && (
         <ConfirmDialog

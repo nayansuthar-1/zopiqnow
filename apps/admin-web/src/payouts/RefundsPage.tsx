@@ -9,6 +9,7 @@ import {
   EmptyState,
   Field,
   Modal,
+  PageBody,
   Pill,
   SegmentedControl,
   TableSkeleton,
@@ -157,7 +158,7 @@ export function RefundsPage() {
         }
       />
 
-      <div className="p-6">
+      <PageBody>
         {error && (
           <Banner
             tone="error"
@@ -314,7 +315,7 @@ export function RefundsPage() {
             </tbody>
           </DataTable>
         )}
-      </div>
+      </PageBody>
 
       {issuing && (
         <Modal

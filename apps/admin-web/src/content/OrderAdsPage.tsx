@@ -10,6 +10,8 @@ import {
   EmptyState,
   Field,
   Modal,
+  PageBody,
+  Pill,
   Toggle,
 } from '../ui/primitives'
 
@@ -31,12 +33,13 @@ const stateLabels: Record<SlideState, string> = {
   expired: 'Expired',
 }
 
-const stateStyles: Record<SlideState, string> = {
-  live: 'bg-veg-soft text-veg',
-  off: 'bg-canvas text-ink-muted',
-  scheduled: 'bg-warn-soft text-warn',
-  expired: 'bg-non-veg-soft text-non-veg-ink',
-}
+const stateTones: Record<SlideState, 'live' | 'neutral' | 'warn' | 'danger'> =
+  {
+    live: 'live',
+    off: 'neutral',
+    scheduled: 'warn',
+    expired: 'danger',
+  }
 
 /// `datetime-local` speaks 'YYYY-MM-DDTHH:mm' in local time and nothing else.
 function toLocalInput(iso: string | null): string {
@@ -100,7 +103,7 @@ export function OrderAdsPage() {
         action={<Button onClick={() => setAdding(true)}>New ad</Button>}
       />
 
-      <div className="p-6">
+      <PageBody>
         {error && (
           <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
             {error}
@@ -142,11 +145,7 @@ export function OrderAdsPage() {
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-2 text-sm font-bold text-ink">
                       {ad.name}
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${stateStyles[state]}`}
-                      >
-                        {stateLabels[state]}
-                      </span>
+                      <Pill tone={stateTones[state]}>{stateLabels[state]}</Pill>
                     </p>
                     <p className="mt-0.5 truncate text-sm text-ink-muted">
                       {ad.cta_target
@@ -195,7 +194,7 @@ export function OrderAdsPage() {
             })}
           </div>
         )}
-      </div>
+      </PageBody>
 
       {(adding || editing) && (
         <AdDialog

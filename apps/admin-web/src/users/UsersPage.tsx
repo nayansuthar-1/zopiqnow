@@ -15,6 +15,7 @@ import {
   EmptyState,
   Field,
   Modal,
+  PageBody,
   Pill,
   SegmentedControl,
   TableSkeleton,
@@ -449,7 +450,7 @@ export function UsersPage() {
         }
       />
 
-      <div className="p-6">
+      <PageBody>
         {error && (
           <Banner tone="error" onDismiss={() => setError(null)}>
             {error}
@@ -544,7 +545,7 @@ export function UsersPage() {
             </tbody>
           </DataTable>
         )}
-      </div>
+      </PageBody>
 
       {open && (
         <UserSheet

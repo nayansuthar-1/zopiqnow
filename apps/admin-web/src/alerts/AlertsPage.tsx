@@ -10,6 +10,7 @@ import {
   CardSkeleton,
   ConfirmDialog,
   EmptyState,
+  PageBody,
   Pill,
   SegmentedControl,
 } from '../ui/primitives'
@@ -150,7 +151,7 @@ export function AlertsPage() {
         }
       />
 
-      <div className="space-y-4 px-6 py-6">
+      <PageBody className="space-y-4">
         {error && (
           <Banner tone="error" onDismiss={() => setError(null)}>
             {error}
@@ -278,7 +279,7 @@ export function AlertsPage() {
             )}
           </Card>
         ))}
-      </div>
+      </PageBody>
 
       {suspending && (
         <ConfirmDialog

@@ -6,10 +6,12 @@ import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
   Button,
+  Card,
   CardSkeleton,
   EmptyState,
   Field,
   Modal,
+  PageBody,
   Pill,
 } from '../ui/primitives'
 import { inr } from '../lib/money'
@@ -175,7 +177,7 @@ export function LiveOrdersPage() {
         }
       />
 
-      <div className="p-6">
+      <PageBody>
         {error && (
           <Banner tone="error" className="mb-4 max-w-2xl" onDismiss={() => setError(null)}>
             {error}
@@ -262,7 +264,7 @@ export function LiveOrdersPage() {
             ))}
           </div>
         )}
-      </div>
+      </PageBody>
 
       {acting && (
         <Modal
@@ -340,7 +342,7 @@ function OrderCard({
   )
 
   return (
-    <div className="rounded-card border border-line bg-white p-5">
+    <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -433,7 +435,7 @@ function OrderCard({
           )}
         </Cell>
       </dl>
-    </div>
+    </Card>
   )
 }
 

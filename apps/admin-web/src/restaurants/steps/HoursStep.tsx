@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../../lib/api'
 import type { RestaurantDetail } from '../../lib/api'
+import { Pill } from '../../ui/primitives'
 import { StepFrame } from './StepFrame'
 
 /// Seven rows, one per weekday, matching `restaurant_hours` exactly: a day the
@@ -124,9 +125,9 @@ export function HoursStep({
                   className="h-9 rounded-field border border-field bg-white px-2 text-sm outline-none focus:border-brand-ink"
                 />
                 {day.closes < day.opens && (
-                  <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-ink">
+                  <Pill tone="brand">
                     closes next day
-                  </span>
+                  </Pill>
                 )}
                 <button
                   type="button"

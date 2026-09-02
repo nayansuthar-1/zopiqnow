@@ -18,9 +18,11 @@ import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
   Button,
+  Card,
   ConfirmDialog,
   Field,
   Modal,
+  PageBody,
   Pill,
   Skeleton,
 } from '../ui/primitives'
@@ -222,14 +224,14 @@ export function RidersPage() {
         }
       />
 
-      <div className="max-w-3xl p-6">
+      <PageBody width="form">
         {error && (
           <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
             {error}
           </Banner>
         )}
 
-        <div className="rounded-card border border-line bg-white p-6">
+        <Card>
           <h2 className="text-base font-bold text-ink">Delivery partners</h2>
           <p className="mt-1 text-sm text-ink-muted">
             {riders === null
@@ -296,14 +298,14 @@ export function RidersPage() {
                     <p className="text-sm font-medium text-ink">
                       {r.name}
                       {!r.is_active && (
-                        <span className="ml-2 rounded-full bg-canvas px-2 py-0.5 text-xs font-medium text-ink-muted">
+                        <span className="ml-2 inline-block align-middle"><Pill>
                           inactive
-                        </span>
+                        </Pill></span>
                       )}
                       {r.live_order_id && (
-                        <span className="ml-2 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-ink">
+                        <span className="ml-2 inline-block align-middle"><Pill tone="brand">
                           carrying {r.live_order_id}
-                        </span>
+                        </Pill></span>
                       )}
                       {/* Three facts, not one. `verified` says an admin read the
                           papers; `blocked` says whether they can work today,
@@ -426,8 +428,8 @@ export function RidersPage() {
               ))}
             </div>
           )}
-        </div>
-      </div>
+        </Card>
+      </PageBody>
 
       {banking && (
         <BankDialog rider={banking} onClose={() => setBanking(null)} />

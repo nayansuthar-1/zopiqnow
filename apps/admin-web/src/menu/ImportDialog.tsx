@@ -111,10 +111,10 @@ export function ImportDialog({
               <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className="border-b border-line text-xs uppercase text-ink-muted">
                   <tr>
-                    <th className="px-3 py-2 font-semibold">Section</th>
-                    <th className="px-3 py-2 font-semibold">Dish</th>
-                    <th className="px-3 py-2 text-right font-semibold">Price</th>
-                    <th className="px-3 py-2 font-semibold">Veg</th>
+                    <th scope="col" className="px-3 py-2 font-semibold">Section</th>
+                    <th scope="col" className="px-3 py-2 font-semibold">Dish</th>
+                    <th scope="col" className="px-3 py-2 text-right font-semibold">Price</th>
+                    <th scope="col" className="px-3 py-2 font-semibold">Veg</th>
                   </tr>
                 </thead>
                 <tbody>

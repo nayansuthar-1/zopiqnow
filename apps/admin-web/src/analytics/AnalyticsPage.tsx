@@ -4,6 +4,7 @@ import type { DailyOrders, PlatformStats, TopRestaurant } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
+  Card,
   DataTable,
   PageBody,
   SegmentedControl,
@@ -89,11 +90,11 @@ export function AnalyticsPage() {
         {stats === null ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 8 }, (_, i) => (
-              <div key={i} className="rounded-card border border-line bg-white p-6">
+              <Card key={i}>
                 <Skeleton className="h-3 w-20" />
                 <Skeleton className="mt-3 h-7 w-28" />
                 <Skeleton className="mt-2 h-3 w-32" />
-              </div>
+              </Card>
             ))}
           </div>
         ) : (
@@ -226,7 +227,7 @@ function Chart({ series }: { series: DailyOrders[] }) {
       <p className="mt-0.5 mb-3 text-sm text-ink-muted">
         Placed in the tint, delivered on the line. Peak {peak} in a day.
       </p>
-      <div className="rounded-card border border-line bg-white p-5">
+      <Card>
         <svg
           viewBox={`0 0 ${W} ${H}`}
           className="h-44 w-full"
@@ -248,7 +249,7 @@ function Chart({ series }: { series: DailyOrders[] }) {
           <span>{label(first.day)}</span>
           <span>{label(last.day)}</span>
         </div>
-      </div>
+      </Card>
     </section>
   )
 }

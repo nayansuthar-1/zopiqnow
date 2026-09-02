@@ -3,7 +3,15 @@ import { api } from '../lib/api'
 import type { AdminRow, RiderPayRates } from '../lib/api'
 import { useSession } from '../auth/context'
 import { PageHeader } from '../ui/AppShell'
-import { Banner, Button, ConfirmDialog, Field, Skeleton } from '../ui/primitives'
+import {
+  Banner,
+  Button,
+  Card,
+  ConfirmDialog,
+  Field,
+  PageBody,
+  Skeleton,
+} from '../ui/primitives'
 
 /// Who else can run the platform.
 ///
@@ -63,7 +71,7 @@ export function SettingsPage() {
         subtitle="Who can sign in to this console, and what a delivery pays."
       />
 
-      <div className="max-w-2xl p-6">
+      <PageBody width="form">
         {error && (
           <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
             {error}
@@ -75,7 +83,7 @@ export function SettingsPage() {
           </Banner>
         )}
 
-        <div className="rounded-card border border-line bg-white p-6">
+        <Card>
           <h2 className="text-base font-bold text-ink">Platform admins</h2>
           <p className="mt-1 text-sm text-ink-muted">
             Everyone here can create and publish restaurants, and can see every
@@ -173,10 +181,10 @@ export function SettingsPage() {
             One that has signed in before, as a customer or a restaurant, keeps
             the password it already has.
           </p>
-        </div>
+        </Card>
 
         <RiderPayCard />
-      </div>
+      </PageBody>
 
       {removing && (
         <ConfirmDialog
@@ -237,7 +245,7 @@ function RiderPayCard() {
     (base !== String(rates.base_fee) || perKm !== String(rates.per_km_fee))
 
   return (
-    <div className="mt-6 rounded-card border border-line bg-white p-6">
+    <Card className="mt-6">
       <h2 className="text-base font-bold text-ink">Rider pay</h2>
       <p className="mt-1 text-sm text-ink-muted">
         What one delivery pays. The distance is measured in a straight line from
@@ -314,6 +322,6 @@ function RiderPayCard() {
           {saved && <p className="mt-2 text-sm text-veg">Saved.</p>}
         </>
       )}
-    </div>
+    </Card>
   )
 }
