@@ -114,24 +114,24 @@ export function HoursStep({
                   type="time"
                   value={day.opens}
                   onChange={(e) => update(i, { opens: e.target.value })}
-                  className="h-9 rounded-[8px] border border-line bg-white px-2 text-sm outline-none focus:border-brand"
+                  className="h-9 rounded-[8px] border border-field bg-white px-2 text-sm outline-none focus:border-brand-ink"
                 />
                 <span className="text-ink-muted">–</span>
                 <input
                   type="time"
                   value={day.closes}
                   onChange={(e) => update(i, { closes: e.target.value })}
-                  className="h-9 rounded-[8px] border border-line bg-white px-2 text-sm outline-none focus:border-brand"
+                  className="h-9 rounded-[8px] border border-field bg-white px-2 text-sm outline-none focus:border-brand-ink"
                 />
                 {day.closes < day.opens && (
-                  <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-deep">
+                  <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-ink">
                     closes next day
                   </span>
                 )}
                 <button
                   type="button"
                   onClick={() => copyToAll(i)}
-                  className="text-xs font-semibold text-brand hover:text-brand-deep"
+                  className="text-xs font-semibold text-brand-ink hover:text-ink"
                 >
                   Copy to all days
                 </button>

@@ -157,7 +157,7 @@ export function BroadcastPage() {
           <p className="mt-2 text-sm text-ink-muted">
             {picked.who}{' '}
             {reachError !== null ? (
-              <span className="text-non-veg">
+              <span className="text-non-veg-ink">
                 Counting them failed, so there is no number to send to.
               </span>
             ) : reach === null ? (

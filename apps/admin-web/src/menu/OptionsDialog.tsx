@@ -228,13 +228,13 @@ export function OptionsDialog({
                   value={g.name}
                   placeholder="Choose a size"
                   onChange={(e) => patch(i, { name: e.target.value })}
-                  className="h-10 flex-1 rounded-[8px] border border-line bg-white px-3 text-sm font-medium text-ink outline-none focus:border-brand"
+                  className="h-10 flex-1 rounded-[8px] border border-field bg-white px-3 text-sm font-medium text-ink outline-none focus:border-brand-ink"
                   aria-label="Group name"
                 />
                 <button
                   type="button"
                   onClick={() => setGroups((gs) => gs && gs.filter((_, j) => j !== i))}
-                  className="shrink-0 text-sm font-medium text-ink-muted hover:text-non-veg"
+                  className="shrink-0 text-sm font-medium text-ink-muted hover:text-non-veg-ink"
                 >
                   Remove group
                 </button>
@@ -260,7 +260,7 @@ export function OptionsDialog({
                     value={g.min}
                     inputMode="numeric"
                     onChange={(e) => patch(i, { min: e.target.value })}
-                    className="h-9 w-16 rounded-[8px] border border-line bg-white px-2 text-center text-sm text-ink outline-none focus:border-brand"
+                    className="h-9 w-16 rounded-[8px] border border-field bg-white px-2 text-center text-sm text-ink outline-none focus:border-brand-ink"
                     aria-label="Minimum picks"
                   />
                   <span>and up to</span>
@@ -268,7 +268,7 @@ export function OptionsDialog({
                     value={g.max}
                     inputMode="numeric"
                     onChange={(e) => patch(i, { max: e.target.value })}
-                    className="h-9 w-16 rounded-[8px] border border-line bg-white px-2 text-center text-sm text-ink outline-none focus:border-brand"
+                    className="h-9 w-16 rounded-[8px] border border-field bg-white px-2 text-center text-sm text-ink outline-none focus:border-brand-ink"
                     aria-label="Maximum picks"
                   />
                 </div>
@@ -281,7 +281,7 @@ export function OptionsDialog({
                       value={o.name}
                       placeholder="500 g"
                       onChange={(e) => patchOption(i, j, { name: e.target.value })}
-                      className="h-10 flex-1 rounded-[8px] border border-line bg-white px-3 text-sm text-ink outline-none focus:border-brand"
+                      className="h-10 flex-1 rounded-[8px] border border-field bg-white px-3 text-sm text-ink outline-none focus:border-brand-ink"
                       aria-label="Option name"
                     />
                     <span className="text-sm text-ink-muted">+₹</span>
@@ -289,7 +289,7 @@ export function OptionsDialog({
                       value={o.delta}
                       inputMode="numeric"
                       onChange={(e) => patchOption(i, j, { delta: e.target.value })}
-                      className="h-10 w-24 rounded-[8px] border border-line bg-white px-3 text-sm tabular-nums text-ink outline-none focus:border-brand"
+                      className="h-10 w-24 rounded-[8px] border border-field bg-white px-3 text-sm tabular-nums text-ink outline-none focus:border-brand-ink"
                       aria-label="Adds to the price"
                     />
                     <span className="w-20 shrink-0 text-right text-sm tabular-nums text-ink-muted">
@@ -302,7 +302,7 @@ export function OptionsDialog({
                       onClick={() =>
                         patch(i, { options: g.options.filter((_, oj) => oj !== j) })
                       }
-                      className="shrink-0 px-1 text-sm text-ink-muted hover:text-non-veg"
+                      className="shrink-0 px-1 text-sm text-ink-muted hover:text-non-veg-ink"
                       aria-label={`Remove ${o.name || 'option'}`}
                     >
                       ✕
@@ -321,7 +321,7 @@ export function OptionsDialog({
                     ],
                   })
                 }
-                className="mt-3 text-sm font-semibold text-brand hover:text-brand-deep"
+                className="mt-3 text-sm font-semibold text-brand-ink hover:text-ink"
               >
                 Add option
               </button>

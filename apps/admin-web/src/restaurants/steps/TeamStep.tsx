@@ -70,7 +70,7 @@ export function TeamStep({
                     api.setStaffRole(id, s.email, e.target.value as 'owner' | 'staff'),
                   )
                 }
-                className="h-9 rounded-[8px] border border-line bg-white px-2 text-sm outline-none focus:border-brand"
+                className="h-9 rounded-[8px] border border-field bg-white px-2 text-sm outline-none focus:border-brand-ink"
               >
                 <option value="owner">Owner</option>
                 <option value="staff">Staff</option>
@@ -79,7 +79,7 @@ export function TeamStep({
                 type="button"
                 disabled={busy}
                 onClick={() => void run(() => api.removeStaff(id, s.email))}
-                className="text-sm font-medium text-ink-muted hover:text-non-veg"
+                className="text-sm font-medium text-ink-muted hover:text-non-veg-ink"
               >
                 Remove
               </button>
@@ -106,7 +106,7 @@ export function TeamStep({
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as 'owner' | 'staff')}
-              className="h-11 rounded-[8px] border border-line bg-white px-3 text-sm outline-none focus:border-brand"
+              className="h-11 rounded-[8px] border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
             >
               <option value="owner">Owner</option>
               <option value="staff">Staff</option>

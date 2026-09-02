@@ -35,7 +35,7 @@ const stateStyles: Record<SlideState, string> = {
   live: 'bg-veg-soft text-veg',
   off: 'bg-canvas text-ink-muted',
   scheduled: 'bg-warn-soft text-warn',
-  expired: 'bg-non-veg-soft text-non-veg',
+  expired: 'bg-non-veg-soft text-non-veg-ink',
 }
 
 /// `datetime-local` speaks 'YYYY-MM-DDTHH:mm' in local time and nothing else.
@@ -178,14 +178,14 @@ export function OrderAdsPage() {
                     <button
                       type="button"
                       onClick={() => setEditing(ad)}
-                      className="text-sm font-semibold text-brand hover:text-brand-deep"
+                      className="text-sm font-semibold text-brand-ink hover:text-ink"
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       onClick={() => setDeleting(ad)}
-                      className="text-sm font-medium text-ink-muted hover:text-non-veg"
+                      className="text-sm font-medium text-ink-muted hover:text-non-veg-ink"
                     >
                       Delete
                     </button>

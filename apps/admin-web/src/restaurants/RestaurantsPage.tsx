@@ -131,7 +131,7 @@ export function RestaurantsPage() {
       <div className="p-6">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <input
-            className="h-10 w-full max-w-xs rounded-[8px] border border-line bg-white px-3 text-sm outline-none placeholder:text-ink-muted focus:border-brand"
+            className="h-10 w-full max-w-xs rounded-[8px] border border-field bg-white px-3 text-sm outline-none placeholder:text-ink-muted focus:border-brand-ink"
             placeholder="Search name, city, or owner"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -189,7 +189,7 @@ export function RestaurantsPage() {
                       <td className="px-5 py-3">
                         <Link
                           to={`/restaurants/${r.id}`}
-                          className="font-semibold text-ink hover:text-brand-deep"
+                          className="font-semibold text-ink hover:text-brand-ink"
                         >
                           {r.name}
                         </Link>
@@ -202,12 +202,12 @@ export function RestaurantsPage() {
                       </td>
                       <td className="px-5 py-3 text-ink-muted">
                         {r.owner_email ?? (
-                          <span className="text-non-veg">No owner</span>
+                          <span className="text-non-veg-ink">No owner</span>
                         )}
                       </td>
                       <td
                         className={`px-5 py-3 text-right tabular-nums ${
-                          r.menu_item_count === 0 ? 'text-non-veg' : 'text-ink-muted'
+                          r.menu_item_count === 0 ? 'text-non-veg-ink' : 'text-ink-muted'
                         }`}
                       >
                         {r.menu_item_count}

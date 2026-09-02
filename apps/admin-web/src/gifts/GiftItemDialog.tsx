@@ -129,7 +129,7 @@ export function GiftItemDialog({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Hand-painted lippan art with inset mirror work, on a seasoned MDF base."
-              className="w-full rounded-[8px] border border-line bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand"
+              className="w-full rounded-[8px] border border-field bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink"
             />
           </label>
 
@@ -153,7 +153,7 @@ export function GiftItemDialog({
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="h-11 w-full rounded-[8px] border border-line bg-white px-3 text-sm outline-none focus:border-brand"
+                className="h-11 w-full rounded-[8px] border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
               >
                 {categories.map((c) => (
                   <option key={c} value={c}>
@@ -181,7 +181,7 @@ export function GiftItemDialog({
             <select
               value={gstRateBps}
               onChange={(e) => setGstRateBps(e.target.value)}
-              className="h-11 w-full rounded-[8px] border border-line bg-white px-3 text-sm outline-none focus:border-brand"
+              className="h-11 w-full rounded-[8px] border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
             >
               {GIFT_GST_SLABS.map((s) => (
                 <option key={s.value} value={String(s.value)}>

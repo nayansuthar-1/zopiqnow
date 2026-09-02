@@ -42,7 +42,7 @@ const stateStyles: Record<SlideState, string> = {
   live: 'bg-veg-soft text-veg',
   off: 'bg-canvas text-ink-muted',
   scheduled: 'bg-warn-soft text-warn',
-  expired: 'bg-non-veg-soft text-non-veg',
+  expired: 'bg-non-veg-soft text-non-veg-ink',
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +236,7 @@ function SlidePreview({
           )}
           {ctaLabel && (
             <span
-              className="inline-flex items-center rounded-full bg-white font-semibold text-brand-deep"
+              className="inline-flex items-center rounded-full bg-white font-semibold text-brand-ink"
               style={{
                 fontSize: px(14),
                 marginTop: title || subtitle ? px(16) : 0,
@@ -522,7 +522,7 @@ function SlideForm({
               </p>
             )}
             {uploadError && (
-              <p className="mt-1.5 text-sm text-non-veg">{uploadError}</p>
+              <p className="mt-1.5 text-sm text-non-veg-ink">{uploadError}</p>
             )}
           </div>
 
@@ -570,7 +570,7 @@ function SlideForm({
                       setArtFromVideo(false)
                     }
                   }}
-                  className="text-sm font-medium text-ink-muted hover:text-non-veg"
+                  className="text-sm font-medium text-ink-muted hover:text-non-veg-ink"
                 >
                   Remove loop
                 </button>
@@ -620,7 +620,7 @@ function SlideForm({
             )}
 
             {motionError && (
-              <p className="mt-1.5 text-sm text-non-veg">{motionError}</p>
+              <p className="mt-1.5 text-sm text-non-veg-ink">{motionError}</p>
             )}
           </div>
         </div>
@@ -810,7 +810,7 @@ export function HeroSlidesPage() {
                         onClick={() =>
                           void run(() => api.setHeroSlideActive(s.id, false))
                         }
-                        className="text-sm font-medium text-ink-muted hover:text-non-veg disabled:opacity-40"
+                        className="text-sm font-medium text-ink-muted hover:text-non-veg-ink disabled:opacity-40"
                       >
                         Switch off
                       </button>
@@ -821,7 +821,7 @@ export function HeroSlidesPage() {
                         onClick={() =>
                           void run(() => api.setHeroSlideActive(s.id, true))
                         }
-                        className="text-sm font-medium text-brand hover:text-brand-deep disabled:opacity-40"
+                        className="text-sm font-medium text-brand-ink hover:text-ink disabled:opacity-40"
                       >
                         Publish
                       </button>
@@ -831,7 +831,7 @@ export function HeroSlidesPage() {
                       type="button"
                       disabled={busy}
                       onClick={() => setDeleting(s)}
-                      className="text-sm font-medium text-ink-muted hover:text-non-veg disabled:opacity-40"
+                      className="text-sm font-medium text-ink-muted hover:text-non-veg-ink disabled:opacity-40"
                     >
                       Delete
                     </button>

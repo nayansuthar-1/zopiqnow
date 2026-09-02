@@ -125,7 +125,7 @@ export function ItemDialog({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Long-grain rice, slow-cooked with saffron"
-              className="w-full rounded-[8px] border border-line bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand"
+              className="w-full rounded-[8px] border border-field bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink"
             />
           </label>
 
@@ -144,7 +144,7 @@ export function ItemDialog({
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="h-11 w-full rounded-[8px] border border-line bg-white px-3 text-sm outline-none focus:border-brand"
+                className="h-11 w-full rounded-[8px] border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
               >
                 {categories.map((c) => (
                   <option key={c} value={c}>
@@ -247,7 +247,7 @@ export function ItemDialog({
                   <select
                     value={gstRateBps}
                     onChange={(e) => setGstRateBps(e.target.value)}
-                    className="h-11 w-full rounded-[8px] border border-line bg-white px-3 text-sm outline-none focus:border-brand"
+                    className="h-11 w-full rounded-[8px] border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
                   >
                     <option value="500">5% — restaurant food</option>
                     <option value="0">0% — exempt</option>

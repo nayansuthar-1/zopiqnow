@@ -74,14 +74,14 @@ function DocumentField({
             <button
               type="button"
               onClick={() => void open()}
-              className="text-sm font-semibold text-brand hover:text-brand-deep"
+              className="text-sm font-semibold text-brand-ink hover:text-ink"
             >
               View
             </button>
             <button
               type="button"
               onClick={() => onChange(null)}
-              className="text-sm font-medium text-ink-muted hover:text-non-veg"
+              className="text-sm font-medium text-ink-muted hover:text-non-veg-ink"
             >
               Remove
             </button>
@@ -89,7 +89,7 @@ function DocumentField({
         )}
       </div>
       <p className="mt-1.5 text-sm text-ink-muted">{hint}</p>
-      {error && <p className="mt-1.5 text-sm text-non-veg">{error}</p>}
+      {error && <p className="mt-1.5 text-sm text-non-veg-ink">{error}</p>}
     </div>
   )
 }

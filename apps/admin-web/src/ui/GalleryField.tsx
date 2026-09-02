@@ -100,7 +100,7 @@ export function GalleryField({
               <div className="relative aspect-square bg-canvas">
                 <img src={url} alt="" className="h-full w-full object-cover" />
                 {i === 0 && (
-                  <span className="absolute top-1.5 left-1.5 rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-white">
+                  <span className="absolute top-1.5 left-1.5 rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-ink">
                     Cover
                   </span>
                 )}
@@ -132,7 +132,7 @@ export function GalleryField({
                       type="button"
                       disabled={busy}
                       onClick={() => move(i, 0)}
-                      className="text-xs font-semibold text-brand hover:text-brand-deep"
+                      className="text-xs font-semibold text-brand-ink hover:text-ink"
                     >
                       Make cover
                     </button>
@@ -142,7 +142,7 @@ export function GalleryField({
                     disabled={busy}
                     onClick={() => onChange(value.filter((_, at) => at !== i))}
                     aria-label={`Remove photo ${i + 1}`}
-                    className="text-xs font-medium text-ink-muted hover:text-non-veg"
+                    className="text-xs font-medium text-ink-muted hover:text-non-veg-ink"
                   >
                     Remove
                   </button>
@@ -225,7 +225,7 @@ export function GalleryField({
       )}
 
       {hint && <p className="mt-1.5 text-sm text-ink-muted">{hint}</p>}
-      {error && <p className="mt-1.5 text-sm text-non-veg">{error}</p>}
+      {error && <p className="mt-1.5 text-sm text-non-veg-ink">{error}</p>}
     </div>
   )
 }

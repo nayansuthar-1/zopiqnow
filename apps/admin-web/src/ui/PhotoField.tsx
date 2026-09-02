@@ -135,7 +135,7 @@ export function PhotoField({
                 type="button"
                 disabled={busy}
                 onClick={onRemove}
-                className="text-sm font-medium text-ink-muted hover:text-non-veg"
+                className="text-sm font-medium text-ink-muted hover:text-non-veg-ink"
               >
                 Remove
               </button>
@@ -183,7 +183,7 @@ export function PhotoField({
 
           {hint && <p className="mt-1.5 text-sm text-ink-muted">{hint}</p>}
 
-          {error && <p className="mt-1.5 text-sm text-non-veg">{error}</p>}
+          {error && <p className="mt-1.5 text-sm text-non-veg-ink">{error}</p>}
         </div>
       </div>
 

@@ -199,7 +199,7 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
                     autoFocus
                     value={renaming.to}
                     onChange={(e) => setRenaming({ ...renaming, to: e.target.value })}
-                    className="h-9 flex-1 rounded-[8px] border border-line bg-white px-3 text-sm outline-none focus:border-brand"
+                    className="h-9 flex-1 rounded-[8px] border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
                   />
                   <Button type="submit" className="h-9 px-3" loading={busy}>
                     Rename
@@ -268,7 +268,7 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
                     type="button"
                     disabled={busy}
                     onClick={() => setDeletingSection(section)}
-                    className="text-sm font-medium text-ink-muted hover:text-non-veg"
+                    className="text-sm font-medium text-ink-muted hover:text-non-veg-ink"
                   >
                     Delete section
                   </button>
@@ -312,12 +312,12 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
                     <p className="truncate text-sm font-medium text-ink">
                       {item.name}
                       {item.is_bestseller && (
-                        <span className="ml-2 text-xs font-semibold text-brand-deep">
+                        <span className="ml-2 text-xs font-semibold text-brand-ink">
                           Bestseller
                         </span>
                       )}
                       {!item.is_available && (
-                        <span className="ml-2 text-xs font-medium text-non-veg">
+                        <span className="ml-2 text-xs font-medium text-non-veg-ink">
                           Unavailable
                         </span>
                       )}
@@ -330,7 +330,7 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
                   <button
                     type="button"
                     onClick={() => setEditing(item)}
-                    className="shrink-0 text-sm font-semibold text-brand hover:text-brand-deep"
+                    className="shrink-0 text-sm font-semibold text-brand-ink hover:text-ink"
                   >
                     Edit
                   </button>
@@ -344,7 +344,7 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
                   <button
                     type="button"
                     onClick={() => setDeleting(item)}
-                    className="shrink-0 text-sm font-medium text-ink-muted hover:text-non-veg"
+                    className="shrink-0 text-sm font-medium text-ink-muted hover:text-non-veg-ink"
                   >
                     Delete
                   </button>

@@ -156,7 +156,7 @@ export function SignInPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
 
-            {error && <p className="text-sm text-non-veg">{error}</p>}
+            {error && <p className="text-sm text-non-veg-ink">{error}</p>}
 
             <Button type="submit" loading={busy} className="w-full">
               Sign in
@@ -181,7 +181,7 @@ export function SignInPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
 
-            {error && <p className="text-sm text-non-veg">{error}</p>}
+            {error && <p className="text-sm text-non-veg-ink">{error}</p>}
 
             <Button type="submit" loading={busy} className="w-full">
               Email me a code
@@ -218,7 +218,7 @@ export function SignInPage() {
               onChange={(e) => setCode(e.target.value)}
             />
 
-            {error && <p className="text-sm text-non-veg">{error}</p>}
+            {error && <p className="text-sm text-non-veg-ink">{error}</p>}
 
             <Button
               type="submit"

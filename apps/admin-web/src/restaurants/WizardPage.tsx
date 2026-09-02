@@ -115,7 +115,7 @@ export function WizardPage() {
                   onClick={() => setStep(i)}
                   className={`shrink-0 border-b-2 px-3 py-3 text-sm font-medium transition-colors ${
                     step === i
-                      ? 'border-brand text-brand-deep'
+                      ? 'border-brand-ink text-brand-ink'
                       : reachable
                         ? 'border-transparent text-ink-muted hover:text-ink'
                         : 'border-transparent text-ink-muted/40'

@@ -119,7 +119,7 @@ function RiderForm({
         {editing ? (
           <div>
             <span className="mb-1.5 block text-sm font-medium text-ink">Email</span>
-            <p className="flex h-11 items-center rounded-[8px] border border-line bg-canvas px-3 text-sm text-ink-muted">
+            <p className="flex h-11 items-center rounded-[8px] border border-field bg-canvas px-3 text-sm text-ink-muted">
               {editing.email}
             </p>
             <span className="mt-1.5 block text-sm text-ink-muted">
@@ -140,7 +140,7 @@ function RiderForm({
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-ink">Vehicle</span>
           <select
-            className="h-11 w-full rounded-[8px] border border-line bg-white px-3 text-sm text-ink outline-none focus:border-brand"
+            className="h-11 w-full rounded-[8px] border border-field bg-white px-3 text-sm text-ink outline-none focus:border-brand-ink"
             value={vehicle}
             onChange={(e) => setVehicle(e.target.value as Vehicle)}
           >
@@ -301,7 +301,7 @@ export function RidersPage() {
                         </span>
                       )}
                       {r.live_order_id && (
-                        <span className="ml-2 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-deep">
+                        <span className="ml-2 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-ink">
                           carrying {r.live_order_id}
                         </span>
                       )}
@@ -367,7 +367,7 @@ export function RidersPage() {
                     onClick={() => setVerifying(r)}
                     className={`text-sm font-medium disabled:opacity-40 ${
                       r.kyc_blocked
-                        ? 'text-brand hover:text-brand-deep'
+                        ? 'text-brand-ink hover:text-ink'
                         : 'text-ink-muted hover:text-ink'
                     }`}
                   >
@@ -406,7 +406,7 @@ export function RidersPage() {
                           ? `They are carrying ${r.live_order_id}. Release it from Live orders first — that works even if they have stopped answering.`
                           : undefined
                       }
-                      className="text-sm font-medium text-ink-muted hover:text-non-veg disabled:opacity-40 disabled:hover:text-ink-muted"
+                      className="text-sm font-medium text-ink-muted hover:text-non-veg-ink disabled:opacity-40 disabled:hover:text-ink-muted"
                     >
                       Deactivate
                     </button>
@@ -417,7 +417,7 @@ export function RidersPage() {
                       onClick={() =>
                         void run(() => api.setRiderActive(r.email, true))
                       }
-                      className="text-sm font-medium text-brand hover:text-brand-deep disabled:opacity-40"
+                      className="text-sm font-medium text-brand-ink hover:text-ink disabled:opacity-40"
                     >
                       Reactivate
                     </button>
@@ -537,14 +537,14 @@ function RiderDocField({
                   .then((url) => window.open(url, '_blank', 'noopener'))
                   .catch(() => setError('That document could not be opened.'))
               }}
-              className="text-sm font-semibold text-brand hover:text-brand-deep"
+              className="text-sm font-semibold text-brand-ink hover:text-ink"
             >
               View
             </button>
             <button
               type="button"
               onClick={() => onChange(null)}
-              className="text-sm font-medium text-ink-muted hover:text-non-veg"
+              className="text-sm font-medium text-ink-muted hover:text-non-veg-ink"
             >
               Remove
             </button>
@@ -552,7 +552,7 @@ function RiderDocField({
         )}
       </div>
       <p className="mt-1.5 text-sm text-ink-muted">{hint}</p>
-      {error && <p className="mt-1.5 text-sm text-non-veg">{error}</p>}
+      {error && <p className="mt-1.5 text-sm text-non-veg-ink">{error}</p>}
     </div>
   )
 }
@@ -794,7 +794,7 @@ function KycDialog({
                   ID proof
                 </span>
                 <select
-                  className="h-11 w-full rounded-[8px] border border-line bg-white px-3 text-sm text-ink outline-none focus:border-brand"
+                  className="h-11 w-full rounded-[8px] border border-field bg-white px-3 text-sm text-ink outline-none focus:border-brand-ink"
                   value={idKind}
                   onChange={(e) => setIdKind(e.target.value as 'aadhaar' | 'pan')}
                 >
@@ -1238,7 +1238,7 @@ function EngagementDialog({
               key={o.value}
               className={`flex cursor-pointer gap-3 rounded-[8px] border p-3 ${
                 engagement === o.value
-                  ? 'border-brand bg-brand-soft/40'
+                  ? 'border-brand-ink bg-brand-soft/40'
                   : 'border-line hover:bg-canvas'
               }`}
             >
@@ -1274,7 +1274,7 @@ function EngagementDialog({
                 value={employer}
                 onChange={(e) => setEmployer(e.target.value)}
                 required
-                className="h-11 rounded-[8px] border border-line bg-white px-3 text-sm text-ink"
+                className="h-11 rounded-[8px] border border-field bg-white px-3 text-sm text-ink"
               >
                 <option value="">Choose a restaurant…</option>
                 {restaurants.map((r) => (

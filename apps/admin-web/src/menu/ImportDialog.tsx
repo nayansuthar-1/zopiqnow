@@ -75,7 +75,7 @@ export function ImportDialog({
           <button
             type="button"
             onClick={downloadTemplate}
-            className="text-sm font-semibold text-brand hover:text-brand-deep"
+            className="text-sm font-semibold text-brand-ink hover:text-ink"
           >
             Download template
           </button>
@@ -90,7 +90,7 @@ export function ImportDialog({
             <p className="text-sm text-ink">
               <span className="font-semibold">{good.length}</span> dishes ready
               {bad.length > 0 && (
-                <span className="text-non-veg">
+                <span className="text-non-veg-ink">
                   {' '}
                   · {bad.length} {bad.length === 1 ? 'row' : 'rows'} will be skipped
                 </span>
@@ -98,7 +98,7 @@ export function ImportDialog({
             </p>
 
             {bad.length > 0 && (
-              <ul className="mt-3 max-h-32 overflow-y-auto rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg">
+              <ul className="mt-3 max-h-32 overflow-y-auto rounded-[8px] bg-non-veg-soft px-4 py-3 text-sm text-non-veg-ink">
                 {bad.map((r) => (
                   <li key={r.line}>
                     Line {r.line}: {r.problem}

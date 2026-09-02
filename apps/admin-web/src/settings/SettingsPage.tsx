@@ -101,7 +101,7 @@ export function SettingsPage() {
                       type="button"
                       disabled={busy || isMe}
                       onClick={() => setRemoving(a)}
-                      className="text-sm font-medium text-ink-muted hover:text-non-veg disabled:opacity-40 disabled:hover:text-ink-muted"
+                      className="text-sm font-medium text-ink-muted hover:text-non-veg-ink disabled:opacity-40 disabled:hover:text-ink-muted"
                       // Not just disabled — the reason, because a greyed-out
                       // button with no explanation reads as a bug.
                       title={isMe ? 'You cannot remove yourself.' : undefined}

@@ -72,7 +72,7 @@ function Counts({ user }: { user: UserRow }) {
       <span className="font-semibold text-ink">{user.total_orders} total</span>
       <span className="text-veg">{user.delivered_orders} delivered</span>
       {user.rejected_orders > 0 && (
-        <span className="text-non-veg">{user.rejected_orders} declined</span>
+        <span className="text-non-veg-ink">{user.rejected_orders} declined</span>
       )}
       {user.cancelled_orders > 0 && (
         <span className="text-warn">{user.cancelled_orders} cancelled</span>
@@ -232,7 +232,7 @@ function UserSheet({
                 <span
                   className={
                     m.action === 'block'
-                      ? 'font-medium text-non-veg'
+                      ? 'font-medium text-non-veg-ink'
                       : 'font-medium text-veg'
                   }
                 >

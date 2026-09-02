@@ -268,7 +268,7 @@ export function AllOrdersPage() {
             }}
           >
             <input
-              className="h-11 flex-1 rounded-[8px] border border-line bg-white px-3 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand"
+              className="h-11 flex-1 rounded-[8px] border border-field bg-white px-3 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Order id or phone number"
@@ -299,7 +299,7 @@ export function AllOrdersPage() {
               }}
             />
             <select
-              className="h-9 rounded-[8px] border border-line bg-white px-2 text-sm text-ink outline-none focus:border-brand"
+              className="h-9 rounded-[8px] border border-field bg-white px-2 text-sm text-ink outline-none focus:border-brand-ink"
               value={restaurantId}
               aria-label="Restaurant"
               onChange={(e) => {

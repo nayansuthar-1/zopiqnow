@@ -194,7 +194,7 @@ export function LiveOrdersPage() {
           }}
         >
           <input
-            className="h-11 flex-1 rounded-[8px] border border-line bg-white px-3 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand"
+            className="h-11 flex-1 rounded-[8px] border border-field bg-white px-3 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Order id or phone number"
@@ -352,7 +352,7 @@ function OrderCard({
               // can never disagree.
               <span
                 className={`text-xs font-semibold ${
-                  secondsToDeadline <= 60 ? 'text-non-veg' : 'text-warn'
+                  secondsToDeadline <= 60 ? 'text-non-veg-ink' : 'text-warn'
                 }`}
               >
                 {secondsToDeadline > 0
