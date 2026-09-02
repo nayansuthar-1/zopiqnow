@@ -19,7 +19,7 @@ import type {
 /// than a global `*:focus` rule so that it lands on the element that should
 /// show it — a `<label>` wrapping an input shows it on the input, not the label.
 const RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-white'
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 focus-visible:ring-offset-white'
 
 export function Spinner({ className = '' }: { className?: string }) {
   return (
@@ -76,14 +76,14 @@ export function Button({
   const base = `inline-flex shrink-0 items-center justify-center gap-2 rounded-[8px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${RING}`
   const sizes = { md: 'h-11 px-4 text-sm', sm: 'h-9 px-3 text-sm' }[size]
   const styles = {
-    primary: 'bg-brand text-white hover:bg-brand-deep',
+    primary: 'bg-brand text-ink hover:bg-brand-hover',
     secondary: 'border border-line bg-white text-ink hover:bg-canvas',
     ghost: 'text-ink-muted hover:bg-canvas hover:text-ink',
     // For the handful of actions that end something. Outlined rather than
     // filled: a solid red button is the most eye-catching thing on a screen,
     // and the most eye-catching thing should not be the irreversible one.
     danger:
-      'border border-non-veg/40 bg-white text-non-veg hover:bg-non-veg-soft',
+      'border border-non-veg/80 bg-white text-non-veg-ink hover:bg-non-veg-soft',
   }[variant]
 
   return (
@@ -136,13 +136,13 @@ export function Field({
         // A read-only field that looks editable is one somebody types into and
         // wonders why nothing happens. Still focusable and still selectable —
         // the value is usually there to be copied.
-        className={`h-11 w-full rounded-[8px] border bg-white px-3 text-sm text-ink outline-none read-only:bg-canvas read-only:text-ink-muted placeholder:text-ink-muted focus:border-brand ${RING} ${
-          error ? 'border-non-veg' : 'border-line'
+        className={`h-11 w-full rounded-[8px] border bg-white px-3 text-sm text-ink outline-none read-only:bg-canvas read-only:text-ink-muted placeholder:text-ink-muted focus:border-brand-ink ${RING} ${
+          error ? 'border-non-veg' : 'border-field'
         }`}
         {...rest}
       />
       {error ? (
-        <p id={noteId} className="mt-1.5 text-sm text-non-veg">
+        <p id={noteId} className="mt-1.5 text-sm text-non-veg-ink">
           {error}
         </p>
       ) : hint ? (
@@ -179,7 +179,7 @@ export function TextArea({
       <textarea
         id={inputId}
         aria-describedby={hint ? noteId : undefined}
-        className={`min-h-24 w-full rounded-[8px] border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand ${RING}`}
+        className={`min-h-24 w-full rounded-[8px] border border-field bg-white px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-brand-ink ${RING}`}
         {...rest}
       />
       {hint && (
@@ -276,17 +276,17 @@ export function ChipsInput({
     <div>
       <span className="mb-1.5 block text-sm font-medium text-ink">{label}</span>
       <div
-        className={`flex min-h-11 flex-wrap items-center gap-1.5 rounded-[8px] border border-line bg-white px-2 py-1.5 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand focus-within:ring-offset-2 focus-within:ring-offset-white`}
+        className={`flex min-h-11 flex-wrap items-center gap-1.5 rounded-[8px] border border-field bg-white px-2 py-1.5 focus-within:border-brand-ink focus-within:ring-2 focus-within:ring-brand focus-within:ring-offset-2 focus-within:ring-offset-white`}
       >
         {values.map((v) => (
           <span
             key={v}
-            className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-sm font-medium text-brand-deep"
+            className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-sm font-medium text-brand-ink"
           >
             {v}
             <button
               type="button"
-              className="rounded-full text-brand-deep/60 hover:text-brand-deep"
+              className="rounded-full text-brand-ink hover:text-ink"
               onClick={() => onChange(values.filter((x) => x !== v))}
               aria-label={`Remove ${v}`}
             >
@@ -319,7 +319,7 @@ export function ChipsInput({
               key={s}
               type="button"
               onClick={() => add(s)}
-              className={`rounded-full border border-line px-2.5 py-1 text-xs font-medium text-ink-muted hover:border-brand hover:text-brand-deep ${RING}`}
+              className={`rounded-full border border-line px-2.5 py-1 text-xs font-medium text-ink-muted hover:border-brand-ink hover:text-brand-ink ${RING}`}
             >
               + {s}
             </button>
@@ -529,7 +529,7 @@ export function Banner({
   className?: string
 }) {
   const styles = {
-    error: 'bg-non-veg-soft text-non-veg',
+    error: 'bg-non-veg-soft text-non-veg-ink',
     success: 'bg-veg-soft text-veg',
     warn: 'bg-warn-soft text-warn',
     info: 'bg-canvas text-ink-muted',
@@ -637,9 +637,9 @@ export function Pill({
   const styles = {
     live: 'bg-veg-soft text-veg',
     warn: 'bg-warn-soft text-warn',
-    danger: 'bg-non-veg-soft text-non-veg',
+    danger: 'bg-non-veg-soft text-non-veg-ink',
     neutral: 'bg-canvas text-ink-muted',
-    brand: 'bg-brand-soft text-brand-deep',
+    brand: 'bg-brand-soft text-brand-ink',
   }[tone]
 
   return (
@@ -676,7 +676,7 @@ export function SegmentedControl<T extends string>({
           onClick={() => onChange(o.value)}
           className={`rounded-[8px] px-3 py-1.5 text-sm font-medium transition-colors ${RING} ${
             value === o.value
-              ? 'bg-brand-soft text-brand-deep'
+              ? 'bg-brand-soft text-brand-ink'
               : 'text-ink-muted hover:bg-canvas hover:text-ink'
           }`}
         >

@@ -70,9 +70,9 @@ const groups: {
 ]
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
-  `block whitespace-nowrap rounded-[8px] px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+  `block whitespace-nowrap rounded-[8px] px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
     isActive
-      ? 'bg-brand-soft text-brand-deep'
+      ? 'bg-brand-soft text-brand-ink'
       : 'text-ink-muted hover:bg-canvas hover:text-ink'
   }`
 
@@ -99,7 +99,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           only once it has focus. */}
       <a
         href="#main"
-        className="sr-only rounded-[8px] bg-brand px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50"
+        className="sr-only rounded-[8px] bg-brand px-4 py-2 text-sm font-semibold text-ink focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50"
       >
         Skip to content
       </a>
@@ -108,7 +108,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex items-center justify-between gap-3 px-5 py-4">
           <div>
             <span className="text-base font-bold text-ink">Zopiqnow</span>
-            <span className="ml-1.5 text-base font-medium text-brand">
+            <span className="ml-1.5 text-base font-medium text-brand-ink">
               Console
             </span>
           </div>
@@ -116,7 +116,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               `hidden md:block`, so on a phone or a narrow window there was no
               way to sign out of the console at all. */}
           <button
-            className="rounded-[8px] px-2 py-1 text-xs font-semibold text-brand hover:text-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand md:hidden"
+            className="rounded-[8px] px-2 py-1 text-xs font-semibold text-brand-ink hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink md:hidden"
             onClick={() => void signOut()}
           >
             Sign out
@@ -146,7 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {email}
           </p>
           <button
-            className="mt-1 rounded-[4px] text-xs font-semibold text-brand hover:text-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            className="mt-1 rounded-[4px] text-xs font-semibold text-brand-ink hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2"
             onClick={() => void signOut()}
           >
             Sign out

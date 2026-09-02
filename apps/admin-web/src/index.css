@@ -6,23 +6,61 @@
    and never a raw hex (ENGINEERING_RULES Rule 2). */
 @theme {
   --color-brand: #fc8019; /* primary — active states, highlights */
-  --color-brand-deep: #ff5200; /* strong CTAs */
+  --color-brand-deep: #ff5200; /* strong CTAs; here, the end of one gradient */
   --color-brand-soft: #fff4ea; /* tinted surface behind brand content */
+
+  /* Two darker oranges, because #fc8019 cannot carry text and cannot draw a
+     line. White on it measures 2.55:1 and ink on white behind it 2.55:1 — both
+     below every WCAG threshold there is, including the 3:1 floor for large
+     text. The brand orange is not ours to change (it is ZopiqPalette.primary,
+     shared with all three apps), so it keeps every job it can actually do —
+     it is still the fill of the primary button, still the active tint — and
+     these two take the jobs it cannot. */
+
+  /* The primary button's hover. Darker than --color-brand, so the button still
+     darkens under the cursor, but light enough that --color-ink on it stays at
+     4.56:1. --color-brand-deep, the obvious candidate, measures 4.24:1 with ink
+     and fails. */
+  --color-brand-hover: #f06e00;
+
+  /* Brand as *text* or a *line*, never as a fill: link-styled buttons, the
+     focus ring, the active nav item, the wizard's current-step underline.
+     4.88:1 on white, 4.50:1 on --color-brand-soft. */
+  --color-brand-ink: #b85400;
 
   --color-ink: #282c3f; /* headings / primary text */
   --color-ink-muted: #5f6470; /* captions / secondary text — 5.93:1 on white */
-  --color-line: #e9e9eb; /* dividers, input borders */
+  --color-line: #e9e9eb; /* dividers, card edges */
+
+  /* The boundary of a control, and only a control. A divider is decoration and
+     may be as quiet as it likes; the edge of a text box is the only thing on
+     screen saying a text box is there, so WCAG 1.4.11 asks it for 3:1 and
+     --color-line gives 1.21:1. 3.24:1 on white, 3.00:1 on --color-canvas. */
+  --color-field: #8e8e99;
   --color-canvas: #f6f6f7; /* page background behind cards */
 
   --color-veg: #267335;
+
+  /* Left where it is: --color-non-veg is the *food* indicator as well as the
+     error colour, and the dot beside a non-veg dish is a product semantic the
+     three apps share. As text it measures 4.17:1 on white and 3.60:1 on its own
+     tint, so error copy uses the darker sibling below and the dish dot does
+     not. */
   --color-non-veg: #e43b4f;
+
+  /* Error and danger as text: 5.68:1 on white, 4.91:1 on --color-non-veg-soft. */
+  --color-non-veg-ink: #c62336;
 
   /* Tints for the status pills and inline banners. Web-only: the Flutter apps
      derive these with an alpha, which CSS cannot do without a blend mode, so
      they are pre-mixed against white here. */
   --color-veg-soft: #e8f3ea;
   --color-non-veg-soft: #fdeaec;
-  --color-warn: #b06a1c;
+  /* Darkened from #b06a1c, which measured 3.83:1 on its own tint and 4.26:1 on
+     white. Changed in place rather than given an -ink sibling because this
+     token is only ever a foreground — nothing in the console fills with it.
+     5.07:1 on white, 4.55:1 on --color-warn-soft. */
+  --color-warn: #a05f18;
   --color-warn-soft: #fdf1e3;
 
   --radius-card: 12px;
@@ -53,7 +91,7 @@ body {
    through a payout list with. Components that own a shaped ring (Button, Field,
    Toggle) set their own and this never reaches them. */
 :where(a, [tabindex]):focus-visible {
-  outline: 2px solid var(--color-brand);
+  outline: 2px solid var(--color-brand-ink);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -67,7 +105,7 @@ body {
 
 ::selection {
   background: var(--color-brand-soft);
-  color: var(--color-brand-deep);
+  color: var(--color-brand-ink);
 }
 
 /* The console has three animations: a spinner, a skeleton pulse, and colour
