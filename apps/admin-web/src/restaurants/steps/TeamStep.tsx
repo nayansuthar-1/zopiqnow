@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api } from '../../lib/api'
 import type { RestaurantDetail } from '../../lib/api'
-import { Button, Field } from '../../ui/primitives'
+import { Button, Field, Select } from '../../ui/primitives'
 import { StepFrame } from './StepFrame'
 
 /// The step that turns a database row into a business someone can run.
@@ -62,7 +62,10 @@ export function TeamStep({
           {staff.map((s) => (
             <div key={s.email} className="flex flex-wrap items-center gap-3 px-4 py-3">
               <span className="flex-1 text-sm text-ink">{s.email}</span>
-              <select
+              <Select
+                label={`Role for ${s.email}`}
+                hideLabel
+                size="sm"
                 value={s.role}
                 disabled={busy}
                 onChange={(e) =>
@@ -70,11 +73,10 @@ export function TeamStep({
                     api.setStaffRole(id, s.email, e.target.value as 'owner' | 'staff'),
                   )
                 }
-                className="h-9 rounded-field border border-field bg-white px-2 text-sm outline-none focus:border-brand-ink"
               >
                 <option value="owner">Owner</option>
                 <option value="staff">Staff</option>
-              </select>
+              </Select>
               <button
                 type="button"
                 disabled={busy}
@@ -101,17 +103,13 @@ export function TeamStep({
             onChange={(e) => setEmail(e.target.value)}
             placeholder="owner@restaurant.com"
           />
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink">Role</span>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as 'owner' | 'staff')}
+          <Select label="Role" value={role} onChange={(e) =>
+setRole(e.target.value as 'owner' | 'staff')}
               className="h-11 rounded-field border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
             >
               <option value="owner">Owner</option>
               <option value="staff">Staff</option>
-            </select>
-          </label>
+</Select>
           <Button
             type="button"
             variant="secondary"

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { MenuItemRow } from '../lib/api'
-import { Banner, Button, Field, Modal, Toggle } from '../ui/primitives'
+import { Banner, Button, Field, Modal, Select, Toggle } from '../ui/primitives'
 import { PhotoField } from '../ui/PhotoField'
 
 /// Add or edit one dish. The same dialog for both, because they are the same
@@ -139,21 +139,18 @@ export function ItemDialog({
               onChange={(e) => setPrice(e.target.value)}
               placeholder="320"
             />
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-ink">Section</span>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="h-11 w-full rounded-field border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
-              >
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-                <option value="__new__">+ New section…</option>
-              </select>
-            </label>
+            <Select
+              label="Section"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value="__new__">+ New section…</option>
+            </Select>
           </div>
 
           {creatingSection && (
@@ -242,23 +239,17 @@ export function ItemDialog({
               </p>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-ink">GST</span>
-                  <select
-                    value={gstRateBps}
-                    onChange={(e) => setGstRateBps(e.target.value)}
-                    className="h-11 w-full rounded-field border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
-                  >
-                    <option value="500">5% — restaurant food</option>
-                    <option value="0">0% — exempt</option>
-                    <option value="1200">12%</option>
-                    <option value="1800">18%</option>
-                  </select>
-                  <p className="mt-1.5 text-sm text-ink-muted">
-                    5% unless somebody says otherwise, which is every dish on every
-                    menu today.
-                  </p>
-                </label>
+                <Select
+                  label="GST"
+                  value={gstRateBps}
+                  onChange={(e) => setGstRateBps(e.target.value)}
+                  hint="5% unless somebody says otherwise, which is every dish on every menu today."
+                >
+                  <option value="500">5% — restaurant food</option>
+                  <option value="0">0% — exempt</option>
+                  <option value="1200">12%</option>
+                  <option value="1800">18%</option>
+                </Select>
                 <Field
                   label="HSN code"
                   value={hsnCode}

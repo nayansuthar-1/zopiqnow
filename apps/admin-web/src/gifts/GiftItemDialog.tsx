@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { GIFT_GST_SLABS } from '../lib/api'
 import type { GiftItemRow } from '../lib/api'
 import { GIFT_THUMB_WIDTH, deliveryUrl, parseAsset } from '../lib/cloudinary'
-import { Banner, Button, Field, Modal, Toggle } from '../ui/primitives'
+import { Banner, Button, Field, Modal, Select, Toggle } from '../ui/primitives'
 import { inr } from '../lib/money'
 import { GalleryField } from '../ui/GalleryField'
 
@@ -149,21 +149,18 @@ export function GiftItemDialog({
                   : 'Before tax, like every price on the platform.'
               }
             />
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-ink">Shelf</span>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="h-11 w-full rounded-field border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
-              >
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-                <option value="__new__">+ New shelf…</option>
-              </select>
-            </label>
+            <Select
+              label="Shelf"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value="__new__">+ New shelf…</option>
+            </Select>
           </div>
 
           {creatingShelf && (
@@ -177,24 +174,18 @@ export function GiftItemDialog({
             />
           )}
 
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink">GST</span>
-            <select
-              value={gstRateBps}
-              onChange={(e) => setGstRateBps(e.target.value)}
-              className="h-11 w-full rounded-field border border-field bg-white px-3 text-sm outline-none focus:border-brand-ink"
-            >
-              {GIFT_GST_SLABS.map((s) => (
-                <option key={s.value} value={String(s.value)}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1.5 text-sm text-ink-muted">
-              18% unless somebody says otherwise. Handicrafts are often 12% — check
-              the HSN before changing it, because this is what the receipt states.
-            </p>
-          </label>
+          <Select
+            label="GST"
+            value={gstRateBps}
+            onChange={(e) => setGstRateBps(e.target.value)}
+            hint="18% unless somebody says otherwise. Handicrafts are often 12% — check the HSN before changing it, because this is what the receipt states."
+          >
+            {GIFT_GST_SLABS.map((s) => (
+              <option key={s.value} value={String(s.value)}>
+                {s.label}
+              </option>
+            ))}
+          </Select>
 
           <Toggle
             label="Available"

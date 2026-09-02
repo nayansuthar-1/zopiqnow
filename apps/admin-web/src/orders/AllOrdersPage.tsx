@@ -20,6 +20,7 @@ import {
   SearchField,
   SegmentedControl,
   Select,
+  Skeleton,
   TableSkeleton,
   Td,
   Th,
@@ -460,7 +461,11 @@ export function AllOrdersPage() {
           {photosError ? (
             <Banner tone="warn">{photosError}</Banner>
           ) : !photos ? (
-            <p className="text-sm text-ink-muted">Loading…</p>
+            <div className="grid grid-cols-3 gap-3">
+              <Skeleton className="aspect-square w-full" />
+              <Skeleton className="aspect-square w-full" />
+              <Skeleton className="aspect-square w-full" />
+            </div>
           ) : (
             <>
               <p className="text-sm text-ink-muted">

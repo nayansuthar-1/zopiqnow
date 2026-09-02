@@ -3,7 +3,11 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import type { RestaurantDetail } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
-import { Banner } from '../ui/primitives'
+import {
+  Banner,
+  CardSkeleton,
+  PageBody,
+} from '../ui/primitives'
 import { StorefrontStep } from './steps/StorefrontStep'
 import { AddressStep } from './steps/AddressStep'
 import { LegalStep } from './steps/LegalStep'
@@ -79,7 +83,9 @@ export function WizardPage() {
     return (
       <>
         <PageHeader title="Restaurant" />
-        <p className="p-6 text-sm text-ink-muted">Loading…</p>
+        <PageBody width="form">
+          <CardSkeleton rows={2} />
+        </PageBody>
       </>
     )
   }

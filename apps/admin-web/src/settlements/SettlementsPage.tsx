@@ -348,7 +348,7 @@ export function SettlementsPage() {
             <p className="text-ink-muted">
               Currently payable{' '}
               <span className="font-medium tabular-nums text-ink">
-                ₹{adjusting.net_payable.toLocaleString('en-IN')}
+                {inr(adjusting.net_payable)}
               </span>
               {amount.trim() !== '' && !Number.isNaN(Number(amount)) && (
                 <>

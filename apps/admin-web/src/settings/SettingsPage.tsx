@@ -12,6 +12,7 @@ import {
   PageBody,
   Skeleton,
 } from '../ui/primitives'
+import { inr } from '../lib/money'
 
 /// Who else can run the platform.
 ///
@@ -314,7 +315,7 @@ function RiderPayCard() {
           <p className="mt-3 text-sm text-ink-muted">
             A 4 km delivery pays{' '}
             <span className="font-medium text-ink">
-              ₹{Math.round(Number(base || 0) + 4 * Number(perKm || 0))}
+              {inr(Math.round(Number(base || 0) + 4 * Number(perKm || 0)))}
             </span>
             . Changing this does not reprice jobs already claimed — each one keeps
             the rate it was taken under.

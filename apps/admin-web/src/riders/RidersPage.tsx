@@ -20,10 +20,12 @@ import {
   Button,
   Card,
   ConfirmDialog,
+  EmptyState,
   Field,
   Modal,
   PageBody,
   Pill,
+  Select,
   Skeleton,
 } from '../ui/primitives'
 
@@ -139,20 +141,15 @@ function RiderForm({
             hint="They sign in to the rider app with a code sent here."
           />
         )}
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-ink">Vehicle</span>
-          <select
-            className="h-11 w-full rounded-field border border-field bg-white px-3 text-sm text-ink outline-none focus:border-brand-ink"
-            value={vehicle}
-            onChange={(e) => setVehicle(e.target.value as Vehicle)}
+        <Select label="Vehicle" value={vehicle} onChange={(e) =>
+setVehicle(e.target.value as Vehicle)}
           >
             {vehicles.map((v) => (
               <option key={v} value={v}>
                 {v[0].toUpperCase() + v.slice(1)}
               </option>
             ))}
-          </select>
-        </label>
+</Select>
       </div>
 
       <div className="mt-4 flex gap-2">
@@ -284,10 +281,12 @@ export function RidersPage() {
           )}
 
           {riders !== null && riders.length === 0 && !adding && (
-            <p className="mt-5 text-sm text-ink-muted">
-              Nobody on the fleet yet. Restaurants can still deliver with their
-              own staff — the vendor's own "Hand to rider" button is unaffected.
-            </p>
+            <div className="mt-5">
+              <EmptyState
+                title="Nobody on the fleet yet"
+                body={`Restaurants can still deliver with their own staff — the vendor's own "Hand to rider" button is unaffected.`}
+              />
+            </div>
           )}
 
           {riders !== null && riders.length > 0 && (
@@ -791,19 +790,12 @@ function KycDialog({
             )}
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-ink">
-                  ID proof
-                </span>
-                <select
-                  className="h-11 w-full rounded-field border border-field bg-white px-3 text-sm text-ink outline-none focus:border-brand-ink"
-                  value={idKind}
-                  onChange={(e) => setIdKind(e.target.value as 'aadhaar' | 'pan')}
+              <Select label="ID proof" value={idKind} onChange={(e) =>
+setIdKind(e.target.value as 'aadhaar' | 'pan')}
                 >
                   <option value="aadhaar">Aadhaar</option>
                   <option value="pan">PAN</option>
-                </select>
-              </label>
+</Select>
               <Field
                 label={idKind === 'aadhaar' ? 'Aadhaar number' : 'PAN'}
                 value={idNumber}
@@ -1268,24 +1260,19 @@ function EngagementDialog({
           (restaurants === null ? (
             <Skeleton className="h-11 w-full" />
           ) : (
-            <label className="grid gap-1.5">
-              <span className="text-sm font-medium text-ink">
-                Which restaurant employs them?
-              </span>
-              <select
-                value={employer}
-                onChange={(e) => setEmployer(e.target.value)}
-                required
-                className="h-11 rounded-field border border-field bg-white px-3 text-sm text-ink"
-              >
-                <option value="">Choose a restaurant…</option>
-                {restaurants.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <Select
+              label="Which restaurant employs them?"
+              value={employer}
+              onChange={(e) => setEmployer(e.target.value)}
+              required
+            >
+              <option value="">Choose a restaurant…</option>
+              {restaurants.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </Select>
           ))}
 
         <div className="flex justify-end gap-2">

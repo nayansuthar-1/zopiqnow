@@ -13,6 +13,7 @@ import {
   PageBody,
   Pill,
   SegmentedControl,
+  Skeleton,
 } from '../ui/primitives'
 
 /// What the platform noticed while nobody was looking.
@@ -212,7 +213,10 @@ export function AlertsPage() {
             {openDetail === row.subject && (
               <div className="mt-4 rounded-field bg-canvas p-4">
                 {incidents === null ? (
-                  <p className="text-sm text-ink-muted">Loading…</p>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-72" />
+                    <Skeleton className="h-4 w-56" />
+                  </div>
                 ) : (
                   <ul className="space-y-2">
                     {incidents.map((i) => (

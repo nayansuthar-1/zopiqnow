@@ -5,6 +5,7 @@ import { todayLocal } from '../../lib/dates'
 import {
   Button,
   Card,
+  CardSkeleton,
   ConfirmDialog,
   Modal,
   TextArea,
@@ -118,7 +119,7 @@ export function ReviewStep({
   }, [id])
 
   if (!detail || menu === null) {
-    return <p className="text-sm text-ink-muted">Loading…</p>
+    return <CardSkeleton rows={2} />
   }
 
   const r = detail.restaurant

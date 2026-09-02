@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Button } from '../../ui/primitives'
+import { Banner, Button } from '../../ui/primitives'
 
 /// The frame each wizard step shares: a title, the fields, one error line, and a
 /// save that says what it will do next.
@@ -36,13 +36,17 @@ export function StepFrame({
       <h2 className="text-base font-bold text-ink">{title}</h2>
       {description && <p className="mt-1 text-sm text-ink-muted">{description}</p>}
 
-      <div className="mt-6 space-y-5">{children}</div>
-
+      {/* Above the fields, not below them. This was a bare <p> under the last
+          field and over the save button, so a refusal about the *first* field
+          announced itself six hundred pixels below it — and, being a <p> rather
+          than a Banner, announced itself to a screen reader not at all. */}
       {error && (
-        <p className="mt-5 rounded-field bg-non-veg-soft px-4 py-3 text-sm text-non-veg-ink">
+        <Banner tone="error" className="mt-5">
           {error}
-        </p>
+        </Banner>
       )}
+
+      <div className="mt-6 space-y-5">{children}</div>
 
       <div className="mt-6 flex justify-end">
         <Button type="submit" loading={busy}>

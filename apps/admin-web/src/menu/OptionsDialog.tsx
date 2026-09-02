@@ -186,7 +186,7 @@ export function OptionsDialog({
     >
       <p className="text-sm text-ink-muted">
         This dish costs {inr(item.price)}. Every option adds to that — a 500 g cake at
-        {inr(item.price)} with a 1 kg option at +{inr(item.price)} sells for ₹{item.price * 2}.
+        {inr(item.price)} with a 1 kg option at +{inr(item.price)} sells for {inr(item.price * 2)}.
       </p>
 
       {saveError && (

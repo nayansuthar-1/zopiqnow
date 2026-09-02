@@ -13,6 +13,7 @@ import {
   Pager,
   Pill,
   SegmentedControl,
+  Skeleton,
   TableSkeleton,
   Td,
   Th,
@@ -336,7 +337,10 @@ export function GiftOrdersPage() {
             What to pack
           </p>
           {lines === null ? (
-            <p className="mt-1 text-sm text-ink-muted">Loading…</p>
+            <div className="mt-2 space-y-2">
+              <Skeleton className="h-4 w-64" />
+              <Skeleton className="h-4 w-40" />
+            </div>
           ) : (
             <ul className="mt-1 text-sm text-ink">
               {lines.map((l, i) => (

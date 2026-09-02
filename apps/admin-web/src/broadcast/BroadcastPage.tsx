@@ -232,7 +232,7 @@ export function BroadcastPage() {
               {sent.map((b) => (
                 <div
                   key={b.id}
-                  className="rounded-card border border-line bg-white p-4"
+                  className="rounded-card border border-line bg-white p-6"
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <p className="font-semibold text-ink">{b.title}</p>
