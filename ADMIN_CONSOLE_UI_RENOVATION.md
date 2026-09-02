@@ -319,6 +319,8 @@ Phosphor's own SVG set, which is the same drawing. Either way, the answer is "th
 the product already uses", not a new dependency.
 
 #### C2 — There is no brand typeface
+- [x] **Done** — `src/index.css`, `src/fonts/` (`8300746`)
+
 
 `index.css` sets `system-ui, 'Segoe UI', Roboto, sans-serif`. The apps set **Figtree**, a
 variable face bundled at `packages/zopiq_ui/assets/fonts/Figtree-Variable.ttf` (62 kB,
@@ -328,6 +330,9 @@ a comment saying nothing else in the codebase references a font name.
 The console is the one surface that looks like a different company's product.
 
 #### C3 — There is no type scale
+- [x] **Done** — `src/index.css` (`8300746`). Mirrored onto the six size names the console
+      already writes, so 308 uses of `text-sm` inherited the scale without a page changing.
+
 
 The token package defines thirteen steps with line-heights and letter-spacing
 (`zopiq_typography.dart:44-57`). The console has four sizes and no scale: **308**
@@ -338,6 +343,9 @@ line-height or letter-spacing is set anywhere. That flatness is most of why the 
 reads as utilitarian rather than professional.
 
 #### C4 — There is no elevation, and the sticky header proves it
+- [~] **Half done** — the scale is mirrored and the modal’s inline shadow is named
+      (`8300746`). The sticky headers that need one are Phase 4.
+
 
 One shadow exists, on the modal (`primitives.tsx:448`). `ZopiqElevation` defines three
 tiers and calls them "soft, premium … rather than harsh Material drop shadows".
@@ -356,6 +364,9 @@ This is the one finding here that is closest to a functional bug, and it is the 
 put a toast layer in: an ops console's feedback has to arrive where the eye already is.
 
 #### C6 — There is no spacing grid
+- [x] **Written down** — `src/index.css` (`8300746`). Stating the grid is the whole of this
+      item; the off-grid `p-5` and `py-2.5` sites are corrected per screen in Phase 3.
+
 
 `ZopiqSpacing` is an 8-pt grid — 2, 4, 8, 12, 16, 24, 32, 48 — and says "no magic
 numbers". The console uses `p-5` (20), `py-0.5` (2), `mt-1.5` (6), `gap-3` (12),
@@ -363,6 +374,11 @@ numbers". The console uses `p-5` (20), `py-0.5` (2), `mt-1.5` (6), `gap-3` (12),
 is this.
 
 #### C7 — Five corner radii where the tokens declare two
+- [x] **Done** — `src/index.css` and 37 files (`8300746`). 119 literals became `rounded-card`,
+      `rounded-field` and `rounded-xs`; `rounded-lg` was Tailwind’s 8px, the field radius named
+      by accident. **Four literals stay on purpose** — three `rounded-[6px]` and the
+      `rounded-[2px]` veg indicator, none of which is a value ZopiqRadii declares.
+
 
 `index.css` declares `--radius-card: 12px` and `--radius-field: 8px`. In use:
 `rounded-[8px]` ×81, `rounded-[12px]` ×34, `rounded-full` ×17, `rounded-[4px]` ×4,
@@ -429,6 +445,9 @@ else can proceed without an answer.
 ---
 
 ### Phase 1 — The token floor
+
+**Done** (`a66a546`, `7bf1d8e`, `8300746`). All six items landed; item 5’s elevation half
+carries over to Phase 4, which is where the shadow gets a consumer.
 
 *Goal: the console's colour, type, spacing and radius all come from a token, and the ones
 that fail a contrast threshold stop failing.*
@@ -605,12 +624,12 @@ Tick as they land.
 
 **Part 3 — missing**
 - [ ] C1 — icons
-- [ ] C2 — Figtree
-- [ ] C3 — type scale
-- [ ] C4 — elevation
+- [x] C2 — Figtree
+- [x] C3 — type scale
+- [~] C4 — elevation *(scale mirrored; sticky-header shadow is Phase 4)*
 - [ ] C5 — toasts
-- [ ] C6 — spacing grid
-- [ ] C7 — radii
+- [x] C6 — spacing grid *(stated; per-screen corrections in Phase 3)*
+- [x] C7 — radii
 - [x] C8 — dark mode *(decided: no)*
 
 **Part 4 — per screen**
