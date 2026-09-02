@@ -51,6 +51,22 @@ bg-white p-5">` twenty-seven times. That is the shape of every finding below.
 These are not taste. Each one is a number that fails a published threshold.
 
 #### A1 — The primary button's label fails contrast at 2.55:1
+- [x] **Done** — `src/index.css`, `src/ui/primitives.tsx`, `src/ui/AppShell.tsx` and 25 page
+      files (`a66a546`, `7bf1d8e`)
+
+**Decided: keep `#fc8019`, darken the *label*.** Ink on the unchanged brand orange measures
+**5.41:1** — the option this section did not measure when it was written, and the better one.
+The resting orange stays identical to the three apps, where the recommendation below would
+have changed it on every primary button in the console. Both cost exactly one new token.
+
+What shipped: `--color-brand-hover` (#f06e00) for the button's hover, because
+`--color-brand-deep` measured 4.24:1 with ink and failed; `--color-brand-ink` (#b85400) for
+brand as text or a line; `--color-non-veg-ink` (#c62336) for error copy, leaving
+`--color-non-veg` alone where it means *food*; `--color-warn` darkened in place to #a05f18,
+no sibling needed because nothing in the console fills with it; and `--color-field` (#8e8e99)
+for the boundary of a control. **All 21 measured pairs now pass**, re-checked against the hex
+values as they sit in `index.css` rather than against these notes.
+
 
 White text on `--color-brand` (`#fc8019`) measures **2.55:1**. WCAG AA needs 4.5:1 for
 14 px semibold text and 3:1 even for large text. It fails both. The hover state
@@ -158,6 +174,17 @@ the orange pin in `apps/customer/android/app/src/main/res/mipmap-*/ic_launcher.p
 `apps/admin-web/public/icons.svg` is likewise dead — a sprite sheet of social icons
 (Bluesky, among others), referenced by nothing in `src/` or `index.html`. *Mentioned, not
 deleted* — it is not this survey's to remove.
+
+#### A7 — The toggle's two states are both below the non-text threshold
+
+*Found while fixing A1; not in the original survey.* `Toggle` (`primitives.tsx:216`) shows
+"on" as a white thumb on `--color-brand` (**2.55:1**) and "off" as a white thumb on
+`--color-line` (**1.21:1**). A switch's state is conveyed by nothing but those two, so
+WCAG 1.4.11 asks both for 3:1.
+
+Deliberately **not** taken with A1: the answer is either a darker track — which makes the
+control a different colour from the brand it is meant to echo — or a shape change, and
+neither is a token swap. It belongs with the primitives work in Phase 2.
 
 ---
 
@@ -558,12 +585,13 @@ on `/` does not fetch the wizard.
 Tick as they land.
 
 **Part 1 — measurably wrong**
-- [ ] A1 — brand contrast *(blocked: needs a decision)*
+- [x] A1 — brand contrast *(decided: keep the orange, darken the label — 21/21 pairs pass)*
 - [ ] A2 — `<select>` focus
 - [ ] A3 — table hover + sticky header
 - [ ] A4 — `scope="col"`
 - [ ] A5 — money and date formatting
 - [ ] A6 — favicon and the dead sprite
+- [ ] A7 — the toggle's two states *(new, found during A1)*
 
 **Part 2 — inconsistent**
 - [ ] B1 — twelve tables → one
