@@ -156,7 +156,7 @@ export function SettlementsPage() {
         title="Restaurant settlements"
         subtitle={
           rows
-            ? `${rows.length} shown · ₹${owed.toLocaleString('en-IN')} still owed`
+            ? `${rows.length} shown · ${inr(owed)} still owed`
             : 'Rolled up every Monday for the week before.'
         }
       />
@@ -411,7 +411,7 @@ export function SettlementsPage() {
             setPaying(null)
             setBank(null)
           }}
-          title={`Mark ₹${paying.net_payable.toLocaleString('en-IN')} to ${paying.restaurant_name} as paid`}
+          title={`Mark ${inr(paying.net_payable)} to ${paying.restaurant_name} as paid`}
           footer={
             <>
               <Button

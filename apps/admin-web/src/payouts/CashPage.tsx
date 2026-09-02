@@ -5,11 +5,15 @@ import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
   Button,
+  DataTable,
   Field,
   Modal,
   TableSkeleton,
+  Td,
   TextArea,
+  Th,
 } from '../ui/primitives'
+import { inr, inrSigned } from '../lib/money'
 
 /// Where the platform's cash actually is (migration 0076).
 ///
@@ -123,7 +127,7 @@ export function CashPage() {
         title="Rider cash"
         subtitle={
           rows
-            ? `₹${held} held by ${holders} of ${rows.length} riders · limit ₹${limit}`
+            ? `${inr(held)} held by ${holders} of ${rows.length} riders · limit ${inr(limit)}`
             : 'COD collected, deposited, and what is still out there.'
         }
       />
@@ -145,7 +149,7 @@ export function CashPage() {
           <>
             <div className="mb-4 flex items-center gap-3">
               <p className="text-sm text-ink-muted">
-                A rider carrying ₹{limit} or more stops being offered cash
+                A rider carrying {inr(limit)} or more stops being offered cash
                 orders until they hand it in.
               </p>
               <Button
@@ -160,107 +164,104 @@ export function CashPage() {
               </Button>
             </div>
 
-            <div className="overflow-x-auto rounded-card border border-line bg-white">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead className="border-b border-line text-left text-ink-muted">
-                  <tr>
-                    <th className="px-5 py-3 font-medium">Rider</th>
-                    <th className="px-5 py-3 text-right font-medium">
-                      Collected
-                    </th>
-                    <th className="px-5 py-3 text-right font-medium">
-                      Deposited
-                    </th>
-                    <th className="px-5 py-3 text-right font-medium">
-                      Adjustments
-                    </th>
-                    <th className="px-5 py-3 text-right font-medium">
-                      In hand
-                    </th>
-                    <th className="px-5 py-3 font-medium">Last collection</th>
-                    <th className="px-5 py-3" />
+            <DataTable label="Rider cash" minWidth={900}>
+              <thead>
+                <tr>
+                  <Th>Rider</Th>
+                  <Th align="right">
+                    Collected
+                  </Th>
+                  <Th align="right">
+                    Deposited
+                  </Th>
+                  <Th align="right">
+                    Adjustments
+                  </Th>
+                  <Th align="right">
+                    In hand
+                  </Th>
+                  <Th>Last collection</Th>
+                  <Th hideLabel>Actions</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.partner_email}>
+                    <Td>
+                      <p className="font-medium text-ink">
+                        {r.partner_name}
+                        {!r.is_active && (
+                          <span className="ml-2 text-xs text-ink-muted">
+                            inactive
+                          </span>
+                        )}
+                      </p>
+                      <p className="truncate text-ink-muted">
+                        {r.partner_email}
+                      </p>
+                    </Td>
+                    <Td align="right" className="text-ink-muted">
+                      {inr(r.collected_total)}
+                      <span className="ml-1 text-xs">
+                        ({r.collections})
+                      </span>
+                    </Td>
+                    <Td align="right" className="text-ink-muted">
+                      {inr(r.deposited_total)}
+                    </Td>
+                    <Td align="right" className="text-ink-muted">
+                      {r.adjusted_total === 0
+                        ? '—'
+                        : inrSigned(r.adjusted_total)}
+                    </Td>
+                    <Td className={`px-5 py-3 text-right font-semibold tabular-nums ${
+                        // At or past the limit this rider is no longer being
+                        // offered cash work, which is an ops problem and not
+                        // just a number.
+                        r.outstanding>= r.cap
+                          ? 'text-warn'
+                          : r.outstanding > 0
+                            ? 'text-ink'
+                            : 'text-ink-muted'
+                      }`}
+                    >
+                      {inr(r.outstanding)}
+                    </Td>
+                    <Td className="text-ink-muted">
+                      {when(r.last_collected_at)}
+                    </Td>
+                    <Td>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setViewing(r)}
+                        >
+                          Ledger
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={r.outstanding <= 0}
+                          title={
+                            r.outstanding > 0
+                              ? undefined
+                              : 'They are not holding anything.'
+                          }
+                          onClick={() => {
+                            setDepositing(r)
+                            setAmount(String(r.outstanding))
+                            setReference('')
+                          }}
+                        >
+                          Record deposit
+                        </Button>
+                      </div>
+                    </Td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {rows.map((r) => (
-                    <tr key={r.partner_email}>
-                      <td className="px-5 py-3">
-                        <p className="font-medium text-ink">
-                          {r.partner_name}
-                          {!r.is_active && (
-                            <span className="ml-2 text-xs text-ink-muted">
-                              inactive
-                            </span>
-                          )}
-                        </p>
-                        <p className="truncate text-ink-muted">
-                          {r.partner_email}
-                        </p>
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
-                        ₹{r.collected_total}
-                        <span className="ml-1 text-xs">
-                          ({r.collections})
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
-                        ₹{r.deposited_total}
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
-                        {r.adjusted_total === 0
-                          ? '—'
-                          : `${r.adjusted_total > 0 ? '+' : '−'}₹${Math.abs(r.adjusted_total)}`}
-                      </td>
-                      <td
-                        className={`px-5 py-3 text-right font-semibold tabular-nums ${
-                          // At or past the limit this rider is no longer being
-                          // offered cash work, which is an ops problem and not
-                          // just a number.
-                          r.outstanding >= r.cap
-                            ? 'text-warn'
-                            : r.outstanding > 0
-                              ? 'text-ink'
-                              : 'text-ink-muted'
-                        }`}
-                      >
-                        ₹{r.outstanding}
-                      </td>
-                      <td className="px-5 py-3 text-ink-muted">
-                        {when(r.last_collected_at)}
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setViewing(r)}
-                          >
-                            Ledger
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            disabled={r.outstanding <= 0}
-                            title={
-                              r.outstanding > 0
-                                ? undefined
-                                : 'They are not holding anything.'
-                            }
-                            onClick={() => {
-                              setDepositing(r)
-                              setAmount(String(r.outstanding))
-                              setReference('')
-                            }}
-                          >
-                            Record deposit
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </DataTable>
           </>
         )}
       </div>
@@ -304,7 +305,7 @@ export function CashPage() {
           }
         >
           <p className="text-sm text-ink-muted">
-            They are holding ₹{depositing.outstanding}. This records what came
+            They are holding {inr(depositing.outstanding)}. This records what came
             back — it does not transfer anything.
           </p>
           <Field
@@ -317,7 +318,7 @@ export function CashPage() {
             onChange={(e) => setAmount(e.target.value)}
             error={
               Number(amount) > depositing.outstanding
-                ? `More than the ₹${depositing.outstanding} they are holding. Use an adjustment if this is a correction.`
+                ? `More than the ${inr(depositing.outstanding)} they are holding. Use an adjustment if this is a correction.`
                 : undefined
             }
           />
@@ -387,7 +388,7 @@ export function CashPage() {
         >
           <p className="text-sm text-ink-muted">
             The only way a balance moves without money moving. They are holding
-            ₹{adjusting.outstanding}; enter −{adjusting.outstanding} to clear it.
+            {inr(adjusting.outstanding)}; enter −{adjusting.outstanding} to clear it.
             The note is permanent and is the whole point of the action.
           </p>
           <Field
@@ -412,7 +413,7 @@ export function CashPage() {
         <Modal
           size="lg"
           onClose={() => setViewing(null)}
-          title={`${viewing.partner_name} · ₹${viewing.outstanding} in hand`}
+          title={`${viewing.partner_name} · ${inr(viewing.outstanding)} in hand`}
           footer={
             <Button variant="secondary" onClick={() => setViewing(null)}>
               Close
@@ -448,7 +449,7 @@ export function CashPage() {
                           e.amount > 0 ? 'text-ink' : 'text-veg'
                         }`}
                       >
-                        {e.amount > 0 ? '+' : '−'}₹{Math.abs(e.amount)}
+                        {inrSigned(e.amount)}
                       </td>
                       <td className="py-2 text-ink-muted">
                         {e.order_id ??

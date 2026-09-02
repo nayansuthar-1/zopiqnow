@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api'
 import type { MenuItemRow } from '../lib/api'
 import { Banner, Button, ConfirmDialog } from '../ui/primitives'
+import { inr } from '../lib/money'
 import { ItemDialog } from './ItemDialog'
 import { ImportDialog } from './ImportDialog'
 import { OptionsDialog } from './OptionsDialog'
@@ -326,7 +327,7 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
                       <p className="truncate text-xs text-ink-muted">{item.description}</p>
                     )}
                   </div>
-                  <span className="shrink-0 text-sm tabular-nums text-ink">₹{item.price}</span>
+                  <span className="shrink-0 text-sm tabular-nums text-ink">{inr(item.price)}</span>
                   <button
                     type="button"
                     onClick={() => setEditing(item)}

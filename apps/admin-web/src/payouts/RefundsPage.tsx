@@ -5,14 +5,18 @@ import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
   Button,
+  DataTable,
   EmptyState,
   Field,
   Modal,
   Pill,
   SegmentedControl,
   TableSkeleton,
+  Td,
   TextArea,
+  Th,
 } from '../ui/primitives'
+import { inr } from '../lib/money'
 
 /// Money going back out (migration 0077).
 ///
@@ -137,7 +141,7 @@ export function RefundsPage() {
         title="Refunds"
         subtitle={
           rows
-            ? `${rows.length} shown · ₹${owed} still to send`
+            ? `${rows.length} shown · ${inr(owed)} still to send`
             : 'Raised automatically when an order ends without being delivered.'
         }
         action={
@@ -189,128 +193,126 @@ export function RefundsPage() {
             }
           />
         ) : (
-          <div className="overflow-x-auto rounded-card border border-line bg-white">
-            <table className="w-full min-w-[900px] text-sm">
-              <thead className="border-b border-line text-left text-ink-muted">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Order</th>
-                  <th className="px-5 py-3 font-medium">Why</th>
-                  <th className="px-5 py-3 text-right font-medium">Amount</th>
-                  <th className="px-5 py-3 font-medium">Funded by</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td className="px-5 py-3">
-                      <p className="font-medium text-ink">{r.order_id}</p>
-                      <p className="truncate text-ink-muted">
-                        {r.restaurant_name} · {r.user_phone}
+          <DataTable label="Refunds" minWidth={900}>
+            <thead>
+              <tr>
+                <Th>Order</Th>
+                <Th>Why</Th>
+                <Th align="right">Amount</Th>
+                <Th>Funded by</Th>
+                <Th>Status</Th>
+                <Th hideLabel>Actions</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <Td>
+                    <p className="font-medium text-ink">{r.order_id}</p>
+                    <p className="truncate text-ink-muted">
+                      {r.restaurant_name} · {r.user_phone}
+                    </p>
+                  </Td>
+                  <Td className="max-w-[260px] text-ink-muted">
+                    <p className="truncate" title={r.reason}>
+                      {r.reason}
+                    </p>
+                    <p className="text-xs">
+                      {r.requested_by === 'system'
+                        ? 'Automatic'
+                        : `By ${r.requested_by}`}{' '}
+                      · {stamp(r.created_at)}
+                    </p>
+                  </Td>
+                  <Td align="right" className="font-semibold text-ink">
+                    {inr(r.amount)}
+                    {/* A partial has to say what it is a part of, or the
+                        figure looks like a mis-keyed full refund. */}
+                    {r.amount < r.order_total && (
+                      <p className="text-xs font-normal text-ink-muted">
+                        of {inr(r.order_total)}
                       </p>
-                    </td>
-                    <td className="max-w-[260px] px-5 py-3 text-ink-muted">
-                      <p className="truncate" title={r.reason}>
-                        {r.reason}
-                      </p>
+                    )}
+                  </Td>
+                  <Td className="text-ink-muted">
+                    {r.funded_by === 'restaurant' ? 'Restaurant' : 'Platform'}
+                    {r.settlement_id !== null && (
                       <p className="text-xs">
-                        {r.requested_by === 'system'
-                          ? 'Automatic'
-                          : `By ${r.requested_by}`}{' '}
-                        · {stamp(r.created_at)}
+                        On settlement #{r.settlement_id}
                       </p>
-                    </td>
-                    <td className="px-5 py-3 text-right font-semibold tabular-nums text-ink">
-                      ₹{r.amount}
-                      {/* A partial has to say what it is a part of, or the
-                          figure looks like a mis-keyed full refund. */}
-                      {r.amount < r.order_total && (
-                        <p className="text-xs font-normal text-ink-muted">
-                          of ₹{r.order_total}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-ink-muted">
-                      {r.funded_by === 'restaurant' ? 'Restaurant' : 'Platform'}
-                      {r.settlement_id !== null && (
-                        <p className="text-xs">
-                          On settlement #{r.settlement_id}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-5 py-3">
-                      <Pill tone={statusTone[r.status]}>
-                        {statusLabel[r.status]}
-                      </Pill>
-                      {r.status === 'paid' && r.gateway_refund_id && (
+                    )}
+                  </Td>
+                  <Td>
+                    <Pill tone={statusTone[r.status]}>
+                      {statusLabel[r.status]}
+                    </Pill>
+                    {r.status === 'paid' && r.gateway_refund_id && (
+                      <p className="mt-1 text-xs text-ink-muted">
+                        {r.gateway_refund_id}
+                      </p>
+                    )}
+                    {(r.status === 'failed' || r.status === 'declined') &&
+                      r.failure_reason && (
                         <p className="mt-1 text-xs text-ink-muted">
-                          {r.gateway_refund_id}
+                          {r.failure_reason}
                         </p>
                       )}
-                      {(r.status === 'failed' || r.status === 'declined') &&
-                        r.failure_reason && (
-                          <p className="mt-1 text-xs text-ink-muted">
-                            {r.failure_reason}
-                          </p>
-                        )}
-                      {(r.status === 'requested' ||
-                        r.status === 'approved') && (
-                        <p className="mt-1 text-xs text-ink-muted">
-                          Promised by {stamp(r.expected_by)}
-                        </p>
+                    {(r.status === 'requested' ||
+                      r.status === 'approved') && (
+                      <p className="mt-1 text-xs text-ink-muted">
+                        Promised by {stamp(r.expected_by)}
+                      </p>
+                    )}
+                  </Td>
+                  <Td>
+                    <div className="flex justify-end gap-2">
+                      {(r.status === 'requested' || r.status === 'failed') && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setApproving(r)
+                            setFunder(r.funded_by)
+                          }}
+                        >
+                          Approve
+                        </Button>
                       )}
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex justify-end gap-2">
-                        {(r.status === 'requested' || r.status === 'failed') && (
+                      {/* Absent, not disabled, on an automatic refund: the
+                          database refuses it and a button that always errors
+                          is a button that teaches people to ignore errors. */}
+                      {(r.status === 'requested' || r.status === 'failed') &&
+                        r.requested_by !== 'system' && (
                           <Button
                             variant="secondary"
                             size="sm"
                             onClick={() => {
-                              setApproving(r)
-                              setFunder(r.funded_by)
+                              setDeclining(r)
+                              setDeclineReason('')
                             }}
                           >
-                            Approve
+                            Decline
                           </Button>
                         )}
-                        {/* Absent, not disabled, on an automatic refund: the
-                            database refuses it and a button that always errors
-                            is a button that teaches people to ignore errors. */}
-                        {(r.status === 'requested' || r.status === 'failed') &&
-                          r.requested_by !== 'system' && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => {
-                                setDeclining(r)
-                                setDeclineReason('')
-                              }}
-                            >
-                              Decline
-                            </Button>
-                          )}
-                        {(r.status === 'approved' ||
-                          r.status === 'processing') && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => {
-                              setPaying(r)
-                              setReference('')
-                            }}
-                          >
-                            Mark sent
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      {(r.status === 'approved' ||
+                        r.status === 'processing') && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setPaying(r)
+                            setReference('')
+                          }}
+                        >
+                          Mark sent
+                        </Button>
+                      )}
+                    </div>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </DataTable>
         )}
       </div>
 
@@ -403,7 +405,7 @@ export function RefundsPage() {
         <Modal
           busy={busy}
           onClose={() => setApproving(null)}
-          title={`Approve ₹${approving.amount} on ${approving.order_id}`}
+          title={`Approve ${inr(approving.amount)} on ${approving.order_id}`}
           footer={
             <>
               <Button
@@ -450,7 +452,7 @@ export function RefundsPage() {
         <Modal
           busy={busy}
           onClose={() => setDeclining(null)}
-          title={`Decline ₹${declining.amount} on ${declining.order_id}`}
+          title={`Decline ${inr(declining.amount)} on ${declining.order_id}`}
           footer={
             <>
               <Button
@@ -494,7 +496,7 @@ export function RefundsPage() {
         <Modal
           busy={busy}
           onClose={() => setPaying(null)}
-          title={`Mark ₹${paying.amount} on ${paying.order_id} as sent`}
+          title={`Mark ${inr(paying.amount)} on ${paying.order_id} as sent`}
           footer={
             <>
               <Button

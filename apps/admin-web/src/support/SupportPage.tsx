@@ -10,13 +10,18 @@ import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
   Button,
+  DataTable,
   EmptyState,
   Field,
   Modal,
+  Pager,
   Pill,
   SegmentedControl,
   TableSkeleton,
+  Td,
+  Th,
 } from '../ui/primitives'
+import { inr } from '../lib/money'
 
 /// The complaint queue (migration 0095).
 ///
@@ -196,97 +201,75 @@ export function SupportPage() {
             />
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
-                    <tr>
-                      <th className="px-5 py-3">Waiting</th>
-                      <th className="px-5 py-3">Problem</th>
-                      <th className="px-5 py-3">Order</th>
-                      <th className="px-5 py-3">Customer</th>
-                      <th className="px-5 py-3 text-right">Value</th>
-                      <th className="px-5 py-3 text-right" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line">
-                    {rows.map((tk) => (
-                      <tr key={tk.id}>
-                        <td className="px-5 py-4 align-top">
-                          <p className="font-semibold text-ink">
-                            {tk.status === 'open' ? waited(tk.created_at) : '—'}
+              <DataTable label="Support tickets" minWidth={720}>
+                <thead>
+                  <tr>
+                    <Th>Waiting</Th>
+                    <Th>Problem</Th>
+                    <Th>Order</Th>
+                    <Th>Customer</Th>
+                    <Th align="right">Value</Th>
+                    <Th align="right" hideLabel>Actions</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((tk) => (
+                    <tr key={tk.id}>
+                      <Td>
+                        <p className="font-semibold text-ink">
+                          {tk.status === 'open' ? waited(tk.created_at) : '—'}
+                        </p>
+                        <p className="text-xs text-ink-muted">
+                          {when(tk.created_at)}
+                        </p>
+                      </Td>
+                      <Td>
+                        <Pill tone={tk.status === 'open' ? 'warn' : 'neutral'}>
+                          {ISSUE_LABEL[tk.category]}
+                        </Pill>
+                        {tk.body && (
+                          <p className="mt-1 max-w-md text-xs text-ink-muted">
+                            {tk.body}
                           </p>
-                          <p className="text-xs text-ink-muted">
-                            {when(tk.created_at)}
-                          </p>
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <Pill tone={tk.status === 'open' ? 'warn' : 'neutral'}>
-                            {ISSUE_LABEL[tk.category]}
-                          </Pill>
-                          {tk.body && (
-                            <p className="mt-1 max-w-md text-xs text-ink-muted">
-                              {tk.body}
-                            </p>
+                        )}
+                      </Td>
+                      <Td>
+                        <p className="text-ink">
+                          {tk.order_id}
+                          {tk.kind === 'gift' && (
+                            // Said out loud rather than left to be inferred from
+                            // the id prefix. A gift complaint is answered
+                            // differently — no kitchen to call, no rider to ask.
+                            <span className="ml-2 align-middle">
+                              <Pill tone="neutral">Gift</Pill>
+                            </span>
                           )}
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <p className="text-ink">
-                            {tk.order_id}
-                            {tk.kind === 'gift' && (
-                              // Said out loud rather than left to be inferred from
-                              // the id prefix. A gift complaint is answered
-                              // differently — no kitchen to call, no rider to ask.
-                              <span className="ml-2 align-middle">
-                                <Pill tone="neutral">Gift</Pill>
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-xs text-ink-muted">
-                            {tk.seller_name} · {orderStatusLabel(tk)}
-                          </p>
-                        </td>
-                        <td className="px-5 py-4 align-top text-ink">
-                          {tk.customer_phone}
-                        </td>
-                        <td className="px-5 py-4 text-right align-top font-semibold text-ink">
-                          ₹{tk.order_total}
-                        </td>
-                        <td className="px-5 py-4 text-right align-top">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void open(tk)}
-                          >
-                            {tk.status === 'open' ? 'Answer' : 'View'}
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </p>
+                        <p className="text-xs text-ink-muted">
+                          {tk.seller_name} · {orderStatusLabel(tk)}
+                        </p>
+                      </Td>
+                      <Td className="text-ink">
+                        {tk.customer_phone}
+                      </Td>
+                      <Td align="right" className="font-semibold text-ink">
+                        {inr(tk.order_total)}
+                      </Td>
+                      <Td align="right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void open(tk)}
+                        >
+                          {tk.status === 'open' ? 'Answer' : 'View'}
+                        </Button>
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </DataTable>
 
-              {pages > 1 && (
-                <div className="mt-4 flex items-center justify-between px-5 pb-5">
-                  <Button
-                    variant="secondary"
-                    disabled={page === 0}
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm text-ink-muted">
-                    Page {page + 1} of {pages}
-                  </span>
-                  <Button
-                    variant="secondary"
-                    disabled={page + 1 >= pages}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              )}
+              <Pager page={page} pages={pages} onChange={setPage} />
             </>
           )}
         </div>
@@ -337,7 +320,7 @@ export function SupportPage() {
             <div>
               <dt className="text-ink-muted">Order</dt>
               <dd className="text-ink">
-                {orderStatusLabel(answering)} · ₹{answering.order_total}
+                {orderStatusLabel(answering)} · {inr(answering.order_total)}
               </dd>
             </div>
             <div>

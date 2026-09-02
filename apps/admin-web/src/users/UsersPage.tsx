@@ -11,13 +11,17 @@ import {
   Banner,
   Button,
   Card,
+  DataTable,
   EmptyState,
   Field,
   Modal,
   Pill,
   SegmentedControl,
   TableSkeleton,
+  Td,
+  Th,
 } from '../ui/primitives'
+import { inr } from '../lib/money'
 
 /// Everybody on the platform, and the power to shut one of them out.
 ///
@@ -180,7 +184,7 @@ function UserSheet({
             {user.cancelled_orders} cancelled
           </p>
           <p className="mt-2 text-sm text-ink">
-            ₹{user.total_spend} spent across delivered orders
+            {inr(user.total_spend)} spent across delivered orders
           </p>
         </Card>
       </div>
@@ -265,7 +269,7 @@ function UserSheet({
               <li key={o.id} className="py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-semibold text-ink">{o.id}</span>
-                  <span className="text-ink">₹{o.total}</span>
+                  <span className="text-ink">{inr(o.total)}</span>
                 </div>
                 <p className="text-xs text-ink-muted">
                   {o.restaurant_name ?? 'Unknown restaurant'} · {o.status} ·{' '}
@@ -492,58 +496,53 @@ export function UsersPage() {
             }
           />
         ) : (
-          <div className="overflow-x-auto rounded-card border border-line bg-white">
-            <table className="w-full min-w-[900px] text-sm">
-              <thead>
-                <tr className="border-b border-line text-left text-xs font-medium tracking-wide text-ink-muted uppercase">
-                  <th className="px-5 py-3">Person</th>
-                  <th className="px-5 py-3">Role</th>
-                  <th className="px-5 py-3">Orders</th>
-                  <th className="px-5 py-3 text-right">Spent</th>
-                  <th className="px-5 py-3">Last seen</th>
-                  <th className="px-5 py-3" />
+          <DataTable label="People" minWidth={900}>
+            <thead>
+              <tr>
+                <Th>Person</Th>
+                <Th>Role</Th>
+                <Th>Orders</Th>
+                <Th align="right">Spent</Th>
+                <Th>Last seen</Th>
+                <Th hideLabel>Actions</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((u) => (
+                <tr key={u.user_id}>
+                  <Td>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-ink">
+                        {u.name ?? u.email ?? 'Unnamed'}
+                      </span>
+                      {u.is_blocked && <Pill tone="danger">Blocked</Pill>}
+                    </div>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      {u.email ?? '—'}
+                      {u.phone ? ` · ${u.phone}` : ''}
+                    </p>
+                  </Td>
+                  <Td>
+                    <Pill tone={roleTone[u.role]}>{roleLabel[u.role]}</Pill>
+                  </Td>
+                  <Td className="text-xs">
+                    <Counts user={u} />
+                  </Td>
+                  <Td align="right" className="text-ink">
+                    {u.total_spend > 0 ? `${inr(u.total_spend)}` : '—'}
+                  </Td>
+                  <Td className="text-xs text-ink-muted">
+                    {when(u.last_sign_in_at)}
+                  </Td>
+                  <Td align="right">
+                    <Button variant="secondary" onClick={() => setOpen(u)}>
+                      Open
+                    </Button>
+                  </Td>
                 </tr>
-              </thead>
-              <tbody>
-                {rows.map((u) => (
-                  <tr
-                    key={u.user_id}
-                    className="border-b border-line last:border-b-0"
-                  >
-                    <td className="px-5 py-4 align-top">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-ink">
-                          {u.name ?? u.email ?? 'Unnamed'}
-                        </span>
-                        {u.is_blocked && <Pill tone="danger">Blocked</Pill>}
-                      </div>
-                      <p className="mt-1 text-xs text-ink-muted">
-                        {u.email ?? '—'}
-                        {u.phone ? ` · ${u.phone}` : ''}
-                      </p>
-                    </td>
-                    <td className="px-5 py-4 align-top">
-                      <Pill tone={roleTone[u.role]}>{roleLabel[u.role]}</Pill>
-                    </td>
-                    <td className="px-5 py-4 align-top text-xs">
-                      <Counts user={u} />
-                    </td>
-                    <td className="px-5 py-4 text-right align-top text-ink">
-                      {u.total_spend > 0 ? `₹${u.total_spend}` : '—'}
-                    </td>
-                    <td className="px-5 py-4 align-top text-xs text-ink-muted">
-                      {when(u.last_sign_in_at)}
-                    </td>
-                    <td className="px-5 py-4 text-right align-top">
-                      <Button variant="secondary" onClick={() => setOpen(u)}>
-                        Open
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </DataTable>
         )}
       </div>
 

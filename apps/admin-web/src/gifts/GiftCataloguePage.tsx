@@ -12,6 +12,7 @@ import {
   Field,
   Pill,
 } from '../ui/primitives'
+import { inr } from '../lib/money'
 import { GiftItemDialog } from './GiftItemDialog'
 import { GiftShopDialog } from './GiftShopDialog'
 
@@ -452,7 +453,7 @@ export function GiftCataloguePage() {
                                 </p>
                               </div>
                               <span className="shrink-0 text-sm tabular-nums text-ink">
-                                ₹{item.price}
+                                {inr(item.price)}
                               </span>
                               <button
                                 type="button"

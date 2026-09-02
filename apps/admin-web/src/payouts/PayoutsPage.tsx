@@ -5,12 +5,16 @@ import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
   Button,
+  DataTable,
   EmptyState,
   Field,
   Modal,
   SegmentedControl,
   TableSkeleton,
+  Td,
+  Th,
 } from '../ui/primitives'
+import { inr } from '../lib/money'
 
 /// What the platform owes its riders, and the record that it paid.
 ///
@@ -78,7 +82,7 @@ export function PayoutsPage() {
         title="Rider payouts"
         subtitle={
           rows
-            ? `${rows.length} shown · ₹${owed} still owed`
+            ? `${rows.length} shown · ${inr(owed)} still owed`
             : 'Rolled up every Monday for the week before.'
         }
       />
@@ -119,80 +123,78 @@ export function PayoutsPage() {
             }
           />
         ) : (
-          <div className="overflow-x-auto rounded-card border border-line bg-white">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead className="border-b border-line text-left text-ink-muted">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Rider</th>
-                  <th className="px-5 py-3 font-medium">Week</th>
-                  <th className="px-5 py-3 text-right font-medium">Deliveries</th>
-                  <th className="px-5 py-3 text-right font-medium">Amount</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3" />
+          <DataTable label="Rider payouts" minWidth={760}>
+            <thead>
+              <tr>
+                <Th>Rider</Th>
+                <Th>Week</Th>
+                <Th align="right">Deliveries</Th>
+                <Th align="right">Amount</Th>
+                <Th>Status</Th>
+                <Th hideLabel>Actions</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <Td>
+                    <p className="font-medium text-ink">{r.partner_name}</p>
+                    <p className="truncate text-ink-muted">{r.partner_email}</p>
+                  </Td>
+                  <Td className="text-ink-muted">
+                    {period(r.period_start, r.period_end)}
+                  </Td>
+                  <Td align="right" className="text-ink-muted">
+                    {r.delivery_count}
+                  </Td>
+                  <Td align="right" className="font-semibold text-ink">
+                    {inr(r.amount)}
+                    {/* A transfer smaller than the week's earnings has to say
+                        why on the row, or the figure looks like an error
+                        (migration 0076). */}
+                    {r.cash_withheld > 0 && (
+                      <p className="text-xs font-normal text-ink-muted">
+                        {inr(r.gross_amount)} less {inr(r.cash_withheld)} cash
+                      </p>
+                    )}
+                  </Td>
+                  <Td>
+                    {r.status === 'paid' ? (
+                      <span className="text-veg">Paid · {r.reference}</span>
+                    ) : r.has_bank ? (
+                      <span className="text-ink-muted">Pending</span>
+                    ) : (
+                      // The one thing that stops a transfer, said before
+                      // somebody clicks and finds out.
+                      <span className="text-warn">No bank details</span>
+                    )}
+                  </Td>
+                  <Td>
+                    <div className="flex justify-end">
+                      {r.status === 'pending' && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={!r.has_bank}
+                          title={
+                            r.has_bank
+                              ? undefined
+                              : 'No account on file for this rider. Add it from the Riders screen first.'
+                          }
+                          onClick={() => {
+                            setPaying(r)
+                            setReference('')
+                          }}
+                        >
+                          Mark paid
+                        </Button>
+                      )}
+                    </div>
+                  </Td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td className="px-5 py-3">
-                      <p className="font-medium text-ink">{r.partner_name}</p>
-                      <p className="truncate text-ink-muted">{r.partner_email}</p>
-                    </td>
-                    <td className="px-5 py-3 text-ink-muted">
-                      {period(r.period_start, r.period_end)}
-                    </td>
-                    <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
-                      {r.delivery_count}
-                    </td>
-                    <td className="px-5 py-3 text-right font-semibold tabular-nums text-ink">
-                      ₹{r.amount}
-                      {/* A transfer smaller than the week's earnings has to say
-                          why on the row, or the figure looks like an error
-                          (migration 0076). */}
-                      {r.cash_withheld > 0 && (
-                        <p className="text-xs font-normal text-ink-muted">
-                          ₹{r.gross_amount} less ₹{r.cash_withheld} cash
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-5 py-3">
-                      {r.status === 'paid' ? (
-                        <span className="text-veg">Paid · {r.reference}</span>
-                      ) : r.has_bank ? (
-                        <span className="text-ink-muted">Pending</span>
-                      ) : (
-                        // The one thing that stops a transfer, said before
-                        // somebody clicks and finds out.
-                        <span className="text-warn">No bank details</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex justify-end">
-                        {r.status === 'pending' && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            disabled={!r.has_bank}
-                            title={
-                              r.has_bank
-                                ? undefined
-                                : 'No account on file for this rider. Add it from the Riders screen first.'
-                            }
-                            onClick={() => {
-                              setPaying(r)
-                              setReference('')
-                            }}
-                          >
-                            Mark paid
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </DataTable>
         )}
       </div>
 
@@ -200,7 +202,7 @@ export function PayoutsPage() {
         <Modal
           busy={busy}
           onClose={() => setPaying(null)}
-          title={`Mark ₹${paying.amount} to ${paying.partner_name} as paid`}
+          title={`Mark ${inr(paying.amount)} to ${paying.partner_name} as paid`}
           footer={
             <>
               <Button

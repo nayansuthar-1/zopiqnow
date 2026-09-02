@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import type { MenuItemRow, OptionGroup } from '../lib/api'
 import { Banner, Button, Modal, SegmentedControl, Spinner } from '../ui/primitives'
+import { inr } from '../lib/money'
 
 /// Every question one dish asks before it can be ordered: its sizes and add-ons.
 ///
@@ -184,8 +185,8 @@ export function OptionsDialog({
       }
     >
       <p className="text-sm text-ink-muted">
-        This dish costs ₹{item.price}. Every option adds to that — a 500 g cake at
-        ₹{item.price} with a 1 kg option at +₹{item.price} sells for ₹{item.price * 2}.
+        This dish costs {inr(item.price)}. Every option adds to that — a 500 g cake at
+        {inr(item.price)} with a 1 kg option at +{inr(item.price)} sells for ₹{item.price * 2}.
       </p>
 
       {saveError && (
@@ -294,7 +295,7 @@ export function OptionsDialog({
                     />
                     <span className="w-20 shrink-0 text-right text-sm tabular-nums text-ink-muted">
                       {Number.isFinite(Number(o.delta))
-                        ? `₹${item.price + Math.round(Number(o.delta || 0))}`
+                        ? `${inr(item.price + Math.round(Number(o.delta || 0)))}`
                         : '—'}
                     </span>
                     <button

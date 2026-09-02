@@ -3,6 +3,7 @@ import { GIFT_GST_SLABS } from '../lib/api'
 import type { GiftItemRow } from '../lib/api'
 import { GIFT_THUMB_WIDTH, deliveryUrl, parseAsset } from '../lib/cloudinary'
 import { Banner, Button, Field, Modal, Toggle } from '../ui/primitives'
+import { inr } from '../lib/money'
 import { GalleryField } from '../ui/GalleryField'
 
 /// Add or edit one gift. The same dialog for both — the fields are identical and
@@ -144,7 +145,7 @@ export function GiftItemDialog({
               placeholder="999"
               hint={
                 withTax
-                  ? `Before tax. The customer pays about ₹${withTax}.`
+                  ? `Before tax. The customer pays about ${inr(withTax)}.`
                   : 'Before tax, like every price on the platform.'
               }
             />

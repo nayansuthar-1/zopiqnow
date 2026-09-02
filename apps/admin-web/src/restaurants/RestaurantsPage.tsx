@@ -7,10 +7,13 @@ import {
   Banner,
   Button,
   ConfirmDialog,
+  DataTable,
   EmptyState,
   Pill,
   SegmentedControl,
   TableSkeleton,
+  Td,
+  Th,
 } from '../ui/primitives'
 
 const statusLabels: Record<Status, string> = {
@@ -170,88 +173,84 @@ export function RestaurantsPage() {
             />
           )
         ) : (
-          <div className="overflow-x-auto rounded-card border border-line bg-white">
-            <table className="w-full min-w-[820px] text-left text-sm">
-              <thead className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Restaurant</th>
-                  <th className="px-5 py-3 font-semibold">Status</th>
-                  <th className="px-5 py-3 font-semibold">Owner</th>
-                  <th className="px-5 py-3 text-right font-semibold">Dishes</th>
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((r) => {
-                  const status = statusOf(r)
-                  return (
-                    <tr key={r.id} className="border-b border-line last:border-0">
-                      <td className="px-5 py-3">
-                        <Link
-                          to={`/restaurants/${r.id}`}
-                          className="font-semibold text-ink hover:text-brand-ink"
-                        >
-                          {r.name}
-                        </Link>
-                        <div className="text-xs text-ink-muted">
-                          {r.city ?? 'No city yet'}
-                        </div>
-                      </td>
-                      <td className="px-5 py-3">
-                        <StatusPill status={status} />
-                      </td>
-                      <td className="px-5 py-3 text-ink-muted">
-                        {r.owner_email ?? (
-                          <span className="text-non-veg-ink">No owner</span>
-                        )}
-                      </td>
-                      <td
-                        className={`px-5 py-3 text-right tabular-nums ${
-                          r.menu_item_count === 0 ? 'text-non-veg-ink' : 'text-ink-muted'
-                        }`}
+          <DataTable label="Restaurants" minWidth={820}>
+            <thead>
+              <tr>
+                <Th>Restaurant</Th>
+                <Th>Status</Th>
+                <Th>Owner</Th>
+                <Th align="right">Dishes</Th>
+                <Th hideLabel>Actions</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((r) => {
+                const status = statusOf(r)
+                return (
+                  <tr key={r.id}>
+                    <Td>
+                      <Link
+                        to={`/restaurants/${r.id}`}
+                        className="font-semibold text-ink hover:text-brand-ink"
                       >
-                        {r.menu_item_count}
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="flex justify-end gap-2">
+                        {r.name}
+                      </Link>
+                      <div className="text-xs text-ink-muted">
+                        {r.city ?? 'No city yet'}
+                      </div>
+                    </Td>
+                    <Td>
+                      <StatusPill status={status} />
+                    </Td>
+                    <Td className="text-ink-muted">
+                      {r.owner_email ?? (
+                        <span className="text-non-veg-ink">No owner</span>
+                      )}
+                    </Td>
+                    <Td className={`px-5 py-3 text-right tabular-nums ${
+                        r.menu_item_count === 0 ? 'text-non-veg-ink' : 'text-ink-muted'
+                      }`}>
+                      {r.menu_item_count}
+                    </Td>
+                    <Td>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="secondary"
+                          className="h-9 px-3"
+                          onClick={() => navigate(`/restaurants/${r.id}`)}
+                        >
+                          Edit
+                        </Button>
+                        {r.is_active ? (
                           <Button
-                            variant="secondary"
+                            variant="ghost"
                             className="h-9 px-3"
-                            onClick={() => navigate(`/restaurants/${r.id}`)}
+                            onClick={() => setConfirming(r)}
                           >
-                            Edit
+                            Delist
                           </Button>
-                          {r.is_active ? (
-                            <Button
-                              variant="ghost"
-                              className="h-9 px-3"
-                              onClick={() => setConfirming(r)}
-                            >
-                              Delist
-                            </Button>
-                          ) : (
-                            // Offered on anything not live, and the RPC decides:
-                            // a restaurant with orders is refused by name and
-                            // count (0044). The list does not carry an order
-                            // count, and adding one to grey out a button would
-                            // be a query on every row to pre-empt a sentence the
-                            // refusal already says better.
-                            <Button
-                              variant="ghost"
-                              className="h-9 px-3"
-                              onClick={() => setDeleting(r)}
-                            >
-                              Delete
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                        ) : (
+                          // Offered on anything not live, and the RPC decides:
+                          // a restaurant with orders is refused by name and
+                          // count (0044). The list does not carry an order
+                          // count, and adding one to grey out a button would
+                          // be a query on every row to pre-empt a sentence the
+                          // refusal already says better.
+                          <Button
+                            variant="ghost"
+                            className="h-9 px-3"
+                            onClick={() => setDeleting(r)}
+                          >
+                            Delete
+                          </Button>
+                        )}
+                      </div>
+                    </Td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </DataTable>
         )}
       </div>
 

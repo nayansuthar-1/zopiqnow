@@ -7,13 +7,17 @@ import {
   Banner,
   Button,
   ConfirmDialog,
+  DataTable,
   EmptyState,
   Field,
   Modal,
   Pill,
   SegmentedControl,
   TableSkeleton,
+  Td,
+  Th,
 } from '../ui/primitives'
+import { inr } from '../lib/money'
 
 /// Platform coupons — the `restaurant_id is null` ones that work at any
 /// restaurant. They have existed since migration 0003 and have only ever been
@@ -40,8 +44,17 @@ const stateTones: Record<CouponState, 'live' | 'neutral' | 'danger'> = {
 /// What the code is worth, in the words the customer's cart uses.
 function worth(c: CouponRow) {
   const off =
-    c.flat_off !== null ? `₹${c.flat_off} off` : `${c.percent_off}% off up to ₹${c.max_off}`
-  return c.min_subtotal > 0 ? `${off} over ₹${c.min_subtotal}` : off
+    c.flat_off !== null
+      ? `${inr(c.flat_off)} off`
+      : // The only non-null assertion in this app, and it is a statement about
+        // the database rather than a hope about the data:
+        // `coupon_is_flat_xor_capped_percent` has been on `coupons` since 0003
+        // and says a coupon is either flat or a capped percentage, so a row that
+        // reaches this branch has both `percent_off` and `max_off`. The
+        // alternative is a `?? 0` for a row that cannot exist — which is the
+        // dead guard finding D4 of the fix queue looked at and declined.
+        `${c.percent_off}% off up to ${inr(c.max_off!)}`
+  return c.min_subtotal > 0 ? `${off} over ${inr(c.min_subtotal)}` : off
 }
 
 type Draft = {
@@ -472,86 +485,84 @@ function Table({
       {rows.length === 0 ? (
         <EmptyState title={empty.title} body={empty.body} />
       ) : (
-        <div className="overflow-x-auto rounded-card border border-line bg-white">
-          <table className="w-full min-w-[820px] text-sm">
-            <thead className="border-b border-line text-left text-ink-muted">
-              <tr>
-                <th className="px-5 py-3 font-medium">Code</th>
-                <th className="px-5 py-3 font-medium">Worth</th>
-                <th className="px-5 py-3 text-right font-medium">Redeemed</th>
-                <th className="px-5 py-3 text-right font-medium">Given away</th>
-                <th className="px-5 py-3 font-medium">Until</th>
-                <th className="px-5 py-3 font-medium">Status</th>
-                <th className="px-5 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {rows.map((c) => {
-                const state = couponStateOf(c)
-                return (
-                  <tr key={c.code}>
-                    <td className="px-5 py-3">
-                      <p className="font-semibold text-ink">{c.code}</p>
-                      {c.restaurant_name && (
-                        <p className="text-ink-muted">{c.restaurant_name}</p>
+        <DataTable label="Coupons" minWidth={820}>
+          <thead>
+            <tr>
+              <Th>Code</Th>
+              <Th>Worth</Th>
+              <Th align="right">Redeemed</Th>
+              <Th align="right">Given away</Th>
+              <Th>Until</Th>
+              <Th>Status</Th>
+              <Th hideLabel>Actions</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((c) => {
+              const state = couponStateOf(c)
+              return (
+                <tr key={c.code}>
+                  <Td>
+                    <p className="font-semibold text-ink">{c.code}</p>
+                    {c.restaurant_name && (
+                      <p className="text-ink-muted">{c.restaurant_name}</p>
+                    )}
+                  </Td>
+                  <Td className="text-ink-muted">{worth(c)}</Td>
+                  <Td align="right" className="text-ink-muted">
+                    {c.redeemed}
+                  </Td>
+                  <Td align="right" className="text-ink">
+                    {inr(c.discount_given)}
+                  </Td>
+                  <Td className="text-ink-muted">
+                    {c.valid_until
+                      ? new Date(c.valid_until).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                        })
+                      : 'no end date'}
+                  </Td>
+                  <Td>
+                    <Pill tone={stateTones[state]}>{stateLabels[state]}</Pill>
+                  </Td>
+                  <Td>
+                    <div className="flex justify-end gap-2">
+                      {onEdit && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onEdit(c)}
+                        >
+                          Edit
+                        </Button>
                       )}
-                    </td>
-                    <td className="px-5 py-3 text-ink-muted">{worth(c)}</td>
-                    <td className="px-5 py-3 text-right tabular-nums text-ink-muted">
-                      {c.redeemed}
-                    </td>
-                    <td className="px-5 py-3 text-right tabular-nums text-ink">
-                      ₹{c.discount_given}
-                    </td>
-                    <td className="px-5 py-3 text-ink-muted">
-                      {c.valid_until
-                        ? new Date(c.valid_until).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                          })
-                        : 'no end date'}
-                    </td>
-                    <td className="px-5 py-3">
-                      <Pill tone={stateTones[state]}>{stateLabels[state]}</Pill>
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex justify-end gap-2">
-                        {onEdit && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onEdit(c)}
-                          >
-                            Edit
-                          </Button>
-                        )}
-                        {/* A vendor's code shows only the one lever it has. */}
-                        {(c.restaurant_id === null || c.is_active) && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => onToggle(c)}
-                          >
-                            {c.is_active ? 'Switch off' : 'Switch on'}
-                          </Button>
-                        )}
-                        {onDelete && c.redeemed === 0 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onDelete(c)}
-                          >
-                            Delete
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                      {/* A vendor's code shows only the one lever it has. */}
+                      {(c.restaurant_id === null || c.is_active) && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => onToggle(c)}
+                        >
+                          {c.is_active ? 'Switch off' : 'Switch on'}
+                        </Button>
+                      )}
+                      {onDelete && c.redeemed === 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onDelete(c)}
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </div>
+                  </Td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </DataTable>
       )}
     </section>
   )

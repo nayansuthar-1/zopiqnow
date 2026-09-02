@@ -12,6 +12,7 @@ import {
   Modal,
   Pill,
 } from '../ui/primitives'
+import { inr } from '../lib/money'
 
 /// The running floor. Every order that has not ended, oldest first, because the
 /// order that has been open longest is the one somebody is about to ring about.
@@ -365,7 +366,7 @@ function OrderCard({
           </div>
           <p className="mt-1 text-sm text-ink-muted">
             {o.restaurant_name} · placed {minutesSince(o.placed_at)}m ago at{' '}
-            {clock(o.placed_at)} · ₹{o.total}{' '}
+            {clock(o.placed_at)} · {inr(o.total)}{' '}
             {o.payment_method === 'upi' ? 'prepaid' : 'cash on delivery'}
             {o.coupon_code && ` · ${o.coupon_code}`}
           </p>
