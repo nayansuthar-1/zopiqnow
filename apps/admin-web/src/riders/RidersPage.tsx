@@ -20,6 +20,7 @@ import {
   Button,
   Card,
   ConfirmDialog,
+  DataTable,
   EmptyState,
   Field,
   Modal,
@@ -27,6 +28,9 @@ import {
   Pill,
   Select,
   Skeleton,
+  TableSkeleton,
+  Td,
+  Th,
 } from '../ui/primitives'
 
 /// The delivery fleet.
@@ -164,6 +168,12 @@ setVehicle(e.target.value as Vehicle)}
   )
 }
 
+/// The focus ring for the roster row's link-weight buttons. The list this
+/// replaced had five bare <button>s a row with no focus style at all, which on
+/// a table of forty riders is two hundred stops a keyboard cannot see.
+const ROW_RING =
+  'rounded-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2'
+
 export function RidersPage() {
   const [riders, setRiders] = useState<RiderRow[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -213,7 +223,11 @@ export function RidersPage() {
     <>
       <PageHeader
         title="Riders"
-        subtitle="The delivery fleet. A rider carries orders from any kitchen."
+        subtitle={
+          riders === null
+            ? 'The delivery fleet. A rider carries orders from any kitchen.'
+            : `${active.length} active of ${riders.length}. A rider is offered jobs only once they are active and their documents are verified.`
+        }
         action={
           !adding && !editing ? (
             <Button onClick={() => setAdding(true)}>Add rider</Button>
@@ -221,40 +235,35 @@ export function RidersPage() {
         }
       />
 
-      <PageBody width="form">
+      <PageBody className="space-y-4">
         {error && (
-          <Banner tone="error" className="mb-4" onDismiss={() => setError(null)}>
+          <Banner tone="error" onDismiss={() => setError(null)}>
             {error}
           </Banner>
         )}
 
-        <Card>
-          <h2 className="text-base font-bold text-ink">Delivery partners</h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            {riders === null
-              ? 'Loading…'
-              : `${active.length} active of ${riders.length}. A rider is offered jobs only once they are active and their documents are verified.`}
-          </p>
+        {/* These two describe a state rather than report an event, which is why
+            they have never carried a dismiss and do not move to a toast. */}
+        {waiting.length > 0 && (
+          <Banner tone="warn">
+            {waiting.length === 1
+              ? '1 rider cannot take deliveries — their documents are unverified or have expired.'
+              : `${waiting.length} riders cannot take deliveries — their documents are unverified or have expired.`}{' '}
+            Open Documents on each to check them.
+          </Banner>
+        )}
 
-          {waiting.length > 0 && (
-            <Banner tone="warn" className="mt-4">
-              {waiting.length === 1
-                ? '1 rider cannot take deliveries — their documents are unverified or have expired.'
-                : `${waiting.length} riders cannot take deliveries — their documents are unverified or have expired.`}{' '}
-              Open Documents on each to check them.
-            </Banner>
-          )}
+        {cleared.length > 0 && (
+          <Banner tone="warn">
+            {cleared.length === 1
+              ? '1 rider is working without verified documents, because an admin cleared them.'
+              : `${cleared.length} riders are working without verified documents, because an admin cleared them.`}{' '}
+            Open Documents to see who allowed it and why.
+          </Banner>
+        )}
 
-          {cleared.length > 0 && (
-            <Banner tone="warn" className="mt-4">
-              {cleared.length === 1
-                ? '1 rider is working without verified documents, because an admin cleared them.'
-                : `${cleared.length} riders are working without verified documents, because an admin cleared them.`}{' '}
-              Open Documents to see who allowed it and why.
-            </Banner>
-          )}
-
-          {adding && (
+        {adding && (
+          <Card>
             <RiderForm
               editing={null}
               busy={busy}
@@ -265,9 +274,11 @@ export function RidersPage() {
                 ).then((ok) => ok && setAdding(false))
               }
             />
-          )}
+          </Card>
+        )}
 
-          {editing && (
+        {editing && (
+          <Card>
             <RiderForm
               editing={editing}
               busy={busy}
@@ -278,156 +289,176 @@ export function RidersPage() {
                 ).then((ok) => ok && setEditing(null))
               }
             />
-          )}
+          </Card>
+        )}
 
-          {riders !== null && riders.length === 0 && !adding && (
-            <div className="mt-5">
-              <EmptyState
-                title="Nobody on the fleet yet"
-                body={`Restaurants can still deliver with their own staff — the vendor's own "Hand to rider" button is unaffected.`}
-              />
-            </div>
-          )}
+        {riders === null && <TableSkeleton rows={5} />}
 
-          {riders !== null && riders.length > 0 && (
-            <div className="mt-5 divide-y divide-line rounded-field border border-line">
+        {riders !== null && riders.length === 0 && !adding && (
+          <EmptyState
+            title="Nobody on the fleet yet"
+            body={`Restaurants can still deliver with their own staff — the vendor's own "Hand to rider" button is unaffected.`}
+          />
+        )}
+
+        {riders !== null && riders.length > 0 && (
+          <DataTable label="Delivery partners" minWidth={1100}>
+            <thead>
+              <tr>
+                <Th>Rider</Th>
+                <Th>Vehicle</Th>
+                <Th>Documents</Th>
+                <Th>Engagement</Th>
+                <Th align="right">Delivered</Th>
+                <Th hideLabel>Actions</Th>
+              </tr>
+            </thead>
+            <tbody>
               {riders.map((r) => (
-                <div key={r.email} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-ink">
-                      {r.name}
-                      {!r.is_active && (
-                        <span className="ml-2 inline-block align-middle"><Pill>
-                          inactive
-                        </Pill></span>
-                      )}
+                <tr key={r.email}>
+                  <Td>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-ink">{r.name}</span>
+                      {!r.is_active && <Pill>inactive</Pill>}
                       {r.live_order_id && (
-                        <span className="ml-2 inline-block align-middle"><Pill tone="brand">
-                          carrying {r.live_order_id}
-                        </Pill></span>
+                        <Pill tone="brand">carrying {r.live_order_id}</Pill>
                       )}
-                      {/* Three facts, not one. `verified` says an admin read the
-                          papers; `blocked` says whether they can work today,
-                          and a lapsed insurance separates them; `overridden`
-                          says they are working on somebody's say-so and no
-                          documents at all. The override is checked first and
-                          never renders as "verified" — the whole reason it is
-                          stored apart from the status is so this line can tell
-                          the truth about why a rider is on the road. */}
-                      <span className="ml-2 inline-block align-middle">
-                        {r.kyc_overridden ? (
-                          <Pill tone="warn">cleared by admin</Pill>
-                        ) : r.kyc_status === 'verified' && !r.kyc_blocked ? (
-                          <Pill tone="live">verified</Pill>
-                        ) : r.kyc_status === 'rejected' ? (
-                          <Pill tone="danger">documents rejected</Pill>
-                        ) : r.kyc_status === 'verified' ? (
-                          <Pill tone="danger">expired</Pill>
-                        ) : (
-                          <Pill tone="warn">documents pending</Pill>
-                        )}
-                      </span>
-                      {/* Only the exceptions get a pill. Freelance is the
-                          default and the overwhelming majority, so badging it
-                          would put a label on every row and draw the eye away
-                          from the two that actually change what is owed. The
-                          engagement is spelled out in the line below either
-                          way, so nothing is hidden — this only decides what is
-                          worth interrupting for. */}
-                      {r.engagement !== 'freelance' && (
-                        <span className="ml-2 inline-block align-middle">
-                          <Pill tone="neutral">
-                            {r.engagement === 'salaried'
-                              ? 'salaried · not paid by us'
-                              : `${r.employer_name ?? 'restaurant'}'s own · not paid by us`}
-                          </Pill>
-                        </span>
+                    </div>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      {r.email} · {r.phone}
+                    </p>
+                  </Td>
+
+                  <Td className="text-ink-muted">{r.vehicle}</Td>
+
+                  {/* Three facts, not one. `verified` says an admin read the
+                      papers; `blocked` says whether they can work today, and a
+                      lapsed insurance separates them; `overridden` says they are
+                      working on somebody's say-so and no documents at all. The
+                      override is checked first and never renders as "verified" —
+                      the whole reason it is stored apart from the status is so
+                      this cell can tell the truth about why a rider is on the
+                      road. */}
+                  <Td>
+                    {r.kyc_overridden ? (
+                      <Pill tone="warn">cleared by admin</Pill>
+                    ) : r.kyc_status === 'verified' && !r.kyc_blocked ? (
+                      <Pill tone="live">verified</Pill>
+                    ) : r.kyc_status === 'rejected' ? (
+                      <Pill tone="danger">documents rejected</Pill>
+                    ) : r.kyc_status === 'verified' ? (
+                      <Pill tone="danger">expired</Pill>
+                    ) : (
+                      <Pill tone="warn">documents pending</Pill>
+                    )}
+                  </Td>
+
+                  {/* Only the exceptions get a pill. Freelance is the default and
+                      the overwhelming majority, so badging it would put a label
+                      in every row and draw the eye away from the two that
+                      actually change what is owed. */}
+                  <Td>
+                    {r.engagement === 'freelance' ? (
+                      <span className="text-ink-muted">Freelance</span>
+                    ) : (
+                      <Pill tone="neutral">
+                        {r.engagement === 'salaried'
+                          ? 'salaried · not paid by us'
+                          : `${r.employer_name ?? 'restaurant'}'s own · not paid by us`}
+                      </Pill>
+                    )}
+                  </Td>
+
+                  <Td align="right" className="text-ink">
+                    {r.delivered_count}
+                  </Td>
+
+                  {/* Five doors and no detail screen behind them, which is why
+                      this column is not People's single "Open". Kept as link-
+                      weight text so a row of them does not read as five equally
+                      urgent calls to action. */}
+                  <Td align="right">
+                    <div className="flex flex-wrap justify-end gap-x-4 gap-y-1">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setAdding(false)
+                          setEditing(r)
+                        }}
+                        className={`text-sm font-medium text-ink-muted hover:text-ink disabled:opacity-40 ${ROW_RING}`}
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setVerifying(r)}
+                        className={`text-sm font-medium disabled:opacity-40 ${ROW_RING} ${
+                          r.kyc_blocked
+                            ? 'text-brand-ink hover:text-ink'
+                            : 'text-ink-muted hover:text-ink'
+                        }`}
+                      >
+                        Documents
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setBanking(r)}
+                        className={`text-sm font-medium text-ink-muted hover:text-ink disabled:opacity-40 ${ROW_RING}`}
+                      >
+                        Bank
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setEngaging(r)}
+                        className={`text-sm font-medium text-ink-muted hover:text-ink disabled:opacity-40 ${ROW_RING}`}
+                      >
+                        Engagement
+                      </button>
+
+                      {r.is_active ? (
+                        <button
+                          type="button"
+                          // Greyed out *and* explained. The database refuses this
+                          // anyway — the point of doing it here too is that a
+                          // disabled button with a reason beats an error after a
+                          // click for something ops must never do by accident.
+                          disabled={busy || r.live_order_id !== null}
+                          onClick={() => setDeactivating(r)}
+                          title={
+                            r.live_order_id
+                              ? `They are carrying ${r.live_order_id}. Release it from Live orders first — that works even if they have stopped answering.`
+                              : undefined
+                          }
+                          className={`text-sm font-medium text-ink-muted hover:text-non-veg-ink disabled:opacity-40 disabled:hover:text-ink-muted ${ROW_RING}`}
+                        >
+                          Deactivate
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(() => api.setRiderActive(r.email, true))
+                          }
+                          className={`text-sm font-medium text-brand-ink hover:text-ink disabled:opacity-40 ${ROW_RING}`}
+                        >
+                          Reactivate
+                        </button>
                       )}
-                    </p>
-                    <p className="truncate text-sm text-ink-muted">
-                      {r.email} · {r.phone} · {r.vehicle} · {r.delivered_count}{' '}
-                      delivered
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => {
-                      setAdding(false)
-                      setEditing(r)
-                    }}
-                    className="text-sm font-medium text-ink-muted hover:text-ink disabled:opacity-40"
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => setVerifying(r)}
-                    className={`text-sm font-medium disabled:opacity-40 ${
-                      r.kyc_blocked
-                        ? 'text-brand-ink hover:text-ink'
-                        : 'text-ink-muted hover:text-ink'
-                    }`}
-                  >
-                    Documents
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => setBanking(r)}
-                    className="text-sm font-medium text-ink-muted hover:text-ink disabled:opacity-40"
-                  >
-                    Bank
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => setEngaging(r)}
-                    className="text-sm font-medium text-ink-muted hover:text-ink disabled:opacity-40"
-                  >
-                    Engagement
-                  </button>
-
-                  {r.is_active ? (
-                    <button
-                      type="button"
-                      // Greyed out *and* explained. The database refuses this
-                      // anyway — the point of doing it here too is that a
-                      // disabled button with a reason beats an error after a
-                      // click for something ops must never do by accident.
-                      disabled={busy || r.live_order_id !== null}
-                      onClick={() => setDeactivating(r)}
-                      title={
-                        r.live_order_id
-                          ? `They are carrying ${r.live_order_id}. Release it from Live orders first — that works even if they have stopped answering.`
-                          : undefined
-                      }
-                      className="text-sm font-medium text-ink-muted hover:text-non-veg-ink disabled:opacity-40 disabled:hover:text-ink-muted"
-                    >
-                      Deactivate
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        void run(() => api.setRiderActive(r.email, true))
-                      }
-                      className="text-sm font-medium text-brand-ink hover:text-ink disabled:opacity-40"
-                    >
-                      Reactivate
-                    </button>
-                  )}
-                </div>
+                    </div>
+                  </Td>
+                </tr>
               ))}
-            </div>
-          )}
-        </Card>
+            </tbody>
+          </DataTable>
+        )}
       </PageBody>
 
       {banking && (

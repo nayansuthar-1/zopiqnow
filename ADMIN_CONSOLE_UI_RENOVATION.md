@@ -442,10 +442,18 @@ Things that belong to one screen rather than to the system.
   `md` the whole thing becomes one horizontal scroller with the group headings hidden, so
   a phone user scrolls a twenty-item strip with no landmarks. The comment still says
   "eleven links"; it has been twenty for a while.
-- **Riders** (`RidersPage.tsx:225`) — the only roster screen that is not a table. It is a
-  `max-w-3xl` card wrapping a nested `divide-y` list, so the same job (find a person, act
-  on them) has a different shape here than on People, Restaurants or Gift catalogue. At
-  1,305 lines it is also the largest file in the app.
+- **Riders** (`RidersPage.tsx:225`) — **done.** It is a `DataTable` now, with the columns
+  People has and the same sticky header, row hover and scroll floor: Rider, Vehicle,
+  Documents, Engagement, Delivered, actions. `PageBody` lost `width="form"`, so a fleet
+  roster stops being laid out like a settings form.
+  **Not** collapsed to People's single "Open" button: Edit, Documents, Bank, Engagement and
+  Deactivate open five different dialogs and there is no rider detail screen behind them to
+  collapse into, so the column keeps all five at link weight. Two things the list was
+  hiding got fixed on the way — those five buttons a row had **no focus style at all**
+  (`ROW_RING` now), and the loading state was the word "Loading…" inside a card rather than
+  a `TableSkeleton`. The count sentence moved into the page subtitle; the two KYC banners
+  stayed exactly where they were, because they describe a state rather than report an
+  event. The file is still the largest in the app.
 - **Wizard** (`WizardPage.tsx:107`) — the eight-step bar shows a number and an underline
   and nothing else. There is no completed state, so on step 6 there is no way to see which
   of the first five actually saved. Unreachable steps render at `text-ink-muted/40`, far
@@ -453,8 +461,24 @@ Things that belong to one screen rather than to the system.
 - **StepFrame** (`StepFrame.tsx:41`) — hand-rolls an error banner rather than using
   `Banner`: no `role="alert"`, no dismiss, and it sits at the *bottom* of the form, so an
   error about the first field appears below the last one.
-- **Analytics** (`AnalyticsPage.tsx:228`) — the one chart in the console is a hand-drawn
-  800×180 SVG polyline with no axes, no labels, no hover and no accessible text.
+- **Analytics** (`AnalyticsPage.tsx:228`) — **done**, and still hand-drawn: a charting
+  library is a new dependency and Rule 4 makes that an explicit request. What it stopped
+  being is a sketch.
+  **The geometry was lying.** An 800×180 viewBox with `preserveAspectRatio="none"` stretches
+  every slope by whatever width the window happens to be. It is sized in real pixels off a
+  `ResizeObserver` now, so the angles are true and the axis text is at its own size instead
+  of being scaled with the drawing.
+  **The colour was failing.** The delivered line was `--color-brand`, which is **2.55:1** on
+  white and below the 3:1 that WCAG 1.4.11 asks of a mark — the same finding as A1, in the
+  one place A1 did not reach. Delivered is `--color-brand-ink` now (4.88:1) and placed is
+  the neutral `--color-field` (3.24:1): emphasis, rather than two hues competing, with the
+  gap between them reading as the orders that fell through. The pair separates at **ΔE 15.4**
+  under deuteranopia against a floor of 8 — measured, not eyeballed.
+  Added: a y axis on clean steps, up to five dates that thin out as the window narrows, a
+  crosshair with a two-series tooltip, **arrow-key reading** for anyone not using a mouse,
+  a legend, and an `sr-only` table of the figures so nothing the drawing says lives only in
+  the drawing. Layout was checked by rasterising it at 420/900/1600 px across 7/30/90 days
+  before it shipped — no label collisions, no tooltip overflow.
 - **Bundle** — 712 kB in one chunk. Every admin downloads all 21 screens, the wizard, the
   image adjuster and the map picker to look at the live board. Not a visual defect; it is
   the first thing anybody feels.
@@ -809,6 +833,8 @@ Tick as they land.
 - [x] C8 — dark mode *(decided: no)*
 
 **Part 4 — per screen**
-- [~] D — sidebar (mobile disclosure, link count, icons per link), step frame, the
-      wizard’s step contrast, sign-in and the bundle done; the Riders table shape and the
-      chart still open
+- [~] D — everything but the wizard's saved-step tick: sidebar (mobile disclosure, link
+      count, icons per link), step frame, the wizard’s step contrast, sign-in, the bundle,
+      the Riders table shape and the chart are all done. The tick needs `checksFor` lifted
+      somewhere the step bar and `ReviewStep` can both read it — a second completeness rule
+      in the tab strip is the divergence that file's own header warns against.
