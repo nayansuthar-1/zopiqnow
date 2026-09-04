@@ -70,3 +70,6 @@ dist/
 # it re-dirties on every build, which collides with the rule that a release
 # never ships from a dirty tree.
 .gradle/
+
+# The icon contact sheet (tool/phosphor-preview.mjs) — regenerate it, do not commit it.
+tool/.phosphor-preview.png

@@ -30,7 +30,7 @@ that a handful of things in it are measurably wrong rather than merely inconsist
 | Design system | `src/ui/primitives.tsx` — 704 lines, 15 exported components |
 | Tokens | `src/index.css` — 13 colours, 2 radii, mirrored by hand from `packages/zopiq_ui/lib/src/tokens/` |
 | Tables | 12, all hand-rolled |
-| Icons | none |
+| Icons | none — *20 Phosphor glyphs since C1* |
 | Shadows | one, on the modal |
 | Bundle | a single 712 kB chunk (191 kB gzipped), no code splitting — *split in Phase 6* |
 
@@ -304,6 +304,39 @@ a 672 px ribbon against an ocean of grey.
 ### C. Things that are missing
 
 #### C1 — There are no icons
+- [x] **Done** — `tool/phosphor-glyphs.mjs`, `src/ui/icons.ts`, `src/ui/primitives.tsx`,
+  `src/ui/nav.ts`, `src/ui/AppShell.tsx`
+
+**Both routes below were tried and both were dead ends, so there is a third.** The font
+costs **376 kB gzipped** to draw twenty pictures. Phosphor's SVG set is not in this
+repository, and writing the paths from memory would be inventing drawings and labelling
+them Phosphor.
+
+So `tool/phosphor-glyphs.mjs` reads the outlines out of `Phosphor-Regular.ttf` — the file
+the three Flutter apps already bundle — and emits them as path data. No dependency: a
+TrueType `glyf` table is a documented format and the part these glyphs use is small. The
+result is the apps' own drawings **by construction rather than by resemblance**, which is
+the whole point, and it costs **10 kB gzipped** instead of 376.
+
+**Twenty glyphs, one per sidebar link, none held in reserve** — an unused glyph is bytes in
+the bundle and a picture nobody has looked at. The codepoints are copied from
+`packages/zopiq_ui/lib/src/tokens/zopiq_icons.dart` and the generator refuses a codepoint
+that is not in the font, so the console's set cannot drift from the apps'. The font's
+`post` table is version 3.0 and carries no glyph names, so that Dart file is the only
+name-to-codepoint map there is — which is why the generator is pinned to it.
+
+**The check that matters is `tool/phosphor-preview.mjs`.** A hand-written binary parser
+does not fail loudly when it is wrong; it draws a subtly mangled contour, silently, and
+twenty icons nobody ever looked at ship. So the second tool rasterises the committed path
+data to a contact sheet — nonzero winding, 3×3 supersampled, PNG written with `zlib` and
+no dependency — and all twenty were checked by eye before this landed. Re-run it after any
+change to the generator.
+
+`Icon` is always `aria-hidden`: every icon here sits beside its own label, and announcing
+it would read the name twice. It fills with `currentColor`, so the active nav item's glyph
+turns `brand-ink` along with its label rather than needing a second rule to keep in step.
+
+*The original survey follows.*
 
 Two `<svg>` elements exist in 13,600 lines: the `Spinner`, and the sparkline in
 `AnalyticsPage`. The sidebar is twenty text links. Every button is a word. Every status is
@@ -659,11 +692,11 @@ go through a local formatter now, which is the shape every other screen already 
 verify line below is stricter than the survey's: no bare `toLocale*` call anywhere in
 `src/`.
 
-**The sidebar icons did not land; the count comment did.** Three comments said "eleven
-links". There are twenty, and have been for some time. The icons are C1: the Phosphor font
-route costs 376 kB gzipped, and the SVG route means twenty path definitions that are not in
-this repository — writing them from memory would be inventing drawings and calling them
-Phosphor. It waits on the same glyph extraction C1 waits on.
+**The count comment landed here; the sidebar icons landed later, under C1.** Three
+comments said "eleven links". There are twenty, and have been for some time. The icons were
+blocked at the time this phase ran — the font route costs 376 kB gzipped and Phosphor's SVG
+set is not in this repository — and were unblocked afterwards by extracting the outlines
+from the bundled TTF. See C1.
 
 *Goal: the console looks like Zopiqnow made it.*
 
@@ -765,8 +798,8 @@ Tick as they land.
 - [x] B8 — page padding and content width *(`PageBody` on 16 pages)*
 
 **Part 3 — missing**
-- [ ] C1 — icons *(blocked: the font route costs 376 kB gzipped, and the SVG route wants
-      twenty glyphs this repository does not carry — needs glyph extraction)*
+- [x] C1 — icons *(20 Phosphor glyphs extracted from the bundled TTF, 10 kB gzipped
+      against the font's 376; one per sidebar link, each one checked by eye)*
 - [x] C2 — Figtree
 - [x] C3 — type scale
 - [x] C4 — elevation *(scale mirrored; `PageHeader` lifts on scroll)*
@@ -776,5 +809,6 @@ Tick as they land.
 - [x] C8 — dark mode *(decided: no)*
 
 **Part 4 — per screen**
-- [~] D — sidebar (mobile disclosure, link count), step frame, the wizard’s step contrast,
-      sign-in and the bundle done; the Riders table shape and the chart still open
+- [~] D — sidebar (mobile disclosure, link count, icons per link), step frame, the
+      wizard’s step contrast, sign-in and the bundle done; the Riders table shape and the
+      chart still open

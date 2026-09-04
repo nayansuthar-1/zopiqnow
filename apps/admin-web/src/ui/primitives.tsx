@@ -6,6 +6,8 @@ import type {
   ReactNode,
   TextareaHTMLAttributes,
 } from 'react'
+import { ICON_VIEWBOX, icons } from './icons'
+import type { IconName } from './icons'
 
 /// The handful of shared pieces every screen in the console is built from.
 /// Restrained on purpose — a flat surface, one accent colour, no glow.
@@ -1039,4 +1041,42 @@ export function PageBody({
   }[width]
 
   return <div className={`p-6 ${max} ${className}`}>{children}</div>
+}
+
+/// One Phosphor glyph.
+///
+/// C1 in the renovation doc: 13,600 lines of console with two `<svg>` in them,
+/// a sidebar of twenty words and every status a word in a coloured lozenge —
+/// nothing on any screen scannable at a glance, in a tool whose whole job is
+/// scanning. The two routes the doc found were both blocked, so the paths are
+/// extracted from the Phosphor TTF the three Flutter apps already bundle
+/// (`tool/phosphor-glyphs.mjs`). Twenty glyphs cost 22 kB of path data against
+/// 376 kB gzipped for the font, and they are the apps' own drawings rather than
+/// something that resembles them.
+///
+/// **Always `aria-hidden`.** Every icon in this console sits beside its own
+/// label, so announcing it would read the name twice. An icon that is ever the
+/// only content of a control needs an `aria-label` on the control — which is
+/// how the rest of these primitives already do it.
+///
+/// `currentColor`, so an icon takes the colour of the text it sits with and
+/// there is no second place to keep the palette in step.
+export function Icon({
+  name,
+  className = 'size-5',
+}: {
+  name: IconName
+  className?: string
+}) {
+  return (
+    <svg
+      viewBox={ICON_VIEWBOX}
+      className={`shrink-0 ${className}`}
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d={icons[name]} />
+    </svg>
+  )
 }

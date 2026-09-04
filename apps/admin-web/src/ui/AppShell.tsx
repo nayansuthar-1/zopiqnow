@@ -3,13 +3,14 @@ import type { ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useSession } from '../auth/context'
 import { currentLink, groups } from './nav'
+import { Icon } from './primitives'
 
 /// The frame every signed-in screen sits in. A fixed sidebar on desktop, a row
 /// of tabs under the header on narrow windows — this is an ops tool used at a
 /// desk, so the desktop layout is the one that gets the room.
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
-  `block whitespace-nowrap rounded-field px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+  `flex items-center gap-2.5 whitespace-nowrap rounded-field px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
     isActive
       ? 'bg-brand-soft text-brand-ink'
       : 'text-ink-muted hover:bg-canvas hover:text-ink'
@@ -21,12 +22,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Closed on every navigation: below md this is a menu over the page, and a
   // menu that stays open after you have chosen from it is in the way.
   const [navOpen, setNavOpen] = useState(false)
+  const here = currentLink(pathname)
 
   // The browser tab says which screen this is. With twenty of them and no tab
   // title, three console windows open side by side are three identical tabs.
   useEffect(() => {
-    const here = currentLink(pathname)
-    document.title = here ? `${here.label} · Zopiqnow Console` : 'Zopiqnow Console'
+    // Recomputed rather than closing over `here`, and keyed on the path: two
+    // paths can share a link — every /restaurants/:id resolves to the
+    // Restaurants entry — and the nav has to close on the navigation, not only
+    // when the highlighted item changes.
+    const link = currentLink(pathname)
+    document.title = link ? `${link.label} · Zopiqnow Console` : 'Zopiqnow Console'
     setNavOpen(false)
   }, [pathname])
 
@@ -72,7 +78,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           onClick={() => setNavOpen((o) => !o)}
           className="mx-3 mb-3 flex items-center justify-between rounded-field border border-line px-3 py-2 text-sm font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink md:hidden"
         >
-          <span>{currentLink(pathname)?.label ?? 'Menu'}</span>
+          <span className="flex items-center gap-2.5">
+            {here && <Icon name={here.icon} className="size-[18px]" />}
+            {here?.label ?? 'Menu'}
+          </span>
           <span aria-hidden="true" className="text-ink-muted">
             {navOpen ? '▲' : '▼'}
           </span>
@@ -92,6 +101,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               </p>
               {g.links.map((l) => (
                 <NavLink key={l.to} to={l.to} end={l.end} className={linkClass}>
+                  {/* The icon inherits the link's colour, so the active item's
+                      glyph turns brand-ink with its label rather than needing a
+                      second rule that could fall out of step. */}
+                  <Icon name={l.icon} className="size-[18px]" />
                   {l.label}
                 </NavLink>
               ))}
