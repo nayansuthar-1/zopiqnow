@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import type { MenuItemRow } from '../lib/api'
 import { Banner, Button, Card, ConfirmDialog, Pill } from '../ui/primitives'
@@ -58,7 +58,19 @@ function orderPayload(sections: Section[]) {
   )
 }
 
-export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
+export function MenuStep({
+  id,
+  onNext,
+  /// Every load of this list, handed to whoever is holding the wizard. The step
+  /// bar needs to know whether there is a sellable dish, and this component has
+  /// already asked — a second fetch on the same rows would be a second answer
+  /// that can disagree with the first.
+  onLoaded,
+}: {
+  id: string
+  onNext: () => void
+  onLoaded?: (items: MenuItemRow[]) => void
+}) {
   const [items, setItems] = useState<MenuItemRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -73,9 +85,19 @@ export function MenuStep({ id, onNext }: { id: string; onNext: () => void }) {
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null)
   const [dragging, setDragging] = useState<{ section: number; item: number } | null>(null)
 
+  // Held in a ref, so `load` still depends on `id` and nothing else. As a plain
+  // dependency it would rebuild `load` whenever the caller passed a fresh arrow,
+  // and the effect below runs on `load` — which is a fetch loop, not a re-render.
+  const onLoadedRef = useRef(onLoaded)
+  useEffect(() => {
+    onLoadedRef.current = onLoaded
+  })
+
   const load = useCallback(async () => {
     try {
-      setItems(await api.listMenu(id))
+      const rows = await api.listMenu(id)
+      setItems(rows)
+      onLoadedRef.current?.(rows)
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

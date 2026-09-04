@@ -376,8 +376,19 @@ line-height or letter-spacing is set anywhere. That flatness is most of why the 
 reads as utilitarian rather than professional.
 
 #### C4 — There is no elevation, and the sticky header proves it
-- [~] **Half done** — the scale is mirrored and the modal’s inline shadow is named
-      (`8300746`). The sticky headers that need one are Phase 4.
+- [~] **Done bar the wizard's step bar** — the scale is mirrored, the modal's inline shadow
+      is named (`8300746`), and `PageHeader` lifts on scroll (Phase 4, `e638afa`).
+      **The wizard is still wrong, and differently wrong than this survey said.** Its
+      `sticky` block is `PageHeader` followed by the step bar. The header is `z-20` and
+      positioned; the step bar is static, so it paints *underneath* — and since Phase 4 gave
+      the header a `shadow-card`, that shadow now falls across the top of the tab strip
+      whenever the page is scrolled, instead of below the block where a lift belongs. It is
+      an artifact Phase 4 introduced, not the flatness this entry was opened for.
+      The clean fix is a `below` slot on `PageHeader` so the step bar sits inside the
+      header's own box: the lift then lands under both, and `--page-header-h` starts
+      including the step bar's height — which it does not today, so `DataTable`'s
+      viewport-height cap is wrong by 49 px on any wizard step that ever grows a table.
+      **Not taken here**, because it is a primitive change reaching past this item.
 
 
 One shadow exists, on the modal (`primitives.tsx:448`). `ZopiqElevation` defines three
@@ -454,10 +465,24 @@ Things that belong to one screen rather than to the system.
   a `TableSkeleton`. The count sentence moved into the page subtitle; the two KYC banners
   stayed exactly where they were, because they describe a state rather than report an
   event. The file is still the largest in the app.
-- **Wizard** (`WizardPage.tsx:107`) — the eight-step bar shows a number and an underline
-  and nothing else. There is no completed state, so on step 6 there is no way to see which
-  of the first five actually saved. Unreachable steps render at `text-ink-muted/40`, far
-  below 3:1.
+- **Wizard** (`WizardPage.tsx:107`) — **done.** Unreachable steps went to 3.08:1 in Phase 4;
+  the tick landed last, once the thing blocking it was resolved rather than worked around.
+  `checksFor` moved out of `ReviewStep` into `src/restaurants/checklist.ts`, so the bar and
+  the Review page read **one rule** — the divergence that file's header warns about was the
+  whole reason this waited.
+  **A tick means "nothing left here", not "you have been here."** Whether a step was visited
+  is not something the wizard knows or anybody needs; what an admin on step 7 wants is which
+  of the first six still owe something, which is the question the checklist already answers.
+  So Storefront stays unticked while the cover photo is missing even though the row saved —
+  the same sentence Review prints.
+  The menu was the other half of the block: `checksFor` needs it and the wizard never loaded
+  it. `MenuStep` now hands up the rows it had already fetched (`onLoaded`, pinned in a ref so
+  it cannot become a dependency of that component's `load` and turn an inline callback into a
+  fetch loop), and the wizard fetches once itself for the case where nobody opens the Menu
+  tab. Until that first fetch returns the Menu step shows **no** tick rather than a wrong one.
+  **`ReviewStep` still loads its own menu.** The bar's ticks are advice; Review is the page
+  with the Publish button, and the checklist behind that button has to be what the database
+  will see a moment later.
 - **StepFrame** (`StepFrame.tsx:41`) — hand-rolls an error banner rather than using
   `Banner`: no `role="alert"`, no dismiss, and it sits at the *bottom* of the form, so an
   error about the first field appears below the last one.
@@ -800,7 +825,15 @@ hard reload on `/` does not fetch the wizard *(`dist/index.html` references neit
 
 ## Ledger
 
-Tick as they land.
+**Every item in this survey is closed as of 2026-09-04.** Two were decisions rather than
+work (dark mode: no; A1's brand contrast: keep the orange, add `--color-brand-ink`), and
+one — C1 — was recorded as blocked both ways and turned out to have a third route: the
+glyphs are parsed out of the Phosphor TTF the Flutter apps already bundle. See C1.
+
+**One thing found on the way out and deliberately left open:** Phase 4's scroll shadow on
+`PageHeader` lands across the wizard's step bar rather than below it, because the bar is a
+static sibling under a `z-20` header. Written up under C4. It wants a `below` slot on
+`PageHeader`, which also fixes `--page-header-h` under-reporting the wizard's sticky height.
 
 **Part 1 — measurably wrong**
 - [x] A1 — brand contrast *(decided: keep the orange, darken the label — 21/21 pairs pass)*
@@ -833,8 +866,6 @@ Tick as they land.
 - [x] C8 — dark mode *(decided: no)*
 
 **Part 4 — per screen**
-- [~] D — everything but the wizard's saved-step tick: sidebar (mobile disclosure, link
-      count, icons per link), step frame, the wizard’s step contrast, sign-in, the bundle,
-      the Riders table shape and the chart are all done. The tick needs `checksFor` lifted
-      somewhere the step bar and `ReviewStep` can both read it — a second completeness rule
-      in the tab strip is the divergence that file's own header warns against.
+- [x] D — all of it: sidebar (mobile disclosure, link count, icons per link), step frame,
+      the wizard’s step contrast *and its tick*, sign-in, the bundle, the Riders table shape
+      and the chart.

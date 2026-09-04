@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../lib/api'
-import type { RestaurantDetail } from '../lib/api'
+import type { MenuItemRow, RestaurantDetail } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
 import {
   Banner,
   CardSkeleton,
+  Icon,
   PageBody,
 } from '../ui/primitives'
+import { checksFor } from './checklist'
 import { StorefrontStep } from './steps/StorefrontStep'
 import { AddressStep } from './steps/AddressStep'
 import { LegalStep } from './steps/LegalStep'
@@ -45,6 +47,12 @@ export function WizardPage() {
   const location = useLocation()
 
   const [detail, setDetail] = useState<RestaurantDetail | null>(null)
+  /// The menu, only so the step bar can say whether the Menu step is done.
+  /// `MenuStep` owns the real copy and pushes every load here; this fetch is the
+  /// first one, for the case where somebody opens the wizard on step 1 and never
+  /// goes near the Menu tab. `null` is "not asked yet", which reads as no tick
+  /// rather than as a failure.
+  const [menu, setMenu] = useState<MenuItemRow[] | null>(null)
   // Creating the draft changes the URL from /new to /:id, which is a different
   // route and therefore a fresh mount — the step counter in the old one dies with
   // it. Carried across in navigation state so "Create draft" lands on step 2
@@ -71,6 +79,13 @@ export function WizardPage() {
     void reload()
   }, [reload])
 
+  useEffect(() => {
+    if (!id) return
+    // Quietly: a step bar that cannot be ticked is not worth an error banner
+    // over, and every screen that acts on the menu reports its own failures.
+    api.listMenu(id).then(setMenu, () => {})
+  }, [id])
+
   /// Step 1 on a new restaurant: the row does not exist until this returns, so the
   /// URL changes with it. `replace` rather than push — the /new page is not
   /// somewhere Back should ever return to, because going there again would create
@@ -91,6 +106,31 @@ export function WizardPage() {
   }
 
   const r = detail?.restaurant
+
+  /// Which steps are finished, from the same `checksFor` the Review step reads.
+  ///
+  /// **A tick means "nothing left here", not "you have been here".** Whether a
+  /// step was visited is not a thing the wizard knows or a thing anybody needs;
+  /// what an admin on step 7 wants to know is which of the first six still owe
+  /// something, and that is the question the checklist already answers. So
+  /// Storefront stays unticked while the cover photo is missing even though the
+  /// row saved — which is the same sentence the Review step will print.
+  ///
+  /// A step is done when every check filed under it passes. A step with no checks
+  /// at all — Review, which is the action rather than a thing to complete — is
+  /// never ticked, and before the draft exists there is no `detail` and so no
+  /// ticks at all.
+  const done = new Set<number>()
+  if (detail) {
+    const checks = checksFor(detail, menu ?? [])
+    for (const i of new Set(checks.map((c) => c.step))) {
+      if (checks.every((c) => c.step !== i || c.done)) done.add(i)
+    }
+    // The menu has not come back yet, so "no sellable dish" is not something we
+    // know — only something we have not been told. Better a missing tick than a
+    // wrong one.
+    if (menu === null) done.delete(6)
+  }
 
   return (
     <>
@@ -114,6 +154,7 @@ export function WizardPage() {
           <div className="flex gap-1 overflow-x-auto">
             {steps.map((s, i) => {
               const reachable = Boolean(id) || i === 0
+              const ticked = done.has(i)
               return (
                 <button
                   key={s.key}
@@ -133,7 +174,22 @@ export function WizardPage() {
                           'cursor-not-allowed border-transparent text-ink-muted/70'
                   }`}
                 >
-                  <span className="mr-1.5 text-xs tabular-nums">{i + 1}</span>
+                  {/* The tick takes the number's place rather than sitting
+                      beside it: the step bar is already eight items wide on a
+                      laptop, and a step you have finished is not one you are
+                      counting to any more. It is a shape and not just a colour,
+                      and the word behind it is there for a screen reader. */}
+                  {ticked ? (
+                    <>
+                      <Icon
+                        name="checkCircle"
+                        className="mr-1.5 inline-block size-4 align-[-3px] text-veg"
+                      />
+                      <span className="sr-only">Done. </span>
+                    </>
+                  ) : (
+                    <span className="mr-1.5 text-xs tabular-nums">{i + 1}</span>
+                  )}
                   {s.label}
                 </button>
               )
@@ -179,7 +235,9 @@ export function WizardPage() {
           {step === 5 && id && (
             <TeamStep id={id} detail={detail} onSaved={reload} onNext={() => setStep(6)} />
           )}
-          {step === 6 && id && <MenuStep id={id} onNext={() => setStep(7)} />}
+          {step === 6 && id && (
+            <MenuStep id={id} onNext={() => setStep(7)} onLoaded={setMenu} />
+          )}
           {step === 7 && id && (
             <ReviewStep
               id={id}
