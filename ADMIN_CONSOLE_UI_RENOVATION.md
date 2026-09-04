@@ -32,7 +32,7 @@ that a handful of things in it are measurably wrong rather than merely inconsist
 | Tables | 12, all hand-rolled |
 | Icons | none |
 | Shadows | one, on the modal |
-| Bundle | a single 712 kB chunk (191 kB gzipped), no code splitting |
+| Bundle | a single 712 kB chunk (191 kB gzipped), no code splitting — *split in Phase 6* |
 
 The primitives are genuinely good. `Modal` traps focus, restores it, and refuses to close
 mid-request. `Button` defaults to `type="button"` for a reason that is written down.
@@ -679,14 +679,52 @@ Phosphor. It waits on the same glyph extraction C1 waits on.
 
 ### Phase 6 — Weight
 
+**Done** — the initial download is **139 kB gzipped**, from 192 kB. The doc asked for under
+250 kB, so this clears it with room; the twenty screens that are not the live board come
+down as their own chunks, the largest being the wizard at 15.7 kB gzipped.
+
+**The live board is not a chunk.** It is the landing route, and lazy-loading the screen
+somebody always lands on buys nothing and costs a round trip. The shell, the primitives,
+`api.ts` and the board are the first download; everything else is fetched on the click.
+
+**Nineteen `lazy()` calls written out rather than folded into a helper.** A generic
+`named(name, load)` has to type the module as components-only, which stops being true the
+moment a screen also exports a constant — and `import()` has to be statically visible in
+the source for the bundler to cut a chunk from it at all. Verbose beats clever here.
+
+**The fallback is the console's own frame with the real screen name already in it.** The
+nav knows where you clicked, so `currentLink(pathname)` fills the header while the chunk is
+in the air; the screen then draws its own skeleton while it queries, so a navigation reads
+as one continuous load instead of a blank flash followed by a header dropping in. That
+needed `groups` and `currentLink` out of `AppShell.tsx` and into `src/ui/nav.ts` — two
+files want them now, and oxlint's `react(only-export-components)` is right that a file
+exporting both components and plain functions breaks fast refresh.
+
+**Splitting bought one new way to fail, so it comes with its cure.** A single bundle either
+loaded or did not; twenty chunks can each 404 on their own, most often because the console
+was redeployed while an admin had the tab open and the hashed filename it is asking for is
+last week's. React's answer to a rejected `lazy` import is to unmount the tree — a white
+page mid-shift. `src/ui/RouteBoundary.tsx` catches it and offers a reload, which for a
+stale chunk is genuinely the fix. It clears itself on navigation via `getDerivedStateFromProps`
+rather than by being keyed from outside, so a working screen is not remounted on every
+click just to reset an error it never had. It is the console's only error boundary; there
+was none before, because before there was nothing for one to catch.
+
+**What was verified and what was not.** `tsc -b`, `vite build` and `oxlint` are green;
+`dist/index.html` preloads only the entry and the CSS, so a hard reload on `/` provably
+does not fetch the wizard; `vite preview` serves `/`, `/orders`, `/restaurants/new`,
+`/settings` and `/gifts` at 200 and every chunk is fetchable. **Clicking all twenty-one
+routes in a browser is still a manual step** — there is no headless browser in this
+toolchain and adding one is a dependency change.
+
 *Goal: the console opens fast enough that nobody notices it opening.*
 
 Route-level `React.lazy` on the twenty-one screens. The live board, the shell and the
 primitives are the initial chunk; the wizard, the image adjuster and the map picker load
 when somebody onboards a restaurant.
 
-**Verify:** initial chunk under 250 kB gzipped; every route still reachable; a hard reload
-on `/` does not fetch the wizard.
+**Verify:** initial chunk under 250 kB gzipped *(139 kB)*; every route still reachable; a
+hard reload on `/` does not fetch the wizard *(`dist/index.html` references neither)*.
 
 ---
 
@@ -738,5 +776,5 @@ Tick as they land.
 - [x] C8 — dark mode *(decided: no)*
 
 **Part 4 — per screen**
-- [~] D — sidebar (mobile disclosure, link count), step frame, the wizard’s step contrast
-      and sign-in done; the Riders table shape, the chart and the bundle still open
+- [~] D — sidebar (mobile disclosure, link count), step frame, the wizard’s step contrast,
+      sign-in and the bundle done; the Riders table shape and the chart still open

@@ -2,72 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useSession } from '../auth/context'
+import { currentLink, groups } from './nav'
 
 /// The frame every signed-in screen sits in. A fixed sidebar on desktop, a row
 /// of tabs under the header on narrow windows — this is an ops tool used at a
 /// desk, so the desktop layout is the one that gets the room.
-
-/// Grouped since B7, because twenty links in a row is a list nobody reads. The
-/// headings are desktop-only — on a narrow window the nav is a horizontal
-/// scroller and a heading in it would just be a chip that does nothing.
-const groups: {
-  heading: string
-  links: { to: string; label: string; end: boolean }[]
-}[] = [
-  {
-    heading: 'Today',
-    links: [
-      { to: '/', label: 'Live orders', end: true },
-      { to: '/orders', label: 'All orders', end: false },
-      // Under Today, not under Money: a complaint is worked the day it lands,
-      // and it is the only screen here with somebody waiting on the other end.
-      { to: '/support', label: 'Support', end: false },
-      // Beside Support for the same reason Support is here: both are a person
-      // reading something that went wrong. The difference is who noticed —
-      // a customer complained, or the platform did (migration 0130).
-      { to: '/alerts', label: 'Alerts', end: false },
-      // Beside the food queues: a gift order has nobody but this page to move
-      // it, so it belongs where somebody looks every day.
-      { to: '/gift-orders', label: 'Gift orders', end: false },
-      { to: '/analytics', label: 'Platform', end: false },
-    ],
-  },
-  {
-    heading: 'Catalogue',
-    links: [
-      { to: '/restaurants', label: 'Restaurants', end: true },
-      { to: '/restaurants/new', label: 'Add restaurant', end: false },
-      { to: '/riders', label: 'Riders', end: false },
-      { to: '/users', label: 'People', end: false },
-      // Under Catalogue and not beside Gift orders, because that is what it is:
-      // the second marketplace's products, edited the way restaurants are.
-      // Read-only from 0022 until 0118.
-      { to: '/gifts', label: 'Gift catalogue', end: false },
-    ],
-  },
-  {
-    heading: 'Reach',
-    links: [
-      { to: '/hero', label: 'Home hero', end: false },
-      { to: '/map-ads', label: 'Map ads', end: false },
-      { to: '/coupons', label: 'Coupons', end: false },
-      { to: '/broadcast', label: 'Send a notification', end: false },
-    ],
-  },
-  {
-    heading: 'Money',
-    links: [
-      { to: '/refunds', label: 'Refunds', end: false },
-      { to: '/settlements', label: 'Restaurant settlements', end: false },
-      { to: '/payouts', label: 'Rider payouts', end: false },
-      { to: '/cash', label: 'Rider cash', end: false },
-    ],
-  },
-  {
-    heading: 'Console',
-    links: [{ to: '/settings', label: 'Settings', end: false }],
-  },
-]
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `block whitespace-nowrap rounded-field px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
@@ -75,15 +14,6 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
       ? 'bg-brand-soft text-brand-ink'
       : 'text-ink-muted hover:bg-canvas hover:text-ink'
   }`
-
-/// Which link the current path belongs to. The longest matching prefix wins,
-/// so /restaurants/new does not read as /restaurants.
-function currentLink(pathname: string) {
-  return groups
-    .flatMap((g) => g.links)
-    .filter((l) => (l.end ? pathname === l.to : pathname.startsWith(l.to)))
-    .sort((a, b) => b.to.length - a.to.length)[0]
-}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { email, signOut } = useSession()
