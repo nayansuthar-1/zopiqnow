@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase, messageFor } from '../lib/supabase'
-import { Button, Card, Field } from '../ui/primitives'
+import { Banner, Button, Card, Field } from '../ui/primitives'
 
 /// Two doors: email and password, or a six-digit code mailed to an address
 /// already on the roster. Both end in the same place — a Supabase session that
@@ -29,6 +29,28 @@ import { Button, Card, Field } from '../ui/primitives'
 /// does not begin with an existing admin, which is the same reason
 /// `platform_admins` has no self-service path. The code door does begin with
 /// one: the roster is the gate, and it is checked on the server.
+
+/// The product mark, above the card.
+///
+/// The sign-in page is the only screen anybody sees before they are signed in,
+/// and it opened on a bare white card that could have belonged to any product —
+/// the only thing naming the console was a line of text inside it. Same file
+/// the browser tab loads, so the tab and the page show the same mark.
+///
+/// `alt=""`, deliberately: the heading directly under it reads "Zopiqnow
+/// Console", and a screen reader announcing the name twice is worse than one
+/// that skips a decoration.
+function Mark() {
+  return (
+    <img
+      src="/favicon-192.png"
+      alt=""
+      width={56}
+      height={56}
+      className="mb-6 rounded-card shadow-card"
+    />
+  )
+}
 
 type Door = 'password' | 'code'
 
@@ -116,7 +138,8 @@ export function SignInPage() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center p-6">
+    <div className="flex min-h-full flex-col items-center justify-center p-6">
+      <Mark />
       <Card className="w-full max-w-md">
         <h1 className="text-xl font-bold text-ink">Zopiqnow Console</h1>
         <p className="mt-1 text-sm text-ink-muted">
@@ -156,7 +179,7 @@ export function SignInPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
 
-            {error && <p className="text-sm text-non-veg-ink">{error}</p>}
+            {error && <Banner tone="error">{error}</Banner>}
 
             <Button type="submit" loading={busy} className="w-full">
               Sign in
@@ -181,7 +204,7 @@ export function SignInPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
 
-            {error && <p className="text-sm text-non-veg-ink">{error}</p>}
+            {error && <Banner tone="error">{error}</Banner>}
 
             <Button type="submit" loading={busy} className="w-full">
               Email me a code
@@ -218,7 +241,7 @@ export function SignInPage() {
               onChange={(e) => setCode(e.target.value)}
             />
 
-            {error && <p className="text-sm text-non-veg-ink">{error}</p>}
+            {error && <Banner tone="error">{error}</Banner>}
 
             <Button
               type="submit"
@@ -302,7 +325,8 @@ export function NotAdminPage({
   const [busy, setBusy] = useState(false)
 
   return (
-    <div className="flex min-h-full items-center justify-center p-6">
+    <div className="flex min-h-full flex-col items-center justify-center p-6">
+      <Mark />
       <Card className="w-full max-w-md text-center">
         {checkFailed ? (
           <>

@@ -568,6 +568,18 @@ function RiderDocField({
 /// **A bicycle rider is asked for ID and nothing else.** They have no licence to
 /// hold, no insurance to lapse and nothing to register, and the database applies
 /// the same rule — so the three sections simply are not drawn.
+/// Pinned to `en-IN`, like every other date in the console. The three calls in
+/// this dialog passed no locale, so a machine defaulted to en-US read back
+/// `9/4/2026` beside a Refunds page reading `04 Sep` — and a KYC override with
+/// an end date is exactly the figure nobody should have to re-read.
+function kycDay(iso: string) {
+  return new Date(iso).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
 function KycDialog({
   rider,
   onClose,
@@ -697,10 +709,10 @@ function KycDialog({
               Working without verified documents.
               {kyc.override_by ? ` Cleared by ${kyc.override_by}` : ' Cleared'}
               {kyc.override_at
-                ? ` on ${new Date(kyc.override_at).toLocaleDateString()}`
+                ? ` on ${kycDay(kyc.override_at)}`
                 : ''}
               {kyc.override_until
-                ? `, until ${new Date(kyc.override_until).toLocaleDateString()}`
+                ? `, until ${kycDay(kyc.override_until)}`
                 : ', with no end date'}
               . “{kyc.override_reason}”
             </Banner>
@@ -713,7 +725,7 @@ function KycDialog({
               Verified
               {kyc?.reviewed_by ? ` by ${kyc.reviewed_by}` : ''}
               {kyc?.reviewed_at
-                ? ` on ${new Date(kyc.reviewed_at).toLocaleDateString()}`
+                ? ` on ${kycDay(kyc.reviewed_at)}`
                 : ''}
               . They can take deliveries.
             </Banner>

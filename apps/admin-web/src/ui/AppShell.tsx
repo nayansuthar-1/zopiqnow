@@ -7,7 +7,7 @@ import { useSession } from '../auth/context'
 /// of tabs under the header on narrow windows — this is an ops tool used at a
 /// desk, so the desktop layout is the one that gets the room.
 
-/// Grouped since B7, because eleven links in a row is a list nobody reads. The
+/// Grouped since B7, because twenty links in a row is a list nobody reads. The
 /// headings are desktop-only — on a narrow window the nav is a horizontal
 /// scroller and a heading in it would just be a chip that does nothing.
 const groups: {
@@ -92,7 +92,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // menu that stays open after you have chosen from it is in the way.
   const [navOpen, setNavOpen] = useState(false)
 
-  // The browser tab says which screen this is. With eleven of them and no tab
+  // The browser tab says which screen this is. With twenty of them and no tab
   // title, three console windows open side by side are three identical tabs.
   useEffect(() => {
     const here = currentLink(pathname)
@@ -103,7 +103,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-col md:flex-row">
       {/* Straight to the content, for anybody who does not want to tab through
-          eleven nav links on every page. The first thing in the DOM, visible
+          twenty nav links on every page. The first thing in the DOM, visible
           only once it has focus. */}
       <a
         href="#main"

@@ -51,6 +51,27 @@ type Filter = 'open' | 'all'
 const RIDER_NO_SHOWS = 'rider_no_shows'
 const REFUNDS_STALLED = 'refunds_stalled'
 
+/// Pinned to `en-IN`, like every other date in the console. These five calls
+/// passed no locale at all, so they rendered in whichever one the browser was
+/// set to — an admin on a US-defaulted machine read `9/4/2026, 7:30 PM` on this
+/// page and `04 Sep, 19:30` on the order the alert is about, which is the same
+/// moment written two ways on two screens somebody reads in sequence.
+function when(iso: string) {
+  return new Date(iso).toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function clock(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export function AlertsPage() {
   const toast = useToast()
   const navigate = useNavigate()
@@ -197,7 +218,7 @@ export function AlertsPage() {
                 )}
               </div>
               <p className="shrink-0 text-xs text-ink-muted">
-                {new Date(row.created_at).toLocaleString()}
+                {when(row.created_at)}
               </p>
             </div>
 
@@ -219,11 +240,11 @@ export function AlertsPage() {
                       <li key={i.order_id} className="text-sm text-ink-muted">
                         <span className="font-semibold text-ink">{i.order_id}</span>
                         {' — accepted '}
-                        {new Date(i.accepted_at).toLocaleString()}
+                        {when(i.accepted_at)}
                         {i.ready_at &&
-                          `, food ready ${new Date(i.ready_at).toLocaleTimeString()}`}
+                          `, food ready ${clock(i.ready_at)}`}
                         {', taken back '}
-                        {new Date(i.released_at).toLocaleTimeString()}
+                        {clock(i.released_at)}
                         {i.had_arrived && (
                           <span className="ml-2">
                             <Pill tone="neutral">Was at the restaurant</Pill>
@@ -274,7 +295,7 @@ export function AlertsPage() {
             {row.resolved_at && row.resolved_by && (
               <p className="mt-3 text-xs text-ink-muted">
                 Cleared by {row.resolved_by} on{' '}
-                {new Date(row.resolved_at).toLocaleString()}
+                {when(row.resolved_at)}
               </p>
             )}
           </Card>

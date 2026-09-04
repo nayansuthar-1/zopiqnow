@@ -632,6 +632,39 @@ scrollbar anywhere; every table's own scroll shows its affordance.
 
 ### Phase 5 — Identity and the small things
 
+**Done bar the sidebar icons**, which are C1 and still blocked. Everything else landed.
+
+**The favicon is the shipped raster, not a redrawing.** The mark is
+`apps/customer/android/app/src/main/res/mipmap-*/ic_launcher.png` — a `#F74E03` square
+with a white pin, a Z, a fork and three speed lines in it. Nothing in the repository is
+that drawing as vector art, and tracing it here would have given the console its own
+slightly-different version of the company mark, which is exactly what the purple `#863bff`
+leftover was. So the two files are copies: `favicon-48.png` from `mipmap-mdpi` and
+`favicon-192.png` from `mipmap-xxxhdpi`. **Two sizes, because a tab draws the icon at 16
+or 32 px** — a 192 px source scaled that far turns the pin's strokes to grey mush and a
+48 px source does not. The day somebody draws the mark as an SVG, this is one `<link>` to
+change.
+
+**The sign-in mark is the same file the tab loads,** at 56 px above the card, and it is on
+`NotAdminPage` too — signing in and being turned away are the same doorway. `alt=""`,
+because the heading directly under it already reads "Zopiqnow Console", and announcing the
+name twice is worse than skipping a decoration. The three copies of
+`<p className="text-sm text-non-veg-ink">{error}</p>` are one `Banner tone="error"`.
+
+**Eight dates were unpinned, not three.** The survey named the three `toLocaleString()`
+calls in `AlertsPage`; two `toLocaleTimeString()` calls sit in the same block of the same
+component, and `RidersPage`'s KYC dialog has three `toLocaleDateString()` calls with the
+same defect — the one place an admin reads back the end date of a KYC override. All eight
+go through a local formatter now, which is the shape every other screen already uses. The
+verify line below is stricter than the survey's: no bare `toLocale*` call anywhere in
+`src/`.
+
+**The sidebar icons did not land; the count comment did.** Three comments said "eleven
+links". There are twenty, and have been for some time. The icons are C1: the Phosphor font
+route costs 376 kB gzipped, and the SVG route means twenty path definitions that are not in
+this repository — writing them from memory would be inventing drawings and calling them
+Phosphor. It waits on the same glyph extraction C1 waits on.
+
 *Goal: the console looks like Zopiqnow made it.*
 
 1. **Favicon** (A6) — the real mark, from the launcher icon.
@@ -640,7 +673,7 @@ scrollbar anywhere; every table's own scroll shows its affordance.
 4. **Alerts' three dates** (A5) pinned to `en-IN`.
 5. **Sidebar** — icons per link, and the stale "eleven links" comment corrected.
 
-**Verify:** the tab icon is orange; `grep -rn "toLocaleString()"` returns nothing.
+**Verify:** the tab icon is orange; `grep -rn "toLocale[A-Za-z]*()" src/` returns nothing.
 
 ---
 
@@ -679,8 +712,8 @@ Tick as they land.
 - [x] A2 — `<select>` focus *(all 10 call sites)*
 - [x] A3 — table hover + sticky header *(all 10 page-level tables)*
 - [x] A4 — `scope="col"` *(every `<th>` in the console has it)*
-- [x] A5 — money *(49 sites through `inr`/`inrSigned`)*; the 3 Alerts dates still owed
-- [ ] A6 — favicon and the dead sprite
+- [x] A5 — money *(49 sites through `inr`/`inrSigned`)* and all 8 unpinned dates
+- [x] A6 — favicon *(the real mark, at 48 and 192 px)*; the dead sprite deleted
 - [x] A7 — the toggle's two states *(2.55 → 4.88 on, 1.21 → 3.24 off)*
 
 **Part 2 — inconsistent**
@@ -694,7 +727,8 @@ Tick as they land.
 - [x] B8 — page padding and content width *(`PageBody` on 16 pages)*
 
 **Part 3 — missing**
-- [ ] C1 — icons *(blocked: the font route costs 376 kB gzipped — needs glyph extraction)*
+- [ ] C1 — icons *(blocked: the font route costs 376 kB gzipped, and the SVG route wants
+      twenty glyphs this repository does not carry — needs glyph extraction)*
 - [x] C2 — Figtree
 - [x] C3 — type scale
 - [x] C4 — elevation *(scale mirrored; `PageHeader` lifts on scroll)*
@@ -704,5 +738,5 @@ Tick as they land.
 - [x] C8 — dark mode *(decided: no)*
 
 **Part 4 — per screen**
-- [~] D — sidebar (mobile disclosure), step frame and the wizard’s step contrast done;
-      sign-in, the Riders table shape, the chart and the bundle still open
+- [~] D — sidebar (mobile disclosure, link count), step frame, the wizard’s step contrast
+      and sign-in done; the Riders table shape, the chart and the bundle still open

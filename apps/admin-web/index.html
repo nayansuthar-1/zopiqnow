@@ -2,7 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- The product's own mark, copied from the customer app's launcher icon
+         (apps/customer/android/app/src/main/res/mipmap-*/ic_launcher.png) —
+         the orange square with the white pin. What was here before was a
+         purple #863bff mark from the Vite template that appears nowhere else
+         in the repository.
+
+         Two sizes rather than one: a tab renders the icon at 16 or 32 px, and
+         a 192 px source scaled that far turns the pin's thin white strokes to
+         mush. The 48 px file is the one browsers pick for the tab; the 192 px
+         one is for a pinned tab or an installed shortcut. Both are the
+         shipped raster, not a redrawing — this console does not get its own
+         version of the mark. -->
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Zopiqnow Console</title>
   </head>
