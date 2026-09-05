@@ -874,6 +874,58 @@ export type AdminOrderRow = {
   /// holding it — the dispatcher will not offer an order that has a delivery.
   offer_to: string | null
   offer_expires_at: string | null
+  /// What is wrong with this order right now (migration 0155). Empty, never
+  /// null, and always empty on an order that has ended — what went wrong on a
+  /// delivered order is a question for its own page, not for a board whose job
+  /// is the things somebody can still act on.
+  breaches: BreachKind[]
+  /// When the oldest of those started, and what the board sorts on. Null when
+  /// there are none.
+  breach_since: string | null
+}
+
+/// The six ways an order can be in trouble (0155). Every threshold behind these
+/// lives in `sla_settings`, one row, so "two minutes" is an UPDATE rather than a
+/// deploy.
+export type BreachKind =
+  | 'unaccepted'
+  | 'stuck_prep'
+  | 'no_rider'
+  | 'dispatch_stalled'
+  | 'eta_slipped'
+  | 'payment_unverified'
+
+/// What each breach is called on the board, and — under it — what it means.
+///
+/// Two lines rather than one, because the name alone is the jargon and the
+/// sentence is the reason somebody should get up. `dispatch_stalled` is the one
+/// that most needs its second line: it does not mean the fleet is exhausted, it
+/// means nobody is holding the order and the dispatcher has not rung again.
+export const BREACH_LABEL: Record<BreachKind, { title: string; why: string }> = {
+  unaccepted: {
+    title: 'Not accepted',
+    why: 'The kitchen has not answered. It auto-rejects at the deadline.',
+  },
+  stuck_prep: {
+    title: 'Stuck in the kitchen',
+    why: 'Accepted, and past the prep time the kitchen chose itself.',
+  },
+  no_rider: {
+    title: 'No rider',
+    why: 'Cooked and on the shelf with nobody carrying it.',
+  },
+  dispatch_stalled: {
+    title: 'Dispatch stalled',
+    why: 'Riders were rung, none is holding it, and nothing has been offered since.',
+  },
+  eta_slipped: {
+    title: 'ETA slipped',
+    why: 'Arriving later than the time promised at checkout. The customer has been told.',
+  },
+  payment_unverified: {
+    title: 'Payment unverified',
+    why: 'A UPI order with no verified payment behind it.',
+  },
 }
 
 /// One order in the whole-book view. Deliberately narrower than

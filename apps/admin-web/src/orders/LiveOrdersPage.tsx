@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
-import { api, DELIVERY_LABEL, STATUS_LABEL } from '../lib/api'
+import { api, BREACH_LABEL, DELIVERY_LABEL, STATUS_LABEL } from '../lib/api'
 import type { AdminOrderRow, OrderStatus } from '../lib/api'
 import { PageHeader } from '../ui/AppShell'
 import {
@@ -14,12 +14,25 @@ import {
   Modal,
   PageBody,
   Pill,
+  SegmentedControl,
 } from '../ui/primitives'
 import { useToast } from '../ui/toast'
 import { inr } from '../lib/money'
 
-/// The running floor. Every order that has not ended, oldest first, because the
-/// order that has been open longest is the one somebody is about to ring about.
+/// The running floor. Every order that has not ended, **worst first** since
+/// 0155 and oldest first under that.
+///
+/// It used to be oldest first alone, on the reasoning that the order open
+/// longest is the one somebody is about to ring about. That is true of a quiet
+/// evening and wrong on a busy one: an order twelve minutes old that is cooking
+/// on time matters less than one three minutes old that no kitchen has accepted.
+/// So the database now says which orders are in breach and when each breach
+/// started (`sla_settings` holds the thresholds), and this board leads with them.
+///
+/// **The breaches are the database's opinion, not this screen's.** Nothing here
+/// subtracts two timestamps to decide whether an order is late; it prints what
+/// `admin_orders` returned. One definition of late, in one place, for a board
+/// that is meant to agree with itself between refreshes.
 ///
 /// **It polls, and says so.** Every other live surface in this system is on
 /// Realtime, which the console cannot use: `orders` grants an admin no read at
@@ -90,6 +103,8 @@ export function LiveOrdersPage() {
   } | null>(null)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
+  // The board's one view switch: everything open, or only what is in trouble.
+  const [onlyRisk, setOnlyRisk] = useState(false)
 
   // Read inside the interval so the timer does not have to be torn down and
   // rebuilt every time the search box changes.
@@ -161,6 +176,12 @@ export function LiveOrdersPage() {
   const age = fetchedAt ? Math.round((Date.now() - fetchedAt) / 1000) : null
   const searching = applied !== ''
 
+  // Filtered here rather than in the database: the rows already carry their
+  // breaches, so narrowing to them is not worth a round trip, and switching
+  // between the two views has to be instant to be worth having.
+  const atRisk = rows?.filter((o) => o.breaches.length > 0) ?? []
+  const shown = rows === null ? null : onlyRisk ? atRisk : rows
+
   return (
     <>
       <PageHeader
@@ -170,12 +191,28 @@ export function LiveOrdersPage() {
             ? 'Every order that has not ended yet.'
             : searching
               ? `${rows.length} order${rows.length === 1 ? '' : 's'} matching “${applied}”, any status`
-              : `${rows.length} open · updated ${age === null || age < 2 ? 'just now' : `${age}s ago`}`
+              : `${rows.length} open${atRisk.length > 0 ? ` · ${atRisk.length} in trouble` : ''} · updated ${age === null || age < 2 ? 'just now' : `${age}s ago`}`
         }
         action={
-          <Button variant="secondary" onClick={() => void load(applied)}>
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Only outside search. A search returns finished orders too, and
+                a finished order is never in breach — the filter would read as
+                broken rather than as empty. */}
+            {!searching && rows !== null && (
+              <SegmentedControl
+                label="Show"
+                value={onlyRisk ? 'risk' : 'all'}
+                onChange={(v) => setOnlyRisk(v === 'risk')}
+                options={[
+                  { value: 'all', label: `All ${rows.length}` },
+                  { value: 'risk', label: `In trouble ${atRisk.length}` },
+                ]}
+              />
+            )}
+            <Button variant="secondary" onClick={() => void load(applied)}>
+              Refresh
+            </Button>
+          </div>
         }
       />
 
@@ -217,10 +254,20 @@ export function LiveOrdersPage() {
           )}
         </form>
 
-        {rows === null ? (
+        {shown === null ? (
           <CardSkeleton />
-        ) : rows.length === 0 ? (
-          searching ? (
+        ) : shown.length === 0 ? (
+          onlyRisk && !searching ? (
+            <EmptyState
+              title="Nothing in trouble"
+              body="Every open order is inside its time. The thresholds live in sla_settings, one row, so this is the platform's current definition of late and not a fixed one."
+              action={
+                <Button variant="secondary" onClick={() => setOnlyRisk(false)}>
+                  Show all {rows?.length ?? 0}
+                </Button>
+              }
+            />
+          ) : searching ? (
             <EmptyState
               title="No match"
               body="No order carries that id, and no customer has that number. Order ids look like ZPQ-1044; a phone number matches on its last digits, with or without +91."
@@ -244,7 +291,7 @@ export function LiveOrdersPage() {
           )
         ) : (
           <div className="space-y-3">
-            {rows.map((o) => (
+            {shown.map((o) => (
               <OrderCard
                 key={o.order_id}
                 order={o}
@@ -352,6 +399,16 @@ function OrderCard({
               {o.order_id}
             </Link>
             <Pill tone={statusTones[o.status]}>{STATUS_LABEL[o.status]}</Pill>
+            {/* What is wrong with this order, said by the database (0155)
+                rather than worked out by whoever is reading the row. The
+                `title` carries the sentence under the name — the pill is what
+                catches the eye across a board of twenty, and the reason is one
+                hover away rather than a line of prose on every card. */}
+            {o.breaches.map((b) => (
+              <span key={b} title={BREACH_LABEL[b].why}>
+                <Pill tone="danger">{BREACH_LABEL[b].title}</Pill>
+              </span>
+            ))}
             {awaitingAccept && (
               // The kitchen's five minutes (0051). Counted against
               // `orders.accept_deadline`, the same column the vendor tablet

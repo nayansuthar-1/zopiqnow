@@ -378,10 +378,14 @@ export function OrderDetailPage() {
   const o = detail.order
   const paidBy = o.payment_method.toUpperCase()
   // The one fact on this page that is worth shouting about: money the kitchen
-  // cooked against and nobody proved (0085). Cash orders have no intent and are
-  // not a gap.
-  const unverified =
-    o.payment_method !== 'cash' && (!detail.payment || !detail.payment.verified_at)
+  // cooked against and nobody proved (0085).
+  //
+  // `'cod'`, not `'cash'` — the live check constraint on `orders.payment_method`
+  // allows exactly `cod` and `upi`, and a cash-on-delivery order has no payment
+  // intent by design. Reading that column against the wrong spelling would flag
+  // every COD order on the platform as unpaid.
+  const prepaid = o.payment_method === 'upi'
+  const unverified = prepaid && (!detail.payment || !detail.payment.verified_at)
 
   return (
     <>
@@ -655,9 +659,9 @@ export function OrderDetailPage() {
                 </div>
               ) : (
                 <p className="text-sm text-ink-muted">
-                  {o.payment_method === 'cash'
-                    ? 'Cash on delivery — the rider collected it, and it settles through Rider cash.'
-                    : 'No payment intent was ever recorded against this order.'}
+                  {prepaid
+                    ? 'No payment intent was ever recorded against this order.'
+                    : 'Cash on delivery — the rider collected it, and it settles through Rider cash.'}
                 </p>
               )}
             </Section>

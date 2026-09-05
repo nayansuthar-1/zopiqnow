@@ -160,7 +160,35 @@ highest-leverage item in this document, and it also deletes code: the live board
 All orders' modal and Support's photo viewer all collapse into it.
 
 #### T1-2 — Orders at risk: an SLA engine, not a sort order
-- [ ] **Cost:** 1 migration (view + settings row) + ~150 lines
+- [x] **Shipped 2026-09-05** — migration `0155_the_board_says_which_ones_are_in_trouble.sql`,
+      `src/orders/LiveOrdersPage.tsx`.
+
+**What landed.** A one-row `sla_settings` table holds the four time thresholds, and
+`admin_orders` — dropped and recreated, because `create or replace` cannot add output
+columns — now returns `breaches text[]` and `breach_since`. The board leads with the worst
+order rather than the oldest, carries a red pill per breach (the reason on hover), counts
+them in the header, and has an "In trouble" filter that narrows client-side from rows it
+already has.
+
+All six kinds verified against the live database by synthesising each one inside a
+transaction and rolling it back — triggers disabled for that transaction only, so nothing
+reached a notification, a push or WhatsApp, and the rollback was confirmed afterwards
+(order statuses, payment intents, deliveries, thresholds and all fifteen triggers back as
+they were).
+
+Two decisions worth keeping:
+
+- **`dispatch_stalled`, not `relay_exhausted`.** Proving exhaustion means reproducing
+  0148's candidate query — every online rider already offered and therefore excluded — as a
+  second copy that would drift from the first. "Riders were rung, none is holding it, and
+  nothing has been offered since" is cheaper, always true when exhaustion is, and is the
+  sentence an admin acts on either way.
+- **A finished order is never in breach.** What went wrong on a delivered order is a
+  question for its own page and for Analytics, not for a board whose job is what somebody
+  can still act on.
+
+**The thresholds are a row, not a form, until T2-2.** They are editable with one UPDATE
+today; the settings screen that fronts them is Tier 2 work.
 
 The live board sorts oldest-first and says `whereItIs()`. That is a human doing breach
 detection by eye. Zomato's floor is a triage list: the system says *which* orders are
