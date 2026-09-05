@@ -109,7 +109,40 @@ The four items that change what the console *is*. Everything else is an improvem
 screen; these four are the reason the screens exist.
 
 #### T1-1 — Order 360: one page per order
-- [ ] **Cost:** 1 migration + ~400 lines · **Route:** `/orders/:id`
+- [x] **Shipped 2026-09-05** — migration `0154_one_order_on_one_page.sql`,
+      `src/orders/OrderDetailPage.tsx`, linked from Live orders, All orders and Support.
+
+**What landed.** `admin_order_detail(order_id)` returns one `jsonb`: the order, its
+restaurant and customer, the items with their chosen options, the live delivery, every
+dispatch offer, the payment intent, the refunds, the canned conversation, the three
+photographs, the review, the complaints, and the `admin_actions` taken on the order *and
+on its refunds*. Verified against the live database — largest payload on the platform is
+4.8 kB, all 30 orders return without error.
+
+Four decisions worth keeping:
+
+- **Handover attempt counts, never the codes.** An admin who can read the pickup code can
+  close a handover that never happened. `handover` carries the attempt counts only, which
+  is the diagnostic support actually needs.
+- **Audit details are diffed, not dumped.** 0092 stores `{before: <whole row>, after:
+  <whole row>}`; one refund moving `approved → processing → paid` is four complete copies
+  of a nineteen-column row. `audit_detail_changes()` reduces that to
+  `{status: {from, to}}`. The trail keeps everything; the page is told what changed.
+- **A deleted id gets a sentence, not a 404.** The id survives in a customer's inbox and in
+  a settlement, so `admin_order_detail` raises "Order ZPQ-1020 was deleted by <admin> on
+  <date>. Reason given: …" rather than "No such order."
+- **The page is read-only.** Every lever already exists elsewhere with an audit row behind
+  it. A second Cancel button here would be a second path to one action.
+
+**Known gap, deliberately not closed.** There is no status-transition log in this schema —
+`orders.status` is updated in place — so a delivered order does not remember when it was
+accepted. Every row on the timeline is a stored timestamp; `ready_by` is labelled as the
+promise it is rather than the `accepted_at` it is not. A true per-transition log with an
+actor would be a trigger on the busiest table in the system and is a decision of its own.
+
+**Not yet done from the original scope:** the live board's modal, All orders' modal and
+Support's photo viewer still exist and were to collapse into this page. Left standing for
+now — deleting three working dialogs is its own change.
 
 Today an order's story is scattered. Its timeline is in the live board's modal, its photos
 are in Support, its refund is in Refunds, its chat is nowhere, its payment intent is

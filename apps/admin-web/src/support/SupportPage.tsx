@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api, GIFT_STATUS_LABEL, ISSUE_LABEL, STATUS_LABEL } from '../lib/api'
 import type {
   GiftOrderStatus,
@@ -232,7 +233,21 @@ export function SupportPage() {
                       </Td>
                       <Td>
                         <p className="text-ink">
-                          {tk.order_id}
+                          {/* A food order has a page of its own (0154) holding
+                              the photographs, the rider and the money this
+                              complaint is about. A gift order has no such page —
+                              its queue is Gift orders — so only the food half
+                              gets a link. */}
+                          {tk.kind === 'gift' ? (
+                            tk.order_id
+                          ) : (
+                            <Link
+                              to={`/orders/${tk.order_id}`}
+                              className="underline decoration-line underline-offset-4 hover:decoration-brand-ink"
+                            >
+                              {tk.order_id}
+                            </Link>
+                          )}
                           {tk.kind === 'gift' && (
                             // Said out loud rather than left to be inferred from
                             // the id prefix. A gift complaint is answered

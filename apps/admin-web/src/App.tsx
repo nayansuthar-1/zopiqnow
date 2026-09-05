@@ -31,6 +31,9 @@ import { LiveOrdersPage } from './orders/LiveOrdersPage'
 const AllOrdersPage = lazy(() =>
   import('./orders/AllOrdersPage').then((m) => ({ default: m.AllOrdersPage })),
 )
+const OrderDetailPage = lazy(() =>
+  import('./orders/OrderDetailPage').then((m) => ({ default: m.OrderDetailPage })),
+)
 const RestaurantsPage = lazy(() =>
   import('./restaurants/RestaurantsPage').then((m) => ({ default: m.RestaurantsPage })),
 )
@@ -156,6 +159,8 @@ function ConsoleRoutes() {
               Restaurants where it was, one click away. */}
           <Route path="/" element={<LiveOrdersPage />} />
           <Route path="/orders" element={<AllOrdersPage />} />
+          {/* One order, on one page (0154). */}
+          <Route path="/orders/:id" element={<OrderDetailPage />} />
           <Route path="/restaurants" element={<RestaurantsPage />} />
           {/* Keyed so switching from an existing restaurant to /new remounts the
               wizard — otherwise React keeps the old form state and the new draft

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api, DELIVERY_LABEL, STATUS_LABEL } from '../lib/api'
 import type {
   AllOrderRow,
@@ -353,9 +354,16 @@ export function AllOrdersPage() {
                   <tr key={o.order_id}>
                     <Td>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold text-ink">
+                          {/* The id opens the order's own page (0154), which is
+                              where the photographs, the conversation and the
+                              money all are — this row is the index, not the
+                              record. */}
+                          <Link
+                            to={`/orders/${o.order_id}`}
+                            className="font-semibold text-ink underline decoration-line underline-offset-4 hover:decoration-brand-ink"
+                          >
                             {o.order_id}
-                          </span>
+                          </Link>
                           <Pill tone={statusTones[o.status]}>
                             {STATUS_LABEL[o.status]}
                           </Pill>

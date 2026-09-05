@@ -542,6 +542,16 @@ export const api = {
   orders: (query?: string) =>
     rpc<AdminOrderRow[]>('admin_orders', { p_query: query ?? null }),
 
+  /// Every stored fact about one order, as one object (0154). The screen behind
+  /// `/orders/:id`.
+  ///
+  /// Refuses in two different ways, and the difference matters to whoever is
+  /// reading: an id that was **deleted** (0069) raises a sentence naming the
+  /// admin who removed it and why, because that id still exists in a customer's
+  /// inbox and in a settlement. An id that never existed raises "No such order."
+  orderDetail: (orderId: string) =>
+    rpc<OrderDetail>('admin_order_detail', { p_order_id: orderId }),
+
   /// Takes the order off its rider and puts it back in the dispatcher's way.
   /// The order survives. Returns whoever was holding it.
   releaseDelivery: (orderId: string, reason: string) =>
@@ -976,6 +986,231 @@ export type OrderDeletionRow = {
   order_status: OrderStatus
   invoice_no: string | null
   total: number | null
+}
+
+/// Everything stored about one order, as `admin_order_detail` returns it
+/// (migration 0154).
+///
+/// This is the shape behind `/orders/:id`, and it is the only place in the
+/// console where an order's four halves — what was bought, who carried it, what
+/// was paid, and what was said about it afterwards — are one object. Before it,
+/// answering "what happened to this order" meant the live board, All orders,
+/// Support and Refunds, and the conversation was on none of them.
+///
+/// Two absences are deliberate and are the RPC's, not this file's:
+///
+///  * **No handover codes.** `handover` carries the attempt counts and no code.
+///    An admin who could read the pickup code could close a handover that never
+///    happened, which is the one thing 0049 exists to prevent.
+///  * **No route polylines.** Two encoded strings only a map can read, on a page
+///    that has no map.
+export type OrderDetail = {
+  /// The `orders` row, near enough whole. Every money column is in whole rupees.
+  order: {
+    id: string
+    status: OrderStatus
+    status_reason: string | null
+    created_at: string
+    accept_deadline: string
+    /// Written **when the kitchen accepted**, as accept-time plus the prep
+    /// minutes it chose (0015). Evidence that an accept happened and roughly
+    /// when — not an `accepted_at`, and the page never calls it one.
+    ready_by: string | null
+    ready_at: string | null
+    dispatch_started_at: string | null
+    eta_at: string | null
+    eta_reason: string | null
+    invoice_no: string | null
+    invoiced_at: string | null
+
+    restaurant_id: string
+    restaurant_name: string
+    user_id: string
+    user_phone: string
+    delivery_to: string
+    delivery_lat: number | null
+    delivery_lng: number | null
+    delivery_notes: string | null
+    eta_minutes: number
+    route_km: number | null
+
+    subtotal: number
+    delivery_fee: number
+    platform_fee: number
+    packaging_fee: number
+    surge_fee: number
+    taxes: number
+    tax_on_fees: number
+    cgst: number
+    sgst: number
+    igst: number
+    discount: number
+    total: number
+    coupon_code: string | null
+    discount_funded_by: string | null
+    payment_method: string
+    payment_id: string | null
+    place_of_supply: string | null
+    settlement_id: number | null
+  }
+
+  restaurant: {
+    id: string
+    name: string
+    phone: string | null
+    owner_name: string | null
+    address_line: string | null
+    city: string | null
+    latitude: number | null
+    longitude: number | null
+    accepting_orders: boolean
+    is_active: boolean
+  } | null
+
+  customer: {
+    user_id: string
+    email: string | null
+    name: string | null
+    phone: string | null
+    is_blocked: boolean
+    created_at: string
+    /// Orders placed **before this one**. Somebody's first night is a different
+    /// conversation from their fortieth.
+    orders_before: number
+  } | null
+
+  items: {
+    name: string
+    menu_item_id: string
+    unit_price: number
+    quantity: number
+    line_total: number
+    gst_rate_bps: number | null
+    hsn_code: string | null
+    discount_alloc: number | null
+    taxable_value: number | null
+    tax_amount: number | null
+    options: { name: string; price_delta: number }[]
+  }[]
+
+  /// The live delivery, or null while the order is still looking for a rider.
+  delivery: {
+    partner_email: string
+    rider_name: string | null
+    rider_phone: string | null
+    rider_vehicle: string | null
+    rider_engagement: RiderEngagement | null
+    state: DeliveryState
+    claimed_at: string
+    arrived_at_restaurant_at: string | null
+    picked_up_at: string | null
+    arrived_at_customer_at: string | null
+    delivered_at: string | null
+    distance_km: number | null
+    pay_base: number | null
+    pay_per_km: number | null
+    rider_pay: number | null
+    payout_id: number | null
+  } | null
+
+  /// Every ring this order made, oldest first (0148's relay). Five rows all
+  /// `expired` says the fleet was asleep; one `declined` and then nothing says
+  /// the relay ran out of riders.
+  offers: {
+    partner_email: string
+    rider_name: string | null
+    state: string
+    offered_at: string
+    expires_at: string
+    responded_at: string | null
+    distance_km: number | null
+    ride_km: number | null
+    rider_pay: number | null
+  }[]
+
+  /// Attempts at the two codes, never the codes. Non-zero here is somebody
+  /// standing at a door typing the wrong number.
+  handover: {
+    pickup_attempts: number
+    delivery_attempts: number
+    updated_at: string
+  } | null
+
+  /// The gateway's side (0085). `verified_at` null on a non-cash order is the
+  /// most important field on this page: the kitchen cooked against a payment
+  /// nobody proved.
+  payment: {
+    razorpay_order_id: string
+    razorpay_payment_id: string | null
+    amount: number
+    status: string
+    instrument: string | null
+    created_at: string
+    verified_at: string | null
+    consumed_at: string | null
+  } | null
+
+  refunds: {
+    id: number
+    amount: number
+    reason: string
+    status: string
+    funded_by: string
+    requested_by: string
+    approved_by: string | null
+    expected_by: string
+    gateway_refund_id: string | null
+    failure_reason: string | null
+    created_at: string
+    approved_at: string | null
+    paid_at: string | null
+  }[]
+
+  /// The canned conversation (0061). Safe to show whole because there is no
+  /// free text in it — the database owns every sentence either side can send.
+  messages: {
+    sender: string
+    code: string
+    body: string
+    created_at: string
+    read_at: string | null
+  }[]
+
+  photos: {
+    cooked: string | null
+    packed: string | null
+    delivery: string | null
+  }
+
+  review: {
+    food_rating: number | null
+    rider_rating: number | null
+    comment: string | null
+    created_at: string
+  } | null
+
+  tickets: {
+    id: number
+    category: IssueCategory
+    body: string | null
+    status: string
+    created_at: string
+    resolved_at: string | null
+    resolved_by: string | null
+    admin_note: string | null
+  }[]
+
+  /// What an admin did to this order, from the append-only trail (0092),
+  /// including the actions taken on its refunds. `detail` arrives reduced to the
+  /// fields that changed — `{status: {from, to}}` — because the stored row is
+  /// two complete copies of the table and a timeline cannot read that.
+  admin_actions: {
+    actor_email: string
+    action: string
+    target_type: string
+    detail: Record<string, { from: unknown; to: unknown }> | null
+    created_at: string
+  }[]
 }
 
 export type OrderStatus =

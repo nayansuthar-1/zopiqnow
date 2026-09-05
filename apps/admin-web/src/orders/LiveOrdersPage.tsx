@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { api, DELIVERY_LABEL, STATUS_LABEL } from '../lib/api'
 import type { AdminOrderRow, OrderStatus } from '../lib/api'
@@ -342,7 +343,14 @@ function OrderCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold text-ink">{o.order_id}</span>
+            {/* The id is the way in to the order's own page (0154). Everything
+                this card says is a summary of what is on it. */}
+            <Link
+              to={`/orders/${o.order_id}`}
+              className="font-semibold text-ink underline decoration-line underline-offset-4 hover:decoration-brand-ink"
+            >
+              {o.order_id}
+            </Link>
             <Pill tone={statusTones[o.status]}>{STATUS_LABEL[o.status]}</Pill>
             {awaitingAccept && (
               // The kitchen's five minutes (0051). Counted against
