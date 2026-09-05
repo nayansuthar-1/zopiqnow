@@ -439,7 +439,33 @@ the 21 screens by name. Four per-page search boxes stay; this is the one that wo
 you do not know which page the answer is on.
 
 #### T4-3 — Filters in the URL
-- [ ] **Cost:** ~150 lines across pages + a small hook
+- [x] **Shipped 2026-09-05** — `src/ui/urlState.ts` plus seven screens. No migration.
+
+**What landed.** Two hooks — `useUrlState` and `useUrlPage` — and adoption across All
+orders (search, status, range, restaurant, page), Support (filter, page), Refunds,
+Settlements, Rider payouts, People (filter, search) and Riders (search). A filtered view is
+now a link: "the stalled refunds for Sadri" can be sent rather than described.
+
+Four rules the hooks enforce, so seven screens cannot each decide differently:
+
+- **A default is absent, not written.** `/orders` and `/orders?status=any` are the same
+  screen, so only one of them is ever in the address bar and "is this link filtered?" stays
+  answerable at a glance.
+- **A change replaces rather than pushes.** Choosing four filters in a row would otherwise
+  put four entries in history and make the back button walk them one at a time.
+- **The URL is not trusted.** Anything with a fixed set of values is checked against it, so
+  a hand-typed `?status=nonsense` shows the default instead of reaching an RPC as an order
+  status.
+- **`?page=2` means the second page.** The hook holds the 1-based number a person reads and
+  returns the 0-based one the RPCs take, in one place rather than five chances to be off by
+  one in the direction that silently skips fifty orders.
+
+**Two knock-on fixes.** `admin_all_orders`' loader used to set the applied search term
+after a successful fetch; with the term living in the URL that would be a loop — the effect
+that reads it would be the thing that wrote it — so submitting now writes the address bar
+and the navigation runs the search. And People and Riders lost the seed-then-follow effect
+T4-2 gave them two days ago: the URL is the box now, not a value copied into one, so there
+is no second copy to disagree with it.
 
 Every filter, page number and search term on every list is component state. A support lead
 cannot send a colleague "the stalled refunds for Sadri" — there is no link for it, and a

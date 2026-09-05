@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useUrlPage, useUrlState } from '../ui/urlState'
 import { api, DELIVERY_LABEL, STATUS_LABEL } from '../lib/api'
 import type {
   AllOrderRow,
@@ -65,6 +66,11 @@ const rangeOptions: { value: Range; label: string }[] = [
   { value: '30d', label: '30 days' },
 ]
 
+/// What the two fixed-value filters accept, so a hand-typed `?status=nonsense`
+/// shows the default instead of reaching `admin_all_orders` as an order status.
+/// Derived from the option lists below rather than written twice.
+const RANGE_VALUES = rangeOptions.map((o) => o.value)
+
 const statusOptions: { value: OrderStatus | 'any'; label: string }[] = [
   { value: 'any', label: 'Any status' },
   { value: 'placed', label: STATUS_LABEL.placed },
@@ -76,6 +82,8 @@ const statusOptions: { value: OrderStatus | 'any'; label: string }[] = [
   { value: 'cancelled', label: STATUS_LABEL.cancelled },
   { value: 'rejected', label: STATUS_LABEL.rejected },
 ]
+
+const STATUS_VALUES = statusOptions.map((o) => o.value)
 
 /// A range as the start instant it means, in the browser's own timezone — the
 /// console is used from one desk in one country, and `toISOString()` hands
@@ -104,14 +112,27 @@ export function AllOrdersPage() {
   const [restaurants, setRestaurants] = useState<RestaurantRow[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  // Filters. `query` is what is being typed; it only reaches the database when
-  // the form is submitted, so a half-typed order id does not run four searches.
-  const [query, setQuery] = useState('')
-  const [applied, setApplied] = useState('')
-  const [status, setStatus] = useState<OrderStatus | 'any'>('any')
-  const [range, setRange] = useState<Range>('all')
-  const [restaurantId, setRestaurantId] = useState<string>('')
-  const [page, setPage] = useState(0)
+  // Filters, in the address bar since 0158's sibling change — so a filtered
+  // view is a link somebody can be sent rather than a screen they have to be
+  // talked through, and a refresh does not put you back on page one of nothing.
+  //
+  // `query` is what is being typed and stays local; `applied` is what the
+  // database was actually asked, and that is the half worth sharing. Submitting
+  // the form is what moves one into the other.
+  const [applied, setApplied] = useUrlState('q', '')
+  const [query, setQuery] = useState(applied)
+  // Typing never changes `applied`, so this only fires on a real navigation —
+  // the back button, or a link somebody was sent. Without it the box would keep
+  // showing the term you typed while the table showed the one you went back to.
+  useEffect(() => setQuery(applied), [applied])
+  const [status, setStatus] = useUrlState<OrderStatus | 'any'>(
+    'status',
+    'any',
+    STATUS_VALUES,
+  )
+  const [range, setRange] = useUrlState<Range>('range', 'all', RANGE_VALUES)
+  const [restaurantId, setRestaurantId] = useUrlState('restaurant', '')
+  const [page, setPage] = useUrlPage()
 
   // The evidence viewer (0094). `photosFor` is the order whose modal is open;
   // `photos` is null while the one fetch is in flight.
@@ -142,7 +163,6 @@ export function AllOrdersPage() {
           offset: opts.page * PAGE_SIZE,
         })
         setRows(next)
-        setApplied(opts.query)
         setError(null)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
@@ -157,6 +177,11 @@ export function AllOrdersPage() {
   // It depends on `applied` and never on `query`, which is the whole reason the
   // two exist separately: typing an order id must not fire a request per
   // keystroke, and submitting the form is what moves `query` into `applied`.
+  //
+  // `applied` is the URL now, so submitting writes the address bar and the
+  // navigation is what runs the search. `load` used to set it after a successful
+  // fetch, which would be a loop from here — the effect that reads it would be
+  // the thing that wrote it.
   useEffect(() => {
     void load({ query: applied, status, range, restaurantId, page })
   }, [load, applied, status, range, restaurantId, page])

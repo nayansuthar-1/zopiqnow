@@ -18,6 +18,7 @@ import {
   Th,
 } from '../ui/primitives'
 import { inr } from '../lib/money'
+import { useUrlState } from '../ui/urlState'
 
 /// Money going back out (migration 0077).
 ///
@@ -95,7 +96,13 @@ const isOpen = (r: RefundRow) => r.status !== 'paid' && r.status !== 'declined'
 
 export function RefundsPage() {
   const [all, setAll] = useState<RefundRow[] | null>(null)
-  const [filter, setFilter] = useState<Filter>('open')
+  // In the address bar, so a filtered view is a link a colleague can be sent
+  // rather than a screen they have to be talked through.
+  const [filter, setFilter] = useUrlState<Filter>('filter', 'open', [
+    'open',
+    'paid',
+    'all',
+  ])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

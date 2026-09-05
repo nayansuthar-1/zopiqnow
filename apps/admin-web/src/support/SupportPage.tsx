@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useUrlPage, useUrlState } from '../ui/urlState'
 import { api, GIFT_STATUS_LABEL, ISSUE_LABEL, STATUS_LABEL } from '../lib/api'
 import type {
   GiftOrderStatus,
@@ -51,6 +52,8 @@ const filterOptions: { value: Filter; label: string }[] = [
   { value: 'all', label: 'All' },
 ]
 
+const FILTER_VALUES = filterOptions.map((o) => o.value)
+
 function when(iso: string) {
   return new Date(iso).toLocaleString('en-IN', {
     day: '2-digit',
@@ -85,8 +88,10 @@ export function SupportPage() {
   const [rows, setRows] = useState<SupportTicketRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const [filter, setFilter] = useState<Filter>('open')
-  const [page, setPage] = useState(0)
+  // In the address bar, so a worklist someone is halfway through survives a
+  // refresh and can be handed to whoever takes over.
+  const [filter, setFilter] = useUrlState<Filter>('filter', 'open', FILTER_VALUES)
+  const [page, setPage] = useUrlPage()
 
   // The ticket being answered, and the reply being written.
   const [answering, setAnswering] = useState<SupportTicketRow | null>(null)

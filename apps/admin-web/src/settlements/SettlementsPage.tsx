@@ -20,6 +20,7 @@ import {
   Th,
 } from '../ui/primitives'
 import { inr, inrSigned } from '../lib/money'
+import { useUrlState } from '../ui/urlState'
 
 /// What the platform owes its restaurants, and the record that it paid.
 ///
@@ -60,7 +61,13 @@ function day(iso: string) {
 
 export function SettlementsPage() {
   const [rows, setRows] = useState<SettlementRow[] | null>(null)
-  const [filter, setFilter] = useState<'pending' | 'paid' | 'all'>('pending')
+  // In the address bar, so a run somebody is halfway through survives a refresh
+  // and can be handed to whoever takes over paying it.
+  const [filter, setFilter] = useUrlState<'pending' | 'paid' | 'all'>(
+    'filter',
+    'pending',
+    ['pending', 'paid', 'all'],
+  )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [paying, setPaying] = useState<SettlementRow | null>(null)

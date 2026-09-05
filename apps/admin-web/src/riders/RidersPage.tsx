@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useUrlState } from '../ui/urlState'
 import { api } from '../lib/api'
 import type {
   RestaurantRow,
@@ -188,12 +188,10 @@ export function RidersPage() {
   const [engaging, setEngaging] = useState<RiderRow | null>(null)
   // The roster had no search of any kind, which was fine while it was one
   // screenful and stopped being fine the moment the palette (0157) needed
-  // somewhere to send a rider it had found. Followed rather than read once:
-  // arriving here from the palette while already on this screen does not
-  // remount, and typing never touches the URL.
-  const urlQuery = useSearchParams()[0].get('q') ?? ''
-  const [query, setQuery] = useState(urlQuery)
-  useEffect(() => setQuery(urlQuery), [urlQuery])
+  // somewhere to send a rider it had found. Held in the address bar, so the
+  // narrowed roster is a link as well as a screen — and so there is no second
+  // copy of the value to disagree with the URL.
+  const [query, setQuery] = useUrlState('q', '')
 
   const load = useCallback(async () => {
     try {
