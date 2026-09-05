@@ -211,7 +211,36 @@ The board grows a breach filter and a red count in the header; a breach carries 
 that asks the most of the person reading it.
 
 #### T1-3 — The board stops polling, without a read policy on `orders`
-- [ ] **Cost:** 1 migration + ~60 lines
+- [x] **Shipped 2026-09-05** — migration `0156_the_board_is_told_instead_of_asking.sql`,
+      `src/orders/LiveOrdersPage.tsx`.
+
+**What landed.** Statement-level triggers on `orders`, `deliveries` and `delivery_offers`
+call `realtime.send('{}', 'changed', 'ops:orders', private => true)`. The board answers the
+doorbell by refetching through `admin_orders` — same function, same `assert_admin()`. No
+table got a read policy and nothing about an order crosses the socket. The poll survives at
+sixty seconds as the fallback, and the header says which of the two the board is running on.
+
+Three decisions worth keeping:
+
+- **The payload is empty, on purpose.** An order id on the wire invites a later change to
+  patch a row into the board client-side, and then there are two definitions of what is on
+  the board and one of them skips `admin_orders`. A doorbell cannot be misused that way.
+- **Statement-level triggers with a transition table.** Per row, one dispatch sweep would
+  ring twenty times. Per statement without the `exists` guard, the dispatcher's frequent
+  no-op updates would ring on every cron tick — which is the fifteen-second poll again
+  wearing a socket. Verified: one row changed rings once, zero rows changed rings not at all.
+- **Private channel, admin-only.** `realtime.messages` had RLS on and no policies, so
+  private channels denied everyone. This adds exactly one `select` policy, for one topic,
+  gated on `is_admin()`. No `insert` policy — the database is the only speaker, and an
+  admin trying to write to the channel is refused by RLS.
+
+**Verified as Realtime evaluates it** (role `authenticated`, claims set, `realtime.topic`
+set): an admin on `ops:orders` passes; a signed-in customer on `ops:orders`, an admin on any
+other topic, and `anon` with no session all see nothing; writes are refused for everyone.
+
+**Not verified end to end.** The socket itself — browser joins channel, hears the event,
+refetches — needs a signed-in admin session in a browser, which this work did not have.
+The database half is proven; the client half is compiled and unobserved.
 
 The 15-second poll is documented as a deliberate trade (`LiveOrdersPage.tsx:24`): Realtime
 would need an admin read policy on `orders`, and the console's structural guarantee is that

@@ -16,6 +16,7 @@ import {
   Pill,
   SegmentedControl,
 } from '../ui/primitives'
+import { supabase } from '../lib/supabase'
 import { useToast } from '../ui/toast'
 import { inr } from '../lib/money'
 
@@ -34,17 +35,31 @@ import { inr } from '../lib/money'
 /// `admin_orders` returned. One definition of late, in one place, for a board
 /// that is meant to agree with itself between refreshes.
 ///
-/// **It polls, and says so.** Every other live surface in this system is on
-/// Realtime, which the console cannot use: `orders` grants an admin no read at
-/// all — `admin_orders` is a `security definer` function, and a function cannot
-/// be subscribed to. Adding an admin policy to `orders` would buy a socket at
-/// the cost of the console's one structural guarantee, which is that it reaches
-/// the database through named functions and nothing else. So: fifteen seconds,
-/// a visible clock, and a refresh button for the impatient. An ops screen at a
-/// desk can afford to be a quarter-minute behind; it cannot afford to be the
-/// reason a table got a read policy.
+/// **It is told, and it also asks** (0156).
+///
+/// This screen polled every fifteen seconds for a good reason: `orders` grants
+/// an admin no read at all, `admin_orders` is a `security definer` function, and
+/// a function cannot be subscribed to. An admin read policy on `orders` would
+/// have bought a socket at the cost of the console's one structural guarantee.
+///
+/// A broadcast does not have to carry a row. The database now rings a private
+/// channel — `ops:orders`, event `changed`, **no payload** — and this screen
+/// answers the doorbell by refetching through `admin_orders`, the same function
+/// with the same `assert_admin()` behind it. No table got a policy; nothing about
+/// an order crosses the socket; the board is a second behind instead of fifteen.
+///
+/// The poll stays, at a minute, as the thing that makes the socket optional. If
+/// Realtime is down, the channel is denied, or the tab has been asleep, the board
+/// is still correct within a minute and says which of the two it is running on.
 
-const REFRESH_MS = 15_000
+/// The fallback sweep. Long, because it exists to cover a socket that is not
+/// working rather than to be the way the board keeps up.
+const REFRESH_MS = 60_000
+
+/// The floor between two socket-driven refetches. One statement on the vendor's
+/// side can ring three of these triggers — the order, its delivery, its offer —
+/// and a burst is one event as far as an admin reading the board is concerned.
+const DEBOUNCE_MS = 1_000
 
 const statusTones: Record<
   OrderStatus,
@@ -105,6 +120,9 @@ export function LiveOrdersPage() {
   const [busy, setBusy] = useState(false)
   // The board's one view switch: everything open, or only what is in trouble.
   const [onlyRisk, setOnlyRisk] = useState(false)
+  // Whether the doorbell is actually connected. False means the board is running
+  // on the minute-long fallback sweep, and the header says so.
+  const [live, setLive] = useState(false)
 
   // Read inside the interval so the timer does not have to be torn down and
   // rebuilt every time the search box changes.
@@ -146,6 +164,57 @@ export function LiveOrdersPage() {
     return () => {
       clearInterval(poll)
       clearInterval(paint)
+    }
+  }, [load])
+
+  // The doorbell (0156).
+  //
+  // `private: true` means Realtime checks a `select` policy on
+  // `realtime.messages` before it will let this subscription hear anything, and
+  // that policy is `topic = 'ops:orders' and is_admin()`. So the channel is
+  // admin-only by the same function as every RPC on this screen, and a signed-in
+  // customer who guesses the topic is refused by the database rather than by us.
+  //
+  // `setAuth()` with no argument hands Realtime the current session's token. The
+  // client does this on its own when auth state changes, but a channel opened on
+  // first paint can otherwise race that, and a private channel with no token is
+  // simply denied.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let closed = false
+
+    // Coalesced, never immediate. One vendor action rings three triggers.
+    const ring = () => {
+      if (timer !== null) return
+      timer = setTimeout(() => {
+        timer = null
+        // Same rule the poll follows: never reshuffle the board under an open
+        // confirmation, which names a rider the admin is reading before saying
+        // yes to it.
+        if (closed || actingRef.current) return
+        void load(appliedRef.current)
+      }, DEBOUNCE_MS)
+    }
+
+    const channel = supabase.channel('ops:orders', { config: { private: true } })
+
+    void supabase.realtime.setAuth().then(() => {
+      if (closed) return
+      channel
+        .on('broadcast', { event: 'changed' }, ring)
+        .subscribe((status) => {
+          if (closed) return
+          // Said out loud in the header rather than kept as a debug detail. An
+          // ops screen that is quietly a minute behind is worse than one that
+          // says it is.
+          setLive(status === 'SUBSCRIBED')
+        })
+    })
+
+    return () => {
+      closed = true
+      if (timer !== null) clearTimeout(timer)
+      void supabase.removeChannel(channel)
     }
   }, [load])
 
@@ -191,7 +260,11 @@ export function LiveOrdersPage() {
             ? 'Every order that has not ended yet.'
             : searching
               ? `${rows.length} order${rows.length === 1 ? '' : 's'} matching “${applied}”, any status`
-              : `${rows.length} open${atRisk.length > 0 ? ` · ${atRisk.length} in trouble` : ''} · updated ${age === null || age < 2 ? 'just now' : `${age}s ago`}`
+              : `${rows.length} open${atRisk.length > 0 ? ` · ${atRisk.length} in trouble` : ''} · ${
+                  live
+                    ? 'live'
+                    : `no live connection — refreshing every minute, updated ${age === null || age < 2 ? 'just now' : `${age}s ago`}`
+                }`
         }
         action={
           <div className="flex items-center gap-2">
