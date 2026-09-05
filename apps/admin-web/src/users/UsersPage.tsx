@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import type {
   UserDetail,
@@ -377,7 +378,17 @@ export function UsersPage() {
   const [users, setUsers] = useState<UserRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
-  const [query, setQuery] = useState('')
+  // Seeded from `?q=`, which is how the palette (0157) hands a person over —
+  // there is no page for one customer, so the roster narrowed to them is the
+  // nearest thing.
+  //
+  // Followed rather than read once. Arriving here from the palette while
+  // already on this screen does not remount the component, so an initial value
+  // would be the *previous* query; and typing never touches the URL, so this
+  // effect only ever fires on a real navigation and does not fight the box.
+  const urlQuery = useSearchParams()[0].get('q') ?? ''
+  const [query, setQuery] = useState(urlQuery)
+  useEffect(() => setQuery(urlQuery), [urlQuery])
   const [open, setOpen] = useState<UserRow | null>(null)
   const [confirming, setConfirming] = useState<UserRow | null>(null)
   const [busy, setBusy] = useState(false)

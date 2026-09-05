@@ -401,7 +401,37 @@ cosmetic; the RPC refusing is the control.
 a decision already written into the code.
 
 #### T4-2 — Global search and a command palette
-- [ ] **Cost:** 1 migration + ~250 lines · `Ctrl/Cmd-K`
+- [x] **Shipped 2026-09-05** — migration `0157_one_box_that_finds_anything.sql`,
+      `src/ui/CommandPalette.tsx`, mounted in `AppShell`.
+
+**What landed.** `admin_search(q)` asks four arms at once — orders, restaurants, riders,
+people — and Ctrl/Cmd-K opens a palette over any screen. Matches an order id (exact or
+prefix), an invoice number, a phone on its last digits with or without `+91`, an email
+anywhere in it, or a name. With the box empty it lists the twenty-two screens, so it is
+also how you get around; arrow keys and Enter throughout.
+
+Verified against live data: an order id finds one order; `+91 93584 55193` and
+`9358455193` return the same four hits; a name finds five restaurants; one character finds
+nothing; an all-letters query does **not** match every phone on the platform (the trap
+`admin_orders` documents, which has four more places to fall into here); and a rider
+appears once as a rider rather than twice.
+
+Two decisions worth keeping:
+
+- **`id` is the handle the console navigates by, not the primary key.** For a person that
+  means the email, because a uuid is the one thing about a customer no screen here can look
+  up. Riders and people land on their roster with the search applied — neither has a page
+  of its own, and inventing a route with nothing behind it would be worse than the honest
+  hand-off.
+- **The search glyph came out of the font, not from a drawing.** `ZopiqIcons.search`
+  already existed at `0xe30c`, so it went into the generator's WANTED list and was
+  regenerated — same drawing the three apps use, by construction.
+
+**Two small things came with it.** The Riders roster had no search of any kind and now has
+one (the palette needed somewhere to send a rider). Both it and People read `?q=` from the
+URL, following the param rather than reading it once — arriving from the palette while
+already on that screen does not remount, so an initial value would be the previous query.
+That is the first slice of T4-3, done because T4-2 could not work without it.
 
 One `admin_search(q)` that recognises an order id, a phone number, an email, a restaurant
 name or a rider name and returns typed hits. Plus the palette's second half: jump to any of

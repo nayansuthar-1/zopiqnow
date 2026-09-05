@@ -542,6 +542,16 @@ export const api = {
   orders: (query?: string) =>
     rpc<AdminOrderRow[]>('admin_orders', { p_query: query ?? null }),
 
+  /// One query across orders, restaurants, riders and people (0157) — an order
+  /// id, a phone on its last digits, an email, or a name. The console's four
+  /// per-screen search boxes each answer "is it on this page"; this one answers
+  /// the question somebody actually has, which is "where is it".
+  ///
+  /// Fewer than two characters returns nothing, from the database rather than
+  /// from a guard here, so the rule holds for anything else that ever calls it.
+  search: (query: string) =>
+    rpc<SearchHit[]>('admin_search', { p_query: query }),
+
   /// Every stored fact about one order, as one object (0154). The screen behind
   /// `/orders/:id`.
   ///
@@ -883,6 +893,21 @@ export type AdminOrderRow = {
   /// there are none.
   breach_since: string | null
 }
+
+/// One hit from the console-wide search (migration 0157).
+///
+/// `id` is the handle to navigate by, and what that means depends on `kind`: an
+/// order id, a restaurant id, an email for a rider or a person. Never a uuid —
+/// a uuid is the one thing about a customer that no screen here can look up.
+export type SearchHit = {
+  kind: SearchKind
+  id: string
+  title: string
+  subtitle: string | null
+  detail: string | null
+}
+
+export type SearchKind = 'order' | 'restaurant' | 'rider' | 'customer'
 
 /// The six ways an order can be in trouble (0155). Every threshold behind these
 /// lives in `sla_settings`, one row, so "two minutes" is an UPDATE rather than a

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useSession } from '../auth/context'
+import { CommandPalette } from './CommandPalette'
 import { currentLink, groups } from './nav'
 import { Icon } from './primitives'
 
@@ -38,6 +39,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-full flex-col md:flex-row">
+      {/* Ctrl-K, from anywhere in the console. Mounted here rather than per
+          screen because the whole point of it is that you do not have to be on
+          the right screen first. Renders nothing until it is opened. */}
+      <CommandPalette />
+
       {/* Straight to the content, for anybody who does not want to tab through
           twenty nav links on every page. The first thing in the DOM, visible
           only once it has focus. */}

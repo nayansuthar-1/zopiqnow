@@ -46,6 +46,8 @@ const WANTED = {
   wallet: 0xe68a,
   checkCircle: 0xe184,
   sliders: 0xe434,
+  // 0157: the palette's own box. Copied from ZopiqIcons.search.
+  search: 0xe30c,
 }
 
 const buf = fs.readFileSync(TTF)

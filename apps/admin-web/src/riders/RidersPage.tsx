@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import type {
   RestaurantRow,
@@ -26,6 +27,7 @@ import {
   Modal,
   PageBody,
   Pill,
+  SearchField,
   Select,
   Skeleton,
   TableSkeleton,
@@ -184,6 +186,14 @@ export function RidersPage() {
   const [banking, setBanking] = useState<RiderRow | null>(null)
   const [verifying, setVerifying] = useState<RiderRow | null>(null)
   const [engaging, setEngaging] = useState<RiderRow | null>(null)
+  // The roster had no search of any kind, which was fine while it was one
+  // screenful and stopped being fine the moment the palette (0157) needed
+  // somewhere to send a rider it had found. Followed rather than read once:
+  // arriving here from the palette while already on this screen does not
+  // remount, and typing never touches the URL.
+  const urlQuery = useSearchParams()[0].get('q') ?? ''
+  const [query, setQuery] = useState(urlQuery)
+  useEffect(() => setQuery(urlQuery), [urlQuery])
 
   const load = useCallback(async () => {
     try {
@@ -211,6 +221,19 @@ export function RidersPage() {
       setBusy(false)
     }
   }
+
+  // The three counts in the subtitle are about the whole fleet and stay that
+  // way — narrowing the list must not change what "3 active of 12" means.
+  const shown = (() => {
+    const q = query.trim().toLowerCase()
+    if (!q || riders === null) return riders
+    return riders.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.email.toLowerCase().includes(q) ||
+        (r.phone ?? '').includes(q),
+    )
+  })()
 
   const active = riders?.filter((r) => r.is_active) ?? []
   const waiting = riders?.filter((r) => r.kyc_blocked) ?? []
@@ -302,6 +325,31 @@ export function RidersPage() {
         )}
 
         {riders !== null && riders.length > 0 && (
+          <SearchField
+            label="Find a rider"
+            placeholder="Name, email or phone"
+            value={query}
+            onChange={setQuery}
+            // Filtered as you type — the roster is already in the browser, so
+            // there is nothing to submit and nothing to wait for.
+            onSubmit={() => {}}
+            onClear={query ? () => setQuery('') : undefined}
+          />
+        )}
+
+        {riders !== null && riders.length > 0 && shown !== null && shown.length === 0 && (
+          <EmptyState
+            title="No rider matches that"
+            body="Nothing in the fleet carries that name, address or number."
+            action={
+              <Button variant="secondary" onClick={() => setQuery('')}>
+                Show all {riders.length}
+              </Button>
+            }
+          />
+        )}
+
+        {shown !== null && shown.length > 0 && (
           <DataTable label="Delivery partners" minWidth={1100}>
             <thead>
               <tr>
@@ -314,7 +362,7 @@ export function RidersPage() {
               </tr>
             </thead>
             <tbody>
-              {riders.map((r) => (
+              {shown.map((r) => (
                 <tr key={r.email}>
                   <Td>
                     <div className="flex flex-wrap items-center gap-2">
