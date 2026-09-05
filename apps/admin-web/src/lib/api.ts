@@ -489,10 +489,28 @@ export const api = {
   declineRefund: (id: number, reason: string) =>
     rpc<void>('admin_decline_refund', { p_id: id, p_reason: reason }),
 
-  /// Records that the money went back — it does not send it. There is no gateway
-  /// yet (PAY-001), so this is a transfer somebody made and came back to log,
-  /// exactly like a settlement or a rider payout. The reference is mandatory for
-  /// the same reason theirs are.
+  /// Sends one refund to Razorpay now, or reads the answer if it is already in
+  /// flight (migration 0158). The same call behind both "Send to Razorpay" and
+  /// "Check again", because from the desk it is one intent and which half runs
+  /// depends only on where the refund already is.
+  ///
+  /// **It is two calls, not one, and that is pg_net's rule rather than a
+  /// choice.** `net.http_post` queues a request and the worker dispatches it
+  /// only after the transaction commits, so no function can fire and read its
+  /// own answer. Fire, wait a moment, ask again.
+  ///
+  /// Returns the sentence to show the admin, and raises one for every refusal —
+  /// this button is pressed with a customer waiting, and "nothing happened" is
+  /// the worst possible answer.
+  pushRefund: (id: number) =>
+    rpc<string>('admin_push_refund', { p_id: id }),
+
+  /// Records that the money went back — it does not send it. For a refund with
+  /// a real Razorpay capture behind it, `pushRefund` is the one that moves money
+  /// and this is not needed. This is for the other kind: a cash order, or one of
+  /// the `pay_mock_…` rows that predate payments, where the transfer happened
+  /// somewhere else and somebody came back to log it. The reference is mandatory
+  /// for the same reason a settlement's is.
   markRefundPaid: (id: number, reference: string) =>
     rpc<void>('admin_mark_refund_paid', { p_id: id, p_reference: reference }),
 
@@ -1452,6 +1470,16 @@ export type RefundRow = {
   settlement_id: number | null
   created_at: string
   paid_at: string | null
+  /// Whether Razorpay has a payment to send back (0158) — computed by the
+  /// database, not derived here.
+  ///
+  /// **`payment_method` is not this answer**, which is why this column exists.
+  /// Every refund on the platform sits on a `upi` order and nineteen of the
+  /// twenty-three carry a `pay_mock_…` id from before payments existed; deciding
+  /// by payment method would offer a gateway button on all of them and have
+  /// nineteen fail. False means the money goes back some other way and the row
+  /// waits for "Mark sent".
+  gateway_backed: boolean
 }
 
 export type SettlementRow = {

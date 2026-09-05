@@ -34,10 +34,24 @@ import { inr } from '../lib/money'
 /// or the only way to refund a cash order that really was delivered. That one
 /// waits for an approval, and both the issuing and the approving carry a name.
 ///
-/// **This page does not move money.** No gateway is wired in yet (PAY-001), so a
-/// refund is settled the way a rider payout is: somebody makes the transfer and
-/// comes back with the reference. When the gateway lands it writes the same
-/// three columns from a webhook and the row will not know the difference.
+/// **This page moves money.** It said the opposite until 0158 — "no gateway is
+/// wired in yet (PAY-001)" — and that had been untrue since 0138 put Razorpay
+/// behind the queue. Of the four refunds on this platform against a real
+/// capture, three paid themselves without anybody touching them.
+///
+/// So: a refund whose `payment_id` is a real Razorpay capture is sent
+/// automatically, within five minutes of being approved, and **Send to Razorpay**
+/// is the same trip taken now instead of on the next tick. What comes back is
+/// Razorpay's own sentence, kept whole — "this payment was never captured" and
+/// "the payment has been fully refunded already" need completely different
+/// answers, and paraphrasing them into "failed" would throw away the only useful
+/// thing in the reply.
+///
+/// The other kind still settles by hand. A cash order never had a gateway
+/// payment, and neither did the nineteen `pay_mock_…` rows that predate payments
+/// — no money was taken, so none goes back through Razorpay. Those wait for
+/// **Mark sent**, which is a person recording a decision rather than a transfer
+/// this page made.
 
 function stamp(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', {
@@ -64,6 +78,14 @@ const statusLabel: Record<RefundRow['status'], string> = {
   declined: 'Declined',
 }
 
+/// How long to wait before asking Razorpay what it said.
+///
+/// pg_net dispatches the request only once the transaction that queued it has
+/// committed, so the answer cannot exist when `pushRefund` returns. Two seconds
+/// is comfortably longer than Razorpay takes to answer and short enough that the
+/// admin who pressed the button is still looking at it.
+const COLLECT_AFTER_MS = 2_000
+
 type Filter = 'open' | 'paid' | 'all'
 
 /// Open is four of the six statuses, and it is the question the header asks as
@@ -86,6 +108,12 @@ export function RefundsPage() {
   const [declining, setDeclining] = useState<RefundRow | null>(null)
   const [declineReason, setDeclineReason] = useState('')
 
+  // Which row's gateway trip is in flight, and what Razorpay said about it.
+  // `said` is not an error and is not dismissed on a timer: "Razorpay refused
+  // it: this payment was never captured" is the whole reason the button was
+  // pressed, and it stays on screen until the next press.
+  const [pushing, setPushing] = useState<number | null>(null)
+  const [said, setSaid] = useState<string | null>(null)
   const [issuing, setIssuing] = useState(false)
   const [orderId, setOrderId] = useState('')
   const [amount, setAmount] = useState('')
@@ -106,6 +134,38 @@ export function RefundsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  /// Send this refund to Razorpay, then come back for the answer.
+  ///
+  /// Two calls, because pg_net cannot deliver a request and its reply inside one
+  /// transaction. The first fires and says so; the second reads what Razorpay
+  /// returned and settles the row. If the answer has not landed yet the RPC says
+  /// that too — nothing here retries on its own, because a second call to
+  /// Razorpay for money that may already have moved is the one mistake this
+  /// whole path exists to avoid.
+  async function push(r: RefundRow) {
+    setPushing(r.id)
+    setError(null)
+    setSaid(null)
+    try {
+      const first = await api.pushRefund(r.id)
+      setSaid(first)
+      await load()
+
+      // Only when we have just fired one. A "Check again" has already returned
+      // the settled answer, or has told us it is still in flight, and asking
+      // twice in four seconds would say the same thing twice.
+      if (first.startsWith('Sent to Razorpay')) {
+        await new Promise((done) => setTimeout(done, COLLECT_AFTER_MS))
+        setSaid(await api.pushRefund(r.id))
+        await load()
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setPushing(null)
+    }
+  }
 
   async function run(action: () => Promise<unknown>, close: () => void) {
     setBusy(true)
@@ -166,6 +226,25 @@ export function RefundsPage() {
             onDismiss={() => setError(null)}
           >
             {error}
+          </Banner>
+        )}
+
+        {/* Razorpay's own words, kept whole. A refusal is not an error on this
+            screen — the trip was made and this is what came back — so it is a
+            notice rather than a red banner, and it stays until the next push. */}
+        {said && (
+          <Banner
+            tone={
+              said.startsWith('Razorpay refused')
+                ? 'warn'
+                : said.startsWith('Razorpay paid')
+                  ? 'success'
+                  : 'info'
+            }
+            className="mb-4 max-w-2xl"
+            onDismiss={() => setSaid(null)}
+          >
+            {said}
           </Banner>
         )}
 
@@ -258,6 +337,15 @@ export function RefundsPage() {
                           {r.failure_reason}
                         </p>
                       )}
+                    {/* Otherwise these read as stuck. Nineteen rows on this
+                        platform are waiting for a person and look exactly like
+                        the ones the gateway is about to take. */}
+                    {!r.gateway_backed &&
+                      (r.status === 'approved' || r.status === 'requested') && (
+                        <p className="mt-1 text-xs text-ink-muted">
+                          No gateway payment — settle by hand
+                        </p>
+                      )}
                     {(r.status === 'requested' ||
                       r.status === 'approved') && (
                       <p className="mt-1 text-xs text-ink-muted">
@@ -293,6 +381,28 @@ export function RefundsPage() {
                             }}
                           >
                             Decline
+                          </Button>
+                        )}
+                      {/* The gateway trip, on the rows that have one to make.
+                          `failed` is included on purpose: Razorpay refuses for
+                          reasons that get fixed, and the alternative is an admin
+                          re-approving a row just to make a button appear — which
+                          is exactly what happened to refund 98 on this
+                          database. */}
+                      {r.gateway_backed &&
+                        (r.status === 'approved' ||
+                          r.status === 'processing' ||
+                          r.status === 'failed') && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            loading={pushing === r.id}
+                            disabled={pushing !== null}
+                            onClick={() => void push(r)}
+                          >
+                            {r.status === 'processing'
+                              ? 'Check again'
+                              : 'Send to Razorpay'}
                           </Button>
                         )}
                       {(r.status === 'approved' ||
