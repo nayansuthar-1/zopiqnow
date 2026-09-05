@@ -274,6 +274,36 @@ demos. It is fourth only because it is worth less than the three above it on a b
 
 ### Tier 2 — The knobs, brought in from psql
 
+> **Shipped 2026-09-05** — migration `0159_the_knobs_come_in_from_psql.sql`,
+> `src/settings/ServiceAreasPage.tsx` (`/settings/areas`) and
+> `src/settings/PlatformSettingsPage.tsx` (`/settings/platform`).
+>
+> Two screens rather than five: service areas earn their own, and the three
+> single-row settings tables are three cards on one page because they are read
+> together and a round trip each would be three chances to draw a page half from
+> before somebody's change.
+>
+> **Two of this tier's premises were wrong, and checking beat assuming.**
+> T2-4 said the payment gate ships off and one statement arms it — it has been
+> **armed since 2026-08-29**, so the screen is not a switch waiting to be thrown
+> and the dangerous direction is now *off*. T2-5 said the rider cash cap is
+> edited one rider at a time — it is a single platform-wide row and the Cash
+> screen has edited it since 0076. Nothing was built for it; the platform page
+> shows the figure and links there.
+>
+> **A leak caught on the way.** Auditing `delivery_surcharge_settings` would have
+> copied `weather_api_key` into `admin_actions` on every save — a table this plan
+> intends to put a screen in front of. `record_admin_action` now takes optional
+> extra arguments naming columns to leave out, which is additive: all twenty-three
+> existing triggers pass one argument and are unaffected. Verified: the audit row
+> for a surcharge change records `night_amount: 20 → 25` and contains no key.
+>
+> Also verified against live data — the town list carries its kitchens and a
+> month of orders (Sadri 9 and 26; Ghanerao 0 and 0); opening a town with no
+> kitchen is refused in a sentence; a new town slugs its own id and arrives
+> closed; dispatch and surcharge nonsense is refused in words; and a non-admin
+> gets nothing. All of it rolled back.
+
 Five product levers currently live in SQL files and a psql session. Each of these is a
 small screen over a table that already exists — the cheapest real capability in this
 document, and the one that stops requiring an engineer for a business decision.

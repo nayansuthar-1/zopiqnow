@@ -88,6 +88,16 @@ const GiftCataloguePage = lazy(() =>
 const SettingsPage = lazy(() =>
   import('./settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
+const ServiceAreasPage = lazy(() =>
+  import('./settings/ServiceAreasPage').then((m) => ({
+    default: m.ServiceAreasPage,
+  })),
+)
+const PlatformSettingsPage = lazy(() =>
+  import('./settings/PlatformSettingsPage').then((m) => ({
+    default: m.PlatformSettingsPage,
+  })),
+)
 
 /// What a route looks like while its chunk is in the air.
 ///
@@ -183,6 +193,10 @@ function ConsoleRoutes() {
           <Route path="/gift-orders" element={<GiftOrdersPage />} />
           <Route path="/gifts" element={<GiftCataloguePage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          {/* The knobs (0159). Under /settings so the nav's longest-prefix
+              match keeps the Console group highlighted on all three. */}
+          <Route path="/settings/areas" element={<ServiceAreasPage />} />
+          <Route path="/settings/platform" element={<PlatformSettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

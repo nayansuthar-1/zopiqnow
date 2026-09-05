@@ -560,6 +560,46 @@ export const api = {
   orders: (query?: string) =>
     rpc<AdminOrderRow[]>('admin_orders', { p_query: query ?? null }),
 
+  // -------------------------------------------------------------------------
+  // The knobs (0159). Four levers that used to need a psql session.
+  // -------------------------------------------------------------------------
+
+  serviceAreas: () => rpc<ServiceAreaRow[]>('admin_service_areas'),
+
+  /// Creates a town or moves one. A new one arrives **switched off** and its id
+  /// is slugged from the name and never changes afterwards — it is what
+  /// `restaurants.service_area_id` points at.
+  upsertServiceArea: (area: {
+    id?: string
+    name: string
+    centre_lat: number
+    centre_lng: number
+    radius_km: number
+    catchment_id?: string | null
+  }) => rpc<string>('admin_upsert_service_area', { p: area }),
+
+  /// Opens or closes a town. Refuses to open one with no kitchen behind it and
+  /// no shared catalogue — 0126's town lock would put an empty feed in front of
+  /// every customer there, which reads as a broken app rather than as a town we
+  /// do not serve yet.
+  setServiceAreaActive: (id: string, active: boolean) =>
+    rpc<string>('admin_set_service_area_active', { p_id: id, p_active: active }),
+
+  platformSettings: () => rpc<PlatformSettings>('admin_platform_settings'),
+
+  setDispatchSettings: (d: PlatformSettings['dispatch']) =>
+    rpc<string>('admin_set_dispatch_settings', { p: d }),
+
+  setSurchargeSettings: (s: PlatformSettings['surcharge']) =>
+    rpc<string>('admin_set_surcharge_settings', { p: s }),
+
+  /// Arms or disarms 0085's payment-verification trigger. **On since
+  /// 2026-08-29**, so the dangerous direction here is off — and off is a real
+  /// need at three in the morning when verification is down and no order can be
+  /// placed at all.
+  setPaymentGate: (on: boolean) =>
+    rpc<string>('admin_set_payment_gate', { p_on: on }),
+
   /// One query across orders, restaurants, riders and people (0157) — an order
   /// id, a phone on its last digits, an email, or a name. The console's four
   /// per-screen search boxes each answer "is it on this page"; this one answers
@@ -1480,6 +1520,77 @@ export type RefundRow = {
   /// nineteen fail. False means the money goes back some other way and the row
   /// waits for "Mark sent".
   gateway_backed: boolean
+}
+
+/// One town Zopiqnow serves, or has drawn and not opened (migration 0159).
+///
+/// The counts are what make the switch a decision rather than a guess: Ghanerao
+/// has been seeded and dark since August with nothing behind it, and Sadri has
+/// nine kitchens and this month's orders. A list of names and toggles cannot
+/// tell those apart.
+export type ServiceAreaRow = {
+  id: string
+  name: string
+  centre_lat: number
+  centre_lng: number
+  radius_km: number
+  is_active: boolean
+  /// Ranakpur shares Sadri's catalogue (0126). Null is the normal case.
+  catchment_id: string | null
+  catchment_name: string | null
+  restaurant_count: number
+  live_restaurant_count: number
+  orders_30d: number
+  /// Written by `poll_weather` every five minutes. Shown so that turning the
+  /// rain surcharge off is an informed act; never editable from here.
+  raining_until: string | null
+  last_precip_mm: number | null
+  weather_checked_at: string | null
+  created_at: string
+}
+
+/// The three single-row settings tables, read together (0159).
+///
+/// `surcharge` deliberately carries `has_weather_key` and not the key itself —
+/// the console has no use for a credential and a settings screen that
+/// round-tripped one would put it in a bundle and in every screenshot.
+export type PlatformSettings = {
+  dispatch: {
+    id: number
+    first_radius_km: number
+    radius_step_km: number
+    max_radius_km: number
+    widen_after_seconds: number
+    stack_drop_km: number
+    max_live_jobs: number
+    offer_window_seconds: number
+    contest_seconds: number
+    no_show_after_minutes: number
+    no_show_window_days: number
+    no_show_alert_at: number
+    updated_at: string
+  }
+  surcharge: {
+    id: number
+    night_from: string
+    night_to: string
+    night_amount: number
+    rain_amount: number
+    rain_hold_minutes: number
+    rain_min_mm: number
+    enabled: boolean
+    has_weather_key: boolean
+    updated_at: string
+  }
+  payments: {
+    require_verified_payment: boolean
+    /// Live orders on a prepaid method with nothing proving they were paid for.
+    /// The number that decides whether arming the gate is safe, and the number
+    /// that says what leaving it off has been costing.
+    unverified_live_orders: number
+  }
+  /// Read-only here — the Cash screen has owned this since 0076.
+  cash: { cap: number }
 }
 
 export type SettlementRow = {

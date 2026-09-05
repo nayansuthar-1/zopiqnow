@@ -70,7 +70,19 @@ export const groups: {
   },
   {
     heading: 'Console',
-    links: [{ to: '/settings', label: 'Settings', end: false, icon: 'sliders' }],
+    links: [
+      // `end` on Settings, unlike everywhere else: 0159 put two screens
+      // underneath it, and without it the roster link would stay highlighted
+      // while you were on one of them.
+      { to: '/settings', label: 'Settings', end: true, icon: 'sliders' },
+      { to: '/settings/areas', label: 'Service areas', end: false, icon: 'mapPin' },
+      {
+        to: '/settings/platform',
+        label: 'Platform settings',
+        end: false,
+        icon: 'sliders',
+      },
+    ],
   },
 ]
 
