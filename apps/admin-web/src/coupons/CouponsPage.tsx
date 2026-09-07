@@ -44,14 +44,16 @@ const stateTones: Record<CouponState, 'live' | 'neutral' | 'danger'> = {
 
 /// What the code is worth, in the words the customer's cart uses.
 function worth(c: CouponRow) {
-  const off =
-    c.flat_off !== null
+  const off = c.free_delivery
+    ? 'Free delivery'
+    : c.flat_off !== null
       ? `${inr(c.flat_off)} off`
       : // The only non-null assertion in this app, and it is a statement about
         // the database rather than a hope about the data:
-        // `coupon_is_flat_xor_capped_percent` has been on `coupons` since 0003
-        // and says a coupon is either flat or a capped percentage, so a row that
-        // reaches this branch has both `percent_off` and `max_off`. The
+        // `coupon_is_one_kind_of_offer` has been on `coupons` since 0003 (as
+        // the flat-or-percent XOR, widened by 0161) and says a coupon is exactly
+        // one of the three, so a row that reaches this branch — not free
+        // delivery, not flat — has both `percent_off` and `max_off`. The
         // alternative is a `?? 0` for a row that cannot exist — which is the
         // dead guard finding D4 of the fix queue looked at and declined.
         `${c.percent_off}% off up to ${inr(c.max_off!)}`
@@ -66,7 +68,11 @@ type Draft = {
   /// beside it. The field is therefore fixed once a coupon has a code.
   isNew: boolean
   min_subtotal: string
-  kind: 'flat' | 'percent'
+  /// The three kinds a coupon can be (0161). `free` waives the delivery fee and
+  /// carries no amount at all — the fields below stay whatever they were typed
+  /// as and are sent as null, so switching back and forth does not lose a
+  /// half-written percentage.
+  kind: 'flat' | 'percent' | 'free'
   flat_off: string
   percent_off: string
   max_off: string
@@ -125,13 +131,15 @@ export function CouponsPage() {
       await api.saveCoupon({
         code: draft.code,
         min_subtotal: Number(draft.min_subtotal || 0),
-        // A percentage coupon sends no flat amount and a flat one sends no
-        // percentage — the XOR the table has enforced since 0003. Sending both
+        // A percentage coupon sends no flat amount, a flat one sends no
+        // percentage, and a free-delivery one sends neither — the rule the table
+        // has enforced since 0003 and 0161 widened to three arms. Sending both
         // and letting the server pick would make the form the second place the
         // rule lives.
         flat_off: draft.kind === 'flat' ? Number(draft.flat_off || 0) : null,
         percent_off: draft.kind === 'percent' ? Number(draft.percent_off || 0) : null,
         max_off: draft.kind === 'percent' ? Number(draft.max_off || 0) : null,
+        free_delivery: draft.kind === 'free',
         // A date input hands back a bare "2026-09-30", which ECMAScript reads
         // as UTC midnight — half past five on the morning of the 30th, here.
         // The day an admin picks as the last day is a day the code still works
@@ -222,7 +230,11 @@ export function CouponsPage() {
                   code: c.code,
                   isNew: false,
                   min_subtotal: String(c.min_subtotal),
-                  kind: c.flat_off !== null ? 'flat' : 'percent',
+                  kind: c.free_delivery
+                    ? 'free'
+                    : c.flat_off !== null
+                      ? 'flat'
+                      : 'percent',
                   flat_off: c.flat_off === null ? '' : String(c.flat_off),
                   percent_off: c.percent_off === null ? '' : String(c.percent_off),
                   max_off: c.max_off === null ? '' : String(c.max_off),
@@ -318,11 +330,22 @@ export function CouponsPage() {
                   options={[
                     { value: 'flat', label: 'Flat amount' },
                     { value: 'percent', label: 'Percentage' },
+                    { value: 'free', label: 'Free delivery' },
                   ]}
                 />
               </div>
 
-              {draft.kind === 'flat' ? (
+              {draft.kind === 'free' ? (
+                /* Nothing to fill in: the amount is the delivery fee, which the
+                   server sets and this screen has no business restating. The
+                   note is here because "free delivery" is a promise about one
+                   line of the bill, and ops should know which one. */
+                <p className="rounded-field bg-canvas px-3 py-2.5 text-sm text-ink-muted">
+                  The delivery fee is waived in full — nothing comes off the
+                  food. A late-night or rain surcharge is still charged, because
+                  that ride really does cost more to make.
+                </p>
+              ) : draft.kind === 'flat' ? (
                 <Field
                   label="Amount off (₹)"
                   type="number"

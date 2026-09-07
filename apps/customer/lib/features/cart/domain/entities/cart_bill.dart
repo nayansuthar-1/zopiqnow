@@ -29,6 +29,7 @@ class CartBill {
     required this.taxes,
     this.discount = 0,
     this.surcharge = DeliverySurcharge.none,
+    this.freeDelivery = false,
   });
 
   /// Prices a cart. An empty cart bills nothing — not even a delivery fee.
@@ -39,10 +40,17 @@ class CartBill {
   /// [surcharge] likewise comes from the server (`delivery_surcharge_now`), and
   /// defaults to none so that a caller which has not read it yet quotes the
   /// plain fee rather than nothing at all.
+  ///
+  /// [freeDelivery] is the applied coupon's, and is the *only* thing that zeroes
+  /// the fee. It is deliberately not a discount: `place_order` waives the fee
+  /// and the 18% inside it rather than taking rupees off the food, so the food's
+  /// own GST does not move (migration 0161). Subtracting ₹40 here instead would
+  /// quote a total two rupees under the one that is charged.
   factory CartBill.of(
     Cart cart, {
     int discount = 0,
     DeliverySurcharge surcharge = DeliverySurcharge.none,
+    bool freeDelivery = false,
   }) {
     if (cart.isEmpty) {
       return const CartBill(subtotal: 0, deliveryFee: 0, taxes: 0);
@@ -83,9 +91,13 @@ class CartBill {
       // payment gate refuses an intent worth less than the order, so a cart that
       // still believed in free delivery would take ₹40 too little and have the
       // order refused after the money was captured.
-      deliveryFee: flatDeliveryFee,
+      //
+      // A free-delivery coupon is the one thing that moves it, and it moves it
+      // to zero: the fee is waived, not discounted (0161).
+      deliveryFee: freeDelivery ? 0 : flatDeliveryFee,
       taxes: taxes,
       discount: discount,
+      freeDelivery: freeDelivery,
     );
   }
 
@@ -143,8 +155,16 @@ class CartBill {
   /// [deliveryFee].
   final int taxes;
 
-  /// Coupon discount in whole rupees; 0 when no coupon is applied.
+  /// Coupon discount in whole rupees; 0 when no coupon is applied, and 0 for a
+  /// free-delivery code, which takes nothing off the food.
   final int discount;
+
+  /// Whether a coupon waived the delivery fee (migration 0161).
+  ///
+  /// [deliveryFee] is already 0 when this is true. The flag survives beside it
+  /// so the bill can say *why* the line is free rather than quietly printing
+  /// ₹0, which reads like a bug.
+  final bool freeDelivery;
 
   /// What the hour and the weather are adding to delivery (migration 0129).
   ///

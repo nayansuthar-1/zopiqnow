@@ -21,10 +21,12 @@ class BillSummary extends StatelessWidget {
 
   final CartBill bill;
 
-  /// Coupon only. A waived delivery fee used to count towards this and no
-  /// longer can — migration 0123 withdrew the threshold, so there is no waived
-  /// fee to add and "you saved ₹40" would be a claim about nothing.
-  int get _saved => bill.discount;
+  /// Coupon only, and both kinds of it: rupees off the food, or the fee a
+  /// free-delivery code waived (migration 0161). No basket size earns the fee
+  /// back — 0123 withdrew that threshold — so a waived fee here is always a
+  /// coupon's doing and always worth saying.
+  int get _saved =>
+      bill.discount + (bill.freeDelivery ? CartBill.flatDeliveryFee : 0);
 
   /// The height of the band below the perforation.
   ///
@@ -85,10 +87,15 @@ class BillSummary extends StatelessWidget {
                 const SizedBox(height: ZopiqSpacing.xl),
 
                 _BillRow(label: 'Item total', value: '₹${bill.subtotal}'),
-                // No FREE branch and no strikethrough. The fee is charged on
-                // every order now, so a struck-through ₹40 beside the word FREE
-                // would be advertising a discount that does not exist.
-                _BillRow(label: 'Delivery fee', value: '₹${bill.deliveryFee}'),
+                // No basket size earns this and no strikethrough advertises one:
+                // the fee is charged on every order. A coupon that waives it
+                // (migration 0161) is the one exception, and it says so in
+                // words — a bare ₹0 on the line reads like a bug.
+                _BillRow(
+                  label: 'Delivery fee',
+                  value: bill.freeDelivery ? 'FREE' : '₹${bill.deliveryFee}',
+                  valueColor: bill.freeDelivery ? zc.veg : null,
+                ),
                 // Its own line rather than a bigger delivery fee, and captioned
                 // with the reason. A customer who opens the bill at 8pm and
                 // finds ₹60 where ₹40 was an hour ago is owed the sentence, not
@@ -144,9 +151,9 @@ class BillSummary extends StatelessWidget {
                       // in the strip below, but a number nobody has to read a
                       // strip to find is the number that makes an offer feel
                       // like one.
-                      if (bill.discount > 0) ...<Widget>[
+                      if (_saved > 0) ...<Widget>[
                         Text(
-                          '₹${bill.total + bill.discount}',
+                          '₹${bill.total + _saved}',
                           style: t.bodyMedium?.copyWith(
                             color: zc.textMuted,
                             decoration: TextDecoration.lineThrough,

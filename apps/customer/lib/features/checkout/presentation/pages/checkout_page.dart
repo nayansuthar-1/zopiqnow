@@ -435,7 +435,12 @@ class _CouponCardState extends ConsumerState<_CouponCard> {
                       style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     Text(
-                      'You save ₹${coupon.discount} on this order',
+                      // A free-delivery code's discount is 0 and saying "you
+                      // save ₹0" under an applied coupon would read as a
+                      // failure. It saves the delivery fee (migration 0161).
+                      coupon.freeDelivery
+                          ? 'Free delivery on this order'
+                          : 'You save ₹${coupon.discount} on this order',
                       style: t.bodySmall?.copyWith(
                         color: zc.veg,
                         fontWeight: FontWeight.w600,

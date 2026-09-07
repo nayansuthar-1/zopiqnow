@@ -412,6 +412,9 @@ final Provider<CartBill> checkoutBillProvider = Provider<CartBill>((Ref ref) {
   return CartBill.of(
     cart,
     discount: coupon?.discount ?? 0,
+    // Not a discount and not folded into one: the fee goes, the food's tax
+    // stays where it was (migration 0161).
+    freeDelivery: coupon?.freeDelivery ?? false,
     // `.value` and not `.requireValue`: while the read is in flight this is
     // null and the bill shows the plain fee for a moment, rather than the
     // screen showing a spinner over a total the customer was already reading.

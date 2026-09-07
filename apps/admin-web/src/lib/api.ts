@@ -831,6 +831,10 @@ export const api = {
     budget: number | null
     first_order_only: boolean
     is_public: boolean
+    /// Waives the delivery fee instead of taking money off the food (0161).
+    /// Exclusive with the two amounts above — the table refuses a code that is
+    /// both, and so does the RPC, with a sentence.
+    free_delivery: boolean
   }) =>
     rpc<string>('admin_save_coupon', {
       p_code: c.code,
@@ -844,6 +848,7 @@ export const api = {
       p_budget: c.budget,
       p_first_order_only: c.first_order_only,
       p_is_public: c.is_public,
+      p_free_delivery: c.free_delivery,
     }),
 
   /// A restaurant's own code can be switched off from here, and only off.
@@ -1410,6 +1415,9 @@ export type CouponRow = {
   budget: number | null
   first_order_only: boolean
   is_public: boolean
+  /// The code waives the delivery fee (0161). The three amount columns are all
+  /// null when this is true — a coupon is one kind of offer, not two.
+  free_delivery: boolean
   /// Whose money the discount is (0074). Restaurant-funded codes come off that
   /// restaurant's settlement; platform ones come off promotional spend.
   funded_by: 'platform' | 'restaurant'
