@@ -29,7 +29,7 @@ class CartBill {
     required this.taxes,
     this.discount = 0,
     this.surcharge = DeliverySurcharge.none,
-    this.freeDelivery = false,
+    this.deliveryWaived = 0,
   });
 
   /// Prices a cart. An empty cart bills nothing — not even a delivery fee.
@@ -41,16 +41,22 @@ class CartBill {
   /// defaults to none so that a caller which has not read it yet quotes the
   /// plain fee rather than nothing at all.
   ///
-  /// [freeDelivery] is the applied coupon's, and is the *only* thing that zeroes
-  /// the fee. It is deliberately not a discount: `place_order` waives the fee
-  /// and the 18% inside it rather than taking rupees off the food, so the food's
-  /// own GST does not move (migration 0161). Subtracting ₹40 here instead would
-  /// quote a total two rupees under the one that is charged.
+  /// [deliveryFee] is what the server is charging for the ride right now
+  /// (`delivery_fee_now`, migration 0162), and defaults to [flatDeliveryFee] for
+  /// the same reason [surcharge] defaults to none: a caller whose read has not
+  /// landed quotes the shipped number rather than nothing.
+  ///
+  /// [deliveryWaived] is the applied coupon's, and is the *only* thing that
+  /// reduces that fee. It is deliberately not a discount: `place_order` waives
+  /// the fee and the 18% inside it rather than taking rupees off the food, so
+  /// the food's own GST does not move (migration 0161). Subtracting ₹40 from the
+  /// food instead would quote a total two rupees under the one that is charged.
   factory CartBill.of(
     Cart cart, {
     int discount = 0,
     DeliverySurcharge surcharge = DeliverySurcharge.none,
-    bool freeDelivery = false,
+    int deliveryFee = flatDeliveryFee,
+    int deliveryWaived = 0,
   }) {
     if (cart.isEmpty) {
       return const CartBill(subtotal: 0, deliveryFee: 0, taxes: 0);
@@ -84,20 +90,20 @@ class CartBill {
     return CartBill(
       subtotal: subtotal,
       surcharge: surcharge,
-      // Flat, always. Migration 0123 withdrew the ₹500 free-delivery threshold
-      // from `place_order` and `checkout_preflight` in the same statement, and
-      // this line is the third copy of that rule — the cart quotes what the
-      // server charges, and a disagreement here is not a cosmetic one: the
-      // payment gate refuses an intent worth less than the order, so a cart that
-      // still believed in free delivery would take ₹40 too little and have the
-      // order refused after the money was captured.
+      // No basket size earns this back — migration 0123 withdrew the ₹500
+      // free-delivery threshold from `place_order` and `checkout_preflight` in
+      // one statement, and a cart that still believed in it would quote ₹40 too
+      // little and have the order refused after the money was captured.
       //
-      // A free-delivery coupon is the one thing that moves it, and it moves it
-      // to zero: the fee is waived, not discounted (0161).
-      deliveryFee: freeDelivery ? 0 : flatDeliveryFee,
+      // Two things move it now, and both come from the server rather than from
+      // a rule restated here: what an admin has set the fee to (0162), and a
+      // coupon that waives it (0161). `clamp` because a waiver is priced against
+      // the fee the *server* read, and a fee lowered between that read and this
+      // frame must not produce a negative line.
+      deliveryFee: (deliveryFee - deliveryWaived).clamp(0, deliveryFee),
       taxes: taxes,
       discount: discount,
-      freeDelivery: freeDelivery,
+      deliveryWaived: deliveryWaived,
     );
   }
 
@@ -133,9 +139,15 @@ class CartBill {
     return alloc;
   }
 
-  /// Public because the bill card renders it: the alternative is the UI
-  /// restating 40 as its own magic number and then quietly disagreeing with the
-  /// bill the day the rule changes.
+  /// **What this app was built with, not what it charges.** Since migration
+  /// 0162 the fee is a settings row an admin can move from the console, read by
+  /// `delivery_fee_now` — and by `place_order`, so the number here is not the
+  /// number on the bill unless they agree.
+  ///
+  /// It stays for the two moments there is no server answer to use: the frame
+  /// before `deliveryFeeProvider` resolves, and a read that failed. Quoting the
+  /// shipped ₹40 is the honest failure — the order is priced by
+  /// `checkout_preflight` at the moment of payment either way.
   ///
   /// `freeDeliveryThreshold` used to sit beside this and is gone with migration
   /// 0123 — there is no basket size that earns free delivery any more, so there
@@ -159,12 +171,15 @@ class CartBill {
   /// free-delivery code, which takes nothing off the food.
   final int discount;
 
-  /// Whether a coupon waived the delivery fee (migration 0161).
+  /// What a coupon paid towards the ride (migration 0161); 0 without one.
   ///
-  /// [deliveryFee] is already 0 when this is true. The flag survives beside it
-  /// so the bill can say *why* the line is free rather than quietly printing
-  /// ₹0, which reads like a bug.
-  final bool freeDelivery;
+  /// [deliveryFee] is already net of it. This survives beside it because the
+  /// bill has two things to say that the net figure alone cannot: *why* the
+  /// line is free, and how much that was worth in the savings strip.
+  final int deliveryWaived;
+
+  /// Whether a coupon covered the whole ride.
+  bool get freeDelivery => deliveryWaived > 0 && deliveryFee == 0;
 
   /// What the hour and the weather are adding to delivery (migration 0129).
   ///

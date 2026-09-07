@@ -20,7 +20,7 @@ import { inr } from '../lib/money'
 
 /// The levers that used to need a psql session (migration 0159).
 ///
-/// Three settings tables, each one row, each holding numbers that are a
+/// Four settings tables, each one row, each holding numbers that are a
 /// judgement about this town on this evening rather than a fact about the
 /// software — and each, until now, costing a migration to change. Two minutes is
 /// right for Sadri at eight o'clock and wrong for a wedding weekend when every
@@ -61,6 +61,9 @@ export function PlatformSettingsPage() {
   // what the next save sends, and so Cancel has something to go back to.
   const [dispatch, setDispatch] = useState<PlatformSettings['dispatch'] | null>(null)
   const [surcharge, setSurcharge] = useState<PlatformSettings['surcharge'] | null>(null)
+  /// One number rather than the row: nothing else on the delivery-fee table is
+  /// editable, and `null` is the not-loaded-yet state the guard below reads.
+  const [fee, setFee] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -68,6 +71,7 @@ export function PlatformSettingsPage() {
       setSettings(next)
       setDispatch(next.dispatch)
       setSurcharge(next.surcharge)
+      setFee(next.delivery.base_fee)
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -91,7 +95,7 @@ export function PlatformSettingsPage() {
     }
   }
 
-  if (!settings || !dispatch || !surcharge) {
+  if (!settings || !dispatch || !surcharge || fee === null) {
     return (
       <>
         <PageHeader title="Platform settings" />
@@ -160,6 +164,50 @@ export function PlatformSettingsPage() {
                 : `${settings.payments.unverified_live_orders} live order(s) have no verified payment behind them.`}
             </span>
           </div>
+        </Section>
+
+        {/* ------------------------------------------------------------- */}
+        <Section
+          title="Delivery fee"
+          blurb={
+            <>
+              What every order pays for the ride, before the night and rain
+              surcharge below is added and before a free-delivery coupon waives
+              it. GST is <strong>inside</strong> this number, not added to it —
+              type 40 and the customer's bill says ₹40. It applies to orders
+              placed after you save; what somebody was already charged is frozen
+              on their order. Riders are paid by distance and are not affected.
+            </>
+          }
+          footer={
+            <>
+              <Button
+                loading={busy === 'fee'}
+                onClick={() => void save('fee', () => api.setDeliveryFee(fee))}
+              >
+                Save delivery fee
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setFee(settings.delivery.base_fee)}
+                disabled={busy !== null}
+              >
+                Reset
+              </Button>
+            </>
+          }
+        >
+          <Field
+            label="Delivery fee, rupees"
+            type="number"
+            value={String(fee)}
+            onChange={num(setFee)}
+            hint={
+              fee === 0
+                ? 'Zero means delivery is free on every order, for everybody, until this is changed back.'
+                : `Every customer sees ${inr(fee)} on the bill.`
+            }
+          />
         </Section>
 
         {/* ------------------------------------------------------------- */}

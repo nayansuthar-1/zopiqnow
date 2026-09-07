@@ -12,6 +12,7 @@ class AppliedCoupon {
     required this.code,
     required this.discount,
     this.freeDelivery = false,
+    this.deliveryWaived = 0,
   });
 
   final String code;
@@ -28,4 +29,13 @@ class AppliedCoupon {
   /// The surcharge for a late hour or bad weather is *not* waived — it is a
   /// separate line on the bill and the server charges it either way.
   final bool freeDelivery;
+
+  /// Rupees of delivery fee this code covers, as the *server* priced it against
+  /// the fee it is currently charging (migration 0162). 0 for every other kind
+  /// of code.
+  ///
+  /// Beside [freeDelivery] rather than derived from it: the flag says what the
+  /// coupon is, this says what it is worth, and only the server knows the
+  /// second one.
+  final int deliveryWaived;
 }

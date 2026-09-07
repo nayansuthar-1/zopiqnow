@@ -593,6 +593,12 @@ export const api = {
   setSurchargeSettings: (s: PlatformSettings['surcharge']) =>
     rpc<string>('admin_set_surcharge_settings', { p: s }),
 
+  /// The base delivery fee (0162). Applies to orders placed after it and never
+  /// to orders already on the books — what a customer was charged is frozen on
+  /// their order.
+  setDeliveryFee: (fee: number) =>
+    rpc<string>('admin_set_delivery_fee', { p_fee: fee }),
+
   /// Arms or disarms 0085's payment-verification trigger. **On since
   /// 2026-08-29**, so the dangerous direction here is off — and off is a real
   /// need at three in the morning when verification is down and no order can be
@@ -1563,6 +1569,13 @@ export type ServiceAreaRow = {
 /// the console has no use for a credential and a settings screen that
 /// round-tripped one would put it in a bundle and in every screenshot.
 export type PlatformSettings = {
+  /// What delivery costs before the surcharge is added and before a
+  /// free-delivery coupon waives it (0162). Gross — the GST is inside it.
+  delivery: {
+    id: number
+    base_fee: number
+    updated_at: string
+  }
   dispatch: {
     id: number
     first_radius_km: number

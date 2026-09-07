@@ -1,4 +1,5 @@
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
+import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/cart/domain/entities/delivery_surcharge.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
@@ -247,6 +248,18 @@ class OrderRepositoryImpl implements OrderRepository {
       // Under-quote rather than over-quote, and never break the cart: the
       // charge is `checkout_preflight`'s, not this reading's.
       return DeliverySurcharge.none;
+    }
+  }
+
+  @override
+  Future<int> getDeliveryFee() async {
+    try {
+      return await _dataSource.fetchDeliveryFee();
+    } on Object catch (_) {
+      // The value this app shipped with. Wrong only if an admin has moved the
+      // fee *and* this read failed, and wrong for the length of one screen —
+      // `checkout_preflight` prices the order that is actually placed.
+      return CartBill.flatDeliveryFee;
     }
   }
 

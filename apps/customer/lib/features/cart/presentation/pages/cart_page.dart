@@ -36,6 +36,9 @@ class CartPage extends ConsumerWidget {
     // to show different totals for a frame.
     final CartBill bill = CartBill.of(
       cart,
+      // No coupon on this screen — one is applied at checkout — so the only
+      // thing that moves the fee here is what an admin set it to (0162).
+      deliveryFee: ref.watch(deliveryFeeProvider).value ?? CartBill.flatDeliveryFee,
       surcharge: ref.watch(deliverySurchargeProvider).value ?? DeliverySurcharge.none,
     );
     final TextTheme t = Theme.of(context).textTheme;

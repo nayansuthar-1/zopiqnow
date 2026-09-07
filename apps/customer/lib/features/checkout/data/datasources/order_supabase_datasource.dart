@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:zopiqnow/core/observability/crash_reporter.dart';
 import 'package:zopiqnow/core/storage/json_disk_cache.dart';
 import 'package:zopiqnow/features/cart/domain/entities/cart.dart';
-import 'package:zopiqnow/features/cart/domain/entities/cart_bill.dart';
 import 'package:zopiqnow/features/cart/domain/entities/delivery_surcharge.dart';
 import 'package:zopiqnow/features/checkout/data/datasources/order_datasource.dart';
 import 'package:zopiqnow/features/checkout/domain/entities/applied_coupon.dart';
@@ -22,7 +21,7 @@ import 'package:zopiqnow/features/checkout/domain/repositories/order_repository.
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
 import 'package:zopiqnow/features/menu/domain/entities/menu_option.dart';
 
-/// Orders and coupons, over the `validate_coupon` and `place_order` functions.
+/// Orders and coupons, over the `coupon_preview` and `place_order` functions.
 ///
 /// The tables behind them are invisible to this key — RLS is on with no select
 /// policy — so these two functions are the entire surface. Everything the
@@ -59,12 +58,13 @@ class OrderSupabaseDataSource implements OrderDataSource {
       // it answers 0 for such a code, which is true of the food and useless to
       // a cart deciding what to draw on the delivery line.
       //
-      // All four arguments, every time. `p_restaurant_id` is defaulted in the
-      // database so that an old build still binds to the signature — which is
-      // what kept a restaurant's own offer failing here silently rather than
-      // erroring. The fee goes with them because a free-delivery code's budget
-      // is spent in rupees of *ride*: previewing it against a fee of 0 would
-      // approve a code the order then refuses as fully claimed.
+      // `p_restaurant_id` is sent every time and is defaulted in the database so
+      // that an old build still binds to the signature — which is what kept a
+      // restaurant's own offer failing here silently rather than erroring.
+      //
+      // The delivery fee is **not** sent. `coupon_preview` reads it (0162), and
+      // a fee this app supplied would be a price supplied by the client, which
+      // is the one thing this whole design refuses.
       final Map<String, dynamic> preview = await _db
           .rpc<Map<String, dynamic>>(
             'coupon_preview',
@@ -72,13 +72,13 @@ class OrderSupabaseDataSource implements OrderDataSource {
               'p_code': code,
               'p_subtotal': subtotal,
               'p_restaurant_id': restaurantId,
-              'p_delivery_fee': CartBill.flatDeliveryFee,
             },
           );
       return AppliedCoupon(
         code: code.trim().toUpperCase(),
         discount: (preview['discount'] as num).toInt(),
         freeDelivery: preview['free_delivery'] as bool,
+        deliveryWaived: (preview['delivery_waived'] as num).toInt(),
       );
     } on PostgrestException catch (e) {
       if (e.code == _businessRuleErrorCode) throw CouponFailure(e.message);
@@ -574,6 +574,12 @@ class OrderSupabaseDataSource implements OrderDataSource {
         .cast<Map<String, dynamic>>()
         .map(RestaurantOffer.fromJson)
         .toList(growable: false);
+  }
+
+  @override
+  Future<int> fetchDeliveryFee() async {
+    final dynamic fee = await _db.rpc<dynamic>('delivery_fee_now');
+    return (fee as num).toInt();
   }
 
   @override

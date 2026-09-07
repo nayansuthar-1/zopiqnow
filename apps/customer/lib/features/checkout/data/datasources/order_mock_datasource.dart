@@ -69,6 +69,12 @@ class OrderMockDataSource implements OrderDataSource {
   Future<DeliverySurcharge> fetchDeliverySurcharge(String restaurantId) async =>
       DeliverySurcharge.none;
 
+  /// The shipped default, and it does not move. The mock stands in for the
+  /// service, and a demo whose delivery fee depends on a settings row somebody
+  /// changed this afternoon is a demo that cannot be reasoned about.
+  @override
+  Future<int> fetchDeliveryFee() async => CartBill.flatDeliveryFee;
+
   /// Reviews the mock has taken, keyed by order. Enough to exercise the two
   /// states the screen actually has — "not rated" and "rated, still editable" —
   /// without pretending to enforce a window nothing here can advance the clock

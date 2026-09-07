@@ -399,6 +399,17 @@ final AutoDisposeFutureProvider<DeliverySurcharge> deliverySurchargeProvider =
       return ref.watch(orderRepositoryProvider).getDeliverySurcharge(restaurantId);
     });
 
+/// What delivery costs before the surcharge and before any coupon (migration
+/// 0162). One number for the whole platform, so it is keyed off nothing.
+///
+/// Not `autoDispose`: it is read by the cart and again by checkout, it changes
+/// about as often as somebody opens the settings screen, and re-reading it
+/// between two screens of the same order would be the one way to show a
+/// customer two different fees for one cart.
+final FutureProvider<int> deliveryFeeProvider = FutureProvider<int>(
+  (Ref ref) => ref.watch(orderRepositoryProvider).getDeliveryFee(),
+);
+
 /// The bill the checkout screen shows: the cart's bill with the applied
 /// coupon's discount folded in.
 ///
@@ -413,11 +424,15 @@ final Provider<CartBill> checkoutBillProvider = Provider<CartBill>((Ref ref) {
     cart,
     discount: coupon?.discount ?? 0,
     // Not a discount and not folded into one: the fee goes, the food's tax
-    // stays where it was (migration 0161).
-    freeDelivery: coupon?.freeDelivery ?? false,
-    // `.value` and not `.requireValue`: while the read is in flight this is
-    // null and the bill shows the plain fee for a moment, rather than the
-    // screen showing a spinner over a total the customer was already reading.
+    // stays where it was (migration 0161). The rupees are the server's own —
+    // it waived them against the fee it is charging, not the one this app was
+    // compiled with.
+    deliveryWaived: coupon?.deliveryWaived ?? 0,
+    // `.value` and not `.requireValue` on both reads: while one is in flight
+    // this is null and the bill shows the shipped default for a moment, rather
+    // than the screen showing a spinner over a total the customer was already
+    // reading.
+    deliveryFee: ref.watch(deliveryFeeProvider).value ?? CartBill.flatDeliveryFee,
     surcharge: ref.watch(deliverySurchargeProvider).value ?? DeliverySurcharge.none,
   );
 });

@@ -99,6 +99,13 @@ abstract interface class OrderDataSource {
   /// cannot get the number wrong, because it does not compute it.
   Future<DeliverySurcharge> fetchDeliverySurcharge(String restaurantId);
 
+  /// The base delivery fee the server is charging right now (migration 0162).
+  ///
+  /// Nothing about this cart: one number, the same one `place_order` and
+  /// `checkout_preflight` read. It used to be a `const` in this app, which made
+  /// changing what delivery costs a store release.
+  Future<int> fetchDeliveryFee();
+
   /// The signed-in customer's orders, newest first, one page at a time.
   ///
   /// No user id here either, and for the same reason: the caller does not say

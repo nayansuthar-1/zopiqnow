@@ -26,7 +26,7 @@ class BillSummary extends StatelessWidget {
   /// back — 0123 withdrew that threshold — so a waived fee here is always a
   /// coupon's doing and always worth saying.
   int get _saved =>
-      bill.discount + (bill.freeDelivery ? CartBill.flatDeliveryFee : 0);
+      bill.discount + bill.deliveryWaived;
 
   /// The height of the band below the perforation.
   ///

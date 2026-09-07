@@ -87,6 +87,11 @@ abstract interface class OrderRepository {
   /// `checkout_preflight` at the moment of payment either way.
   Future<DeliverySurcharge> getDeliverySurcharge(String restaurantId);
 
+  /// What delivery costs before any surcharge or coupon (migration 0162).
+  /// Never throws: a failed read falls back to the value this app ships with,
+  /// and the amount actually charged comes from `checkout_preflight` either way.
+  Future<int> getDeliveryFee();
+
   /// The signed-in customer's order history, newest first.
   ///
   /// Throws [OrdersLoadFailure] on any transport or contract error. A signed-out
