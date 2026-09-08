@@ -19,6 +19,9 @@ export const groups: {
     links: [
       { to: '/', label: 'Live orders', end: true, icon: 'cookingPot' },
       { to: '/orders', label: 'All orders', end: false, icon: 'receipt' },
+      // Straight after the board it draws, because it is the same board: the
+      // pins come through `admin_orders` and are red for the same reasons.
+      { to: '/map', label: 'Map', end: false, icon: 'mapPin' },
       // Under Today, not under Money: a complaint is worked the day it lands,
       // and it is the only screen here with somebody waiting on the other end.
       { to: '/support', label: 'Support', end: false, icon: 'chat' },

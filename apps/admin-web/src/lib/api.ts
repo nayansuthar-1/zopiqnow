@@ -639,6 +639,16 @@ export const api = {
       p_offset: f.offset ?? 0,
     }),
 
+  /// Everything the operations map draws (0166), as one object: the live orders
+  /// with both ends of each journey, the riders currently carrying one, the
+  /// towns, and the fleet counts that say who is *not* drawn.
+  ///
+  /// The order layer comes through `admin_orders` inside the database, so a red
+  /// pin here and a red row on the live board are the same judgement rather than
+  /// two that agree until somebody edits one of them.
+  opsMap: (serviceAreaId?: string | null) =>
+    rpc<OpsMap>('admin_ops_map', { p_service_area_id: serviceAreaId ?? null }),
+
   // -------------------------------------------------------------------------
   // Reviews (0062, moderated since 0165).
   // -------------------------------------------------------------------------
@@ -1662,6 +1672,73 @@ export type AuditActionRow = {
   created_at: string
   /// The size of the whole match, repeated on every row — the pager reads it.
   total_count: number
+}
+
+/// One live order as the map draws it (0166) — the kitchen at one end, the door
+/// at the other, and 0155's breaches deciding the colour.
+export type OpsMapOrder = {
+  order_id: string
+  status: OrderStatus
+  placed_at: string
+  eta_at: string | null
+  total: number
+  breaches: string[]
+  breach_since: string | null
+  restaurant_id: string
+  restaurant_name: string
+  /// Null for a kitchen nobody has put on the map yet — the wizard allows a
+  /// draft without coordinates, and one exists today.
+  restaurant_lat: number | null
+  restaurant_lng: number | null
+  delivery_to: string
+  delivery_lat: number | null
+  delivery_lng: number | null
+  customer_phone: string
+  rider_email: string | null
+  rider_name: string | null
+  delivery_state: string | null
+  service_area_id: string | null
+}
+
+/// A rider who is out there now. There is no idle rider here and there cannot
+/// be: `purge_rider_locations` (0057) drops the position of anybody with no live
+/// job within ten minutes, which is a privacy rule rather than a gap.
+export type OpsMapRider = {
+  email: string
+  name: string
+  vehicle: string | null
+  phone: string | null
+  lat: number
+  lng: number
+  heading: number | null
+  speed_kmh: number | null
+  updated_at: string
+  order_id: string | null
+  delivery_state: string | null
+}
+
+export type OpsMapTown = {
+  id: string
+  name: string
+  centre_lat: number
+  centre_lng: number
+  radius_km: number
+  is_active: boolean
+}
+
+export type OpsMap = {
+  generated_at: string
+  towns: OpsMapTown[]
+  orders: OpsMapOrder[]
+  riders: OpsMapRider[]
+  /// Who is not on the map, and why. `online` minus `on_a_job` is the fleet
+  /// standing by, whose whereabouts the platform deliberately does not keep.
+  fleet: {
+    active: number
+    online: number
+    on_a_job: number
+    with_a_position: number
+  }
 }
 
 /// One review, as the moderation queue reads it (0165).

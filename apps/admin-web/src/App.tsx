@@ -104,6 +104,9 @@ const AuditPage = lazy(() =>
 const ReviewsPage = lazy(() =>
   import('./reviews/ReviewsPage').then((m) => ({ default: m.ReviewsPage })),
 )
+const OpsMapPage = lazy(() =>
+  import('./ops/OpsMapPage').then((m) => ({ default: m.OpsMapPage })),
+)
 
 /// What a route looks like while its chunk is in the air.
 ///
@@ -175,6 +178,8 @@ function ConsoleRoutes() {
               Restaurants where it was, one click away. */}
           <Route path="/" element={<LiveOrdersPage />} />
           <Route path="/orders" element={<AllOrdersPage />} />
+          {/* The same live board, drawn (0166). */}
+          <Route path="/map" element={<OpsMapPage />} />
           {/* One order, on one page (0154). */}
           <Route path="/orders/:id" element={<OrderDetailPage />} />
           <Route path="/restaurants" element={<RestaurantsPage />} />

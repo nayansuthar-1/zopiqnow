@@ -254,7 +254,54 @@ socket, and the board goes from a quarter-minute stale to sub-second. The poll s
 fallback when the socket is down, at a much longer interval.
 
 #### T1-4 — Live map: the control tower
-- [ ] **Cost:** 1 migration + ~350 lines · **Route:** `/map`
+- [x] **Shipped 2026-09-08** — migration `0166_the_floor_seen_from_above.sql`,
+      `src/ops/OpsMapPage.tsx` (`/map`), `src/ui/maps.ts`.
+
+**What landed.** `admin_ops_map(service_area)` returns one object: the live orders with
+both ends of each journey, the riders currently carrying one, the towns, and the fleet
+counts. The screen draws kitchens, doors and riders as pins with a line per journey,
+fits the view to whatever is live, filters by town from the address bar, and lists the
+same thing beside the map so it is still useful when the basemap is not there.
+
+Four decisions worth keeping:
+
+- **The order layer is `admin_orders`, called from inside the RPC.** What is live and what
+  is in trouble are already decided once (0155); restating either here would be two
+  definitions of a red pin drifting apart at the speed of whichever one somebody
+  remembers to edit. The inner call runs its own `assert_admin()`, which passes because
+  the outer one already did.
+- **There is no idle-rider layer, and there cannot be one.** This item asked for pucks
+  coloured idle / offered / carrying. The first does not exist in the database and that is
+  deliberate: `purge_rider_locations` (0057, inside the dispatcher's five-second tick)
+  drops every position older than ten minutes and every position belonging to a rider with
+  nothing live. A rider's whereabouts are kept exactly as long as a job justifies knowing
+  them. So the map draws who is carrying something and the header says how many of the
+  fleet are online and standing by — the sentence that stops an empty map from reading as
+  a failed query.
+- **One loader, now shared.** `MapPicker` had the key, the script injection and the API
+  types inside it; a second copy for this screen would have had its own promise cache and
+  the two would have injected two copies of the Maps script into one page. Both now go
+  through `src/ui/maps.ts` (which replaces `mapsKey.ts`). Still no map dependency added.
+- **It polls, at fifteen seconds, and says when it last refreshed.** 0156's doorbell rings
+  on orders and deliveries; what moves on a map is a rider, every few seconds, and nothing
+  rings for that.
+
+**Verified against the live database** in a rolled-back transaction. The platform has **no
+live orders** — the newest order is from 27 August — so the layers were proven by
+synthesising one: an order moved to `preparing` with a fifteen-minute-old `ready_by`, its
+delivery moved to `picked_up`, and a rider position dropped between the kitchen and the
+door, with triggers off for the transaction so nothing reached a notification, a push,
+WhatsApp or the order ring. The order came back with both ends' coordinates and the
+`stuck_prep` breach that `admin_orders` reports for the same order; the rider came back
+with heading, speed and the job; the fleet counts moved from 0 to 1 on both `on_a_job` and
+`with_a_position`; the town filter returned it under Sadri and hid it — rider included —
+under Falna; a blank filter is no filter. A non-admin is refused, `anon` holds no grant,
+and after the rollback the order was `delivered` again with sixteen deliveries and no
+positions, exactly as before.
+
+**Not verified end to end.** The basemap itself needs a signed-in admin session in a
+browser. A key is present in `.env.local`, so this one is one sign-in away from being
+seen.
 
 `rider_locations` is written continuously and the console has never drawn it. The customer
 app already has the Google basemap and the key handling (Google tiles, key in
@@ -695,7 +742,7 @@ work.
 | **7** | T4-5 data layer, T4-4 exports, T4-6 bulk, T4-7 keyboard, T4-8 bell | Polish that compounds. |
 | **later** | T4-1 scoped roles, T3-4 compliance, T3-5 messaging health | T4-1 needs a decision; the other two wait on a hire and on Meta respectively. |
 
-**Migrations:** next free is **0166**. Roughly a dozen of the items above carry one each.
+**Migrations:** next free is **0167**. Roughly a dozen of the items above carry one each.
 (**0160 is a hole** — it was claimed by the abandoned first attempt at T3-1, which landed
 its functions on the live database and never committed a file. The work is 0164; nothing
 should ever be numbered 0160.)

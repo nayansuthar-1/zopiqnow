@@ -3,7 +3,7 @@ import { api } from '../../lib/api'
 import type { RestaurantDetail } from '../../lib/api'
 import { Button, Field } from '../../ui/primitives'
 import { MapPicker } from '../../ui/MapPicker'
-import { mapPickerAvailable } from '../../ui/mapsKey'
+import { mapsAvailable } from '../../ui/maps'
 import { StepFrame } from './StepFrame'
 
 /// Where the kitchen is and who to call about it. None of this reaches the
@@ -141,7 +141,7 @@ export function AddressStep({
         />
       </div>
 
-      {mapPickerAvailable ? (
+      {mapsAvailable ? (
         <div className="-mt-2">
           <Button variant="secondary" onClick={() => setPicking(true)}>
             {latitude && longitude ? 'Move the pin on the map' : 'Pick on the map'}

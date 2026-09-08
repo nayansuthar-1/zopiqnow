@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { MAPS_KEY } from './mapsKey'
+import {
+  DEFAULT_CENTRE,
+  loadFailureMessage,
+  loadMaps,
+  type GMarker,
+  type LatLngLiteral,
+} from './maps'
 import { Button, Modal } from './primitives'
 
 /// Drop a pin on the kitchen instead of typing two numbers.
@@ -13,79 +19,13 @@ import { Button, Modal } from './primitives'
 /// failing. The step's own hint used to be "right-click in Google Maps and copy
 /// the pair it shows", which is exactly the manual transcription this removes.
 ///
-/// **No new dependency.** The Maps JavaScript API is loaded by injecting its
-/// script tag, once per page, rather than through `@react-google-maps/api` —
-/// this project has a standing rule against adding packages without an approved
-/// upgrade task, and the whole of what is used here is a map, a marker and two
-/// listeners.
-
-/// The narrow slice of the Maps API this file touches, declared rather than
-/// pulled in as `@types/google.maps` — for the same reason as above, and because
-/// a wrong guess here is a type error rather than a runtime one.
-type LatLngLiteral = { lat: number; lng: number }
-
-type GLatLng = { lat(): number; lng(): number }
-type GMarker = {
-  setPosition(p: LatLngLiteral): void
-  addListener(event: string, handler: () => void): void
-  getPosition(): GLatLng | null
-}
-type GMap = {
-  addListener(event: string, handler: (e: { latLng: GLatLng | null }) => void): void
-  setCenter(p: LatLngLiteral): void
-  setZoom(z: number): void
-}
-type MapsApi = {
-  Map: new (el: HTMLElement, options: Record<string, unknown>) => GMap
-  Marker: new (options: Record<string, unknown>) => GMarker
-}
-
-declare global {
-  interface Window {
-    google?: { maps?: MapsApi }
-  }
-}
-
-/// Where the map opens when the restaurant has no coordinates yet.
-///
-/// Sadri, which with Ranakpur and Falna is where Zopiqnow actually delivers
-/// today. A map that opens on the whole of India costs the admin four zoom
-/// gestures before they can see a street, every single time.
-const DEFAULT_CENTRE: LatLngLiteral = { lat: 25.1846, lng: 73.4419 }
-
-/// Loads the Maps script once and resolves when `window.google.maps` exists.
-///
-/// Cached as a promise rather than a boolean so that two pickers opened in one
-/// session share the single in-flight load instead of racing to inject two
-/// script tags.
-let loader: Promise<MapsApi> | null = null
-
-function loadMaps(): Promise<MapsApi> {
-  if (window.google?.maps) return Promise.resolve(window.google.maps)
-  if (loader) return loader
-
-  loader = new Promise<MapsApi>((resolve, reject) => {
-    const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_KEY}&v=weekly`
-    script.async = true
-    script.onload = () => {
-      const maps = window.google?.maps
-      if (maps) resolve(maps)
-      // A 200 that is not the API: the usual cause is a key that has the Maps
-      // JavaScript API switched off in the Cloud console, which loads a script
-      // whose only job is to log an error.
-      else reject(new Error('maps-unavailable'))
-    }
-    script.onerror = () => reject(new Error('maps-unreachable'))
-    document.head.appendChild(script)
-  })
-  // A failed load must not be cached, or the second attempt resolves the first
-  // failure for ever.
-  loader.catch(() => {
-    loader = null
-  })
-  return loader
-}
+/// **No new dependency, and no second loader.** The Maps script is injected by
+/// hand rather than pulled in through `@react-google-maps/api` — this project
+/// has a standing rule against adding packages without an approved upgrade task.
+/// The key, that loader and the slice of the API this project declares for
+/// itself all live in `ui/maps.ts`, because the operations map (0166) draws
+/// through them too and two copies of the loader would each cache their own
+/// script tag.
 
 export function MapPicker({
   /// Where the pin starts, or null for a restaurant with no coordinates yet.
@@ -151,11 +91,7 @@ export function MapPicker({
       },
       (e: Error) => {
         if (cancelled) return
-        setFailed(
-          e.message === 'maps-unavailable'
-            ? 'Google Maps loaded but refused the key. Check that the Maps JavaScript API is enabled for it, and that this domain is allowed.'
-            : 'Google Maps could not be reached. Check the connection and try again.',
-        )
+        setFailed(loadFailureMessage(e))
       },
     )
 

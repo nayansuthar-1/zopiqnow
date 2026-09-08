@@ -15,7 +15,9 @@ npm run lint                 # oxlint — this should print nothing at all
 Only the anon key reaches the browser. Authority is the signed-in admin's own JWT: every
 RPC re-asks `is_admin()` server-side, where the answer cannot be edited in a devtools
 console. `VITE_GOOGLE_MAPS_BROWSER_KEY` is optional — without it the address step falls
-back to two typed coordinate fields and says so.
+back to two typed coordinate fields and says so, and the operations map (`/map`) lists
+what it would have drawn instead of showing a basemap. Both load the script through
+`src/ui/maps.ts`, which is also the only place the key is read.
 
 ## Getting in
 
