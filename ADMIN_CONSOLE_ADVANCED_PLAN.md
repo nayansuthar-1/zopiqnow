@@ -354,7 +354,47 @@ applies to everyone else is invisible. One card at the top of the existing scree
 ### Tier 3 — Reading what we already write
 
 #### T3-1 — Audit log viewer
-- [ ] **Cost:** 1 migration + ~200 lines · **Route:** `/settings/audit`
+- [x] **Shipped 2026-09-08** — migration `0164_somebody_reads_what_somebody_did.sql`,
+      `src/settings/AuditPage.tsx` (`/settings/audit`).
+
+**What landed.** `admin_list_actions` filtered by actor, action, target type, target id
+and a date window, with `total_count` for the pager; `admin_action_filters` behind the
+three dropdowns; one screen that reads them, with every filter in the address bar. All
+1,103 rows in the live trail render — the four action kinds, the thirteen target types,
+and the three detail shapes.
+
+Four things worth keeping:
+
+- **Two of these functions already existed on the live database, and no migration file
+  recorded them.** An earlier attempt at this screen applied them by hand and its
+  migration was never committed, so the schema had an eight-argument `admin_list_actions`
+  the files did not. That is the ledger drifting in the direction nobody notices —
+  everything works until somebody rebuilds from `supabase/migrations`. 0164 is written to
+  be that record.
+- **0092's four-argument signature is dropped, not replaced.** Adding arguments creates a
+  *second* function beside the first, and PostgREST picks by the argument names it is
+  handed: the day somebody calls it with the old four they would silently get the old
+  body, with no date window and no total count.
+- **The payload is diffed, the snapshots are not.** `detail` comes back through
+  `audit_detail_changes` (0154), so an update is the columns that changed; an insert and a
+  delete keep the whole row, because there the row *is* the change — and a deleted order's
+  snapshot is the only copy of it left anywhere. A named action like `publish_forced`
+  writes its own object (`{name, reason, missing[]}`) and is printed as written: those are
+  the rows this screen exists for.
+- **Nothing is masked and nothing exports.** Rider licence and ID-proof numbers are in the
+  trail and are shown, because the same admins read them on the KYC screen already. There
+  is no export button, and the database clamps a page at 200 however it is asked.
+
+**Verified against the live database** in a rolled-back transaction, impersonating a real
+admin: filter counts match plain counts on the table, a lower-cased order id still finds
+its rows, the date window is half-open as intended, the limit clamps, a signed-in
+non-admin and an anonymous caller are both refused by `assert_admin()`, and `anon` holds
+no execute grant on either function. Over HTTP, PostgREST resolves both by these exact
+parameter names and refuses `anon` at the grant.
+
+**Not verified end to end.** The screen itself needs a signed-in admin session in a
+browser, which this work did not have — same gap as T1-3's socket half. The database half
+is proven; the page compiles, lints and builds.
 
 `admin_actions` has been append-only since 0092 and the console has never shown it. Every
 publish, block, refund, cancel, delete and override is in there with the admin's email.
@@ -612,7 +652,10 @@ work.
 | **7** | T4-5 data layer, T4-4 exports, T4-6 bulk, T4-7 keyboard, T4-8 bell | Polish that compounds. |
 | **later** | T4-1 scoped roles, T3-4 compliance, T3-5 messaging health | T4-1 needs a decision; the other two wait on a hire and on Meta respectively. |
 
-**Migrations:** next free is **0154**. Roughly a dozen of the items above carry one each.
+**Migrations:** next free is **0165**. Roughly a dozen of the items above carry one each.
+(**0160 is a hole** — it was claimed by the abandoned first attempt at T3-1, which landed
+its functions on the live database and never committed a file. The work is 0164; nothing
+should ever be numbered 0160.)
 
 **One open question.** T4-1 reverses a decision written into the Settings screen's own
 comment. Everything else in this document extends the console as it is; that item changes

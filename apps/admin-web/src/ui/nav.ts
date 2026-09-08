@@ -82,6 +82,9 @@ export const groups: {
         end: false,
         icon: 'sliders',
       },
+      // Last in the group, because it is the one screen here nobody opens to
+      // change something — it is where you go afterwards, to find out who did.
+      { to: '/settings/audit', label: 'Audit log', end: false, icon: 'receipt' },
     ],
   },
 ]

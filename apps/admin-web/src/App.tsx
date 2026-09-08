@@ -98,6 +98,9 @@ const PlatformSettingsPage = lazy(() =>
     default: m.PlatformSettingsPage,
   })),
 )
+const AuditPage = lazy(() =>
+  import('./settings/AuditPage').then((m) => ({ default: m.AuditPage })),
+)
 
 /// What a route looks like while its chunk is in the air.
 ///
@@ -197,6 +200,8 @@ function ConsoleRoutes() {
               match keeps the Console group highlighted on all three. */}
           <Route path="/settings/areas" element={<ServiceAreasPage />} />
           <Route path="/settings/platform" element={<PlatformSettingsPage />} />
+          {/* The trail, read at last (0164). */}
+          <Route path="/settings/audit" element={<AuditPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

@@ -606,6 +606,45 @@ export const api = {
   setPaymentGate: (on: boolean) =>
     rpc<string>('admin_set_payment_gate', { p_on: on }),
 
+  // -------------------------------------------------------------------------
+  // The trail (0092, read since 0164).
+  // -------------------------------------------------------------------------
+
+  /// Every publish, block, refund, cancel, delete and override, with the email
+  /// of whoever did it. Every filter is optional; omitting one means "don't
+  /// narrow by it", and each row carries `total_count` for the pager.
+  ///
+  /// There is deliberately no "fetch everything" here, and the database clamps
+  /// the page at 200 whatever this asks for: the screen is a reader, and an
+  /// export button is how an append-only audit trail becomes a spreadsheet on
+  /// somebody's laptop.
+  auditActions: (f: {
+    actor?: string | null
+    action?: string | null
+    targetType?: string | null
+    targetId?: string | null
+    from?: string | null
+    to?: string | null
+    limit?: number
+    offset?: number
+  }) =>
+    rpc<AuditActionRow[]>('admin_list_actions', {
+      p_actor: f.actor ?? null,
+      p_action: f.action ?? null,
+      p_target_type: f.targetType ?? null,
+      p_target_id: f.targetId?.trim() ? f.targetId.trim() : null,
+      p_from: f.from ?? null,
+      p_to: f.to ?? null,
+      p_limit: f.limit ?? 50,
+      p_offset: f.offset ?? 0,
+    }),
+
+  /// What is actually in the trail, for the three dropdowns. Asked of the data
+  /// rather than hardcoded here, because the list of audited tables grows every
+  /// time a trigger is added — thirteen in 0092, twenty-three now — and a list
+  /// written in the browser would be wrong the first time that happens.
+  auditFilters: () => rpc<AuditFilterRow[]>('admin_action_filters'),
+
   /// One query across orders, restaurants, riders and people (0157) — an order
   /// id, a phone on its last digits, an email, or a name. The console's four
   /// per-screen search boxes each answer "is it on this page"; this one answers
@@ -1561,6 +1600,37 @@ export type ServiceAreaRow = {
   last_precip_mm: number | null
   weather_checked_at: string | null
   created_at: string
+}
+
+/// One line of the admin trail (0092, readable since 0164).
+///
+/// `detail` arrives reduced: an update is `{column: {from, to}}` and carries
+/// only the columns that actually changed, while an insert (`{created: row}`)
+/// and a delete (`{deleted: row}`) keep the whole row, because for those the
+/// row *is* the change — and a deleted order's snapshot is the only copy of it
+/// that still exists anywhere.
+export type AuditActionRow = {
+  id: number
+  actor_email: string
+  /// `insert` / `update` / `delete` from the generic trigger, plus the named
+  /// ones the RPCs write themselves, like `publish_forced`.
+  action: string
+  /// The table the row lived in — `orders`, `refunds`, `menu_items`.
+  target_type: string
+  /// Whichever column names that table's row: an order id, a coupon code, an
+  /// email, a uuid. Null only if the row had none.
+  target_id: string | null
+  detail: Record<string, unknown> | null
+  created_at: string
+  /// The size of the whole match, repeated on every row — the pager reads it.
+  total_count: number
+}
+
+/// One value present in the trail, and how many rows carry it.
+export type AuditFilterRow = {
+  kind: 'actor' | 'action' | 'target'
+  value: string
+  uses: number
 }
 
 /// The three single-row settings tables, read together (0159).
