@@ -101,6 +101,9 @@ const PlatformSettingsPage = lazy(() =>
 const AuditPage = lazy(() =>
   import('./settings/AuditPage').then((m) => ({ default: m.AuditPage })),
 )
+const ReviewsPage = lazy(() =>
+  import('./reviews/ReviewsPage').then((m) => ({ default: m.ReviewsPage })),
+)
 
 /// What a route looks like while its chunk is in the air.
 ///
@@ -192,6 +195,8 @@ function ConsoleRoutes() {
           <Route path="/cash" element={<CashPage />} />
           <Route path="/refunds" element={<RefundsPage />} />
           <Route path="/support" element={<SupportPage />} />
+          {/* What customers said, and taking one down (0165). */}
+          <Route path="/reviews" element={<ReviewsPage />} />
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/gift-orders" element={<GiftOrdersPage />} />
           <Route path="/gifts" element={<GiftCataloguePage />} />

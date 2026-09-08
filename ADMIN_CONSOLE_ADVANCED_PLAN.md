@@ -408,7 +408,50 @@ function, and it must never grow an export-everything button that turns the audi
 into a spreadsheet on somebody's laptop.
 
 #### T3-2 — Reviews and ratings moderation
-- [ ] **Cost:** 1 migration + ~250 lines · **Route:** `/reviews`
+- [x] **Shipped 2026-09-08** — migration `0165_a_review_can_be_taken_down.sql`,
+      `src/reviews/ReviewsPage.tsx` (`/reviews`).
+
+**What landed.** `admin_reviews` (the queue, filtered by restaurant, by a rating band and
+by whether anything was written, with `total_count`), `admin_review_summary` (whether
+reviews are arriving at all) and `admin_delete_review` (removal, with a reason the
+database refuses to accept blank). One screen that reads all three.
+
+Four decisions worth keeping:
+
+- **Removal is a delete, not a `hidden_at` flag.** Three readers already select from that
+  table — `restaurant_reviews`, `vendor_reviews` and the order-360 page — and the first one
+  written without the flag would put a removed review back in front of customers. Nothing
+  is lost by it: this migration puts the standard 0092 audit trigger on `reviews` first, so
+  the whole row is kept in `admin_actions`, and `admin_delete_review` writes a second,
+  named row carrying the reason and the sentence. Both read in 0164's screen. The trigger
+  also catches the review that disappears when an order is deleted, which until now went
+  silently.
+- **The last review leaving means unrated, not a frozen average.** 0062's recompute is
+  guarded by `agg.n > 0` so a *seeded* rating survives until a real one replaces it — which
+  also means removing a kitchen's only review would leave that one review's score standing
+  forever. The RPC finishes what the trigger deliberately declines to: no reviews left puts
+  the restaurant back to `0.0 / 0`, the state eleven of the twelve kitchens are in today.
+  ⚠️ The same hole is still open on `delete_my_account` (0081) — named in the migration,
+  not fixed, because it is a different path with different rules.
+- **The refund status rides on the row.** One star written after a refund was refused is
+  not a review of the food, and that is the review this screen exists to catch. Making an
+  admin open another screen for the second half of the fact means they judge the first
+  half alone.
+- **The summary is the point on a platform with four reviews.** Arrival rate against
+  delivered orders, how many carry a sentence, both averages. A moderation queue that
+  opened on a near-empty list without saying so would read as broken rather than honest.
+
+**Verified against the live database** in a rolled-back transaction, including the
+destructive half: the queue and its filters, the summary, a blank reason and an unknown
+order both refused, one review of four removed (restaurant 5.0/4 → 5.0/3, rider 4.7/3 →
+4.5/2), the two trail rows written, then all four removed (restaurant → 0.0/0, both riders
+→ 0.0/0) and the empty-table summary returning nulls rather than dividing by zero. A
+signed-in non-admin is refused by all three. Confirmed afterwards that the rollback left
+the four reviews, both ratings and an empty trail exactly as they were. Over HTTP,
+PostgREST resolves all three by name and refuses `anon` at the grant.
+
+**Not verified end to end.** The screen itself, again, needs a signed-in admin session in a
+browser.
 
 `reviews` is keyed by order and trigger-computes `restaurants.rating` (0062). The console
 can see the average and never the sentences. Zomato's console has a review queue for one
@@ -652,7 +695,7 @@ work.
 | **7** | T4-5 data layer, T4-4 exports, T4-6 bulk, T4-7 keyboard, T4-8 bell | Polish that compounds. |
 | **later** | T4-1 scoped roles, T3-4 compliance, T3-5 messaging health | T4-1 needs a decision; the other two wait on a hire and on Meta respectively. |
 
-**Migrations:** next free is **0165**. Roughly a dozen of the items above carry one each.
+**Migrations:** next free is **0166**. Roughly a dozen of the items above carry one each.
 (**0160 is a hole** — it was claimed by the abandoned first attempt at T3-1, which landed
 its functions on the live database and never committed a file. The work is 0164; nothing
 should ever be numbered 0160.)

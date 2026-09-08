@@ -639,6 +639,44 @@ export const api = {
       p_offset: f.offset ?? 0,
     }),
 
+  // -------------------------------------------------------------------------
+  // Reviews (0062, moderated since 0165).
+  // -------------------------------------------------------------------------
+
+  /// The moderation queue, newest first. `minRating`/`maxRating` are a band on
+  /// the food rating — the one an admin narrows by, because a one-star with a
+  /// sentence is what this screen is opened for.
+  reviews: (f: {
+    restaurantId?: string | null
+    minRating?: number | null
+    maxRating?: number | null
+    withComment?: boolean
+    limit?: number
+    offset?: number
+  }) =>
+    rpc<ReviewRow[]>('admin_reviews', {
+      p_restaurant_id: f.restaurantId ?? null,
+      p_min_rating: f.minRating ?? null,
+      p_max_rating: f.maxRating ?? null,
+      p_with_comment: f.withComment ?? false,
+      p_limit: f.limit ?? 50,
+      p_offset: f.offset ?? 0,
+    }),
+
+  /// Whether reviews are arriving at all, which on a platform with four of them
+  /// is the first thing the screen has to say.
+  reviewSummary: () => rpc<ReviewSummary>('admin_review_summary'),
+
+  /// Removes one review and recomputes both ratings behind it. The reason is
+  /// required by the database, not by this call: it is the only account of why
+  /// a customer's words were taken down, and it is kept in the trail with the
+  /// sentence itself.
+  deleteReview: (orderId: string, reason: string) =>
+    rpc<string>('admin_delete_review', {
+      p_order_id: orderId,
+      p_reason: reason,
+    }),
+
   /// What is actually in the trail, for the three dropdowns. Asked of the data
   /// rather than hardcoded here, because the list of audited tables grows every
   /// time a trigger is added — thirteen in 0092, twenty-three now — and a list
@@ -1624,6 +1662,48 @@ export type AuditActionRow = {
   created_at: string
   /// The size of the whole match, repeated on every row — the pager reads it.
   total_count: number
+}
+
+/// One review, as the moderation queue reads it (0165).
+///
+/// A review is keyed by its order — one order, one verdict — so `order_id` is
+/// both its identity and the link to everything else about it.
+export type ReviewRow = {
+  order_id: string
+  restaurant_id: string
+  restaurant_name: string
+  food_rating: number
+  /// Null when the customer rated the food and left the rider alone, which is
+  /// the common case.
+  rider_rating: number | null
+  comment: string | null
+  customer_name: string | null
+  customer_phone: string | null
+  rider_name: string | null
+  partner_email: string | null
+  /// The newest refund on the same order, if there is one. Context for the
+  /// review this screen exists to catch: one star written after a refund was
+  /// refused is a different thing from one star about the food.
+  refund_status: string | null
+  order_total: number | null
+  created_at: string
+  total_count: number
+}
+
+/// Whether reviews are arriving at all. Every average is null while the table
+/// is empty — there is no average of nothing, and a zero would read as "rated
+/// zero" rather than "not rated".
+export type ReviewSummary = {
+  reviews: number
+  with_comment: number
+  rider_rated: number
+  avg_food: number | null
+  avg_rider: number | null
+  restaurants_rated: number
+  first_at: string | null
+  latest_at: string | null
+  /// Delivered orders — the ones that could have been reviewed.
+  reviewable_orders: number
 }
 
 /// One value present in the trail, and how many rows carry it.

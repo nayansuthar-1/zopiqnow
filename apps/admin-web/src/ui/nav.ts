@@ -26,6 +26,11 @@ export const groups: {
       // reading something that went wrong. The difference is who noticed —
       // a customer complained, or the platform did (migration 0130).
       { to: '/alerts', label: 'Alerts', end: false, icon: 'warning' },
+      // The third of the same kind: somebody reading something a customer
+      // wrote. Support is a complaint, Alerts is the platform complaining, and
+      // this is the verdict left in public where it stays until it is taken
+      // down.
+      { to: '/reviews', label: 'Reviews', end: false, icon: 'star' },
       // Beside the food queues: a gift order has nobody but this page to move
       // it, so it belongs where somebody looks every day.
       { to: '/gift-orders', label: 'Gift orders', end: false, icon: 'gift' },
