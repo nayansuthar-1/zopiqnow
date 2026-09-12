@@ -152,19 +152,68 @@ All three apps offer **"Continue with Google"**
 `apps/vendor/.../sign_in_page.dart`). Apple's Guideline 4.8 requires that an app
 offering a third-party login also offer an equivalent option that, among other
 things, **lets the user keep their email address private**. Email OTP does not —
-the whole mechanism is the address. On a strict reading, **Sign in with Apple is
-required in all three apps**, and this is a common, fast rejection.
+the whole mechanism is the address. So **Sign in with Apple is required in all
+three apps**, and this is a common, fast rejection.
 
-Two routes, and this is a decision rather than a fix:
+> **Decided 2026-09-12: keep Google, add Sign in with Apple.** The cheap route
+> — hiding the Google button on iOS — was considered and rejected: iPhone users
+> keep the one-tap sign-in. This is an **explicitly approved exception to
+> [[zopiqnow-version-freeze]]**, and the only one; `pubspec.lock` will move, and
+> `git diff pubspec.lock` must show *only* the new packages and nothing else
+> bumped.
 
-| Route | Cost | Risk |
-|---|---|---|
-| **Hide the Google button on iOS** (`if (!Platform.isIOS)`) | ~10 lines, no new dependency, no version-freeze conflict | None at review. Costs iPhone users the one-tap sign-in |
-| **Add Sign in with Apple** | New package + a capability + a Supabase provider + an Edge-side audience | Breaks the version freeze; a real chunk of work |
+**Scope: the Apple button is iOS-only.** On Android `sign_in_with_apple` falls
+back to a browser flow that needs a Services ID, a return URL and a client
+secret — a whole second setup for a button no Android user wants and no
+guideline requires. Gate it on `Platform.isIOS`.
 
-**Recommendation: hide the button on iOS for launch, add Sign in with Apple in
-the first update.** It is reversible, it is small, and it removes the only
-review risk on this list that has no workaround.
+**What the code needs** (all three apps, mirroring the existing Google path in
+`auth_supabase_datasource.dart:138`):
+
+- **Two dependencies.** `sign_in_with_apple`, pinned exactly like every other
+  line in these pubspecs; and `crypto` **promoted from transitive to direct** at
+  the version already in `pubspec.lock` — a direct dep at the locked version
+  changes no resolution, and importing a transitive one is a lint at best and a
+  break on the next resolve at worst.
+- **The nonce dance, which is not optional.** Generate a raw nonce, hand Apple
+  its **SHA-256**, then give Supabase the id token **and the raw nonce** so it
+  can check them against each other. `supabase_flutter` 2.8.0 already ships
+  `generateRawNonce()` on the auth client (`supabase_auth.dart:402`) — use it
+  rather than hand-rolling one. `sha256` is what `crypto` is for.
+- **`signInWithIdToken(provider: OAuthProvider.apple, …)`** — the same
+  experimental-but-only method the Google path already uses, with the same
+  `// ignore: experimental_member_use`.
+- ⚠️ **Apple sends the user's name exactly once, ever.** `givenName` and
+  `familyName` arrive on the *first* authorization for that Apple ID and are
+  `null` on every sign-in afterwards — including after a reinstall. If the first
+  response is not captured and written to `zopiq_full_name` there and then, the
+  name is gone for good and the only route back is the user revoking the app in
+  iOS Settings. This fits the rule the datasource already states — *the
+  provider's value is a default, the customer's is an answer* — so write it only
+  when `zopiq_full_name` is empty.
+- **Hide My Email is a real address, and will be common.** Apple returns
+  `…@privaterelay.appleid.com`; the relay forwards, so Brevo order mail still
+  arrives. Nothing may assume an email is typeable or memorable, and nothing may
+  match a user by address across providers.
+- **Its own failure types**, `AppleSignInCancelled` / `AppleSignInFailure`,
+  alongside the Google pair in `auth_repository.dart:135`. Dismissing the sheet
+  is a choice, not a failure — the Google path already draws that line.
+
+**What only a human can do:**
+
+- **Apple Developer portal** → enable the *Sign In with Apple* capability on all
+  three App IDs.
+- **Xcode** → add the *Sign in with Apple* capability to all three targets. It
+  writes `com.apple.developer.applesignin` into `Runner.entitlements`, which
+  currently holds `aps-environment` and nothing else.
+- **Supabase** → enable the Apple provider and put all three **bundle ids** in
+  its client-ids list. A native-only flow needs no secret key; only the browser
+  flow does.
+
+**One follow-on obligation.** Apple requires apps offering Sign in with Apple to
+**revoke the token when the account is deleted**. `deleteAccount()` exists
+(`auth_supabase_datasource.dart:267`) and does not do this. Not a first-review
+blocker, but it is an enforcement item — worth an issue rather than a surprise.
 
 ### 3.2 The Live Activity extension does not exist **[repo]**
 
@@ -278,8 +327,9 @@ starts.
 
 | # | Step | Who | Blocks |
 |---|---|---|---|
-| 1 | Pull `main`, `flutter pub get`, build all three for a device | Mac Claude | everything |
-| 2 | Decide §3.1 (hide Google on iOS, or add Sign in with Apple) and do it | **you**, then Mac Claude | submission |
+| 1 | Pull `main`, `flutter pub get`, build all three for a device — **the baseline, before any new code lands** | Mac Claude | everything |
+| 2a | Sign in with Apple: the Dart and the two pubspec lines, all three apps (§3.1) | Windows Claude | 2b |
+| 2b | Apple capability on 3 App IDs + 3 Xcode targets; Apple provider + 3 bundle ids in Supabase | **you** | submission |
 | 3 | Two iOS Maps keys, into both `Secrets.xcconfig` | you | maps drawing |
 | 4 | `ExportOptions.plist` for rider and vendor | Mac Claude | their builds |
 | 5 | App Store Connect records for rider and vendor | **you**, web UI — the API cannot | their builds |
