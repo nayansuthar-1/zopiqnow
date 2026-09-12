@@ -127,20 +127,30 @@ sign-in fails on iOS with the same one sentence as every other Google failure.
 All three build. Zero Swift errors, zero CocoaPods movement, `pubspec.lock`
 byte-identical before and after. See §1.1.
 
-### B0. No iPhone is reachable from the Mac **[Mac — now the critical path]**
+### B0. No iPhone is reachable from the Mac **[Mac]**
 
-Two devices are known to the Mac and neither is connected. This blocks queue
-steps 7, 8 and 9 — the device smoke test, the push chain and the ₹1 payment —
-which between them are most of what is left, and **none of them has a software
-workaround**. A simulator implements neither APNs, nor Live Activities, nor real
-GPS, nor signing.
+> **Corrected 2026-09-12.** This section first called the missing phone "the
+> critical path" and said registering a device was the cheap fix for B2. **Both
+> were wrong, and wrong in the expensive direction** — they imply you cannot ship
+> without hardware, and you can.
+>
+> **An App Store distribution provisioning profile contains no device list.**
+> Device registration is a *development*-profile concern. The customer app is the
+> proof: it archived and signed to 57.8 MB on a Mac with no phone attached, and
+> `ship_ios.mjs` reports it ready to upload. **All three apps can reach
+> TestFlight and the App Store with no iPhone in the building.**
 
-It also blocks the cheap fix for B2: registering one device in the Developer
-portal is what lets automatic signing produce a development profile for rider
-and vendor.
+What the missing phone actually blocks is **validation, not shipping**: queue
+steps 7, 8 and 9. And the substitute for a USB cable is **TestFlight itself** —
+push a build, install it on any iPhone you can reach (yours, a rider's, a
+restaurant's), and the validation happens there. Internal TestFlight needs no
+Beta App Review and no demo account, so it is a fast loop, not a submission.
 
-**This is the thing to solve first.** A phone plugged into the Mac over USB
-unblocks four separate queue items at once.
+The one thing genuinely unavailable either way is a *debugger* attached while it
+misbehaves. Crashlytics is already in all three apps and handled errors are
+explicitly the point of it — that is the intended answer here.
+
+See §6 for what the simulator does and does not cover.
 
 ### B2. Rider and vendor cannot be exported **[repo]**
 
@@ -438,3 +448,52 @@ on the public App Store at all (Guideline 4.2, "no use for the general public").
 Zopiq's riders and restaurants are independent businesses, so the public route is
 arguable — but put the argument in the review notes rather than finding out.
 Apple Business Manager / Custom Apps is the clean alternative.
+
+---
+
+## 6. What the simulator covers, and what it does not
+
+Added 2026-09-12, because there is no iPhone at the Mac and the honest answer is
+"most of it, and the gaps have workarounds".
+
+### Fully covered — do these on the simulator, they are not compromises
+
+| Queue step | Why the simulator is enough |
+|---|---|
+| **11. App Store screenshots** | The simulator is the *standard* way to produce these — a 6.7" frame is an iPhone 16 Pro Max simulator and `xcrun simctl io booted screenshot`. A device adds nothing |
+| **7, in large part.** Smoke-testing nine builds of unseen Dart | Feed, town lock, cart, checkout up to the payment sheet, the new reviews page, the gift page, the bill's new shape, beverages, order history. All Dart, all real |
+| **10. The demo account** | Email OTP is a network call. `IOS_RELEASE_RUNBOOK.md` §A4 already documents seeding a Sadri address into `SharedPreferences` so the feed opens populated |
+| **Sign in with Apple** (§3.1) | Works, once the simulator is signed into an Apple ID in its own Settings app. **Including the first-authorization name**, which is the half most likely to be got wrong |
+| Google sign-in | Works — it is a web auth session |
+| Rider map, and location logic | Simulated location (Features → Location → Custom / City Run) exercises the reporter and the map honestly |
+| **12. Live Activity rendering** | The Lock Screen card renders in an iOS 16.1+ simulator. Dynamic Island needs a Pro-model simulator. Only *push-driven* updates want a device |
+
+### Not covered, and what to do instead
+
+| Gap | Workaround |
+|---|---|
+| **9. The ₹1 UPI payment** | **No workaround, and this one is real.** UPI apps cannot be installed on a simulator, so `canOpenURL` returns false for every scheme, Razorpay's intent list comes back empty, and the only payment method the app offers at launch is untestable. This needs a real iPhone with a real UPI app — via TestFlight if not via USB |
+| Camera (`image_picker`) | No simulator camera. The photo-library path works; the camera path is device-only. Affects the vendor's dish photos and the rider's handover proof, neither of which is on the customer submission path |
+| Real jank, thermals, 3G | The simulator runs on the Mac's CPU and tells you nothing. ENGINEERING_RULES Rule 8's floor is a real-device claim |
+| Entitlements, signing, archive | Simulator builds are unsigned — but see B0: none of this needs a *phone*, only a distribution profile |
+
+### ⚠️ Push — probably covered, and worth ten minutes to find out
+
+The old runbook line "a simulator cannot show you APNs" is out of date. **Since
+Xcode 14 / macOS 13, an Apple Silicon Mac's simulator receives real remote push
+notifications** — `registerForRemoteNotifications` returns a genuine token and
+APNs delivers to it. On macOS 26.4 with Xcode 26.6 this should hold.
+
+Two caveats before treating step 8 as closed:
+
+- **Apple Silicon only.** `uname -m` must say `arm64`. On an Intel Mac none of
+  this applies and only `xcrun simctl push` — a local fake that bypasses APNs
+  entirely — is available.
+- **The unknown is Firebase, not Apple.** Our chain is
+  `send-notification → FCM → APNs → device`, and `PushService` waits on an APNs
+  token before registering (`push_service.dart:230`). Whether `firebase_messaging`
+  mints an FCM token against a simulator's APNs token is the thing to test rather
+  than assume.
+
+If it works it closes most of step 8, **except the killed-app case**, which is
+where the Android equivalent broke and which deserves a real device regardless.
