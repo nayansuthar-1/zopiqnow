@@ -498,3 +498,84 @@ Two caveats before treating step 8 as closed:
 
 If it works it closes most of step 8, **except the killed-app case**, which is
 where the Android equivalent broke and which deserves a real device regardless.
+
+---
+
+## 7. The simulator smoke test, 2026-09-13 — seven defects, triaged
+
+Ran on an iPhone 17 Pro Max simulator (arm64, iOS 26.5) against a seeded Sadri
+address. **Clean:** gift page, beverages, the drinks upsell, the bill's new shape
+(₹100 + ₹1 + ₹5 = ₹106), own-orders-only history, the reviews page, Veg Mode,
+cart persistence. Nine builds of unseen Dart and nothing threw.
+
+### ⚠️ The triage that matters more than the list
+
+**Five of the seven are shared Dart.** They are not iOS bugs — the same code runs
+on Android, in production, today. So each is either a **pre-existing Android bug
+nobody has noticed**, or an **artifact of the seeded simulator state**. Which one
+is not guessable from here, and the discriminator is cheap: open the Play alpha
+build on an Android phone and look at the same four things.
+
+**Do that before fixing any of them.** Fixing a simulator artifact is wasted work
+and it lands in the shared code path that Android ships from.
+
+| # | Defect | Layer | First move |
+|---|---|---|---|
+| 1 | **`Pay ₹106` is a dead end** — TLS call, haptic, then no sheet, no error, no delegate callback | iOS + gateway | See below — probably not a bug |
+| 2 | "Add a drink?" sheet clipped, no scroll, no dismiss, ADD flush to the bottom edge | **plausibly iOS** — reads like a missing bottom safe-area inset for the home indicator | Compare against Android, which has a nav bar and may hide it |
+| 3 | `0.0 km` on every restaurant | shared | **Likely a seed artifact** — check what lat/lng A4 actually wrote |
+| 4 | `0.0 ★` on cards despite a live 5-star review | shared + DB | Ratings are trigger-computed (0062–0065). Check on Android; if also 0.0, the trigger is the bug |
+| 5 | Order Summary: "ITEMS ORDERED" crowds the star row | shared | Cosmetic |
+| 6 | No photo strip on the restaurant **detail** page | shared / doc | `zopiqnow-card-photo-strip` and 0119 are about the **feed card**. The listing doc may be assuming a strip that was never built there |
+| 7 | Menu FAB overlaps an ADD button | shared | Cosmetic |
+
+### On #1, the payment dead end — read this before calling it a bug
+
+Traced through the plugin source rather than guessed. **The obvious hypothesis is
+wrong**: `razorpay_flutter` 1.4.5 resolves the presenting controller through
+`UIApplication.shared.connectedScenes` and only falls back to the deprecated
+`keyWindow` (`SwiftRazorpayFlutterPlugin.swift:21-33`), so the app's
+`FlutterSceneDelegate` does not break it.
+
+What the observed behaviour actually narrows to:
+
+- `configured: false` is **ruled out** — that path returns `fallback.pay(…)`, and
+  `MockPaymentGateway` draws a modal bottom sheet. No sheet appeared.
+- A thrown `invoke` is **ruled out** — that returns `PaymentFailed` with a
+  message the checkout page renders.
+- Every SDK failure fires `EVENT_PAYMENT_ERROR`, which the gateway wires to an
+  outcome (`razorpay_payment_gateway.dart:134`). Nothing fired.
+
+So native `open` was called and the SDK neither drew nor reported. **The most
+likely explanation is the simulator itself** — §6 already names the ₹1 payment as
+the one gap with no simulator substitute, and Razorpay's iOS checkout leans on
+UPI app hand-off that cannot exist there.
+
+**The cheap discriminator, and it needs no device:** look in the Razorpay
+dashboard for whether the `razorpay-order` call actually created an order. If it
+did, the server half works and the silence is the SDK on a simulator — not a
+launch blocker, just untestable until a real phone. If no order was created, the
+edge function is the bug and that *is* worth fixing now.
+
+### Two corrections to `IOS_RELEASE_RUNBOOK.md` §A4, learned the hard way
+
+- **Its PlistBuddy recipe silently strips the JSON's double quotes.** Write the
+  plist XML directly instead.
+- **Uninstall does not clear the session.** Keychain items survive app removal on
+  iOS, so a "fresh" install came up already signed in. That is the only reason
+  checkout and order history were reachable at all — and it means the A4 recipe
+  is not the clean-slate it reads as.
+
+### 🚩 A launch blocker that has nothing to do with iOS
+
+The Sadri feed's top items are **₹1 dishes from "Sadri Test Restaurant"** — test
+data live in the production catalogue, on the platform Play alpha is already
+serving. A reviewer could order one; so could a customer. It also makes every
+screenshot unusable. **Hide or delete it before either store sees the app.**
+
+### Screenshots are not submittable yet
+
+Two independent reasons, both recorded in `store/ios/screenshots/README.md`:
+the captures are 6.9" (1320×2868) while the live listing holds a **6.5"** set,
+and the content shows the test restaurant above. Regenerate after it is gone, at
+whatever size App Store Connect is actually asking for on the day.
