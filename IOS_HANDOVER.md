@@ -92,15 +92,40 @@ had ever compiled it — exactly the class of error §7 predicted.
 
 ### 0.1 Google sign-in on iOS is finished for `customer` only — found 2026-08-18
 
+> # ⚠️ THIS TABLE IS STALE. VERIFY BEFORE ACTING ON IT.
+>
+> **Corrected 2026-09-13, after a third session repeated its conclusion.** The
+> snapshot below is from 2026-08-18. Commit **`cc06e9b`** (2026-08-20) added
+> `GIDClientID` **and** the `CFBundleURLTypes` block to **both** the rider and
+> the vendor `Info.plist`, and created the vendor's `Secrets.xcconfig`. They are
+> tracked files; read them:
+>
+> ```
+> apps/rider/ios/Runner/Info.plist   GIDClientID :163   CFBundleURLTypes :165
+> apps/vendor/ios/Runner/Info.plist  GIDClientID :114   CFBundleURLTypes :116
+> ```
+>
+> **So step 3 of "To fix" below is already done, and doing it again would put a
+> duplicate key in a plist** — which is malformed rather than merely redundant.
+> Step 1 is done too: three distinct iOS clients exist under project
+> `789936942272`. Step 2 was done on the Mac on 2026-09-13.
+>
+> **What is still genuinely open is only the Supabase half** — the ⚠️ subsection
+> at the end of §0.1, which remains correct and remains unverified.
+>
+> This is the third repeat of a claim that was already false, and each time the
+> source was this table rather than the files. `IOS_PARITY_AND_LAUNCH.md` §1.1 is
+> the current status; prefer it, and prefer the files over both.
+
 All three apps depend on `google_sign_in: 7.2.0` and all three call
 `GoogleSignIn.instance.initialize(serverClientId: Env.googleWebClientId)` —
 passing **no** `clientId`. What each app has beside that call is not the same:
 
-| | `GIDClientID` in Info.plist | reversed-id URL scheme | `GOOGLE_IOS_CLIENT_ID` in Secrets | `CLIENT_ID` in GoogleService-Info.plist |
+| **[snapshot, 2026-08-18 — superseded, see above]** | `GIDClientID` in Info.plist | reversed-id URL scheme | `GOOGLE_IOS_CLIENT_ID` in Secrets | `CLIENT_ID` in GoogleService-Info.plist |
 |---|---|---|---|---|
 | customer | ✅ `$(GOOGLE_IOS_CLIENT_ID)` | ✅ | ✅ | ❌ |
-| rider | ❌ | ❌ | ❌ (file exists, Maps key only) | ❌ |
-| vendor | ❌ | ❌ | ❌ (no Secrets.xcconfig at all) | ❌ |
+| rider | ~~❌~~ → ✅ `cc06e9b` | ~~❌~~ → ✅ | ~~❌~~ → ✅ 09-13 | ❌ |
+| vendor | ~~❌~~ → ✅ `cc06e9b` | ~~❌~~ → ✅ | ~~❌~~ → ✅ 09-13 | ❌ |
 
 **Why that matters**, traced in the plugin's own source rather than inferred —
 `google_sign_in_ios-6.3.0/.../FLTGoogleSignInPlugin.m`:
