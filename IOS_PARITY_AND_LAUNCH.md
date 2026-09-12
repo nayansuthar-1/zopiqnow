@@ -115,8 +115,9 @@ and only the customer's ever reached the Mac.
 still genuinely unconfirmed is step 3 of that memory: whether all three ids are
 in Supabase's `external_google_additional_client_ids`. Until they are, Google
 sign-in fails on iOS with the same one sentence as every other Google failure.
-- `zopiqnow-ios-parity` says the apps have *"never been signed"*. The customer
-  app has; rider and vendor have not.
+
+Also stale, and corrected in the memory itself: `zopiqnow-ios-parity` says the
+apps have *"never been signed"*. The customer app has; rider and vendor have not.
 
 ---
 
