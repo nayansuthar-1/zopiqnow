@@ -40,10 +40,17 @@ exported.
 
 ## 1. Ground truth, 2026-09-12
 
+> **Corrected 2026-09-12 from the Mac, which ran the builds.** Four rows below
+> were wrong and are fixed in place; the reasoning that produced them is in §1.1.
+> The short version: **nothing has a Swift error**, and the two `Secrets.xcconfig`
+> rows were read off the wrong machine.
+
 | | customer | rider | vendor |
 |---|---|---|---|
-| Version in `pubspec.yaml` **[repo]** | `1.0.0+31` | `1.0.0+7` | `1.0.0+8` |
-| Highest build Apple holds **[stale, 08-20]** | 18 | none | none |
+| Version committed on `main` **[Mac]** | `1.0.0+30` | `1.0.0+7` | `1.0.0+8` |
+| Highest build Apple holds **[Mac, live]** | **21** | none | none |
+| `flutter build ios --release` **[Mac]** | ✅ signed, 57.8 MB | ⚠️ signing only | ⚠️ signing only |
+| Same build `--no-codesign` **[Mac]** | — | ✅ 46.8 MB | ✅ 29.1 MB |
 | Bundle id **[repo]** | `com.siteonlab.zopiqnow` | `com.siteonlab.zopiqRider` | `com.siteonlab.zopiqVendor` |
 | `DEVELOPMENT_TEAM` set **[repo]** | ✅ `759C76D23N` | ✅ `759C76D23N` | ✅ `759C76D23N` |
 | Deployment target **[repo]** | 14.0 | 14.0 | 14.0 |
@@ -51,26 +58,63 @@ exported.
 | `GoogleService-Info.plist` **[repo]** | ✅ | ✅ | ✅ |
 | App icons (15 PNGs) **[repo]** | ✅ | ✅ | ✅ |
 | `ExportOptions.plist` **[repo]** | ✅ | ❌ **missing** | ❌ **missing** |
-| iOS OAuth client id in `Secrets.xcconfig` **[repo, Windows copy]** | ✅ set | ✅ set | ✅ set |
-| `MAPS_API_KEY` in `Secrets.xcconfig` **[repo, Windows copy]** | ❌ **empty** | ❌ **empty** | n/a — no map |
+| iOS OAuth client id — **Mac**, the machine that builds | ✅ set | ❌ **empty** | ❌ **empty** |
+| iOS OAuth client id — Windows copy | ✅ set | ✅ set | ✅ set |
+| `MAPS_API_KEY` — **Mac** | ✅ set | ✅ set | n/a — no map |
+| `MAPS_API_KEY` — Windows copy | ❌ empty | ❌ empty | n/a — no map |
 | Live Activity extension target in `project.pbxproj` **[repo]** | ❌ **absent** | n/a | n/a |
 | ASC API credentials in `.env` **[repo, Windows copy]** | ❌ absent — they live on the Mac | | |
 
-**The customer app is 13 builds behind on iOS.** Apple's newest build, 18, was
-uploaded on 2026-08-20 from roughly `1.0.0+21`. Since then: reviews page, gift
-page, the bill's new shape, beverages on every menu, the armed payment gate,
-refunds that actually send, own-orders-only history, the drinks upsell, seven
-audit fixes and an empty-cart dialog. All shared Dart, all of it will come along
-for free — **and none of it has been through a Swift compiler or onto an
-iPhone.**
+**The customer app is 9 builds behind on iOS.** Apple's newest is build 21;
+`main` is at `1.0.0+30`. Since that upload: reviews page, gift page, the bill's
+new shape, beverages on every menu, the armed payment gate, refunds that
+actually send, own-orders-only history, the drinks upsell, seven audit fixes and
+an empty-cart dialog. Because the next `ship_ios` run bumps to 31, **the "must
+be ≥ 22" rule is satisfied automatically** — there is no numbering collision to
+work around.
 
-**Two memories in the index are now stale and should be corrected:**
+### 1.1 What the Mac's baseline run changed, 2026-09-12
 
-- `zopiqnow-vendor-rider-google-ios` says *"no iOS OAuth client exists for any
-  bundle id"*. Not true any more — all three `Secrets.xcconfig` files carry a
-  `GOOGLE_IOS_CLIENT_ID` under Cloud project `789936942272` **[repo]**. What is
-  still unconfirmed is whether all three ids are in Supabase's comma-separated
-  **Authorized Client IDs** list **[Mac / dashboard]**.
+**All three apps compile with zero Swift errors.** Nine builds of unseen Dart,
+and not one compile diagnostic. That was the single biggest unknown on this list
+and it is now closed — the remaining work is configuration, capabilities and
+hardware, not code.
+
+**Rider and vendor did not fail to compile — they failed to sign**, in ~20s,
+before the code was built:
+
+```
+Your team has no devices from which to generate a provisioning profile.
+No profiles for 'com.siteonlab.zopiqRider' were found.
+```
+
+The cause is in `project.pbxproj`: **only the customer app has a Release
+override** setting `CODE_SIGN_STYLE = Manual` with `Apple Distribution` and the
+profile *Zopiq Customer App Store* (lines 710–721). Rider and vendor stay on
+Automatic, which wants a registered device. Re-run with `--no-codesign` they
+build clean: rider 46.8 MB, vendor 29.1 MB. **This is the same gap as B2** — the
+two staff apps were never set up to ship — and an `ExportOptions.plist` alone
+will not clear it.
+
+**⚠️ `Secrets.xcconfig` is gitignored, so the Windows copy and the Mac copy are
+different files, and the doc was written from the wrong one.** On the Mac, which
+is the machine that builds: `MAPS_API_KEY` **is** set for customer and rider (so
+**B3 is largely done** — what remains is confirming both keys are restricted to
+their bundle ids and that *Maps SDK for iOS* is enabled on the project), and
+`GOOGLE_IOS_CLIENT_ID` is set for **customer only**.
+
+**On the OAuth question the Mac's conclusion is too pessimistic, and this is
+worth getting right because it changes who does the work.** The Mac read its own
+empty files and concluded the iOS clients do not exist. They do: the three
+Windows copies carry **three distinct ids**, all under Cloud project
+`789936942272` (`…t78n…`, `…s8a6…`, `…5t83…` — different values, not a
+copy-paste of one). Three real iOS OAuth clients were created around 2026-08-21
+and only the customer's ever reached the Mac.
+
+**So this is a two-minute file copy, not a trip to the Cloud console.** What is
+still genuinely unconfirmed is step 3 of that memory: whether all three ids are
+in Supabase's `external_google_additional_client_ids`. Until they are, Google
+sign-in fails on iOS with the same one sentence as every other Google failure.
 - `zopiqnow-ios-parity` says the apps have *"never been signed"*. The customer
   app has; rider and vendor have not.
 
@@ -78,30 +122,67 @@ iPhone.**
 
 ## 2. Blockers — nothing ships until these are done
 
-### B1. Nobody has compiled today's `main` for iOS **[Mac]**
+### ~~B1. Nobody has compiled today's `main` for iOS~~ — **closed 2026-09-12**
 
-Three weeks of Dart has landed since the last iOS build. The failure mode is not
-subtle — it is a Swift or CocoaPods error at build time — but it has to be met.
-Do this first, for all three apps, before anything else on this list.
+All three build. Zero Swift errors, zero CocoaPods movement, `pubspec.lock`
+byte-identical before and after. See §1.1.
+
+### B0. No iPhone is reachable from the Mac **[Mac — now the critical path]**
+
+Two devices are known to the Mac and neither is connected. This blocks queue
+steps 7, 8 and 9 — the device smoke test, the push chain and the ₹1 payment —
+which between them are most of what is left, and **none of them has a software
+workaround**. A simulator implements neither APNs, nor Live Activities, nor real
+GPS, nor signing.
+
+It also blocks the cheap fix for B2: registering one device in the Developer
+portal is what lets automatic signing produce a development profile for rider
+and vendor.
+
+**This is the thing to solve first.** A phone plugged into the Mac over USB
+unblocks four separate queue items at once.
 
 ### B2. Rider and vendor cannot be exported **[repo]**
 
 `apps/rider/ios/ExportOptions.plist` and `apps/vendor/ios/ExportOptions.plist`
 do not exist, and `tool/ship_ios.mjs` refuses both apps because of it
 (`ship_ios.mjs:134-136`). The customer file is the template; each needs its own
-bundle id and its own provisioning-profile name. Downstream of this: **neither
-app has an App Store Connect record, and the API cannot create one** — that is a
-human at the web UI, and it is the single longest-lead item on this list.
+bundle id and its own provisioning-profile name.
 
-### B3. The Maps key is empty **[repo, Windows copy — confirm on the Mac]**
+**And the plist is only half of it** — §1.1 found the other half: neither app has
+a manual-signing Release configuration, so neither can even archive. The whole
+chain for each staff app, in order, and every link needs the one before it:
 
-`MAPS_API_KEY` is blank in both the customer and rider `Secrets.xcconfig` here.
-An iOS Maps key is a *different key* from the Android one — Google restricts iOS
-keys by bundle id — and "Maps SDK for iOS" is a separate API that is off by
-default on the Cloud project. Empty renders Google's grey "authorization
-failure" tile rather than crashing, so it will not stop a build; it will stop
-the tracking map and the rider's map from drawing. Two keys are needed, one per
-bundle id.
+1. **Register the App ID** in the Developer portal — `com.siteonlab.zopiqRider`,
+   `com.siteonlab.zopiqVendor`. Tick Push Notifications and Sign In with Apple
+   while you are there (§3.1).
+2. **Create an App Store distribution provisioning profile** for each.
+3. **Set manual signing** on the Release configuration, naming that profile.
+4. **Write `ExportOptions.plist`** naming the same profile.
+5. **Create the App Store Connect record** — the API cannot, so this is the web
+   UI, and it is the single longest-lead item on this list.
+
+On step 3 and the "never hand-edit `project.pbxproj`" rule: **that rule is about
+adding targets**, where hand-written UUIDs reliably corrupt the project graph.
+Changing `CODE_SIGN_STYLE` in a build configuration that already exists is not
+that — it is a settings edit, reversible in one line. Do it in Xcode's Signing &
+Capabilities tab anyway, which writes the same thing without the chance of a
+typo.
+
+### B3. The Maps key — **mostly done**, two things to confirm **[Mac]**
+
+`MAPS_API_KEY` **is** set for customer and rider on the Mac. It was the Windows
+copy that was empty, and that copy builds nothing. What is left is confirming,
+in the Cloud console, that each key is **restricted to its own bundle id** and
+that **"Maps SDK for iOS" is enabled** — a separate API from the Android one,
+off by default. A key that is present but unrestricted or unenabled renders
+Google's grey "authorization failure" tile rather than crashing, so it will pass
+a build and fail on screen.
+
+**Two client-id files still need copying to the Mac**, and this is the same
+class of problem: `GOOGLE_IOS_CLIENT_ID` and `GOOGLE_IOS_URL_SCHEME` are filled
+in on Windows for rider and vendor and empty on the Mac. Copy them across; do
+not create new clients (§1.1).
 
 ### B4. Push has never been observed arriving on an iPhone **[Mac]**
 
@@ -327,11 +408,13 @@ starts.
 
 | # | Step | Who | Blocks |
 |---|---|---|---|
-| 1 | Pull `main`, `flutter pub get`, build all three for a device — **the baseline, before any new code lands** | Mac Claude | everything |
+| ~~1~~ | ~~Baseline build of all three~~ | — | **done 09-12, zero Swift errors** |
+| **0** | **Plug an iPhone into the Mac** (B0) | **you** | 7, 8, 9 — and the cheap fix for 4 |
 | 2a | Sign in with Apple: the Dart and the two pubspec lines, all three apps (§3.1) | Windows Claude | 2b |
 | 2b | Apple capability on 3 App IDs + 3 Xcode targets; Apple provider + 3 bundle ids in Supabase | **you** | submission |
-| 3 | Two iOS Maps keys, into both `Secrets.xcconfig` | you | maps drawing |
-| 4 | `ExportOptions.plist` for rider and vendor | Mac Claude | their builds |
+| 3 | Copy `GOOGLE_IOS_CLIENT_ID` + URL scheme for rider and vendor, Windows → Mac; confirm both Maps keys are restricted and *Maps SDK for iOS* is on | you | Google sign-in, maps |
+| 3b | All three iOS client ids into Supabase's authorized client ids | you / Management API | Google sign-in |
+| 4 | Rider + vendor: App ID → distribution profile → manual-signing Release config → `ExportOptions.plist` (B2, five steps in order) | you + Mac Claude | their builds |
 | 5 | App Store Connect records for rider and vendor | **you**, web UI — the API cannot | their builds |
 | 6 | Xcode capabilities on all three: Push, Background Modes (+ Location on rider), Time Sensitive Notifications | you, GUI | push and the ring |
 | 7 | Smoke-test all three on a real iPhone | Mac Claude + you | everything |
@@ -342,6 +425,13 @@ starts.
 | 12 | Live Activity extension target (§3.2) | Mac Claude + you, Xcode GUI | nothing — parity |
 | 13 | iOS notification categories for the vendor ring (§3.3) | Mac Claude | nothing — parity |
 | 14 | TestFlight all three, then submit the customer app | you | — |
+
+**Housekeeping, not blocking:** `apps/customer/pubspec.yaml` carries an
+**uncommitted** bump to `1.0.0+31` on the Windows machine — `main` is at `+30`,
+which is what Play alpha holds. It looks like the residue of an aborted
+`ship.mjs` run. `ship_ios.mjs` bumps and commits the version itself, so leaving
+a stray bump in the tree risks it being swept into an unrelated commit. Revert
+it or commit it deliberately; do not just leave it.
 
 **Trap 2 from the runbook is still undecided**: whether rider and vendor belong
 on the public App Store at all (Guideline 4.2, "no use for the general public").
