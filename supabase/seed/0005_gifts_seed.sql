@@ -5,12 +5,17 @@
 -- devotional plates, mandalas, wall mirrors, tasselled hangings, a key holder.
 -- Every product carries a gallery (image_urls) - the full piece plus close-ups -
 -- with the first image doubling as the card thumbnail (image_url). Photos are the
--- seller's own originals, uploaded to our Cloudinary CDN (cloud mqppsahn) through
--- the app's unsigned preset.
+-- seller's own originals, uploaded to our Cloudinary CDN through the app's
+-- unsigned preset - cloud mqppsahn for everything seeded in 2026-07, which still
+-- resolves and is therefore left alone. gs1-kamdhenu-cow-crimson (0168) is the
+-- exception and the pattern for anything added from here: cloud w69i7qes, signed,
+-- under a deterministic public_id it can be replaced in place under.
 --
 -- PLACEHOLDERS, to be replaced when the seller confirms:
---   * gs1-kamdhenu-cow is still 999 - the one piece the seller has not
---     priced yet. The other fourteen are the seller's own prices (0167).
+--   * gs1-kamdhenu-cow is still 999 - the one piece the seller has not priced.
+--     Note this is the navy-jhool cow; the crimson one beside it (0168) is a
+--     different piece and is priced. The other fourteen are the seller's own
+--     prices (0167).
 --   * the shop name / tagline / blurb on gs1
 --
 -- Idempotent: clears the gifts tables first, so re-running rebuilds the catalog
@@ -251,4 +256,13 @@ values
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784655423/zopiqnow/qmn7nyp9keitx1uvt6tk.jpg',
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784655432/zopiqnow/lq4qv0w1fdhiuglemgk6.jpg'
    ],
-   'Mandala and Lotus', 1, 3);
+   'Mandala and Lotus', 1, 3),
+  ('gs1-kamdhenu-cow-crimson', 'gs1',
+   'Crimson Kamdhenu Cow Lippan Wall Plate',
+   'The sacred cow in a crimson jhool, ringed by red lotuses and mirror inlay on a marigold ground. Hand-painted lippan work, so no two are alike.',
+   1200,
+   'https://res.cloudinary.com/w69i7qes/image/upload/f_auto,q_auto,w_600,c_limit/v1791880059/zopiqnow/gifts/kamdhenu-cow-crimson.jpg',
+   array[
+     'https://res.cloudinary.com/w69i7qes/image/upload/f_auto,q_auto,w_1200,c_limit/v1791880059/zopiqnow/gifts/kamdhenu-cow-crimson.jpg'
+   ],
+   'Devotional Art', 0, 6);
