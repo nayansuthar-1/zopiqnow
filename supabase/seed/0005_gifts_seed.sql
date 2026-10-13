@@ -9,7 +9,8 @@
 -- the app's unsigned preset.
 --
 -- PLACEHOLDERS, to be replaced when the seller confirms:
---   * every price is 999
+--   * gs1-kamdhenu-cow is still 999 - the one piece the seller has not
+--     priced yet. The other fourteen are the seller's own prices (0167).
 --   * the shop name / tagline / blurb on gs1
 --
 -- Idempotent: clears the gifts tables first, so re-running rebuilds the catalog
@@ -34,7 +35,7 @@ values
   ('gs1-evil-eye-hanging', 'gs1',
    'Evil Eye Mandala Wall Hanging',
    'Hand-painted mandala disc in fine mirror work, finished with beaded cotton tassels. The evil eye motif is traditionally hung at an entrance to keep a home safe.',
-   999,
+   2500,
    'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_600,c_limit/v1784653811/zopiqnow/oj3d3qousan2uw4g7j5o.jpg',
    array[
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784653811/zopiqnow/oj3d3qousan2uw4g7j5o.jpg',
@@ -63,7 +64,7 @@ values
   ('gs1-shivling', 'gs1',
    'Shivling Lippan Wall Plate',
    'The Shivling framed by a lotus and a ring of painted petals, finished with mirror inlay. A calm, devotional piece for a mandir wall.',
-   999,
+   499,
    'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_600,c_limit/v1784654061/zopiqnow/bitqc0hbjc5k7kojbzro.png',
    array[
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784654061/zopiqnow/bitqc0hbjc5k7kojbzro.png',
@@ -77,7 +78,7 @@ values
   ('gs1-peacock-key-holder', 'gs1',
    'Peacock Lippan Key Holder',
    'A half-moon key holder with a peacock in full display, mirror-inlaid feathers and five sturdy hooks. Useful and beautiful by the front door.',
-   999,
+   799,
    'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_600,c_limit/v1784654141/zopiqnow/u0jcrvlmb2wazdx4pe3q.jpg',
    array[
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784654141/zopiqnow/u0jcrvlmb2wazdx4pe3q.jpg',
@@ -93,7 +94,7 @@ values
   ('gs1-blue-lotus-frame', 'gs1',
    'Blue Lotus Mandala Wall Frame',
    'A square frame carrying a layered blue lotus mandala in cut mirror work, bordered in deep indigo. Reads beautifully against a plain wall.',
-   999,
+   1100,
    'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_600,c_limit/v1784654280/zopiqnow/zatmw7vr768vbub6gyb5.jpg',
    array[
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784654280/zopiqnow/zatmw7vr768vbub6gyb5.jpg',
@@ -107,7 +108,7 @@ values
   ('gs1-yellow-floral-mirror', 'gs1',
    'Yellow Floral Lippan Wall Mirror',
    'A round wall mirror ringed with hand-painted pink and white blooms on a sunny yellow ground, set with mirror chips.',
-   999,
+   1200,
    'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_600,c_limit/v1784654388/zopiqnow/lw9wwrz4uhwypgfs7uxc.jpg',
    array[
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784654388/zopiqnow/lw9wwrz4uhwypgfs7uxc.jpg',
@@ -122,7 +123,7 @@ values
   ('gs1-ivory-mirror', 'gs1',
    'Ivory Lippan Wall Mirror',
    'A round wall mirror in ivory and white, textured with rows of tiny mirrors and a diamond border. Quiet enough for any room.',
-   999,
+   1200,
    'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_600,c_limit/v1784654538/zopiqnow/hgf6k5rtah7wtku03rpz.jpg',
    array[
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784654538/zopiqnow/hgf6k5rtah7wtku03rpz.jpg',
@@ -134,7 +135,7 @@ values
   ('gs1-rose-mandala', 'gs1',
    'Rose Pink Mandala Lippan Wall Art',
    'A large mandala in soft rose pink, layered ring upon ring with mirror inlay and fine relief work. A statement piece.',
-   999,
+   7000,
    'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_600,c_limit/v1784654610/zopiqnow/em2h5onajtbqy2xqfd1e.jpg',
    array[
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784654610/zopiqnow/em2h5onajtbqy2xqfd1e.jpg',
@@ -152,7 +153,7 @@ values
   ('gs1-sita-ram', 'gs1',
    'Sita Ram Naam Lippan Wall Plate',
    'The Sita Ram naam at the centre of a red and gold mandala, ringed with mirror work and fine stone detailing.',
-   999,
+   4500,
    'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_600,c_limit/v1784654743/zopiqnow/wf2dphkfhi8vukur18oa.jpg',
    array[
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784654743/zopiqnow/wf2dphkfhi8vukur18oa.jpg',
@@ -167,7 +168,7 @@ values
   ('gs1-radha-naam', 'gs1',
    'Radha Naam Lippan Wall Plate',
    'The Radha naam in gold, set on deep teal and framed by rings of yellow petals and mirror inlay.',
-   999,
+   1300,
    'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_600,c_limit/v1784654808/zopiqnow/ttbcxnxoj4utwmedmwfj.jpg',
    array[
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784654808/zopiqnow/ttbcxnxoj4utwmedmwfj.jpg',
@@ -181,7 +182,7 @@ values
   ('gs1-shri-charan', 'gs1',
    'Shri Charan Lippan Wall Plate',
    'The divine charan - the holy footprints - painted in red on a warm ochre plate, circled with mirror work.',
-   999,
+   1200,
    'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_600,c_limit/v1784654905/zopiqnow/buzjdipoyiwaz6wpfd7n.jpg',
    array[
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784654905/zopiqnow/buzjdipoyiwaz6wpfd7n.jpg',
@@ -201,7 +202,7 @@ values
   ('gs1-personalised-name', 'gs1',
    'Personalised Name Wall Hanging',
    'A name plate in mirror work, finished with evil eye beads and silky tassels. Made to order - tell us the name to paint.',
-   999,
+   1100,
    'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_600,c_limit/v1784655104/zopiqnow/plykbbgw0mw3tob1aqgw.jpg',
    array[
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784655104/zopiqnow/plykbbgw0mw3tob1aqgw.jpg',
@@ -225,7 +226,7 @@ values
   ('gs1-krishnaya-mantra', 'gs1',
    'Krishnaya Vasudevaya Mantra Wall Plate',
    'The Krishnaya Vasudevaya mantra in raised gold lettering on deep red, surrounded by hand-painted peacock feathers and mirror flowers. A large centrepiece.',
-   999,
+   4500,
    'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_600,c_limit/v1784655212/zopiqnow/hw0rbs7pvkzunzbkfymp.jpg',
    array[
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784655212/zopiqnow/hw0rbs7pvkzunzbkfymp.jpg',
@@ -242,7 +243,7 @@ values
   ('gs1-lotus-arch-panel', 'gs1',
    'Lotus and Mughal Arch Lippan Panel',
    'A tall panel with a mughal arch in fine mirror work, set against pink lotus vines on teal. Hand-painted throughout.',
-   999,
+   10000,
    'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_600,c_limit/v1784655369/zopiqnow/sdvnmvmzthkr0h8scptn.jpg',
    array[
      'https://res.cloudinary.com/mqppsahn/image/upload/f_auto,q_auto,w_1200,c_limit/v1784655369/zopiqnow/sdvnmvmzthkr0h8scptn.jpg',
