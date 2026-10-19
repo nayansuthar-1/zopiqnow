@@ -173,7 +173,9 @@ These are not style preferences. Each one has already cost this project time.
 3. **Do not run `dart format`.** The installed formatter rewrites unrelated code
    and produces a diff nobody asked for. Hand-format to match the file.
 4. **The Flutter test suites are a real merge gate** — but they are **already red
-   on main** as of 2026-08-15 (roughly 116 of 133 in customer at a clean HEAD).
+   on main** — measured **+105 -28** in customer at a clean `main` on
+   2026-10-19, down from roughly 116 of 133 on 2026-08-15, so the baseline
+   itself drifts and a remembered number is not one.
    ⚠️ **Baseline the suite at a stashed HEAD before blaming your own change.**
    An earlier handover recorded 133/35/62 all passing on 2026-08-02; that is no
    longer true and the regression is not yours. Do not "fix" tests by deleting

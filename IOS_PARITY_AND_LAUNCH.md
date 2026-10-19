@@ -447,7 +447,7 @@ place.
 | **P5** | Menu seeding open questions | Lily Café, Celebration, Wing Orbit, Red Chilli — disputed prices and held-back dishes. `zopiqnow-menu-seeding-open-questions` |
 | **P6** | ₹999 gift placeholders | `zopiqnow-gift-catalogue-admin` |
 | **P7** | No tests on the money layer | QA-001, deliberately deferred until both listings are live |
-| **P8** | Flutter suites are red on main | 116/133 at a clean HEAD since 2026-08-15. **Baseline before blaming a change.** Do not write new tests — this project hands over manual steps |
+| **P8** | Flutter suites are red on main | **+105 -28 at a clean `main`, measured 2026-10-19** (was 116/133 on 08-15 — it drifts). **Measure the baseline, do not recall it.** Do not write new tests — this project hands over manual steps |
 | **P9** | WhatsApp UTILITY template pending Meta | Order confirmation only. Unrelated to login, which stays email |
 
 ---
