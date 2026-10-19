@@ -227,11 +227,34 @@ matters: **GoTrue has no fixed-OTP control for email addresses** — the only su
 field is `sms_test_otp`, which is for phone numbers and is irrelevant now that
 mobile OTP is off the table. The working answer is a demo account on a publicly
 readable disposable mailbox with the inbox URL in the review notes. yopmail is
-proven to receive Brevo mail but sits behind an intermittent reCAPTCHA;
-`maildrop.cc` and `inboxkitten.com` are un-gated alternatives. **Prove whichever
-you pick by hand, end to end, on a real iPhone, before it goes into Test
-Information.** Save the account's delivery address **in Sadri** (8 restaurants),
-never Falna (1).
+proven to receive Brevo mail but sits behind an intermittent reCAPTCHA.
+
+> **Settled 2026-10-19: use `maildrop.cc`.** Both alternatives were probed
+> directly and both answer without a CAPTCHA of any kind:
+>
+> ```
+> POST https://api.maildrop.cc/graphql  { inbox(mailbox:"zopiqreview"){ … } }
+>   → {"data":{"inbox":[]}}
+> GET  https://inboxkitten.com/api/v1/mail/list?recipient=zopiqreview
+>   → []
+> ```
+>
+> maildrop is the better of the two because its `Message` type exposes **`data`
+> and `html`** alongside `subject` and `date`, so the six-digit code can be read
+> out of the body by a script rather than by eye — which is what makes the whole
+> flow provable without a human watching an inbox. Full field list: `id`, `ip`,
+> `helo`, `date`, `mailfrom`, `rcptto`, `headerfrom`, `subject`, `data`, `html`.
+>
+> **What this does and does not settle.** It settles *which* mailbox, and that
+> scripted access works where yopmail's did not. It does **not** prove Brevo
+> delivers to maildrop — only yopmail has ever been seen receiving our mail.
+> That is the next step, and it sends a real email and creates a real user in
+> production auth, so it is the owner's call to make rather than a check to run
+> in passing.
+
+**Prove whichever you pick by hand, end to end, on a real iPhone, before it goes
+into Test Information.** Save the account's delivery address **in Sadri**
+(8 restaurants), never Falna (1).
 
 ---
 
