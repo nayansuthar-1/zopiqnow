@@ -120,6 +120,14 @@ class AuthController extends Notifier<AuthState> {
     state = AuthSignedIn(user);
   }
 
+  /// The same contract as [signInWithGoogle], with [AppleSignInCancelled].
+  Future<void> signInWithApple() async {
+    final AuthUser user = await ref
+        .read(authRepositoryProvider)
+        .signInWithApple();
+    state = AuthSignedIn(user);
+  }
+
   /// The delivery number. Asked for at checkout, where it is first needed, not
   /// as a fourth screen between the user and their food.
   Future<void> setPhone(String phone) async {

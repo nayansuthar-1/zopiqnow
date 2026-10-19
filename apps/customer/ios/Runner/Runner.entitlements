@@ -13,5 +13,12 @@
 	     value does not need a second file. -->
 	<key>aps-environment</key>
 	<string>development</string>
+	<!-- Sign in with Apple (Guideline 4.8). Must match the capability on the
+	     App ID com.siteonlab.zopiqnow and be in the distribution profile, or
+	     the archive fails to sign. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 </dict>
 </plist>

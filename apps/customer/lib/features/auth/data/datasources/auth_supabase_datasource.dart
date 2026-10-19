@@ -1,5 +1,9 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 // Supabase exports an `AuthUser` of its own (an alias of `User`). Ours is the
 // domain entity, so theirs is the one that gives way.
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
@@ -10,7 +14,7 @@ import 'package:zopiqnow/features/auth/data/datasources/auth_datasource.dart';
 import 'package:zopiqnow/features/auth/domain/entities/auth_user.dart';
 import 'package:zopiqnow/features/auth/domain/repositories/auth_repository.dart';
 
-/// Supabase Auth, over email OTP and native Google sign-in.
+/// Supabase Auth, over email OTP and native Google and Apple sign-in.
 ///
 /// The 6-digit code is a template decision on the dashboard, not a different
 /// endpoint: the same `signInWithOtp` mails a magic link or a code depending on
@@ -199,6 +203,95 @@ class AuthSupabaseDataSource implements AuthDataSource {
       _reportGoogleFailure(e, stack, 'sign-in failed unexpectedly');
       throw const GoogleSignInFailure();
     }
+  }
+
+  @override
+  Future<AuthUser> signInWithApple() async {
+    try {
+      // The nonce is not optional. Apple embeds the *hash* in the id token;
+      // Supabase is handed the *raw* value and checks the two against each
+      // other, which is what stops a token lifted from one sign-in being
+      // replayed into another.
+      final String rawNonce = _auth.generateRawNonce();
+      final AuthorizationCredentialAppleID credential =
+          await SignInWithApple.getAppleIDCredential(
+            scopes: <AppleIDAuthorizationScopes>[
+              AppleIDAuthorizationScopes.email,
+              AppleIDAuthorizationScopes.fullName,
+            ],
+            nonce: sha256.convert(utf8.encode(rawNonce)).toString(),
+          );
+
+      final String? idToken = credential.identityToken;
+      if (idToken == null) throw const AppleSignInFailure();
+
+      // ignore: experimental_member_use
+      final AuthResponse response = await _auth.signInWithIdToken(
+        provider: OAuthProvider.apple,
+        idToken: idToken,
+        nonce: rawNonce,
+      );
+      final User? user = response.user;
+      if (user == null) throw const AppleSignInFailure();
+      return _toDomain(await _keepAppleName(user, credential));
+    } on SignInWithAppleAuthorizationException catch (e, stack) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        throw const AppleSignInCancelled();
+      }
+      _reportAppleFailure(e, stack, 'sign-in failed (${e.code.name})');
+      throw const AppleSignInFailure();
+    } on AuthException catch (e, stack) {
+      // Apple vouched for the user and Supabase would not take it: the bundle id
+      // is not in `external_apple_client_id`, or the nonce did not match.
+      _reportAppleFailure(
+        e,
+        stack,
+        'id token rejected (${e.code ?? e.statusCode ?? 'no code'})',
+      );
+      throw const AppleSignInFailure();
+    } on AuthFailure {
+      rethrow;
+    } on Object catch (e, stack) {
+      _reportAppleFailure(e, stack, 'sign-in failed unexpectedly');
+      throw const AppleSignInFailure();
+    }
+  }
+
+  /// **Apple sends the name exactly once, ever** — on the first authorization
+  /// for this Apple ID, and `null` on every one after, reinstalls included. It
+  /// is not in the id token either, so Supabase never sees it. Written here or
+  /// lost for good; and only when the customer has no name of their own, by
+  /// the same rule as Google's: the provider's value is a default.
+  Future<User> _keepAppleName(
+    User user,
+    AuthorizationCredentialAppleID credential,
+  ) async {
+    final String name = <String?>[credential.givenName, credential.familyName]
+        .whereType<String>()
+        .map((String s) => s.trim())
+        .where((String s) => s.isNotEmpty)
+        .join(' ');
+    if (name.isEmpty) return user;
+    if (_firstNonEmpty(<Object?>[user.userMetadata?[nameMetadataKey]]) !=
+        null) {
+      return user;
+    }
+    try {
+      final UserResponse response = await _auth.updateUser(
+        UserAttributes(data: <String, dynamic>{nameMetadataKey: name}),
+      );
+      return response.user ?? user;
+    } on Object catch (e, stack) {
+      // The session is real; a missing name is not worth refusing it over.
+      // The profile screen will ask for one.
+      _reportAppleFailure(e, stack, 'name not saved');
+      return user;
+    }
+  }
+
+  static void _reportAppleFailure(Object e, StackTrace stack, String what) {
+    debugPrint('Apple $what: $e');
+    CrashReporter.recordHandled(e, stack, reason: 'Apple $what');
   }
 
   /// Both halves of the Google failure path record the same way: to Crashlytics

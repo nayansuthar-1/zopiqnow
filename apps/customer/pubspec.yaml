@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+30
+version: 1.0.0+31
 # Part of the zopiqnow pub workspace: shares the single root lockfile (Rule 3).
 resolution: workspace
 
@@ -122,6 +122,17 @@ dependencies:
   # redirect/deep-link scheme is needed. Declares minSdk 21 — under our floor of
   # 24, so Rule 1 is unaffected.
   google_sign_in: 7.2.0
+
+  # --- Sign in with Apple (App Store Guideline 4.8, 2026-10-03) ---------------
+  # The one approved exception to the version freeze (IOS_PARITY_AND_LAUNCH.md
+  # §3.1): an app offering Google sign-in on iOS must also offer a login that
+  # can keep the address private. Added, not upgraded — the lockfile gained the
+  # three sign_in_with_apple packages and moved no existing pin. iOS-only in the
+  # UI; the Android browser flow is a second setup nobody asked for.
+  sign_in_with_apple: 8.2.0
+  # **Not a new version** (Rule 3): transitive at 3.0.7 already, promoted to
+  # direct for the one `sha256` the Apple nonce needs.
+  crypto: 3.0.7
 
   # --- Push notifications (B0, 2026-07-25) ------------------------------------
   # The same three packages the vendor app already pins, at the versions the root

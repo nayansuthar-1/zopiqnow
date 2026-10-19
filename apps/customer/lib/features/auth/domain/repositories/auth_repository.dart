@@ -57,6 +57,12 @@ abstract interface class AuthRepository {
   /// [GoogleSignInFailure] when the sign-in itself fails.
   Future<AuthUser> signInWithGoogle();
 
+  /// Signs in with an Apple ID, creating the account if it is new. iOS only.
+  ///
+  /// Throws [AppleSignInCancelled] when the user dismisses the sheet and
+  /// [AppleSignInFailure] when the sign-in itself fails.
+  Future<AuthUser> signInWithApple();
+
   /// Stores [phone] (E.164) against the signed-in user.
   ///
   /// It goes in the user's metadata, not Supabase's `phone` column: that column
@@ -139,6 +145,17 @@ class GoogleSignInCancelled extends AuthFailure {
 class GoogleSignInFailure extends AuthFailure {
   const GoogleSignInFailure([
     super.message = 'Google sign-in failed. Try again, or use your email.',
+  ]);
+}
+
+/// The user closed the Apple sheet — the same line [GoogleSignInCancelled] draws.
+class AppleSignInCancelled extends AuthFailure {
+  const AppleSignInCancelled([super.message = 'Sign-in cancelled.']);
+}
+
+class AppleSignInFailure extends AuthFailure {
+  const AppleSignInFailure([
+    super.message = 'Apple sign-in failed. Try again, or use your email.',
   ]);
 }
 

@@ -13,7 +13,7 @@
 	<key>provisioningProfiles</key>
 	<dict>
 		<key>com.siteonlab.zopiqnow</key>
-		<string>Zopiq Customer App Store</string>
+		<string>Zopiq Customer App Store 2</string>
 	</dict>
 	<key>uploadSymbols</key>
 	<true/>

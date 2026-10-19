@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:zopiq_legal/zopiq_legal.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
@@ -95,6 +97,7 @@ class _EmailPageState extends ConsumerState<EmailPage> {
   bool _sending = false;
   bool _sendingSms = false;
   bool _googleBusy = false;
+  bool _appleBusy = false;
 
   /// The consent gate. Starts false and is never pre-ticked — a box that
   /// arrives ticked is not consent, it is a notice with a checkbox drawn on it,
@@ -133,7 +136,7 @@ class _EmailPageState extends ConsumerState<EmailPage> {
   /// Any one of the three paths in flight locks the other two. They all end in
   /// the same place, and two codes racing to the same screen is a customer
   /// typing the one that arrived first into a screen expecting the other.
-  bool get _busy => _sending || _sendingSms || _googleBusy;
+  bool get _busy => _sending || _sendingSms || _googleBusy || _appleBusy;
 
   /// The gate, restated in code at the top of every path that creates an
   /// account. The disabled buttons are the visible half; this is the half that
@@ -179,7 +182,7 @@ class _EmailPageState extends ConsumerState<EmailPage> {
   }
 
   /// Records that consent was given, wherever it was given — the box on this
-  /// screen or the one in [_askConsentThenGoogle]'s dialog.
+  /// screen or the one in [_askConsentThen]'s dialog.
   ///
   /// Both halves matter and both are easy to forget separately: `_accepted` is
   /// what re-enables the two OTP buttons on this screen, and
@@ -202,7 +205,14 @@ class _EmailPageState extends ConsumerState<EmailPage> {
   Future<void> _onGooglePressed() async {
     if (_busy) return;
     if (!_gateOpen) {
-      final bool accepted = await _askConsentThenGoogle();
+      final bool accepted = await _askConsentThen(
+        icon: SvgPicture.asset(
+          'assets/icons_zopiq/google_g.svg',
+          width: 20,
+          height: 20,
+        ),
+        label: 'Continue with Google',
+      );
       if (!accepted || !mounted) return;
       _acceptTerms();
     }
@@ -210,8 +220,11 @@ class _EmailPageState extends ConsumerState<EmailPage> {
   }
 
   /// The gate as a dialog. Returns true when the customer ticked the box and
-  /// pressed "Continue with Google"; false on every other exit.
-  Future<bool> _askConsentThenGoogle() async {
+  /// pressed the [label] button; false on every other exit.
+  Future<bool> _askConsentThen({
+    required Widget icon,
+    required String label,
+  }) async {
     // Local to the dialog, so backing out of it leaves this screen's own box
     // exactly as the customer left it — a dismissed dialog is not a decision.
     bool ticked = false;
@@ -260,12 +273,8 @@ class _EmailPageState extends ConsumerState<EmailPage> {
                     onPressed: ticked
                         ? () => Navigator.pop(dialogContext, true)
                         : null,
-                    icon: SvgPicture.asset(
-                      'assets/icons_zopiq/google_g.svg',
-                      width: 20,
-                      height: 20,
-                    ),
-                    label: const Text('Continue with Google'),
+                    icon: icon,
+                    label: Text(label),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
                       side: BorderSide(color: zc.divider),
@@ -312,6 +321,44 @@ class _EmailPageState extends ConsumerState<EmailPage> {
       }
     } finally {
       if (mounted) setState(() => _googleBusy = false);
+    }
+  }
+
+  /// Apple's path through the gate — [_onGooglePressed], step for step.
+  Future<void> _onApplePressed() async {
+    if (_busy) return;
+    if (!_gateOpen) {
+      final bool accepted = await _askConsentThen(
+        icon: const Icon(Icons.apple, size: 22),
+        label: 'Continue with Apple',
+      );
+      if (!accepted || !mounted) return;
+      _acceptTerms();
+    }
+    await _signInWithApple();
+  }
+
+  Future<void> _signInWithApple() async {
+    if (_busy || !_gateOpen) return;
+    setState(() {
+      _appleBusy = true;
+      _error = null;
+    });
+
+    try {
+      await ref.read(authControllerProvider.notifier).signInWithApple();
+      if (mounted) widget.onSignedIn();
+    } on AppleSignInCancelled {
+      // They closed the sheet. They know they closed the sheet.
+    } on AuthFailure catch (failure) {
+      // A SnackBar, for the reason [_signInWithGoogle] gives.
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(failure.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _appleBusy = false);
     }
   }
 
@@ -492,6 +539,21 @@ class _EmailPageState extends ConsumerState<EmailPage> {
                 ],
               ),
               const SizedBox(height: ZopiqSpacing.lg),
+              // iOS only. Guideline 4.8: an app offering Google sign-in on an
+              // iPhone must offer one that can keep the address private, and
+              // Apple's is the one that does. First, and Apple's own button,
+              // because the HIG asks for it to be at least as prominent as any
+              // other third-party option. Android has no such rule and no such
+              // button — its fallback is a browser flow nobody set up.
+              if (defaultTargetPlatform == TargetPlatform.iOS) ...<Widget>[
+                SignInWithAppleButton(
+                  onPressed: _busy ? null : _onApplePressed,
+                  text: 'Continue with Apple',
+                  height: 52,
+                  borderRadius: ZopiqRadii.rMd,
+                ),
+                const SizedBox(height: ZopiqSpacing.md),
+              ],
               OutlinedButton.icon(
                 // Live whether or not the box above is ticked — [_onGooglePressed]
                 // asks for consent in a dialog instead of refusing silently.

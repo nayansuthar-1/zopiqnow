@@ -42,6 +42,10 @@ abstract interface class AuthDataSource {
   /// user backs out of the sheet.
   Future<AuthUser> signInWithGoogle();
 
+  /// Signs in with an Apple ID, or throws [AppleSignInCancelled] if the user
+  /// backs out of the sheet. iOS only.
+  Future<AuthUser> signInWithApple();
+
   /// Writes the given profile fields and returns the updated user. A field left
   /// out is left alone — the transport cannot tell "unchanged" from "cleared",
   /// so it never has to: only what the caller names is written.

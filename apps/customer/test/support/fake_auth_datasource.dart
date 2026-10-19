@@ -111,6 +111,14 @@ class FakeAuthDataSource implements AuthDataSource {
     return _user = googleUser;
   }
 
+  static const AuthUser appleUser = AuthUser(
+    id: 'usr_apple',
+    email: 'apple@privaterelay.appleid.com',
+  );
+
+  @override
+  Future<AuthUser> signInWithApple() async => _user = appleUser;
+
   @override
   Future<AuthUser> saveProfile({
     String? fullName,
