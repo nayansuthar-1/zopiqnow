@@ -487,7 +487,9 @@ Repeat for rider and vendor.
 ### D5. TestFlight first
 
 Push all three to TestFlight internal testing and put them on real phones before
-submitting for review. The Android side is already in closed testing; matching
+submitting for review. **The Android app is live in production on Play** as of
+2026-10-19 (owner, superseding the "closed testing" claim this line used to
+make); matching
 that shape on iOS is the low-risk path.
 
 ---

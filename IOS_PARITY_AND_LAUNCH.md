@@ -44,11 +44,14 @@ exported.
 > were wrong and are fixed in place; the reasoning that produced them is in §1.1.
 > The short version: **nothing has a Swift error**, and the two `Secrets.xcconfig`
 > rows were read off the wrong machine.
+>
+> **Re-read live 2026-10-19**, the two rows below that move on their own. The
+> rest of the table was not re-checked and is a month old — read the files.
 
 | | customer | rider | vendor |
 |---|---|---|---|
-| Version committed on `main` **[Mac]** | `1.0.0+30` | `1.0.0+7` | `1.0.0+8` |
-| Highest build Apple holds **[Mac, live]** | **21** | none | none |
+| Version committed on `main` **[Mac]** | `1.0.0+30` — **`+31` staged but never committed; Apple already holds 31, so the next ship is 32** | `1.0.0+7` | `1.0.0+8` |
+| Highest build Apple holds **[live, 10-19]** | **31**, uploaded 10-03, `VALID`, internal TestFlight `IN_BETA_TESTING`. Version 1.0 is still `PREPARE_FOR_SUBMISSION` — **never submitted for review** | none | none |
 | `flutter build ios --release` **[Mac]** | ✅ signed, 57.8 MB | ⚠️ signing only | ⚠️ signing only |
 | Same build `--no-codesign` **[Mac]** | — | ✅ 46.8 MB | ✅ 29.1 MB |
 | Bundle id **[repo]** | `com.siteonlab.zopiqnow` | `com.siteonlab.zopiqRider` | `com.siteonlab.zopiqVendor` |
@@ -302,6 +305,43 @@ guideline requires. Gate it on `Platform.isIOS`.
   its client-ids list. A native-only flow needs no secret key; only the browser
   flow does.
 
+> ### ✅ Fixed 2026-10-19 — but read this, because the failure was invisible
+>
+> **Current value, read back from the API after the write:**
+>
+> ```
+> external_apple_client_id =
+>   com.siteonlab.zopiqnow,com.siteonlab.zopiqRider,com.siteonlab.zopiqVendor
+> ```
+>
+> **What it was until 2026-10-19**, with the provider enabled the whole time, so
+> nothing anywhere reported a problem:
+>
+> ```
+>   com.siteonlab.zopiqRider,com.siteonlab.zopiqVendor,com.siteonlab.zopiqRider
+> ```
+>
+> The rider twice, and **the customer — the app being submitted — not at all.**
+> Apple's native id token carries the *bundle id* as its audience, so GoTrue
+> refuses the token and the sign-in dies in the `AuthException` branch of
+> `signInWithApple` — the one whose comment already predicts this exact cause.
+> It fails silently as "Apple sign-in failed. Try again, or use your email.",
+> which is indistinguishable from a network problem.
+>
+> It mattered more than its size: Sign in with Apple exists **only** to satisfy
+> Guideline 4.8, and it is live in build 31 — so a reviewer tapping that button
+> would have met a dead end, and a 4.8 rejection on top of whatever else.
+>
+> **Nothing in the repo changed; it was one dashboard field** (Authentication →
+> Providers → Apple, or `PATCH .../config/auth`). **Verify by reading the field
+> back**, never by the save response — that is how this was found and how it was
+> confirmed fixed.
+>
+> ⚠️ **Still owed: one real Apple sign-in, by hand.** The field being right is
+> not the same as the flow working, and the remaining unknowns are downstream of
+> it — the capability on the App ID, and whether Supabase accepts the nonce
+> pairing in practice. Nobody has watched this succeed on a device or simulator.
+
 **One follow-on obligation.** Apple requires apps offering Sign in with Apple to
 **revoke the token when the account is deleted**. `deleteAccount()` exists
 (`auth_supabase_datasource.dart:267`) and does not do this. Not a first-review
@@ -421,12 +461,12 @@ starts.
 |---|---|---|---|
 | ~~1~~ | ~~Baseline build of all three~~ | — | **done 09-12, zero Swift errors** |
 | **0** | **Plug an iPhone into the Mac** (B0) | **you** | 7, 8, 9 — and the cheap fix for 4 |
-| 2a | Sign in with Apple: the Dart and the two pubspec lines, all three apps (§3.1) | Windows Claude | 2b |
-| 2b | Apple capability on 3 App IDs + 3 Xcode targets; Apple provider + 3 bundle ids in Supabase | **you** | submission |
+| ~~2a~~ | ~~Sign in with Apple: the Dart and the two pubspec lines~~ | — | **customer done, shipped in build 31. Rider and vendor still owed** |
+| ~~2b~~ | ~~Apple client ids in Supabase omit the customer~~ | — | **fixed 10-19, read back verified. One real Apple sign-in still unwatched** |
 | 3 | Copy `GOOGLE_IOS_CLIENT_ID` + URL scheme for rider and vendor, Windows → Mac; confirm both Maps keys are restricted and *Maps SDK for iOS* is on | you | Google sign-in, maps |
 | 3b | All three iOS client ids into Supabase's authorized client ids | you / Management API | Google sign-in |
 | 4 | Rider + vendor: App ID → distribution profile → manual-signing Release config → `ExportOptions.plist` (B2, five steps in order) | you + Mac Claude | their builds |
-| 5 | App Store Connect records for rider and vendor | **you**, web UI — the API cannot | their builds |
+| ~~5~~ | ~~App Store Connect records for rider and vendor~~ | — | **done — rider `6811392216`, vendor `6811392157`, both `PREPARE_FOR_SUBMISSION`, zero builds** |
 | 6 | Xcode capabilities on all three: Push, Background Modes (+ Location on rider), Time Sensitive Notifications | you, GUI | push and the ring |
 | 7 | Smoke-test all three on a real iPhone | Mac Claude + you | everything |
 | 8 | Walk the push chain to a device, killed-app case included | Mac Claude | push |

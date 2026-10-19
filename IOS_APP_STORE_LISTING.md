@@ -420,7 +420,9 @@ listing:
   the upload appears to have succeeded**. Bump the `+n` in
   `apps/customer/pubspec.yaml` for every upload, not every release.
 - **TestFlight before review.** Put the build on a real phone through TestFlight
-  first. The Android side is already in closed testing; matching that shape is
+  first. **The Android app has been live in production on Play since before
+  2026-10-19** (owner, superseding every "closed testing" line in these docs);
+  matching that shape is
   the low-risk path.
 
 ---
