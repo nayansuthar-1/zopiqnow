@@ -6,6 +6,9 @@
 node tool/ship_ios.mjs --check        # what is set up, what is missing
 node tool/ship_ios.mjs customer       # bump, build, upload, wait for processing
 node tool/ship_ios.mjs customer <group-id>   # …and hand it to a TestFlight group
+
+node tool/submit_ios.mjs customer            # what submitting would do — changes nothing
+node tool/submit_ios.mjs customer --submit   # submit for review, release on approval
 ```
 
 The iOS counterpart to `tool/ship.mjs`, and deliberately the same shape: bump the
@@ -59,9 +62,41 @@ changes that. New apps: App Store Connect → Apps → **+** → New App.
 **Write `ExportOptions.plist`.** Each app needs one at `apps/<app>/ios/` naming
 its provisioning profile. `customer` has one; it is the template.
 
-**Submit for review.** On purpose. A TestFlight build is reversible and a review
-submission is not, so that stays a decision rather than the last step of a
-successful build.
+**Submit for review.** Not as the last step of a build, on purpose — a TestFlight
+build is reversible and a review submission is not. It is a separate command,
+`tool/submit_ios.mjs`, described below.
+
+---
+
+## Submitting for review
+
+```bash
+node tool/submit_ios.mjs customer            # reports; changes nothing
+node tool/submit_ios.mjs customer --submit   # attaches, submits, releases on approval
+```
+
+The counterpart to `play_promote.mjs`, and the answer to "can Claude push the
+latest build to production without me". It **builds and uploads nothing**: it
+attaches the newest `VALID` build Apple already holds to the version record,
+sets the release to automatic on approval, and submits. So it runs straight
+after `ship_ios.mjs`, and needs no signing identity and no phone.
+
+The bare command reports and exits, and `--submit` is the whole difference.
+That asymmetry is deliberate for the same reason `play_promote.mjs` refuses
+production outright: a submission is answered by a person at Apple, and a
+rejection stays on the record.
+
+**It does not check your metadata, deliberately.** Screenshots, description,
+review notes and the App Privacy answers are all required, and Apple validates
+them at the moment of submission more accurately than any reimplementation of
+its rules. A missing screenshot surfaces as Apple's own sentence, naming the
+field. `IOS_APP_STORE_LISTING.md` is where those answers are written out.
+
+⚠️ **The `--submit` path has never been run.** Every read it performs is
+verified against the live API; the four writes — attach build, set release type,
+create the submission, submit it — are written from Apple's API reference and
+exercised by nothing. Expect to read one of Apple's own errors on the first run,
+and treat that as the tool working.
 
 ---
 

@@ -95,3 +95,34 @@ export async function api(path, cred) {
   }
   return body
 }
+
+/// One writing call against the API — POST or PATCH — returning parsed JSON.
+///
+/// Split from `api` rather than folded into it because the asymmetry is the
+/// point: a GET that goes wrong costs a retry, and a POST to
+/// `reviewSubmissions` that goes wrong puts a version in front of Apple's
+/// reviewers. Anything that calls this is doing something it cannot take back,
+/// and should read as though it is.
+///
+/// Apple answers a successful PATCH to a *relationship* with `204 No Content`,
+/// which `.json()` cannot parse — hence the empty-body case rather than a crash
+/// on the one call that is working correctly.
+export async function send(path, { method, body }, cred) {
+  const res = await fetch(`https://api.appstoreconnect.apple.com/${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token(cred)}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+  if (res.status === 204) return {}
+  const parsed = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const first = parsed.errors?.[0]
+    throw new Error(
+      first ? `${first.title} — ${first.detail}` : `HTTP ${res.status}`,
+    )
+  }
+  return parsed
+}
