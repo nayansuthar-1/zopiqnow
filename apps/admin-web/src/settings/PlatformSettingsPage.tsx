@@ -13,6 +13,7 @@ import {
   Field,
   PageBody,
   Pill,
+  Select,
   Toggle,
 } from '../ui/primitives'
 import { useToast } from '../ui/toast'
@@ -28,6 +29,17 @@ import { inr } from '../lib/money'
 ///
 /// Every field here says what it *means* rather than what it is called. A form
 /// of eight labelled numbers is a form somebody changes the wrong one on.
+
+/// The four slabs `admin_set_tax_settings` accepts, which are the four
+/// `menu_items.gst_rate_bps` is checked against. A free-text basis-point box on
+/// a tax rate is a form where 18 means 0.18%, and the mistake shows up on a
+/// numbered invoice rather than on the screen.
+const SLABS = [0, 500, 1200, 1800] as const
+
+/// Basis points as somebody reads them. All four slabs are whole percents.
+function slabLabel(bps: number): string {
+  return bps === 0 ? 'Nil (0%)' : `${bps / 100}%`
+}
 
 function Section({
   title,
@@ -64,6 +76,9 @@ export function PlatformSettingsPage() {
   /// One number rather than the row: nothing else on the delivery-fee table is
   /// editable, and `null` is the not-loaded-yet state the guard below reads.
   const [fee, setFee] = useState<number | null>(null)
+  /// The two GST rates. `food_slabs_in_use` rides along on the same row and is
+  /// read-only, so the edited copy carries the whole row and sends two fields.
+  const [tax, setTax] = useState<PlatformSettings['tax'] | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -72,6 +87,7 @@ export function PlatformSettingsPage() {
       setDispatch(next.dispatch)
       setSurcharge(next.surcharge)
       setFee(next.delivery.base_fee)
+      setTax(next.tax)
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -95,7 +111,7 @@ export function PlatformSettingsPage() {
     }
   }
 
-  if (!settings || !dispatch || !surcharge || fee === null) {
+  if (!settings || !dispatch || !surcharge || !tax || fee === null) {
     return (
       <>
         <PageHeader title="Platform settings" />
@@ -208,6 +224,103 @@ export function PlatformSettingsPage() {
                 : `Every customer sees ${inr(fee)} on the bill.`
             }
           />
+        </Section>
+
+        {/* ------------------------------------------------------------- */}
+        <Section
+          title="GST"
+          blurb={
+            <>
+              The two rates the platform charges itself. They apply to orders
+              placed after you save and never reach backwards: what a customer
+              was taxed is frozen on their order, and an invoice printed last
+              week prints the same today. The fees are <strong>tax-inclusive</strong>
+              {' '}&mdash; raising a rate changes how much of a{' '}
+              {inr(settings.delivery.base_fee)} delivery fee is tax, not what the
+              customer pays. Food is taxed per dish, below.
+            </>
+          }
+          footer={
+            <>
+              <Button
+                loading={busy === 'tax'}
+                onClick={() =>
+                  void save('tax', () =>
+                    api.setTaxSettings(
+                      tax.fee_gst_rate_bps,
+                      tax.packaging_gst_rate_bps,
+                    ),
+                  )
+                }
+              >
+                Save GST rates
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setTax(settings.tax)}
+                disabled={busy !== null}
+              >
+                Reset
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Select
+                label="GST inside a service fee"
+                value={String(tax.fee_gst_rate_bps)}
+                onChange={(e) =>
+                  setTax({ ...tax, fee_gst_rate_bps: Number(e.target.value) })
+                }
+                hint="Delivery, platform fee and the night and rain surcharge. 18% today."
+              >
+                {SLABS.map((bps) => (
+                  <option key={bps} value={bps}>
+                    {slabLabel(bps)}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                label="GST on packaging"
+                value={String(tax.packaging_gst_rate_bps)}
+                onChange={(e) =>
+                  setTax({
+                    ...tax,
+                    packaging_gst_rate_bps: Number(e.target.value),
+                  })
+                }
+                hint="Packaging is ancillary to the food it wraps, so it follows the food rate rather than the service rate. 5% today."
+              >
+                {SLABS.map((bps) => (
+                  <option key={bps} value={bps}>
+                    {slabLabel(bps)}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            {/* Not a third rate. Food is taxed at each dish's own slab, so the
+                honest thing to show here is which slabs the live menu is
+                actually on — and where to change one. */}
+            <p className="text-sm text-ink-muted">
+              <span className="font-medium text-ink">Food</span> is taxed per
+              dish, not here.{' '}
+              {tax.food_slabs_in_use.length === 0
+                ? 'No dish is on sale right now, so no food slab is in use.'
+                : `The menu on sale today sits on ${tax.food_slabs_in_use
+                    .map((s) => `${slabLabel(s.rate_bps)} (${s.items} dish${s.items === 1 ? '' : 'es'})`)
+                    .join(', ')}.`}{' '}
+              Change one on the dish itself, in a{' '}
+              <Link
+                to="/restaurants"
+                className="font-medium text-brand-ink underline"
+              >
+                restaurant's menu
+              </Link>
+              .
+            </p>
+          </div>
         </Section>
 
         {/* ------------------------------------------------------------- */}

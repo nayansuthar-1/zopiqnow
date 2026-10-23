@@ -599,6 +599,15 @@ export const api = {
   setDeliveryFee: (fee: number) =>
     rpc<string>('admin_set_delivery_fee', { p_fee: fee }),
 
+  /// The two platform-level GST rates (0168): the rate inside a service fee and
+  /// the rate on packaging. Basis points, and only the four real slabs. Food is
+  /// taxed per dish and is not here — the menu item dialog owns that.
+  setTaxSettings: (fee_gst_rate_bps: number, packaging_gst_rate_bps: number) =>
+    rpc<string>('admin_set_tax_settings', {
+      p_fee_gst_rate_bps: fee_gst_rate_bps,
+      p_packaging_gst_rate_bps: packaging_gst_rate_bps,
+    }),
+
   /// Arms or disarms 0085's payment-verification trigger. **On since
   /// 2026-08-29**, so the dangerous direction here is off — and off is a real
   /// need at three in the morning when verification is down and no order can be
@@ -1801,6 +1810,18 @@ export type PlatformSettings = {
   delivery: {
     id: number
     base_fee: number
+    updated_at: string
+  }
+  /// The two platform-level GST rates (0168). Basis points: 1800 is 18%.
+  ///
+  /// `food_slabs_in_use` is read-only and is not a third rate — food is taxed at
+  /// each dish's own slab, so the only true answer to "what is the food taxed
+  /// at" is which slabs the live menu actually sits on.
+  tax: {
+    id: number
+    fee_gst_rate_bps: number
+    packaging_gst_rate_bps: number
+    food_slabs_in_use: { rate_bps: number; items: number }[]
     updated_at: string
   }
   dispatch: {
