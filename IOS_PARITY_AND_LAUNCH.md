@@ -602,7 +602,7 @@ database, read on 2026-11-11:
    recomputes a kitchen's town on every row update using `area_for_point`,
    which only considers active towns — so the moment Sadri was paused, the
    statement-level re-sort trigger un-towned every Sadri kitchen, and
-   switching Sadri back on did not re-town them. **Fixed by migration 0169**
+   switching Sadri back on did not re-town them. **Fixed by migration 0171**
    (applied live): kitchens are placed by `town_for_point`, which ignores
    `is_active`; whether a *customer* is served still goes through
    `area_for_point`. All eleven real kitchens are back in their towns.

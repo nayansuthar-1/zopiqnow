@@ -1,4 +1,4 @@
--- 0169 — a paused town keeps its kitchens.
+-- 0171 — a paused town keeps its kitchens.
 --
 -- **The bug, found from an App Store rejection (2026-10-28, Guideline 2.1).**
 -- 0126 derives `restaurants.service_area_id` with `area_for_point`, which only
