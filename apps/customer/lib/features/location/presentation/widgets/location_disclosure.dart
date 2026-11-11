@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:zopiq_ui/zopiq_ui.dart';
 
@@ -21,7 +23,16 @@ import 'package:zopiq_ui/zopiq_ui.dart';
 /// declining, which is why the caller must treat false as "say nothing and stop"
 /// rather than as an error: they did not fail to give us a location, they
 /// declined to, and an error message would be an argument with their answer.
+///
+/// **Not shown on iOS.** App Review rejected build 31 under Guideline 5.1.1(iv):
+/// a custom message before the system prompt may not let the user close it and
+/// postpone the request, and the "Not now" below does exactly that. Apple's
+/// own dialog already carries the purpose string from `Info.plist`, so on iOS
+/// the tap goes straight to it. The sheet stays on Android, where Play requires
+/// it.
 Future<bool> showLocationDisclosure(BuildContext context) async {
+  if (Platform.isIOS) return true;
+
   final bool? accepted = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,

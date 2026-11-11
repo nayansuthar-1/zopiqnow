@@ -120,6 +120,54 @@ class HomeNoLocationView extends StatelessWidget {
   }
 }
 
+/// An address is set, and it is outside every town we serve.
+///
+/// Distinct from [HomeNoLocationView]: the customer has answered "where", and
+/// the honest reply is "not there yet", naming the towns we are in. Before this
+/// view existed an out-of-town pin fell through to "Where are we delivering?",
+/// which reads as the app having lost the address it was just given — the
+/// App Store reviewer, pinning Cupertino, filed it as a bug (2.1, build 31).
+class HomeOutOfAreaView extends StatelessWidget {
+  const HomeOutOfAreaView({
+    required this.headline,
+    required this.detail,
+    required this.onChangeLocation,
+    super.key,
+  });
+
+  /// Both from `delivery_area_check`, which names the live towns itself.
+  final String headline;
+  final String detail;
+  final VoidCallback onChangeLocation;
+
+  @override
+  Widget build(BuildContext context) {
+    final ZopiqColors zc = context.zc;
+    final TextTheme t = Theme.of(context).textTheme;
+
+    return _CenteredState(
+      children: <Widget>[
+        Icon(Icons.map_outlined, size: 56, color: zc.textMuted),
+        const SizedBox(height: ZopiqSpacing.lg),
+        Text(headline, style: t.titleMedium, textAlign: TextAlign.center),
+        const SizedBox(height: ZopiqSpacing.xs),
+        Text(
+          detail,
+          style: t.bodyMedium?.copyWith(color: zc.textMuted),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: ZopiqSpacing.xl),
+        ZopiqButton(
+          label: 'Change location',
+          icon: Icons.edit_location_alt_outlined,
+          expand: false,
+          onPressed: onChangeLocation,
+        ),
+      ],
+    );
+  }
+}
+
 /// The feed had restaurants, but the active filter chips excluded all of them.
 /// Distinct from [HomeEmptyView]: the fix here is the user's, not ours.
 class HomeNoMatchesView extends StatelessWidget {

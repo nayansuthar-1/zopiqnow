@@ -20,6 +20,7 @@ import 'package:zopiqnow/features/home/presentation/widgets/restaurant_card.dart
 import 'package:zopiqnow/features/home/presentation/widgets/restaurant_list_skeleton.dart';
 import 'package:zopiqnow/features/home/presentation/widgets/section_header.dart';
 import 'package:zopiqnow/features/location/domain/entities/address.dart';
+import 'package:zopiqnow/features/location/domain/entities/delivery_area.dart';
 import 'package:zopiqnow/features/location/presentation/providers/location_providers.dart';
 import 'package:zopiqnow/features/location/presentation/widgets/address_picker_sheet.dart';
 
@@ -326,10 +327,28 @@ class _RestaurantListSection extends ConsumerWidget {
           // sentences both make that claim.
           final Widget view;
           if (ref.watch(currentAreaIdProvider) == null) {
-            view = HomeNoLocationView(
-              onSetLocation: () =>
-                  withBottomNavHidden(ref, () => showAddressPicker(context)),
-            );
+            // No town can mean two things, and only one of them is "ask". An
+            // address outside every town we serve gets told so, with the towns
+            // named, rather than asked again for the address it just gave.
+            final Address? address = ref.watch(selectedAddressProvider);
+            final DeliveryAreaVerdict? verdict = address == null
+                ? null
+                : ref
+                      .watch(
+                        deliveryAreaProvider(
+                          (lat: address.latitude, lng: address.longitude),
+                        ),
+                      )
+                      .valueOrNull;
+            void pick() =>
+                withBottomNavHidden(ref, () => showAddressPicker(context));
+            view = verdict != null && !verdict.serviceable
+                ? HomeOutOfAreaView(
+                    headline: verdict.headline,
+                    detail: verdict.detail,
+                    onChangeLocation: pick,
+                  )
+                : HomeNoLocationView(onSetLocation: pick);
           } else {
             // An empty *filtered* feed is a different problem from an empty
             // area.

@@ -579,3 +579,89 @@ Two independent reasons, both recorded in `store/ios/screenshots/README.md`:
 the captures are 6.9" (1320×2868) while the live listing holds a **6.5"** set,
 and the content shows the test restaurant above. Regenerate after it is gone, at
 whatever size App Store Connect is actually asking for on the day.
+
+---
+
+## 8. App Review rejection of build 31 — 2026-10-28, and the resubmission
+
+Reviewed on an iPad Air 11" (M3), iPadOS 27.0.1, submission
+`40a3d9d6-04b7-40d0-b34c-5c4a4988a515`. Three guidelines. Each one's cause,
+and what was done about it, in the order of how much they matter.
+
+### 2.1(a) "after we selected a location on map, or the location already saved in the account, the app failed to locate services nearby"
+
+**Not an iOS bug, and not the reviewer's location.** Two things in the live
+database, read on 2026-11-11:
+
+1. **Every service area was `is_active = false`**, Sadri included. The audit
+   trail shows the owner toggling Sadri off → on → off between 17:42 and 17:54
+   UTC on 2026-10-27, the evening before review, and leaving it off. With no
+   active town, `area_for_point` answers null for *every* point on Earth — the
+   demo account's Sadri address included.
+2. **All twelve restaurants had `service_area_id = null`.** 0126's trigger
+   recomputes a kitchen's town on every row update using `area_for_point`,
+   which only considers active towns — so the moment Sadri was paused, the
+   statement-level re-sort trigger un-towned every Sadri kitchen, and
+   switching Sadri back on did not re-town them. **Fixed by migration 0169**
+   (applied live): kitchens are placed by `town_for_point`, which ignores
+   `is_active`; whether a *customer* is served still goes through
+   `area_for_point`. All eleven real kitchens are back in their towns.
+
+Plus one app-side fix in the same commit: an address outside every town used
+to fall through to "Where are we delivering?" — which is exactly what a
+reviewer pinning Cupertino saw and filed as "failed to locate services". The
+feed now shows `HomeOutOfAreaView`: the server's own "We'll be there soon /
+we're still only in Sadri, Falna…" sentence and a *Change location* button.
+
+**Still owed before resubmitting, and only the owner can do it:**
+
+- [ ] **Switch Sadri on** in the console (and Ranakpur, which shares its
+      catalogue). With every town off the resubmission is rejected again for
+      the same reason, whatever the code does. If the platform is meant to stay
+      paused for customers, it still has to be on for the duration of review.
+- [ ] **Hide "Sadri Test Restaurant"** (`40b06599…`, still `is_active`, ₹1
+      dishes). §7 flagged it; it is the first card a reviewer sees.
+- [ ] Sign in as `zopiqreview@yopmail.com` on the simulator and confirm the
+      feed is populated before uploading build 32.
+
+### 5.1.1(iv) the location pre-prompt had a "Not now"
+
+The Play prominent-disclosure sheet (`location_disclosure.dart`) let the user
+dismiss and postpone the system prompt. Apple forbids that. **Fixed:** the sheet
+no longer appears on iOS — the tap goes straight to the system dialog, whose
+purpose string is the `NSLocationWhenInUseUsageDescription` already in
+`Info.plist`. Android is unchanged; Play still requires the sheet there.
+
+### 5.1.2(i) the App Privacy labels claim tracking
+
+**No code change — a dashboard mistake.** App Store Connect → App Privacy has
+Phone Number, Email Address and Physical Address marked **"Used to track you"**.
+Nothing in the build tracks (no ad or analytics SDK; `PrivacyInfo.xcprivacy`
+says `NSPrivacyTracking = false`, and `IOS_APP_STORE_LISTING.md` §2 says to
+answer *No* to every tracking question). Untick **Tracking** for all three data
+types — Account Holder or Admin role required — and leave them as *Linked to
+you*, purpose *App Functionality*.
+
+### What to paste
+
+**Resolution Center reply** (send with the resubmission, same thread):
+
+> Thank you for the detailed review. All three items are addressed in build 32:
+>
+> **Guideline 2.1(a)** — This was a data fault on our side, not a device issue: on the day of review our only live service area (Sadri, Rajasthan, India) had been switched off in our admin console, so no address — including the demo account's saved one — resolved to a catalogue. It is switched on again and the restaurant-to-town mapping has been corrected. The app also now states clearly when a chosen location is outside our delivery towns and offers to change it, instead of showing an empty feed. Please note ZopiQ is a hyperlocal service for three small towns in Rajasthan; the demo account's saved address is inside Sadri and shows the full restaurant list.
+>
+> **Guideline 5.1.1(iv)** — The pre-permission message with the "Not now" option has been removed on iOS. Tapping "Use current location" now goes directly to the system location prompt.
+>
+> **Guideline 5.1.2(i)** — The app does not track users on any platform. The App Privacy information has been corrected in App Store Connect to reflect this (no data types are used for tracking), so App Tracking Transparency is not required.
+
+**Review Notes** (App Review Information → Notes):
+
+> ZopiQ delivers only within Sadri, Falna and Ranakpur in Rajasthan, India. Please use the demo account below; its saved delivery address ("Garasiya Bas, Sadri") is inside the service area and the home feed shows all restaurants and menus. If you select a different location, choose a point in Sadri, Rajasthan (around 25.186, 73.439); any location outside these towns will correctly show "We'll be there soon" with a Change location button. Sign-in is by email one-time code: the code for the demo account is readable at https://yopmail.com/?zopiqreview (inbox name: zopiqreview). Payment is UPI via Razorpay in test mode.
+
+**Asking for an expedited review:** there is no button for it in the
+rejection thread. After resubmitting, go to
+<https://developer.apple.com/contact/app-store/?topic=expedite>, pick the app,
+and give the reason — the honest one is a launch with signed restaurant
+partners waiting on the iOS listing. Apple grants these at its discretion and
+does not promise a time; a clean resubmission with a clear reply usually clears
+in 24–48 h on its own.
